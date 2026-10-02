@@ -28,6 +28,7 @@ log = logging.getLogger("front_desk")
 # Modules in build order. Each entry: (extension, privileged intents it needs).
 MODULES = [
     ("cogs.lfg", set()),
+    ("cogs.stats", {"members", "presences"}),  # game time; runs without them, gaming off
 ]
 
 PERMISSIONS = discord.Permissions(
@@ -44,24 +45,26 @@ PERMISSIONS = discord.Permissions(
     send_polls=True,
 )
 
-def build_intents() -> discord.Intents:
+def build_intents(privileged: bool = True) -> discord.Intents:
     """Only ask for the privileged intents that loaded modules need, so the bot
     still connects before they're switched on in the Developer Portal."""
     intents = discord.Intents.default()
-    for _, needs in MODULES:
-        for name in needs:
-            setattr(intents, name, True)
+    if privileged:
+        for _, needs in MODULES:
+            for name in needs:
+                setattr(intents, name, True)
     return intents
 
 
 class FrontDesk(commands.Bot):
-    def __init__(self, settings: config.Settings):
+    def __init__(self, settings: config.Settings, privileged: bool = True, sync: bool = True):
         super().__init__(
             command_prefix=commands.when_mentioned,
-            intents=build_intents(),
+            intents=build_intents(privileged),
             allowed_mentions=discord.AllowedMentions(everyone=False, roles=False, users=True),
         )
         self.settings = settings
+        self.sync_commands = sync
         self.guild_ref = discord.Object(id=settings.guild_id)
         self.db = Database(config.DATA_DIR / "front_desk.db")
 
@@ -72,9 +75,10 @@ class FrontDesk(commands.Bot):
         self.tree.on_error = self.on_app_command_error
         for extension, _ in MODULES:
             await self.load_extension(extension)
-        self.tree.copy_global_to(guild=self.guild_ref)
-        synced = await self.tree.sync(guild=self.guild_ref)
-        log.info("synced %d commands: %s", len(synced), ", ".join(c.name for c in synced))
+        if self.sync_commands:  # the fallback restart reuses the commands just synced
+            self.tree.copy_global_to(guild=self.guild_ref)
+            synced = await self.tree.sync(guild=self.guild_ref)
+            log.info("synced %d commands: %s", len(synced), ", ".join(c.name for c in synced))
 
     async def on_ready(self) -> None:
         if self.get_guild(self.settings.guild_id) is None:
@@ -84,8 +88,8 @@ class FrontDesk(commands.Bot):
             log.info("logged in as %s", self.user)
 
     async def close(self) -> None:
+        await super().close()  # unloads cogs and stops loops first
         await self.db.close()
-        await super().close()
 
     async def on_app_command_error(self, interaction: discord.Interaction,
                                    error: app_commands.AppCommandError) -> None:
@@ -144,7 +148,12 @@ def main() -> None:
 
     lock = single_instance_lock()  # noqa: F841 (held until exit)
     setup_logging()
-    FrontDesk(settings).run(settings.token, log_handler=None)
+    try:
+        FrontDesk(settings).run(settings.token, log_handler=None)
+    except discord.PrivilegedIntentsRequired:
+        log.warning("Server Members / Presence intents aren't enabled in the Developer Portal; "
+                    "running without them (game time is off until they are).")
+        FrontDesk(settings, privileged=False, sync=False).run(settings.token, log_handler=None)
 
 
 if __name__ == "__main__":

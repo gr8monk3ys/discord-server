@@ -40,6 +40,33 @@ MIGRATIONS = [
         # Backstop for "one open post per host per game".
         "CREATE UNIQUE INDEX lfg_one_open_per_game ON lfg_posts (host_id, game) WHERE closed_at IS NULL",
     ],
+    [
+        # Module 2: stats. Counts and durations only, never message text.
+        """CREATE TABLE voice_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        channel_id INTEGER NOT NULL,
+        start INTEGER NOT NULL,
+        "end" INTEGER
+    )""",
+        'CREATE INDEX voice_sessions_open ON voice_sessions (user_id, "end")',
+        'CREATE INDEX voice_sessions_time ON voice_sessions (start, "end")',
+        """CREATE TABLE game_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        game TEXT NOT NULL,
+        start INTEGER NOT NULL,
+        "end" INTEGER
+    )""",
+        'CREATE INDEX game_sessions_open ON game_sessions (user_id, "end")',
+        'CREATE INDEX game_sessions_time ON game_sessions (start, "end")',
+        """CREATE TABLE message_counts (
+        user_id INTEGER NOT NULL,
+        day TEXT NOT NULL,
+        count INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (user_id, day)
+    )""",
+    ],
 ]
 
 
