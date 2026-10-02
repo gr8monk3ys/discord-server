@@ -18,13 +18,9 @@ import discord
 from dotenv import load_dotenv
 
 import layout
+from names import slug
 
 sys.stdout.reconfigure(encoding="utf-8")
-
-
-def slug(name: str) -> str:
-    """'💬・general' -> 'general', '🎮 Squad I' -> 'squadi'."""
-    return re.sub(r"[^a-z0-9]+", "", name.lower())
 
 
 def find(items, spec):
