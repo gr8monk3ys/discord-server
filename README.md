@@ -85,3 +85,43 @@ in `layout.ROLES`, and every bot gets `@Bots` so they're grouped in the member l
 - Kick the bot. It doesn't need to stay, and Admin bots sitting around are a risk.
 - Reset the bot token in the portal if you shared `.env` anywhere.
 - Optional: set `ICON_PATH` in `layout.py` to a square image for the server icon.
+
+## 3. Front Desk bot (`bot/`)
+
+The setup scripts were a one-shot run. `bot/` is a **persistent** bot that runs while your
+PC is on. It uses the same Front Desk app and token, re-invited **without** Administrator.
+Design: `docs/superpowers/specs/2026-10-01-front-desk-bot-design.md`.
+
+Built so far: **Squad-up** (`/lfg`). Still to come: stats and leaderboards, clip of the
+week, and coins and mini-games.
+
+**One-time setup**
+
+1. Install the extra packages into the shared virtualenv:
+   `server\.venv\Scripts\pip install -r bot\requirements.txt`
+2. Print the invite link with `server\.venv\Scripts\python bot\main.py --invite`, open it, and
+   authorize. It asks only for the permissions the bot uses.
+3. Server Settings → Roles: drag **Front Desk** above **Squad**.
+
+Later modules also need **Server Members**, **Message Content** and **Presence**, switched on
+under Developer Portal → your app → Bot → Privileged Gateway Intents. Squad-up needs none of
+them.
+
+**Run it**
+
+Double-click `bot\run_bot.bat`, or run it from a terminal. Logs go to `bot\data\bot.log`, and
+the database is `bot\data\front_desk.db`. Back that file up if you care about the stats.
+
+To start the bot when you log in, open Task Scheduler → Create Basic Task → "When I log on"
+→ Start a program → `bot\run_bot.bat`, with "Start in" set to the `bot` folder.
+
+**Tests:** `cd bot`, then `..\server\.venv\Scripts\python -m pytest`
+
+**Squad-up checklist** (do it once on the live server)
+
+- [ ] `/lfg game:Valorant players:2` creates a post in 🎮・lfg, tagged Valorant, pinging @Valorant and @LFG.
+- [ ] A second account clicks **Join**. The embed shows `2 / 2`, Join turns off, and "Squad's full" pings both people.
+- [ ] That account clicks **Leave**. The post shows `1 / 2` and Join turns back on.
+- [ ] Running `/lfg game:Valorant players:4 when:9pm` again updates the same post instead of making a new one.
+- [ ] **Close** from the second account is refused. From the host, it closes the post (`✓` title, locked, buttons off).
+- [ ] Restart the bot, then click Join on an open post. It still works.

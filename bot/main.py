@@ -16,6 +16,7 @@ from discord.ext import commands
 
 import config
 from db import Database
+from errors import reply_error
 
 sys.stdout.reconfigure(encoding="utf-8")
 log = logging.getLogger("front_desk")
@@ -38,9 +39,6 @@ PERMISSIONS = discord.Permissions(
     manage_roles=True,
     send_polls=True,
 )
-
-ERROR_REPLY = "That didn't work. Lorenzo, check bot.log."
-
 
 def build_intents() -> discord.Intents:
     """Only ask for the privileged intents that loaded modules need, so the bot
@@ -89,16 +87,6 @@ class FrontDesk(commands.Bot):
                                    error: app_commands.AppCommandError) -> None:
         log.error("/%s failed", interaction.command.name if interaction.command else "?", exc_info=error)
         await reply_error(interaction)
-
-
-async def reply_error(interaction: discord.Interaction, text: str = ERROR_REPLY) -> None:
-    try:
-        if interaction.response.is_done():
-            await interaction.followup.send(text, ephemeral=True)
-        else:
-            await interaction.response.send_message(text, ephemeral=True)
-    except discord.HTTPException:
-        pass
 
 
 def app_id_from_token(token: str) -> int:

@@ -33,7 +33,7 @@ breaks if a module is disabled. They just have less to show.
 
 | Decision | Choice | Why |
 |---|---|---|
-| Language | Python 3.12+, discord.py ≥ 2.4 | Matches the existing scripts, `.venv` and `layout.py` |
+| Language | Python 3.11+, discord.py ≥ 2.4, `tzdata` on Windows | Matches the existing scripts, `.venv` and `layout.py` |
 | Location | `bot/` in this repo | Reuses `server/layout.py` and `server/.env` |
 | Bot app | Reuse the existing "Front Desk" application and token | Already exists; Lorenzo re-invites it with the link below |
 | Storage | SQLite `bot/data/front_desk.db` via `aiosqlite`, WAL mode | No server to install; one file to back up |
