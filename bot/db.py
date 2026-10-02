@@ -9,12 +9,13 @@ from pathlib import Path
 import aiosqlite
 
 # Append only: never edit a migration that has shipped, add a new one.
+# Each migration is a list of single SQL statements (no splitting on ";").
 MIGRATIONS = [
-    """
-    CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
-    CREATE TABLE jobs (key TEXT PRIMARY KEY, done_at INTEGER NOT NULL);
-    CREATE TABLE privacy_optout (user_id INTEGER PRIMARY KEY, at INTEGER NOT NULL);
-    CREATE TABLE lfg_posts (
+    [
+        "CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT)",
+        "CREATE TABLE jobs (key TEXT PRIMARY KEY, done_at INTEGER NOT NULL)",
+        "CREATE TABLE privacy_optout (user_id INTEGER PRIMARY KEY, at INTEGER NOT NULL)",
+        """CREATE TABLE lfg_posts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         thread_id INTEGER,
         message_id INTEGER,
@@ -26,15 +27,19 @@ MIGRATIONS = [
         note TEXT,
         created_at INTEGER NOT NULL,
         closed_at INTEGER
-    );
-    CREATE INDEX lfg_posts_open ON lfg_posts (closed_at, host_id, game);
-    CREATE TABLE lfg_members (
+    )""",
+        "CREATE INDEX lfg_posts_open ON lfg_posts (closed_at, host_id, game)",
+        """CREATE TABLE lfg_members (
         post_id INTEGER NOT NULL REFERENCES lfg_posts (id) ON DELETE CASCADE,
         user_id INTEGER NOT NULL,
         joined_at INTEGER NOT NULL,
         PRIMARY KEY (post_id, user_id)
-    );
-    """,
+    )""",
+    ],
+    [
+        # Backstop for "one open post per host per game".
+        "CREATE UNIQUE INDEX lfg_one_open_per_game ON lfg_posts (host_id, game) WHERE closed_at IS NULL",
+    ],
 ]
 
 
@@ -80,9 +85,9 @@ class Database:
         """Apply pending migrations; returns the schema version."""
         async with self.conn.execute("PRAGMA user_version") as cur:
             (version,) = await cur.fetchone()
-        for number, sql in enumerate(MIGRATIONS[version:], start=version + 1):
+        for number, statements in enumerate(MIGRATIONS[version:], start=version + 1):
             async with self.transaction() as tx:
-                for statement in filter(str.strip, sql.split(";")):
+                for statement in statements:
                     await tx.execute(statement)
                 await tx.execute(f"PRAGMA user_version = {number}")
             version = number

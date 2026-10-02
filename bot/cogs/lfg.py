@@ -76,6 +76,7 @@ class Lfg(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.ready = False
+        self.resolved = False  # False until the first resolve(): still starting up
         self.forum: discord.ForumChannel | None = None
         self.game_tags: dict[str, discord.ForumTag] = {}
         self.mode_tags: dict[str, discord.ForumTag] = {}
@@ -97,17 +98,40 @@ class Lfg(commands.Cog):
     async def on_ready(self) -> None:
         self.resolve()
 
+    # Names can change while the bot runs: re-resolve on any channel or role change.
     @commands.Cog.listener()
     async def on_guild_channel_update(self, before, after) -> None:
-        if self.forum is not None and after.id == self.forum.id:
-            self.resolve()  # tags may have changed
+        self.resolve()
+
+    @commands.Cog.listener()
+    async def on_guild_channel_create(self, channel) -> None:
+        self.resolve()
+
+    @commands.Cog.listener()
+    async def on_guild_channel_delete(self, channel) -> None:
+        self.resolve()
+
+    @commands.Cog.listener()
+    async def on_guild_role_create(self, role) -> None:
+        self.resolve()
+
+    @commands.Cog.listener()
+    async def on_guild_role_update(self, before, after) -> None:
+        self.resolve()
+
+    @commands.Cog.listener()
+    async def on_guild_role_delete(self, role) -> None:
+        self.resolve()
 
     def resolve(self) -> None:
-        """Find the forum, tags, roles and voice channels by name; log what's missing."""
+        """Find the forum, tags, roles and voice channels by name; log what's missing.
+        Rebuilds everything from scratch so deleted tags/roles are never reused."""
         guild = self.bot.get_guild(self.bot.settings.guild_id)
         if guild is None:
             self.ready = False
             return
+        self.resolved = True
+        self.game_tags, self.mode_tags, self.game_roles, self.voice = {}, {}, {}, {}
         self.forum = config.match_by_name(guild.forums, config.LFG_FORUM)
         if self.forum is None:
             self.ready = False
@@ -142,6 +166,8 @@ class Lfg(commands.Cog):
             missing.append(f"role @{config.LFG_ROLE}")
         if missing:
             log.warning("LFG works, but these weren't found (pings/tags skipped): %s", ", ".join(missing))
+        if not self.ready:
+            log.info("LFG ready in #%s", self.forum.name)
         self.ready = True
 
     def is_keeper(self, member: discord.Member) -> bool:
@@ -190,7 +216,11 @@ class Lfg(commands.Cog):
     def tags_for(self, game_key: str, mode: str | None) -> list[discord.ForumTag]:
         return [t for t in (self.game_tags.get(game_key), self.mode_tags.get(mode)) if t]
 
-    async def fetch_thread(self, thread_id: int) -> discord.Thread | None:
+    async def fetch_thread(self, thread_id: int | None) -> discord.Thread | None:
+        """The thread, or None if it's gone. Other API errors (5xx) propagate so
+        callers can retry later instead of treating them as 'deleted'."""
+        if thread_id is None:
+            return None
         guild = self.bot.get_guild(self.bot.settings.guild_id)
         thread = guild.get_thread(thread_id) if guild else None
         if thread is None:
@@ -220,32 +250,34 @@ class Lfg(commands.Cog):
         note: app_commands.Range[str, 1, 200] | None = None,
     ) -> None:
         if not self.ready:
-            await interaction.response.send_message(
-                f"Squad-up isn't available: I couldn't find the {config.LFG_FORUM} forum.", ephemeral=True)
+            text = (f"Squad-up isn't available: I couldn't find the {config.LFG_FORUM} forum."
+                    if self.resolved else "I'm still starting up. Try again in a few seconds.")
+            await interaction.response.send_message(text, ephemeral=True)
             return
         await interaction.response.defer(ephemeral=True, thinking=True)
         g = config.game_by_key(game.value)
         mode_value = mode.value if mode else None
         host = interaction.user
 
-        existing = await self.bot.db.fetchone(
-            "SELECT * FROM lfg_posts WHERE host_id = ? AND game = ? AND closed_at IS NULL",
-            (host.id, g.key),
-        )
-        if existing:
-            await self.update_post(interaction, existing, players, mode_value, when, note)
-            return
-
         created = now()
+        # Check-and-insert in one transaction, so a double submit can't make two posts.
         async with self.bot.db.transaction() as tx:
-            cur = await tx.execute(
-                "INSERT INTO lfg_posts (game, host_id, size, mode, when_text, note, created_at)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (g.key, host.id, players, mode_value, when, note, created),
+            existing = await tx.fetchone(
+                "SELECT * FROM lfg_posts WHERE host_id = ? AND game = ? AND closed_at IS NULL",
+                (host.id, g.key),
             )
-            post_id = cur.lastrowid
-            await tx.execute("INSERT INTO lfg_members VALUES (?, ?, ?)", (post_id, host.id, created))
-            post = await tx.fetchone("SELECT * FROM lfg_posts WHERE id = ?", (post_id,))
+            if existing is None:
+                cur = await tx.execute(
+                    "INSERT INTO lfg_posts (game, host_id, size, mode, when_text, note, created_at)"
+                    " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (g.key, host.id, players, mode_value, when, note, created),
+                )
+                post_id = cur.lastrowid
+                await tx.execute("INSERT INTO lfg_members VALUES (?, ?, ?)", (post_id, host.id, created))
+                post = await tx.fetchone("SELECT * FROM lfg_posts WHERE id = ?", (post_id,))
+        if existing is not None:
+            await self.update_post(interaction, existing["id"], players, mode_value, when, note)
+            return
 
         roster = Roster.new(host.id, players)
         try:
@@ -266,43 +298,60 @@ class Lfg(commands.Cog):
         )
         await interaction.followup.send(f"Posted: {made.thread.jump_url}", ephemeral=True)
 
-    async def update_post(self, interaction, post, players, mode, when, note) -> None:
+    async def update_post(self, interaction, post_id: int, players, mode, when, note) -> None:
         """Re-running /lfg for a game you already have open edits that post."""
+        async with self.bot.db.transaction() as tx:
+            post = await tx.fetchone("SELECT * FROM lfg_posts WHERE id = ?", (post_id,))
+            roster = await self.load_roster(tx, post)
+            resized = roster.resize(players)
+            if post["thread_id"] is None:
+                result = "creating"
+            elif resized is None:
+                result = "too_small"
+            else:
+                result = "ok"
+                await tx.execute(
+                    "UPDATE lfg_posts SET size = ?, mode = ?, when_text = ?, note = ? WHERE id = ?",
+                    (players, mode, when, note, post_id),
+                )
+                post = await tx.fetchone("SELECT * FROM lfg_posts WHERE id = ?", (post_id,))
         game = config.game_by_key(post["game"])
-        roster = await self.load_roster(self.bot.db, post)
-        resized = roster.resize(players)
-        if resized is None:
+        if result == "creating":
+            await interaction.followup.send("Your post is still being created. Give it a second.", ephemeral=True)
+            return
+        if result == "too_small":
             await interaction.followup.send(
                 f"Your {game.role} squad already has {len(roster.members)} people, "
                 f"so pick at least {len(roster.members)}.", ephemeral=True)
             return
-        await self.bot.db.execute(
-            "UPDATE lfg_posts SET size = ?, mode = ?, when_text = ?, note = ? WHERE id = ?",
-            (players, mode, when, note, post["id"]),
-        )
-        post = await self.get_post(post["id"])
+
         thread = await self.fetch_thread(post["thread_id"])
-        if thread is None:
-            await self.bot.db.execute("UPDATE lfg_posts SET closed_at = ? WHERE id = ?", (now(), post["id"]))
+        try:
+            if thread is None:
+                raise LookupError
+            await thread.get_partial_message(post["message_id"]).edit(
+                embed=self.render(post, resized), view=build_view(post_id, resized, closed=False))
+        except (LookupError, discord.NotFound):
+            # The thread or its starter message was deleted: retire the post.
+            await self.bot.db.execute("UPDATE lfg_posts SET closed_at = ? WHERE id = ?", (now(), post_id))
             await interaction.followup.send("Your old post was deleted, so run /lfg again for a new one.",
                                             ephemeral=True)
             return
-        message = thread.get_partial_message(post["message_id"])
-        await message.edit(embed=self.render(post, resized), view=build_view(post["id"], resized, closed=False))
         if rules.title(game.role, mode) != thread.name:
             # Mode changed: the one case that renames (rare, so the rate limit doesn't bite).
             await thread.edit(name=rules.title(game.role, mode), applied_tags=self.tags_for(game.key, mode))
         await interaction.followup.send(f"Updated your {game.role} post: {thread.jump_url}", ephemeral=True)
+        if resized.full and not roster.full:
+            await self.announce_full(thread, post_id, resized)
 
     # ------------------------------------------------------------ buttons
     async def handle_button(self, interaction: discord.Interaction, action: str, post_id: int) -> None:
-        post = await self.get_post(post_id)
-        if post is None or post["closed_at"] is not None:
-            await interaction.response.send_message("This squad is closed.", ephemeral=True)
-            return
         user = interaction.user
-
         if action == "close":
+            post = await self.get_post(post_id)
+            if post is None or post["closed_at"] is not None:
+                await interaction.response.send_message("This squad is closed.", ephemeral=True)
+                return
             if not rules.can_close(user.id, post["host_id"], self.is_keeper(user)):
                 await interaction.response.send_message("Only the host or a Keeper can close this.",
                                                         ephemeral=True)
@@ -311,20 +360,27 @@ class Lfg(commands.Cog):
             await self.close_post(post)
             return
 
+        # Read the post inside the transaction: a Close or resize that lands
+        # first must be seen, or a join could reopen a closed post or overfill.
         became_full = False
+        reply = None
         async with self.bot.db.transaction() as tx:
-            roster = await self.load_roster(tx, post)
-            if action == "join":
-                roster, result, became_full = roster.join(user.id)
-                reply = JOIN_REPLIES.get(result)
-                if result is Join.JOINED:
-                    await tx.execute("INSERT INTO lfg_members VALUES (?, ?, ?)", (post_id, user.id, now()))
+            post = await tx.fetchone("SELECT * FROM lfg_posts WHERE id = ?", (post_id,))
+            if post is None or post["closed_at"] is not None:
+                reply = "This squad is closed."
             else:
-                roster, result = roster.leave(user.id)
-                reply = LEAVE_REPLIES.get(result)
-                if result is Leave.LEFT:
-                    await tx.execute("DELETE FROM lfg_members WHERE post_id = ? AND user_id = ?",
-                                     (post_id, user.id))
+                roster = await self.load_roster(tx, post)
+                if action == "join":
+                    roster, result, became_full = roster.join(user.id)
+                    reply = JOIN_REPLIES.get(result)
+                    if result is Join.JOINED:
+                        await tx.execute("INSERT INTO lfg_members VALUES (?, ?, ?)", (post_id, user.id, now()))
+                else:
+                    roster, result = roster.leave(user.id)
+                    reply = LEAVE_REPLIES.get(result)
+                    if result is Leave.LEFT:
+                        await tx.execute("DELETE FROM lfg_members WHERE post_id = ? AND user_id = ?",
+                                         (post_id, user.id))
 
         if reply:
             await interaction.response.send_message(reply, ephemeral=True)
@@ -332,43 +388,76 @@ class Lfg(commands.Cog):
         await interaction.response.edit_message(embed=self.render(post, roster),
                                                 view=build_view(post_id, roster, closed=False))
         if became_full:
-            await self.announce_full(interaction.channel, roster)
+            await self.announce_full(interaction.channel, post_id, roster)
 
-    async def announce_full(self, thread, roster: Roster) -> None:
+    async def announce_full(self, thread, post_id: int, roster: Roster) -> None:
+        """Ping the squad. Failures are logged, not shown: the join itself worked."""
         voice = self.voice.get(rules.voice_hint(roster.size))
         where = f", hop in {voice.mention}" if voice else ""
         mentions = " ".join(f"<@{uid}>" for uid in roster.members)
-        await thread.send(f"Squad's full: {mentions}{where}", allowed_mentions=PING_USERS)
-        # Module 4 hooks in here to pay each member (ref lfg:<post>:<user>).
-        self.bot.dispatch("lfg_squad_full", thread, roster)
+        try:
+            await thread.send(f"Squad's full: {mentions}{where}", allowed_mentions=PING_USERS)
+        except discord.HTTPException:
+            log.warning("couldn't announce full squad for LFG post %s", post_id, exc_info=True)
+        # Module 4 pays each member on this (ref lfg:<post>:<user>, so a refill pays once).
+        self.bot.dispatch("lfg_squad_full", post_id, roster)
 
     # ------------------------------------------------------------ closing
     async def close_post(self, post) -> None:
+        """Mark closed, then turn the buttons off, then lock + archive + rename.
+        Each Discord step is tried on its own, so one failure doesn't skip the rest.
+        A transient API error re-opens the row so the expiry job retries it."""
+        post_id = post["id"]
         changed = await self.bot.db.execute(
-            "UPDATE lfg_posts SET closed_at = ? WHERE id = ? AND closed_at IS NULL", (now(), post["id"]))
+            "UPDATE lfg_posts SET closed_at = ? WHERE id = ? AND closed_at IS NULL", (now(), post_id))
         if not changed:
             return  # someone else closed it first
-        thread = await self.fetch_thread(post["thread_id"]) if post["thread_id"] else None
-        if thread is None:
-            return
-        roster = await self.load_roster(self.bot.db, post)
         try:
-            # Turn the buttons off before archiving: archived threads can't be edited.
-            await thread.get_partial_message(post["message_id"]).edit(
-                embed=self.render(post, roster, closed=True), view=build_view(post["id"], roster, closed=True))
-            await thread.edit(name=rules.closed_title(thread.name), locked=True, archived=True)
+            thread = await self.fetch_thread(post["thread_id"])
         except discord.HTTPException:
-            log.warning("couldn't fully close LFG post %s (thread %s)", post["id"], post["thread_id"], exc_info=True)
+            await self.reopen(post_id, "fetching the thread")
+            return
+        if thread is None:
+            return  # deleted: nothing left to tidy
+        roster = await self.load_roster(self.bot.db, post)
+
+        if getattr(thread, "archived", False):
+            # Auto-archived while the PC was off: archived threads can't be edited.
+            try:
+                await thread.edit(archived=False)
+            except discord.HTTPException:
+                log.warning("couldn't unarchive LFG thread %s", thread.id, exc_info=True)
+        try:
+            await thread.get_partial_message(post["message_id"]).edit(
+                embed=self.render(post, roster, closed=True), view=build_view(post_id, roster, closed=True))
+        except discord.HTTPException:
+            log.warning("couldn't disable buttons on LFG post %s", post_id, exc_info=True)
+        try:
+            await thread.edit(name=rules.closed_title(thread.name), locked=True, archived=True)
+        except discord.NotFound:
+            pass
+        except discord.HTTPException:
+            await self.reopen(post_id, "locking the thread")
+
+    async def reopen(self, post_id: int, step: str) -> None:
+        log.warning("closing LFG post %s failed while %s; will retry", post_id, step, exc_info=True)
+        await self.bot.db.execute("UPDATE lfg_posts SET closed_at = NULL WHERE id = ?", (post_id,))
 
     @tasks.loop(minutes=5)
     async def expiry(self) -> None:
+        current = now()
         try:
-            current = now()
-            for post in await self.bot.db.fetchall("SELECT * FROM lfg_posts WHERE closed_at IS NULL"):
-                if rules.is_expired(post["created_at"], current):
-                    await self.close_post(post)
+            posts = await self.bot.db.fetchall("SELECT * FROM lfg_posts WHERE closed_at IS NULL")
         except Exception:
             log.exception("LFG expiry check failed")
+            return
+        for post in posts:
+            if not rules.is_expired(post["created_at"], current):
+                continue
+            try:
+                await self.close_post(post)
+            except Exception:
+                log.exception("couldn't expire LFG post %s", post["id"])
 
     @expiry.before_loop
     async def before_expiry(self) -> None:
@@ -377,3 +466,4 @@ class Lfg(commands.Cog):
 
 async def setup(bot) -> None:
     await bot.add_cog(Lfg(bot))
+

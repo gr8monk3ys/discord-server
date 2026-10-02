@@ -18,7 +18,10 @@ import config
 from db import Database
 from errors import reply_error
 
+# Logs go to stderr; emoji in channel names break the Windows codepage when
+# output is redirected (Task Scheduler, > file).
 sys.stdout.reconfigure(encoding="utf-8")
+sys.stderr.reconfigure(encoding="utf-8")
 log = logging.getLogger("front_desk")
 
 # Modules in build order. Each entry: (extension, privileged intents it needs).
