@@ -1,7 +1,13 @@
-# Discord makeover: Field Notebook
+# discord-server
 
-Your Discord client and server, restyled to match lscaturchio.xyz: night or
-paper ground, forest-green ink, Fraunces headings, and IBM Plex Mono wall labels.
+Everything for Lorenzo's Server in one place:
+
+1. **Client theme**: the Field Notebook look, matching lscaturchio.xyz. Night or paper
+   ground, forest-green ink, Fraunces headings and IBM Plex Mono wall labels.
+2. **Server setup** (`server/`): roles, channels, Onboarding and AutoMod as code.
+3. **Front Desk** (`bot/`): the server's own bot, with squad-up, stats and more.
+
+Roadmap and design: `docs/superpowers/specs/2026-10-01-front-desk-bot-design.md`.
 
 ## 1. Client theme (`theme/field-notebook.theme.css`)
 

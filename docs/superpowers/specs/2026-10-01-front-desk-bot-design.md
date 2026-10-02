@@ -273,6 +273,66 @@ starts**, so the same coins can't be spent in two games at once.
     and `prediction_bets(prediction_id, user_id, option, amount, at, PRIMARY KEY(prediction_id, user_id))`.
     One bet per person; betting again adds to the same option, and switching sides isn't allowed.
 
+## Roadmap: modules 5–8 (added 2026-10-02)
+
+Lorenzo chose these after modules 1 and 2 shipped. Each one gets its own detailed design
+pass before it's built. Status: modules 1–2 are live, and 3 and up are not built yet.
+
+### Module 5: Join-to-create voice
+
+- A voice channel `➕ New Squad` in 05 · voice. When someone joins it, the bot creates a voice
+  channel in the same category named after what they're playing (presence) or `🎮 <name>'s squad`,
+  and moves them into it.
+- The creator owns the channel and can rename it or set a limit with `/squad name` and
+  `/squad limit`. If the owner leaves, ownership passes to the next person in it.
+- The channel is deleted 30 seconds after it empties. On startup, the bot deletes any empty
+  channels it made earlier (`temp_voice(channel_id, owner_id, created_at)`).
+- The existing 🎮 Squad and 🔊 Lobby stay. Temp channels count in voice stats like any other channel.
+- Needs Manage Channels and Move Members (add to `PERMISSIONS`, re-invite).
+
+### Module 6: Hall of fame (starboard)
+
+- When a message gets **3 ⭐** reactions (a constant), from people other than its author, the
+  bot reposts it as an embed in a new `⭐・hall-of-fame` channel. The embed has the author,
+  text, first image, and a jump link. The star count updates as stars change.
+- `starboard(message_id PRIMARY KEY, board_message_id, stars)`. Each message is posted once.
+  If it drops below the threshold, the post stays and just shows the count.
+- Skips staff channels, NSFW channels and bot messages.
+- Needs the Message Content intent to copy text (same switch as module 3).
+- The channel is added to `layout.py`, read-only for members.
+
+### Module 7: Game nights + free games
+
+- `/gamenight game when note` creates a native Discord scheduled event in 🎮 Squad (or 🔊 Lobby
+  for big groups). Discord's own "Interested" button is the RSVP.
+- 15 minutes before it starts, the bot pings everyone marked Interested in the game's channel.
+  This is a job in the existing scheduler, with ref `gamenight:<event_id>` so it pings once.
+- **Free games:** every Thursday at 18:00 (Epic's weekly rotation), the bot posts free-to-keep
+  PC games in 🕹️・gaming from the GamerPower API (`/api/giveaways?type=game&platform=epic-games-store,steam`,
+  free and keyless). It never posts the same giveaway twice (`free_games(id)` table) and says
+  nothing if the API is down.
+- Needs the Manage Events permission.
+
+### Module 8: Server config snapshot
+
+- `server/snapshot_server.py` (read-only, using the same token) writes the live server's roles
+  (order, colour, permissions as names), categories, channels (type, topic, slowmode,
+  permission overwrites by role name), Onboarding, AutoMod rules and the welcome screen. They go to
+  `server/snapshot/*.yaml`, sorted and stable, so `git diff` shows exactly what changed.
+- It's run by hand, or weekly by the bot, which writes the files without committing. Lorenzo
+  commits snapshots he wants to keep.
+- Later: `--compare` lists the differences between the snapshot and `layout.py`, to catch
+  drift from manual edits.
+
+### Build order
+
+**8 → 6 → 3 → 5 → 7 → 4a → 4b.**
+- **8 first:** it's small and read-only, and it records a baseline before more automation
+  starts changing the server.
+- **6 and 3 next:** both need the Message Content intent and both work with posts.
+- **5 and 7 next:** both need new permissions, so one re-invite covers them.
+- **The economy last:** it pays out for everything above.
+
 ## Running it
 
 1. In the Developer Portal, Lorenzo turns on the three privileged intents for Front Desk.
