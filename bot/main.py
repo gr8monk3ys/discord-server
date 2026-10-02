@@ -19,9 +19,10 @@ from db import Database
 from errors import reply_error
 
 # Logs go to stderr; emoji in channel names break the Windows codepage when
-# output is redirected (Task Scheduler, > file).
-sys.stdout.reconfigure(encoding="utf-8")
-sys.stderr.reconfigure(encoding="utf-8")
+# output is redirected. Under pythonw (the startup task) there is no console at all.
+for stream in (sys.stdout, sys.stderr):
+    if stream is not None:
+        stream.reconfigure(encoding="utf-8")
 log = logging.getLogger("front_desk")
 
 # Modules in build order. Each entry: (extension, privileged intents it needs).
@@ -102,8 +103,27 @@ def setup_logging() -> None:
     config.DATA_DIR.mkdir(exist_ok=True)
     file_handler = RotatingFileHandler(config.DATA_DIR / "bot.log", maxBytes=1_000_000,
                                        backupCount=3, encoding="utf-8")
-    discord.utils.setup_logging(level=logging.INFO)  # console
+    if sys.stderr is not None:
+        discord.utils.setup_logging(level=logging.INFO)  # console
     discord.utils.setup_logging(handler=file_handler, level=logging.INFO, root=True)
+
+
+def single_instance_lock():
+    """Hold an exclusive lock on data/bot.lock for the life of the process, so a
+    second copy (startup task + run_bot.bat) can't answer every click twice."""
+    config.DATA_DIR.mkdir(exist_ok=True)
+    handle = open(config.DATA_DIR / "bot.lock", "a+")
+    try:
+        if sys.platform == "win32":
+            import msvcrt
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        handle.close()
+        raise SystemExit("Front Desk is already running (another process holds data/bot.lock).")
+    return handle
 
 
 def main() -> None:
@@ -122,6 +142,7 @@ def main() -> None:
         ))
         return
 
+    lock = single_instance_lock()  # noqa: F841 (held until exit)
     setup_logging()
     FrontDesk(settings).run(settings.token, log_handler=None)
 
