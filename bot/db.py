@@ -144,6 +144,49 @@ MIGRATIONS = [
     )""",
         "CREATE TABLE free_games (id INTEGER PRIMARY KEY, posted_at INTEGER NOT NULL)",
     ],
+    [
+        # Module 4: economy. Every coin movement goes through bot/economy.py.
+        """CREATE TABLE wallets (
+        user_id INTEGER PRIMARY KEY,
+        balance INTEGER NOT NULL DEFAULT 0 CHECK (balance >= 0),
+        daily_streak INTEGER NOT NULL DEFAULT 0,
+        last_daily TEXT
+    )""",
+        """CREATE TABLE ledger (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        delta INTEGER NOT NULL,
+        reason TEXT NOT NULL,
+        ref TEXT UNIQUE,
+        at INTEGER NOT NULL
+    )""",
+        "CREATE INDEX ledger_user ON ledger (user_id, reason, at)",
+        """CREATE TABLE predictions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        channel_id INTEGER,
+        message_id INTEGER,
+        creator_id INTEGER NOT NULL,
+        question TEXT NOT NULL,
+        option_a TEXT NOT NULL,
+        option_b TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'open',
+        winner TEXT,
+        created_at INTEGER NOT NULL
+    )""",
+        """CREATE TABLE prediction_bets (
+        prediction_id INTEGER NOT NULL REFERENCES predictions (id),
+        user_id INTEGER NOT NULL,
+        option TEXT NOT NULL,
+        amount INTEGER NOT NULL,
+        at INTEGER NOT NULL,
+        PRIMARY KEY (prediction_id, user_id)
+    )""",
+        """CREATE TABLE blackjack_open (
+        user_id INTEGER PRIMARY KEY,
+        bet INTEGER NOT NULL,
+        started_at INTEGER NOT NULL
+    )""",
+    ],
 ]
 
 
