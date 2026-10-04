@@ -573,3 +573,34 @@ def test_richest_empty(monkeypatch):
         await Economy.richest.callback(env.cog, i)
         assert "Nobody" in i.text
     with_env(go, monkeypatch)
+
+
+def test_voice_coins_are_capped_per_day(monkeypatch):
+    """Security: two accounts idling in voice 24/7 can't mint coins without limit."""
+    async def go(env):
+        env.join(A, env.guild.lobby)
+        env.join(B, env.guild.lobby)
+        for i in range(200):  # 200 ticks = 1000 minutes
+            env.t = T0 + i * C.VOICE_TICK_SECONDS
+            await env.cog.pay_voice()
+        assert await env.bal(A) <= C.VOICE_DAILY_CAP * 2  # at most one cap per local day touched
+    with_env(go, monkeypatch)
+
+
+def test_deafened_members_dont_earn_or_count_as_company(monkeypatch):
+    async def go(env):
+        env.join(A, env.guild.lobby)
+        env.join(B, env.guild.lobby)
+        env.guild.lobby.voice_states[B].self_deaf = True
+        assert await env.cog.pay_voice() == 0
+        assert (await env.bal(A), await env.bal(B)) == (0, 0)
+    with_env(go, monkeypatch)
+
+
+def test_lfg_coins_are_capped_per_day(monkeypatch):
+    """Security: making 2-person squads with an alt over and over pays at most the cap."""
+    async def go(env):
+        for post in range(10):
+            await env.cog.on_lfg_squad_full(post, SimpleNamespace(members=(A, B)))
+        assert await env.bal(A) == C.LFG_DAILY_CAP
+    with_env(go, monkeypatch)

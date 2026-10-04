@@ -32,7 +32,7 @@ from setup_server import Makeover, find
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-BOT_ROLES = ("Clip of the Week", "Recruiter", "Bumper")  # roles Front Desk hands out
+BOT_ROLES = ("Season Champ", "Hype", "Clip of the Week", "Recruiter", "Bumper")  # roles Front Desk hands out
 NEEDED = ("manage_roles", "manage_channels", "manage_guild", "create_instant_invite")
 
 

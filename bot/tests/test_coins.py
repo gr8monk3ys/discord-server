@@ -167,3 +167,14 @@ def test_flip_is_deterministic_with_seeded_rng():
 def test_coinflip_net():
     assert C.coinflip_net(100, won=True) == 100
     assert C.coinflip_net(100, won=False) == -100
+
+
+def test_capped():
+    assert C.capped(2, 0, 120) == 2
+    assert C.capped(2, 118, 120) == 2
+    assert C.capped(2, 119, 120) == 0
+
+
+def test_deafened_neither_earn_nor_count():
+    assert C.voice_earners([[(1, False), (2, False, True)]]) == []
+    assert C.voice_earners([[(1, False), (2, False, False), (3, False, True)]]) == [1, 2]

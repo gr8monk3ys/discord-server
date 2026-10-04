@@ -16,6 +16,7 @@ DAILY_BONUS_CAP = 140  # so day 8+ pays 240
 VOICE_COINS = 2
 VOICE_TICK_SECONDS = 5 * 60
 VOICE_MIN_HUMANS = 2
+VOICE_DAILY_CAP = 120  # coins per local day (5 hours): stops 24/7 idle farming
 
 MESSAGE_COINS = 1
 MESSAGE_DAILY_CAP = 50  # coins (= messages) per local day
@@ -24,6 +25,7 @@ CLIP_COINS = 25
 CLIP_DAILY_MAX = 3  # paid clips per local day
 
 LFG_COINS = 20
+LFG_DAILY_CAP = 60  # 3 full squads a day: stops make-a-2-squad-with-an-alt farming
 MVP_COINS = 250
 CLIP_WEEK_COINS = 500
 
@@ -85,13 +87,14 @@ def voice_tick(now: int) -> int:
     return now // VOICE_TICK_SECONDS
 
 
-def voice_earners(channels: Iterable[Iterable[tuple[int, bool]]], opted_out=frozenset()) -> list[int]:
+def voice_earners(channels: Iterable[Iterable[tuple]], opted_out=frozenset()) -> list[int]:
     """Who earns this tick. `channels` holds, per counted voice channel, (user_id, is_bot)
-    for everyone in it. A channel pays only with 2+ humans; bots never earn and don't count
-    as company; opted-out members count as company but don't earn."""
+    or (user_id, is_bot, deafened) for everyone in it. A channel pays only with 2+ humans;
+    bots and deafened members (idling, not listening) never earn and don't count as
+    company; opted-out members count as company but don't earn."""
     earners = []
     for people in channels:
-        humans = [uid for uid, is_bot in people if not is_bot]
+        humans = [p[0] for p in people if not p[1] and not (len(p) > 2 and p[2])]
         if len(humans) >= VOICE_MIN_HUMANS:
             earners += [uid for uid in humans if uid not in opted_out]
     return sorted(set(earners))
@@ -162,3 +165,8 @@ def flip(rng) -> str:
 def coinflip_net(bet: int, won: bool) -> int:
     """A win pays 2x the bet back, so +bet overall; a loss is -bet."""
     return bet if won else -bet
+
+
+def capped(amount: int, earned_today: int, cap: int) -> int:
+    """Pay `amount` only while today's total for that reason stays within `cap`."""
+    return amount if earned_today + amount <= cap else 0

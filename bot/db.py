@@ -187,6 +187,22 @@ MIGRATIONS = [
         started_at INTEGER NOT NULL
     )""",
     ],
+    [
+        # Shop: timed perks (personal colour role, Hype role). One row per perk a member holds.
+        """CREATE TABLE perks (
+        user_id INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        role_id INTEGER,
+        expires_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, kind)
+    )""",
+        # Seasons: one row per finished month, so results post once.
+        """CREATE TABLE seasons (
+        key TEXT PRIMARY KEY,
+        posted_at INTEGER NOT NULL,
+        top TEXT
+    )""",
+    ],
 ]
 
 

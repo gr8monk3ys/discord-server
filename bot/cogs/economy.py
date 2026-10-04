@@ -98,19 +98,23 @@ class Economy(commands.Cog):
             if not self.tracked_voice(guild, channel):
                 continue
             people = []
-            for user_id in channel.voice_states:
+            for user_id, state in channel.voice_states.items():
                 member = guild.get_member(user_id)
-                people.append((user_id, bool(member and member.bot)))
+                deafened = bool(getattr(state, "self_deaf", False) or getattr(state, "deaf", False))
+                people.append((user_id, bool(member and member.bot), deafened))
             rooms.append(people)
         candidates = C.voice_earners(rooms)
         if not candidates:
             return 0
         earners = [uid for uid in candidates if await self.db.tracking_allowed(uid)]
         tick = C.voice_tick(t)
+        since, until = C.day_bounds(t, self.bot.settings.tz)
         paid = 0
         async with self.db.transaction() as tx:
             for uid in earners:
-                if (await E.apply_tx(tx, uid, C.VOICE_COINS, C.VOICE, t, C.voice_ref(uid, tick))).ok:
+                amount = C.capped(C.VOICE_COINS, await E.earned_tx(tx, uid, C.VOICE, since, until),
+                                  C.VOICE_DAILY_CAP)
+                if amount and (await E.apply_tx(tx, uid, amount, C.VOICE, t, C.voice_ref(uid, tick))).ok:
                     paid += 1
         return paid
 
@@ -153,8 +157,13 @@ class Economy(commands.Cog):
 
     @commands.Cog.listener()
     async def on_lfg_squad_full(self, post_id: int, roster) -> None:
+        since, until = C.day_bounds(now(), self.bot.settings.tz)
         for uid in roster.members:
             try:
+                async with self.db.transaction() as tx:
+                    earned = await E.earned_tx(tx, uid, C.LFG, since, until)
+                if not C.capped(C.LFG_COINS, earned, C.LFG_DAILY_CAP):
+                    continue
                 await self.pay_event(uid, C.LFG_COINS, C.LFG, C.lfg_ref(post_id, uid))
             except Exception:
                 log.exception("lfg coins failed for %s on post %s", uid, post_id)

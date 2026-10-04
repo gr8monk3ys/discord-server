@@ -52,6 +52,8 @@ ROLES = [
     {"name": "Bots", "color": SLATE, "hoist": True, "was": ["Bot"]},
     {"name": "LFG", "mentionable": True},
     # Public-server roles, handed out by Front Desk.
+    {"name": "Season Champ", "hoist": True},  # top 3 of last month's season (Front Desk)
+    {"name": "Hype", "hoist": True},  # bought in the shop, lasts 24 h (Front Desk)
     {"name": "Clip of the Week"},  # given by Front Desk to the weekly clip winner
     {"name": "Recruiter"},  # 3+ people you invited stayed
     {"name": "Bumper", "mentionable": True},  # opt-in: /bumpping on
