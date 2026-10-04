@@ -604,3 +604,10 @@ def test_lfg_coins_are_capped_per_day(monkeypatch):
             await env.cog.on_lfg_squad_full(post, SimpleNamespace(members=(A, B)))
         assert await env.bal(A) == C.LFG_DAILY_CAP
     with_env(go, monkeypatch)
+
+
+def test_lfg_cap_holds_under_concurrent_squads(monkeypatch):
+    async def go(env):
+        await asyncio.gather(*(env.cog.on_lfg_squad_full(p, SimpleNamespace(members=(A, B))) for p in range(10)))
+        assert await env.bal(A) == C.LFG_DAILY_CAP and await env.bal(B) == C.LFG_DAILY_CAP
+    with_env(go, monkeypatch)

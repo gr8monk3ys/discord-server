@@ -157,14 +157,17 @@ class Economy(commands.Cog):
 
     @commands.Cog.listener()
     async def on_lfg_squad_full(self, post_id: int, roster) -> None:
-        since, until = C.day_bounds(now(), self.bot.settings.tz)
+        t = now()
+        since, until = C.day_bounds(t, self.bot.settings.tz)
         for uid in roster.members:
             try:
+                if self.is_bot(uid) or not await self.db.tracking_allowed(uid):
+                    continue
+                # Cap check and payment in one transaction, so simultaneous squads can't both pass.
                 async with self.db.transaction() as tx:
                     earned = await E.earned_tx(tx, uid, C.LFG, since, until)
-                if not C.capped(C.LFG_COINS, earned, C.LFG_DAILY_CAP):
-                    continue
-                await self.pay_event(uid, C.LFG_COINS, C.LFG, C.lfg_ref(post_id, uid))
+                    if C.capped(C.LFG_COINS, earned, C.LFG_DAILY_CAP):
+                        await E.apply_tx(tx, uid, C.LFG_COINS, C.LFG, t, C.lfg_ref(post_id, uid))
             except Exception:
                 log.exception("lfg coins failed for %s on post %s", uid, post_id)
 
