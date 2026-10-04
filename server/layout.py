@@ -52,6 +52,7 @@ ROLES = [
     {"name": "Bots", "color": SLATE, "hoist": True, "was": ["Bot"]},
     {"name": "LFG", "mentionable": True},
     # Public-server roles, handed out by Front Desk.
+    {"name": "Clip of the Week"},  # given by Front Desk to the weekly clip winner
     {"name": "Recruiter"},  # 3+ people you invited stayed
     {"name": "Bumper", "mentionable": True},  # opt-in: /bumpping on
     *({"name": role, "mentionable": True} for _, _, role in GAMES),
@@ -77,6 +78,7 @@ CATEGORIES = [
             {"name": "💬・general", "topic": "Anything goes. Mostly."},
             {"name": "🤣・memes", "topic": "Post it here, not in #general."},
             {"name": "📸・clips", "topic": "Highlights, fails, and receipts.", "slowmode": 10},
+            {"name": "⭐・hall-of-fame", "topic": "3 ⭐ on any message and it lands here.", "read_only": True},
         ],
     },
     {
@@ -118,6 +120,7 @@ CATEGORIES = [
         "was": ["Voice Channels"],
         "channels": [
             {"name": "🔊 Lobby", "type": "voice", "was": ["General"]},
+            {"name": "➕ New Squad", "type": "voice"},  # join to get your own channel
             {"name": "🎮 Squad", "type": "voice", "user_limit": 5, "was": ["🎮 Squad I", "General 2"]},
             {"name": "💤 AFK", "type": "voice", "afk": True},
         ],

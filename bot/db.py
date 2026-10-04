@@ -103,6 +103,47 @@ MIGRATIONS = [
         status TEXT NOT NULL DEFAULT 'open'
     )""",
     ],
+    [
+        # Module 6: hall of fame.
+        """CREATE TABLE starboard (
+        message_id INTEGER PRIMARY KEY,
+        channel_id INTEGER NOT NULL,
+        author_id INTEGER NOT NULL,
+        board_message_id INTEGER,
+        stars INTEGER NOT NULL DEFAULT 0,
+        at INTEGER NOT NULL
+    )""",
+        # Module 3: clip of the week.
+        """CREATE TABLE clips (
+        message_id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        url TEXT NOT NULL,
+        posted_at INTEGER NOT NULL
+    )""",
+        "CREATE INDEX clips_time ON clips (posted_at)",
+        """CREATE TABLE clip_polls (
+        week TEXT PRIMARY KEY,
+        message_id INTEGER NOT NULL,
+        ends_at INTEGER NOT NULL,
+        winner_id INTEGER,
+        done INTEGER NOT NULL DEFAULT 0
+    )""",
+        # Module 5: join-to-create voice.
+        """CREATE TABLE temp_voice (
+        channel_id INTEGER PRIMARY KEY,
+        owner_id INTEGER NOT NULL,
+        created_at INTEGER NOT NULL
+    )""",
+        # Module 7: game nights and free games.
+        """CREATE TABLE gamenights (
+        event_id INTEGER PRIMARY KEY,
+        host_id INTEGER NOT NULL,
+        game TEXT,
+        starts_at INTEGER NOT NULL,
+        reminded INTEGER NOT NULL DEFAULT 0
+    )""",
+        "CREATE TABLE free_games (id INTEGER PRIMARY KEY, posted_at INTEGER NOT NULL)",
+    ],
 ]
 
 
