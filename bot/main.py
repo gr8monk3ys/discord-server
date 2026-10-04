@@ -38,6 +38,10 @@ MODULES = [
     ("cogs.economy", {"message_content"}),  # coins: /daily, /balance, /give, /coinflip, /richest
     ("cogs.games", set()),  # /slots, /blackjack, /trivia, /predict
     ("cogs.shop", {"members"}),  # /shop, /buy, /season
+    ("cogs.engagement", {"members", "message_content"}),  # QOTD, daily poll, counting, auto game night, birthdays
+    ("cogs.moderation", {"members", "message_content"}),  # /warn /timeout /cases /purge, anti-spam, anti-raid
+    ("cogs.ops", set()),  # backups, health alerts, config drift, /status
+    ("cogs.utility", {"presences"}),  # /remind, /afk, suggestions, stat channels, tickets
 ]
 
 PERMISSIONS = discord.Permissions(
@@ -58,6 +62,9 @@ PERMISSIONS = discord.Permissions(
     create_instant_invite=True,
     move_members=True,
     manage_events=True,
+    # Moderation autopilot: timeouts and spam cleanup.
+    moderate_members=True,
+    manage_messages=True,
 )
 
 def build_intents(privileged: bool = True) -> discord.Intents:
