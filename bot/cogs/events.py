@@ -104,6 +104,14 @@ class Events(commands.Cog):
     def guild(self) -> discord.Guild | None:
         return self.bot.get_guild(self.bot.settings.guild_id)
 
+    def release_claim(self, host_id: int, claimed_at: int, previous: int | None) -> None:
+        """Undo a cooldown claim, unless a newer request already replaced it."""
+        if self.last_created.get(host_id) == claimed_at:
+            if previous is None:
+                self.last_created.pop(host_id, None)
+            else:
+                self.last_created[host_id] = previous
+
     @staticmethod
     def text_channel_for(guild, game: config.Game | None):
         """The game's channel, or 🕹️・gaming for "Anything" (or if the game channel is gone)."""
@@ -158,14 +166,17 @@ class Events(commands.Cog):
                 await interaction.response.send_message(
                     f"You just made a game night. You can make another in {mins} min.", ephemeral=True)
                 return
+            # Claim the cooldown now, with no await since the check above, so concurrent
+            # submits can't both pass; give it back if this request is refused.
+            self.last_created[host.id] = t
             row = await self.db.fetchone(
                 "SELECT COUNT(*) AS n FROM gamenights WHERE host_id = ? AND starts_at > ?", (host.id, t))
             if row["n"] >= MAX_UPCOMING_PER_HOST:
+                self.release_claim(host.id, t, last)
                 await interaction.response.send_message(
                     "You already have a game night coming up. Run that one first, or ask a mod "
                     "if you need two.", ephemeral=True)
                 return
-            self.last_created[host.id] = t  # claimed before any await, so a double submit can't slip through
 
         await interaction.response.defer(ephemeral=True, thinking=True)
         g = config.game_by_key(game.value)  # None for Anything
@@ -180,6 +191,8 @@ class Events(commands.Cog):
                 reason=f"/gamenight by {host} ({host.id})",
             )
         except discord.Forbidden:
+            if not is_staff(host):
+                self.release_claim(host.id, t, last)
             log.warning("can't create scheduled events: missing Manage Events")
             await interaction.followup.send(
                 "I can't create events here: I need the Manage Events permission.", ephemeral=True)

@@ -663,3 +663,24 @@ def test_members_get_one_upcoming_gamenight_and_an_hourly_cooldown(monkeypatch):
         await env.gamenight(game="roblox", uid=USER_A + 1, staff=True)
         assert len(await env.rows("SELECT * FROM gamenights WHERE host_id = ?", (USER_A + 1,))) == 2
     with_env(go, monkeypatch)
+
+
+def test_concurrent_gamenights_from_one_member_create_only_one(monkeypatch):
+    """Security: two simultaneous /gamenight submits must not both pass the limits."""
+    async def go(env):
+        await asyncio.gather(
+            env.gamenight(uid=USER_A, staff=False),
+            env.gamenight(game="minecraft", uid=USER_A, staff=False),
+        )
+        rows = await env.rows("SELECT * FROM gamenights WHERE host_id = ?", (USER_A,))
+        assert len(rows) == 1
+    with_env(go, monkeypatch)
+
+
+def test_refused_request_gives_the_cooldown_back(monkeypatch):
+    async def go(env):
+        await env.gamenight(uid=USER_A, staff=False)
+        env.cog.last_created.clear()
+        await env.gamenight(game="minecraft", uid=USER_A, staff=False)  # refused: one already upcoming
+        assert USER_A not in env.cog.last_created
+    with_env(go, monkeypatch)
