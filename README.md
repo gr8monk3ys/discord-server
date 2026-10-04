@@ -92,6 +92,26 @@ in `layout.ROLES`, and every bot gets `@Bots` so they're grouped in the member l
 - Reset the bot token in the portal if you shared `.env` anywhere.
 - Optional: set `ICON_PATH` in `layout.py` to a square image for the server icon.
 
+### Emoji & sounds
+
+The server has its own emoji pack (20 emoji, such as `:gg:`, `:take_w:`, `:clutch:`, `:touchgrass:`
+and `:frontdesk:`) and 8 soundboard sounds. Code generates all of them from scratch: Pillow
+draws the emoji, numpy synthesizes the sounds, and the lettering is a hand-made block font.
+No samples, fonts or outside art are used.
+
+```
+.venv\Scripts\pip install pillow numpy                     # ffmpeg must be on PATH for the MP3s
+.venv\Scripts\python ..\assets\expressions\make_emoji.py   # -> assets/expressions/emoji/*.png
+.venv\Scripts\python ..\assets\expressions\make_sounds.py  # -> assets/expressions/sounds/*.mp3
+.venv\Scripts\python expressions.py                        # dry run: what fits in your slots
+.venv\Scripts\python expressions.py --apply                # upload
+```
+
+The bot's role needs **Create Expressions**. **Manage Expressions** is only needed if you later
+want it to edit or delete them. Names that already exist are skipped, and anything over the
+emoji or soundboard slot limit (8 sounds unboosted) is listed rather than uploaded. Sounds are
+MP3 because discord.py only accepts MP3 for the soundboard.
+
 ### Snapshot
 
 `snapshot_server.py` is read-only. It writes the live server's config to `server/snapshot/`
