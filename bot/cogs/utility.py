@@ -370,10 +370,14 @@ class Utility(commands.Cog):
             r = by_id.get(u.id)
             if r is None:
                 continue
-            lines.append(U.afk_notice(display(u), r["reason"], r["since"]))
+            # The reason is member text in a bot-authored message: escape markdown so a
+            # masked link like [free nitro](https://phish) can't render as a trusted link.
+            reason = discord.utils.escape_markdown(r["reason"]) if r["reason"] else None
+            lines.append(U.afk_notice(display(u), reason, r["since"]))
             self.afk_notices[(cid, u.id)] = t
         if lines:
-            await message.reply("\n".join(lines), allowed_mentions=NO_PINGS, mention_author=False)
+            await message.reply("\n".join(lines), allowed_mentions=NO_PINGS, mention_author=False,
+                                suppress_embeds=True)
 
     # ============================================================ suggestions
     def is_suggestions(self, channel) -> bool:

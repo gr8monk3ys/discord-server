@@ -1024,3 +1024,15 @@ def test_reminder_text_cannot_format_or_embed(monkeypatch):
         assert "\*\*big\*\*" in sent["content"] and sent["suppress_embeds"] is True
         assert "@​everyone" in sent["content"]
     with_env(go, monkeypatch)
+
+
+def test_afk_reason_cannot_render_a_masked_link(monkeypatch):
+    """Security: an AFK reason is repeated in a bot message, so a masked phishing link
+    must not render as a trusted link from the bot."""
+    async def go(env):
+        await set_afk(env, A, "[free nitro](https://phish.example)")
+        msg = await env.say(B, mentions=[A])
+        (reply,) = msg.replies
+        # The escaped "[" stops Discord treating it as a masked link; the raw URL stays visible.
+        assert "\\[free nitro](" in reply["content"] and reply["suppress_embeds"] is True
+    with_env(go, monkeypatch)
