@@ -61,9 +61,27 @@ async def http_get_json(url: str):
             return await resp.json(content_type=None)
 
 
+# Anti-spam on a public server: each event pings a game role, so regular members get
+# one upcoming game night at a time and one creation per hour. Mods are exempt.
+MAX_UPCOMING_PER_HOST = 1
+CREATE_COOLDOWN = 60 * 60
+
+
+def is_staff(member) -> bool:
+    guild = getattr(member, "guild", None)
+    if guild is not None and getattr(guild, "owner_id", None) == member.id:
+        return True
+    perms = getattr(member, "guild_permissions", None)
+    if perms is not None and getattr(perms, "administrator", False):
+        return True
+    names = {getattr(r, "name", "") for r in getattr(member, "roles", [])}
+    return bool(names & {config.KEEPER_ROLE, config.MOD_ROLE})
+
+
 class Events(commands.Cog):
     def __init__(self, bot, fetch_json=None):
         self.bot = bot
+        self.last_created: dict[int, int] = {}  # host id -> unix time of their last /gamenight
         self.fetch_json = fetch_json or http_get_json  # injectable: tests never hit the network
         self.reminded: set[int] = set()  # sent this run, in case the DB write after it failed
 
@@ -131,9 +149,26 @@ class Events(commands.Cog):
                 f"I couldn't find the {voice_name} voice channel, so I can't host it there.", ephemeral=True)
             return
 
+        host = interaction.user
+        if not is_staff(host):
+            t = now()
+            last = self.last_created.get(host.id)
+            if last is not None and t - last < CREATE_COOLDOWN:
+                mins = (CREATE_COOLDOWN - (t - last)) // 60 + 1
+                await interaction.response.send_message(
+                    f"You just made a game night. You can make another in {mins} min.", ephemeral=True)
+                return
+            row = await self.db.fetchone(
+                "SELECT COUNT(*) AS n FROM gamenights WHERE host_id = ? AND starts_at > ?", (host.id, t))
+            if row["n"] >= MAX_UPCOMING_PER_HOST:
+                await interaction.response.send_message(
+                    "You already have a game night coming up. Run that one first, or ask a mod "
+                    "if you need two.", ephemeral=True)
+                return
+            self.last_created[host.id] = t  # claimed before any await, so a double submit can't slip through
+
         await interaction.response.defer(ephemeral=True, thinking=True)
         g = config.game_by_key(game.value)  # None for Anything
-        host = interaction.user
         try:
             event = await guild.create_scheduled_event(
                 name=E.event_name(g.role if g else None),

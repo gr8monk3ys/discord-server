@@ -20,6 +20,7 @@ from logic.schedule import occurrence
 TZ = ZoneInfo("America/Los_Angeles")
 GUILD_ID = 999
 HOST, A, B, BOTUSER = 1, 2, 3, 50
+USER_A = 70
 MIN = 60
 HOUR = 3600
 
@@ -209,11 +210,14 @@ class Env:
         self.db, self.guild, self.bot, self.cog, self.feed = db, guild, bot, cog, feed
         self.t = T0
 
-    def inter(self, uid=HOST):
-        return FakeInteraction(FakeUser(uid), self.guild)
+    def inter(self, uid=HOST, staff=True):
+        user = FakeUser(uid)
+        # Staff are exempt from the /gamenight spam limits; most tests aren't about those.
+        user.roles = [SimpleNamespace(name=config.KEEPER_ROLE)] if staff else []
+        return FakeInteraction(user, self.guild)
 
-    async def gamenight(self, game="valorant", when="9pm", size=None, note=None, uid=HOST):
-        i = self.inter(uid)
+    async def gamenight(self, game="valorant", when="9pm", size=None, note=None, uid=HOST, staff=True):
+        i = self.inter(uid, staff)
         await self.cog.gamenight.callback(self.cog, i, choice(game), when, size, note)
         return i
 
@@ -641,3 +645,21 @@ def test_free_games_gives_up_after_a_day(monkeypatch):
 def test_http_fetch_refuses_non_http_urls():
     with pytest.raises(ValueError):
         run(cogmod.http_get_json("file:///etc/passwd"))
+
+
+def test_members_get_one_upcoming_gamenight_and_an_hourly_cooldown(monkeypatch):
+    """Security: on a public server a member can't spam events (each one pings a role)."""
+    async def go(env):
+        await env.gamenight(uid=USER_A, staff=False)
+        second = await env.gamenight(game="minecraft", uid=USER_A, staff=False)
+        assert "just made a game night" in second.texts()[0]
+        env.cog.last_created.clear()  # past the cooldown, but the first night is still upcoming
+        third = await env.gamenight(game="minecraft", uid=USER_A, staff=False)
+        assert "already have a game night" in third.texts()[0]
+        rows = await env.rows("SELECT * FROM gamenights WHERE host_id = ?", (USER_A,))
+        assert len(rows) == 1
+        # Staff aren't limited.
+        await env.gamenight(game="minecraft", uid=USER_A + 1, staff=True)
+        await env.gamenight(game="roblox", uid=USER_A + 1, staff=True)
+        assert len(await env.rows("SELECT * FROM gamenights WHERE host_id = ?", (USER_A + 1,))) == 2
+    with_env(go, monkeypatch)
