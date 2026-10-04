@@ -49,9 +49,15 @@ def extend(current_expiry: int | None, now: int, duration: int) -> int:
     return base + duration
 
 
+COLOUR_ROLE_PREFIX = "Colour · "
+
+
 def role_name(display_name: str) -> str:
+    """Purchased colour roles always carry a fixed text prefix. The bot finds staff roles
+    by name (emoji and punctuation ignored), so a member nicknamed "Keeper" must never
+    get a role whose name matches Keeper, Moderator, Squad or any other real role."""
     name = " ".join((display_name or "").split())[:ROLE_NAME_MAX].strip()
-    return name or "member"
+    return COLOUR_ROLE_PREFIX + (name or "member")
 
 
 # ---------------------------------------------------------------- colours

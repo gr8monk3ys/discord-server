@@ -286,7 +286,7 @@ def test_color_purchase_creates_role_and_charges_once(monkeypatch):
         m = env.member(A, "Lorenzo")
         i = await env.buy(A, "color", color="#3BA55D")
         [role] = personal_roles(env.guild)
-        assert role.name == "Lorenzo" and role.colour.value == 0x3BA55D
+        assert role.name == S.role_name("Lorenzo") and role.colour.value == 0x3BA55D
         # bot 10 > Keeper 9 > Moderator 8: directly below the lowest staff role
         assert role.position == env.guild.mod.position - 1
         assert role.permissions == discord.Permissions.none() and role.hoist is False and role.mentionable is False

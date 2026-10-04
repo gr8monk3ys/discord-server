@@ -30,11 +30,23 @@ def test_extend_adds_to_remaining_time_or_starts_now():
     assert S.extend(130, 100, 50) == 180  # 30 s left + 50
 
 
-def test_role_name_is_member_name_capped():
-    assert S.role_name("Lorenzo") == "Lorenzo"
-    assert S.role_name("x" * 40) == "x" * 32
-    assert S.role_name("  a   b ") == "a b"
-    assert S.role_name("   ") == "member"
+def test_role_name_is_prefixed_member_name_capped():
+    assert S.role_name("Lorenzo") == "Colour · Lorenzo"
+    assert S.role_name("x" * 40) == "Colour · " + "x" * 32
+    assert S.role_name("  a   b ") == "Colour · a b"
+    assert S.role_name("   ") == "Colour · member"
+
+
+def test_role_name_can_never_impersonate_a_real_role():
+    """Security: a member nicknamed after a staff role must not get a role the bot
+    would match as that staff role (matching ignores emoji and punctuation)."""
+    import config
+    from names import slug
+    real = {slug(n) for n in (config.KEEPER_ROLE, config.MOD_ROLE, config.SQUAD_ROLE, config.HYPE_ROLE,
+                              config.SEASON_ROLE, config.CLIP_ROLE, config.LFG_ROLE, config.RECRUITER_ROLE,
+                              config.BUMPER_ROLE, *(g.role for g in config.GAMES))}
+    for nick in ("Keeper", "🔑 keeper", "MODERATOR", "Moderator!", "Squad", "Season Champ", "Valorant"):
+        assert slug(S.role_name(nick)) not in real
 
 
 # ---------------------------------------------------------------- colours
