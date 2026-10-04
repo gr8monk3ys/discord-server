@@ -92,6 +92,23 @@ in `layout.ROLES`, and every bot gets `@Bots` so they're grouped in the member l
 - Reset the bot token in the portal if you shared `.env` anywhere.
 - Optional: set `ICON_PATH` in `layout.py` to a square image for the server icon.
 
+### Snapshot
+
+`snapshot_server.py` is read-only. It writes the live server's config to `server/snapshot/`
+(`server`, `roles`, `channels`, `onboarding`, `automod` and `welcome` `.json`). It uses names,
+not IDs, and sorts its output, so `git diff server/snapshot` shows exactly what changed since
+the last snapshot you committed. It never records members, messages, invites or the token.
+
+```
+cd server
+.venv/Scripts/python snapshot_server.py            # write the snapshot
+.venv/Scripts/python snapshot_server.py --compare  # also list roles/channels that differ from layout.py
+.venv/Scripts/python -m pytest tests               # unit tests
+```
+
+If the bot lacks a permission for a fetch (AutoMod rules need Manage Server), that file
+gets an `"error"` note instead and the rest is still written.
+
 ## 3. Front Desk bot (`bot/`)
 
 The setup scripts were a one-shot run. `bot/` is a **persistent** bot that runs while your

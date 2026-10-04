@@ -1,0 +1,170 @@
+{
+  "default_channels": [
+    "♟️・chess",
+    "🎨・art",
+    "🎮 Squad",
+    "🎮・lfg",
+    "👋・welcome",
+    "👗・fashion",
+    "💤 AFK",
+    "💬・general",
+    "💻・code",
+    "📌・rules",
+    "📣・announcements",
+    "📸・clips",
+    "🔊 Lobby",
+    "🕹️・gaming",
+    "🤖・bot-commands",
+    "🤣・memes"
+  ],
+  "enabled": true,
+  "mode": "default",
+  "prompts": [
+    {
+      "in_onboarding": true,
+      "options": [
+        {
+          "channels": [
+            "🪖・wardogs"
+          ],
+          "description": "Get @Wardogs pings and the #wardogs channel.",
+          "emoji": "🪖",
+          "roles": [
+            "Wardogs"
+          ],
+          "title": "Wardogs"
+        },
+        {
+          "channels": [
+            "⛏️・minecraft"
+          ],
+          "description": "Get @Minecraft pings and the #minecraft channel.",
+          "emoji": "⛏️",
+          "roles": [
+            "Minecraft"
+          ],
+          "title": "Minecraft"
+        },
+        {
+          "channels": [
+            "🪂・fortnite"
+          ],
+          "description": "Get @Fortnite pings and the #fortnite channel.",
+          "emoji": "🪂",
+          "roles": [
+            "Fortnite"
+          ],
+          "title": "Fortnite"
+        },
+        {
+          "channels": [
+            "🎯・valorant"
+          ],
+          "description": "Get @Valorant pings and the #valorant channel.",
+          "emoji": "🎯",
+          "roles": [
+            "Valorant"
+          ],
+          "title": "Valorant"
+        },
+        {
+          "channels": [
+            "💥・call-of-duty"
+          ],
+          "description": "Get @Call of Duty pings and the #call-of-duty channel.",
+          "emoji": "💥",
+          "roles": [
+            "Call of Duty"
+          ],
+          "title": "Call of Duty"
+        },
+        {
+          "channels": [
+            "🧙・league-of-legends"
+          ],
+          "description": "Get @League of Legends pings and the #league-of-legends channel.",
+          "emoji": "🧙",
+          "roles": [
+            "League of Legends"
+          ],
+          "title": "League of Legends"
+        },
+        {
+          "channels": [
+            "💣・counter-strike"
+          ],
+          "description": "Get @Counter-Strike 2 pings and the #counter-strike channel.",
+          "emoji": "💣",
+          "roles": [
+            "Counter-Strike 2"
+          ],
+          "title": "Counter-Strike 2"
+        },
+        {
+          "channels": [
+            "🔺・apex-legends"
+          ],
+          "description": "Get @Apex Legends pings and the #apex-legends channel.",
+          "emoji": "🔺",
+          "roles": [
+            "Apex Legends"
+          ],
+          "title": "Apex Legends"
+        },
+        {
+          "channels": [
+            "🚗・gta-online"
+          ],
+          "description": "Get @GTA Online pings and the #gta-online channel.",
+          "emoji": "🚗",
+          "roles": [
+            "GTA Online"
+          ],
+          "title": "GTA Online"
+        },
+        {
+          "channels": [
+            "🧱・roblox"
+          ],
+          "description": "Get @Roblox pings and the #roblox channel.",
+          "emoji": "🧱",
+          "roles": [
+            "Roblox"
+          ],
+          "title": "Roblox"
+        },
+        {
+          "channels": [],
+          "description": "No game pings. You can pick some later.",
+          "emoji": "🛋️",
+          "roles": [
+            "Guest"
+          ],
+          "title": "Just here to hang"
+        }
+      ],
+      "required": true,
+      "single_select": false,
+      "title": "What do you play?",
+      "type": "multiple_choice"
+    },
+    {
+      "in_onboarding": true,
+      "options": [
+        {
+          "channels": [],
+          "description": "Get @LFG pings when someone needs people for a game.",
+          "emoji": "🎮",
+          "roles": [
+            "LFG"
+          ],
+          "title": "Ping me for squads"
+        }
+      ],
+      "required": false,
+      "single_select": true,
+      "title": "Want squad pings?",
+      "type": "multiple_choice"
+    }
+  ]
+}

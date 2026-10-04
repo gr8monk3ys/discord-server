@@ -1,0 +1,547 @@
+{
+  "categories": [
+    {
+      "channels": [
+        {
+          "name": "📌・rules",
+          "nsfw": false,
+          "overwrites": {
+            "role:@everyone": {
+              "allow": [
+                "add_reactions"
+              ],
+              "deny": [
+                "create_private_threads",
+                "create_public_threads",
+                "send_messages"
+              ]
+            },
+            "role:Keeper": {
+              "allow": [
+                "send_messages"
+              ],
+              "deny": []
+            }
+          },
+          "slowmode": 0,
+          "synced": false,
+          "topic": "Read these once. They're short.",
+          "type": "text"
+        },
+        {
+          "name": "📣・announcements",
+          "nsfw": false,
+          "overwrites": {
+            "role:@everyone": {
+              "allow": [
+                "add_reactions"
+              ],
+              "deny": [
+                "create_private_threads",
+                "create_public_threads",
+                "send_messages"
+              ]
+            },
+            "role:Keeper": {
+              "allow": [
+                "send_messages"
+              ],
+              "deny": []
+            }
+          },
+          "slowmode": 0,
+          "synced": false,
+          "topic": "Game nights, updates, server news.",
+          "type": "text"
+        },
+        {
+          "name": "👋・welcome",
+          "nsfw": false,
+          "overwrites": {
+            "role:@everyone": {
+              "allow": [
+                "add_reactions"
+              ],
+              "deny": [
+                "create_private_threads",
+                "create_public_threads",
+                "send_messages"
+              ]
+            },
+            "role:Keeper": {
+              "allow": [
+                "send_messages"
+              ],
+              "deny": []
+            }
+          },
+          "slowmode": 0,
+          "synced": false,
+          "topic": "New faces land here.",
+          "type": "text"
+        }
+      ],
+      "name": "01 · front desk",
+      "overwrites": {},
+      "type": "category"
+    },
+    {
+      "channels": [
+        {
+          "name": "💬・general",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "topic": "Anything goes. Mostly.",
+          "type": "text"
+        },
+        {
+          "name": "🤣・memes",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "topic": "Post it here, not in #general.",
+          "type": "text"
+        },
+        {
+          "name": "📸・clips",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 10,
+          "synced": true,
+          "topic": "Highlights, fails, and receipts.",
+          "type": "text"
+        }
+      ],
+      "name": "02 · the lobby",
+      "overwrites": {},
+      "type": "category"
+    },
+    {
+      "channels": [
+        {
+          "name": "🕹️・gaming",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "topic": "General gaming chat.",
+          "type": "text"
+        },
+        {
+          "name": "🎮・lfg",
+          "nsfw": false,
+          "overwrites": {},
+          "require_tag": true,
+          "slowmode": 0,
+          "synced": true,
+          "tags": [
+            {
+              "emoji": "🪖",
+              "moderated": false,
+              "name": "Wardogs"
+            },
+            {
+              "emoji": "⛏️",
+              "moderated": false,
+              "name": "Minecraft"
+            },
+            {
+              "emoji": "🪂",
+              "moderated": false,
+              "name": "Fortnite"
+            },
+            {
+              "emoji": "🎯",
+              "moderated": false,
+              "name": "Valorant"
+            },
+            {
+              "emoji": "💥",
+              "moderated": false,
+              "name": "Call of Duty"
+            },
+            {
+              "emoji": "🧙",
+              "moderated": false,
+              "name": "League of Legends"
+            },
+            {
+              "emoji": "💣",
+              "moderated": false,
+              "name": "Counter-Strike 2"
+            },
+            {
+              "emoji": "🔺",
+              "moderated": false,
+              "name": "Apex Legends"
+            },
+            {
+              "emoji": "🚗",
+              "moderated": false,
+              "name": "GTA Online"
+            },
+            {
+              "emoji": "🧱",
+              "moderated": false,
+              "name": "Roblox"
+            },
+            {
+              "emoji": "🏆",
+              "moderated": false,
+              "name": "Ranked"
+            },
+            {
+              "emoji": "🛋️",
+              "moderated": false,
+              "name": "Casual"
+            }
+          ],
+          "topic": "One post per session. Title it with the game and a time, like \"Wardogs, 9pm\".\nTag the game (and Ranked or Casual). Ping @LFG if you need people right now.\nClose or delete the post once the squad is full.",
+          "type": "forum"
+        },
+        {
+          "name": "🪖・wardogs",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "topic": "Wardogs talk, squads, and strats. Ping @Wardogs.",
+          "type": "text"
+        },
+        {
+          "name": "⛏️・minecraft",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "topic": "Minecraft talk, squads, and strats. Ping @Minecraft.",
+          "type": "text"
+        },
+        {
+          "name": "🪂・fortnite",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "topic": "Fortnite talk, squads, and strats. Ping @Fortnite.",
+          "type": "text"
+        },
+        {
+          "name": "🎯・valorant",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "topic": "Valorant talk, squads, and strats. Ping @Valorant.",
+          "type": "text"
+        },
+        {
+          "name": "💥・call-of-duty",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "topic": "Call of Duty talk, squads, and strats. Ping @Call of Duty.",
+          "type": "text"
+        },
+        {
+          "name": "🧙・league-of-legends",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "topic": "League of Legends talk, squads, and strats. Ping @League of Legends.",
+          "type": "text"
+        },
+        {
+          "name": "💣・counter-strike",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "topic": "Counter-Strike 2 talk, squads, and strats. Ping @Counter-Strike 2.",
+          "type": "text"
+        },
+        {
+          "name": "🔺・apex-legends",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "topic": "Apex Legends talk, squads, and strats. Ping @Apex Legends.",
+          "type": "text"
+        },
+        {
+          "name": "🚗・gta-online",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "topic": "GTA Online talk, squads, and strats. Ping @GTA Online.",
+          "type": "text"
+        },
+        {
+          "name": "🧱・roblox",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "topic": "Roblox talk, squads, and strats. Ping @Roblox.",
+          "type": "text"
+        }
+      ],
+      "name": "03 · games",
+      "overwrites": {},
+      "type": "category"
+    },
+    {
+      "channels": [
+        {
+          "name": "🎨・art",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "topic": "Things you made.",
+          "type": "text"
+        },
+        {
+          "name": "💻・code",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "topic": "Projects, snippets, and bugs.",
+          "type": "text"
+        },
+        {
+          "name": "👗・fashion",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "topic": "Fits and finds.",
+          "type": "text"
+        },
+        {
+          "name": "♟️・chess",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "topic": "Games, puzzles, and challenges.",
+          "type": "text"
+        },
+        {
+          "name": "🤖・bot-commands",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "topic": "",
+          "type": "text"
+        }
+      ],
+      "name": "04 · off topic",
+      "overwrites": {},
+      "type": "category"
+    },
+    {
+      "channels": [
+        {
+          "bitrate": 64000,
+          "name": "🔊 Lobby",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "type": "voice",
+          "user_limit": 0
+        },
+        {
+          "bitrate": 64000,
+          "name": "🎮 Squad",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "type": "voice",
+          "user_limit": 5
+        },
+        {
+          "bitrate": 64000,
+          "name": "💤 AFK",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "type": "voice",
+          "user_limit": 0
+        }
+      ],
+      "name": "05 · voice",
+      "overwrites": {},
+      "type": "category"
+    },
+    {
+      "channels": [
+        {
+          "name": "🛡️・mod",
+          "nsfw": false,
+          "overwrites": {
+            "role:@everyone": {
+              "allow": [],
+              "deny": [
+                "read_messages"
+              ]
+            }
+          },
+          "slowmode": 0,
+          "synced": true,
+          "topic": null,
+          "type": "text"
+        },
+        {
+          "name": "🔒・admin",
+          "nsfw": false,
+          "overwrites": {
+            "role:@everyone": {
+              "allow": [],
+              "deny": [
+                "read_messages"
+              ]
+            }
+          },
+          "slowmode": 0,
+          "synced": true,
+          "topic": null,
+          "type": "text"
+        }
+      ],
+      "name": "00 · staff",
+      "overwrites": {
+        "role:@everyone": {
+          "allow": [],
+          "deny": [
+            "read_messages"
+          ]
+        }
+      },
+      "type": "category"
+    },
+    {
+      "channels": [
+        {
+          "name": "🔒・squad-chat",
+          "nsfw": false,
+          "overwrites": {
+            "member:Front Desk": {
+              "allow": [
+                "connect",
+                "embed_links",
+                "read_messages",
+                "send_messages"
+              ],
+              "deny": []
+            },
+            "role:@everyone": {
+              "allow": [],
+              "deny": [
+                "read_messages"
+              ]
+            },
+            "role:Keeper": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            },
+            "role:Squad": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            }
+          },
+          "slowmode": 0,
+          "synced": true,
+          "topic": "Just us.",
+          "type": "text"
+        },
+        {
+          "bitrate": 64000,
+          "name": "🔒 Squad Only",
+          "nsfw": false,
+          "overwrites": {
+            "member:Front Desk": {
+              "allow": [
+                "connect",
+                "embed_links",
+                "read_messages",
+                "send_messages"
+              ],
+              "deny": []
+            },
+            "role:@everyone": {
+              "allow": [],
+              "deny": [
+                "read_messages"
+              ]
+            },
+            "role:Keeper": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            },
+            "role:Squad": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            }
+          },
+          "slowmode": 0,
+          "synced": true,
+          "type": "voice",
+          "user_limit": 0
+        }
+      ],
+      "name": "06 · squad",
+      "overwrites": {
+        "member:Front Desk": {
+          "allow": [
+            "connect",
+            "embed_links",
+            "read_messages",
+            "send_messages"
+          ],
+          "deny": []
+        },
+        "role:@everyone": {
+          "allow": [],
+          "deny": [
+            "read_messages"
+          ]
+        },
+        "role:Keeper": {
+          "allow": [
+            "read_messages"
+          ],
+          "deny": []
+        },
+        "role:Squad": {
+          "allow": [
+            "read_messages"
+          ],
+          "deny": []
+        }
+      },
+      "type": "category"
+    }
+  ],
+  "uncategorized": []
+}

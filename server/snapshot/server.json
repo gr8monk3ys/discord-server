@@ -1,0 +1,27 @@
+{
+  "afk_channel": "💤 AFK",
+  "afk_timeout": 900,
+  "default_notifications": "only_mentions",
+  "description": "Chill 18+ gaming community. No tryhards, no toxicity: squad up for Valorant, CoD, Fortnite, Minecraft and more.",
+  "explicit_content_filter": "all_members",
+  "features": [
+    "AUTO_MODERATION",
+    "COMMUNITY",
+    "GUILD_ONBOARDING",
+    "GUILD_ONBOARDING_EVER_ENABLED",
+    "GUILD_ONBOARDING_HAS_PROMPTS",
+    "GUILD_SERVER_GUIDE",
+    "NEWS",
+    "SOUNDBOARD",
+    "WELCOME_SCREEN_ENABLED"
+  ],
+  "mfa_level": "disabled",
+  "name": "Lorenzo's Server",
+  "nsfw_level": "default",
+  "preferred_locale": "en-US",
+  "premium_progress_bar_enabled": false,
+  "public_updates_channel": "🛡️・mod",
+  "rules_channel": "📌・rules",
+  "system_channel": "👋・welcome",
+  "verification_level": "medium"
+}

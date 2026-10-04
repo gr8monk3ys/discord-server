@@ -51,6 +51,9 @@ ROLES = [
     {"name": "Guest", "color": MUTED},
     {"name": "Bots", "color": SLATE, "hoist": True, "was": ["Bot"]},
     {"name": "LFG", "mentionable": True},
+    # Public-server roles, handed out by Front Desk.
+    {"name": "Recruiter"},  # 3+ people you invited stayed
+    {"name": "Bumper", "mentionable": True},  # opt-in: /bumpping on
     *({"name": role, "mentionable": True} for _, _, role in GAMES),
 ]
 
@@ -107,6 +110,7 @@ CATEGORIES = [
             {"name": "💻・code", "topic": "Projects, snippets, and bugs."},
             {"name": "👗・fashion", "topic": "Fits and finds."},
             {"name": "♟️・chess", "topic": "Games, puzzles, and challenges."},
+            {"name": "🤖・bot-commands", "topic": "Music (/play), bump reminders, and other bot spam."},
         ],
     },
     {
@@ -125,6 +129,17 @@ CATEGORIES = [
         "channels": [
             {"name": "🛡️・mod", "was": ["mod"]},
             {"name": "🔒・admin", "was": ["admin"]},
+            # Front Desk logs joins, leaves, bans, AutoMod hits and /report here.
+            {"name": "📋・mod-log", "private_to": ["Keeper", "Moderator"]},
+        ],
+    },
+    {
+        # The friend group's own space now that the server is public.
+        "name": "06 · squad",
+        "private_to": ["Squad", "Keeper"],
+        "channels": [
+            {"name": "🔒・squad-chat", "topic": "Just us."},
+            {"name": "🔒 Squad Only", "type": "voice"},
         ],
     },
 ]
@@ -143,22 +158,24 @@ POSTS = {
         "title": "House rules",
         "description": "\n".join(
             [
-                "`01`  Be decent. Trash-talk the play, not the person.",
-                "`02`  No cheats, no exploits, no account drama.",
-                "`03`  Clips in {#clips}, memes in {#memes}.",
-                "`04`  Spoilers go under ||spoiler tags||.",
-                "`05`  Want a squad? Post in {#lfg} and ping {@LFG}, not @everyone.",
-                "`06`  No NSFW, no slurs. AutoMod catches the worst of it.",
-                "`07`  Keepers have the final word.",
+                "`01`  18+ only. If you're under 18, this isn't the server for you.",
+                "`02`  Be decent. Trash-talk the play, not the person. No racism, sexism or slurs.",
+                "`03`  No cheats, no exploits, no selling accounts.",
+                "`04`  No spam or self-promo, and no DM advertising to members.",
+                "`05`  Clips in {#clips}, memes in {#memes}, music in {#bot-commands}.",
+                "`06`  Spoilers go under ||spoiler tags||. No NSFW anywhere.",
+                "`07`  Want a squad? Post in {#lfg} and ping {@LFG}, not @everyone.",
+                "`08`  Something wrong? Right-click the message → Apps → Report message, or use `/report`.",
+                "`09`  Mods have the final word.",
             ]
         ),
-        "footer": "FRONT DESK · 01 · UPDATED 2026-09-28",
+        "footer": "FRONT DESK · 01 · UPDATED 2026-10-03",
     },
     "welcome": {
         "title": "Welcome in",
         "description": "\n".join(
             [
-                "Read {#rules}, then say hi in {#general}.",
+                "Chill 18+ gamers. Read {#rules}, then say hi in {#general}.",
                 "",
                 "**Roles**",
                 "{@Keeper}  runs the place",
@@ -177,7 +194,7 @@ POSTS = {
 # Empty channels to remove (skipped if anyone has posted in them).
 # Small servers feel emptier with more channels: aim for 5-10 text, 2-3 voice.
 # Forums are never trimmed, so the old text #🎮・lfg can go once the forum exists.
-TRIM = ["🔗・links", "🤖・bot-commands", "🎮 Squad II", "🎧 Chill", "🎮・lfg"]
+TRIM = ["🔗・links", "🎮 Squad II", "🎧 Chill", "🎮・lfg"]
 
 COMMUNITY = {
     "rules_channel": "📌・rules",
@@ -189,7 +206,7 @@ COMMUNITY = {
 ONBOARDING_DEFAULT_CHANNELS = [
     "📌・rules", "📣・announcements", "👋・welcome", "💬・general",
     "🤣・memes", "📸・clips", "🕹️・gaming", "🎮・lfg", "🎨・art", "💻・code",
-    "👗・fashion", "♟️・chess", "🔊 Lobby", "🎮 Squad", "💤 AFK",
+    "👗・fashion", "♟️・chess", "🤖・bot-commands", "🔊 Lobby", "🎮 Squad", "💤 AFK",
 ]
 # Anything public that's neither a default channel nor an Onboarding option is
 # hidden from members who went through Onboarding, so keep this list complete.
@@ -221,7 +238,7 @@ ONBOARDING_PROMPTS = [
 
 # Welcome Screen: the card new members see, with up to 5 channels.
 WELCOME_SCREEN = {
-    "description": "A small gaming server for friends. Read the rules, pick your games, find a squad.",
+    "description": "Chill 18+ gamers. No tryhards, no toxicity. Pick your games and find a squad tonight.",
     "channels": [
         ("📌・rules", "📌", "Short and worth reading"),
         ("💬・general", "💬", "Say hi"),
@@ -231,10 +248,17 @@ WELCOME_SCREEN = {
     ],
 }
 
-# Recommended for private friend servers: invite with short-lived links
-# (Server name -> Invite People), not a permanent one. True revokes any
-# never-expiring invites the bot made.
-REVOKE_PERMANENT_INVITES = True
+# The server is public now: public_mode.py keeps one permanent invite for
+# listings, so polish_server.py must not revoke it.
+REVOKE_PERMANENT_INVITES = False
+
+# ---------------------------------------------------------------- public
+# Used by public_mode.py. The server description shows in invites and
+# Discovery; keep it under 120 characters.
+PUBLIC = {
+    "description": "Chill 18+ gaming community. No tryhards, no toxicity: squad up for Valorant, CoD, Fortnite, Minecraft and more.",
+    "invite_channel": "👋・welcome",
+}
 
 # AutoMod: alerts go to this channel; these roles are never filtered.
 AUTOMOD_ALERTS = "🛡️・mod"

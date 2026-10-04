@@ -29,6 +29,8 @@ log = logging.getLogger("front_desk")
 MODULES = [
     ("cogs.lfg", set()),
     ("cogs.stats", {"members", "presences"}),  # game time; runs without them, gaming off
+    ("cogs.growth", {"members", "message_content"}),  # invite tracking, Disboard bumps
+    ("cogs.community", {"members"}),  # welcome flow, /report, mod log
 ]
 
 PERMISSIONS = discord.Permissions(
@@ -43,6 +45,12 @@ PERMISSIONS = discord.Permissions(
     add_reactions=True,
     manage_roles=True,
     send_polls=True,
+    # Public server: invite tracking, temp voice, events, listings.
+    manage_guild=True,
+    manage_channels=True,
+    create_instant_invite=True,
+    move_members=True,
+    manage_events=True,
 )
 
 def build_intents(privileged: bool = True) -> discord.Intents:
