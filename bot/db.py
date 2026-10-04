@@ -67,6 +67,42 @@ MIGRATIONS = [
         PRIMARY KEY (user_id, day)
     )""",
     ],
+    [
+        # Growth: invite tracking and Disboard bumps.
+        """CREATE TABLE invite_uses (
+        code TEXT PRIMARY KEY,
+        inviter_id INTEGER,
+        uses INTEGER NOT NULL DEFAULT 0
+    )""",
+        """CREATE TABLE joins (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        joined_at INTEGER NOT NULL,
+        inviter_id INTEGER,
+        invite_code TEXT,
+        left_at INTEGER
+    )""",
+        "CREATE INDEX joins_user ON joins (user_id, joined_at)",
+        "CREATE INDEX joins_inviter ON joins (inviter_id, joined_at)",
+        """CREATE TABLE bumps (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        at INTEGER NOT NULL
+    )""",
+        # Community: welcomes and reports.
+        "CREATE TABLE welcomed (user_id INTEGER PRIMARY KEY, at INTEGER NOT NULL)",
+        """CREATE TABLE reports (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        reporter_id INTEGER NOT NULL,
+        target_id INTEGER NOT NULL,
+        channel_id INTEGER,
+        message_id INTEGER,
+        reason TEXT NOT NULL,
+        at INTEGER NOT NULL,
+        log_message_id INTEGER,
+        status TEXT NOT NULL DEFAULT 'open'
+    )""",
+    ],
 ]
 
 
