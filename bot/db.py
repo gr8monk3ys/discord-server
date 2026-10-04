@@ -203,6 +203,56 @@ MIGRATIONS = [
         top TEXT
     )""",
     ],
+    [
+        # Module 9: engagement autopilot.
+        "CREATE TABLE qotd_used (qid INTEGER PRIMARY KEY, used_at INTEGER NOT NULL)",
+        "CREATE TABLE poll_used (pid INTEGER PRIMARY KEY, used_at INTEGER NOT NULL)",
+        """CREATE TABLE counting (
+        channel_id INTEGER PRIMARY KEY,
+        current INTEGER NOT NULL DEFAULT 0,
+        last_user INTEGER,
+        best INTEGER NOT NULL DEFAULT 0,
+        updated_at INTEGER NOT NULL DEFAULT 0
+    )""",
+        """CREATE TABLE counting_run (
+        user_id INTEGER PRIMARY KEY,
+        n INTEGER NOT NULL DEFAULT 0
+    )""",
+        """CREATE TABLE birthdays (
+        user_id INTEGER PRIMARY KEY,
+        month INTEGER NOT NULL CHECK (month BETWEEN 1 AND 12),
+        day INTEGER NOT NULL CHECK (day BETWEEN 1 AND 31)
+    )""",
+        # Module 10: moderation autopilot.
+        """CREATE TABLE cases (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        mod_id INTEGER,
+        kind TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        at INTEGER NOT NULL,
+        duration INTEGER
+    )""",
+        "CREATE INDEX cases_user ON cases (user_id, at)",
+        # Module 12: utility.
+        """CREATE TABLE reminders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        channel_id INTEGER NOT NULL,
+        due_at INTEGER NOT NULL,
+        text TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        done INTEGER NOT NULL DEFAULT 0
+    )""",
+        "CREATE INDEX reminders_due ON reminders (done, due_at)",
+        "CREATE TABLE afk (user_id INTEGER PRIMARY KEY, reason TEXT, since INTEGER NOT NULL)",
+        """CREATE TABLE tickets (
+        thread_id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        opened_at INTEGER NOT NULL,
+        closed_at INTEGER
+    )""",
+    ],
 ]
 
 

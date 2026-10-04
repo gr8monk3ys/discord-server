@@ -32,7 +32,7 @@ from setup_server import Makeover, find, private_overwrites
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-BOT_ROLES = ("Season Champ", "Hype", "Clip of the Week", "Recruiter", "Bumper")  # roles Front Desk hands out
+BOT_ROLES = ("Season Champ", "Hype", "Birthday", "Counting Champ", "Clip of the Week", "Recruiter", "Bumper")  # roles Front Desk hands out
 NEEDED = ("manage_roles", "manage_channels", "manage_guild", "create_instant_invite")
 
 
@@ -89,7 +89,10 @@ class PublicMode:
                 continue  # handled by private()
             cat = find(self.guild.categories, cat_spec)
             for spec in cat_spec["channels"]:
-                if spec.get("private_to") or spec.get("type") == "forum":
+                if spec.get("private_to"):
+                    continue
+                if spec.get("type") == "forum":
+                    await self.new_forum(spec, cat, cat_spec["name"])
                     continue
                 voice = spec.get("type") == "voice"
                 pool = self.guild.voice_channels if voice else self.guild.text_channels
@@ -116,6 +119,18 @@ class PublicMode:
                 create = self.guild.create_voice_channel if voice else self.guild.create_text_channel
                 await self.do("create", f"{label} in {cat.name}" + (" (read-only)" if spec.get("read_only") else ""),
                               lambda: create(spec["name"], category=cat, **kwargs))
+
+    async def new_forum(self, spec, cat, cat_name):
+        if find(self.guild.forums, spec) is not None:
+            return
+        label = f"#{spec['name']} (forum)"
+        if cat is None:
+            print(f"! skip    {label}: category {cat_name} doesn't exist (run setup_server.py)")
+            return
+        tags = [discord.ForumTag(name=n, emoji=e) for n, e in spec.get("tags", [])]
+        await self.do("create", f"{label} in {cat.name} with {len(tags)} tags",
+                      lambda: self.guild.create_forum(spec["name"], category=cat, topic=spec.get("topic", ""),
+                                                      available_tags=tags))
 
     # ------------------------------------------------------------ private spaces
     def private_overwrites(self, role_names):

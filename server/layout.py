@@ -52,7 +52,9 @@ ROLES = [
     {"name": "Bots", "color": SLATE, "hoist": True, "was": ["Bot"]},
     {"name": "LFG", "mentionable": True},
     # Public-server roles, handed out by Front Desk.
-    {"name": "Season Champ", "hoist": True},  # top 3 of last month's season (Front Desk)
+    {"name": "Season Champ", "hoist": True},
+    {"name": "Birthday", "hoist": True},  # 24 h on your birthday (Front Desk)
+    {"name": "Counting Champ"},  # top counter of the best counting run (Front Desk)  # top 3 of last month's season (Front Desk)
     {"name": "Hype", "hoist": True},  # bought in the shop, lasts 24 h (Front Desk)
     {"name": "Clip of the Week"},  # given by Front Desk to the weekly clip winner
     {"name": "Recruiter"},  # 3+ people you invited stayed
@@ -72,6 +74,13 @@ CATEGORIES = [
             {"name": "📌・rules", "topic": "Read these once. They're short.", "read_only": True, "post": "rules"},
             {"name": "📣・announcements", "topic": "Game nights, updates, server news.", "read_only": True},
             {"name": "👋・welcome", "topic": "New faces land here.", "read_only": True, "system": True, "post": "welcome"},
+            {"name": "🆘・help", "topic": "Need a mod? Press the button to open a private ticket.", "read_only": True},
+            {
+                "name": "💡・suggestions",
+                "type": "forum",
+                "topic": "One idea per post. Vote with 👍 / 👎. Mods tag it when it's decided.",
+                "tags": [("Idea", "💡"), ("Accepted", "✅"), ("Denied", "❌"), ("Done", "🎉")],
+            },
         ],
     },
     {
@@ -81,6 +90,7 @@ CATEGORIES = [
             {"name": "🤣・memes", "topic": "Post it here, not in #general."},
             {"name": "📸・clips", "topic": "Highlights, fails, and receipts.", "slowmode": 10},
             {"name": "⭐・hall-of-fame", "topic": "3 ⭐ on any message and it lands here.", "read_only": True},
+            {"name": "🔢・counting", "topic": "Count up together. Same person can't go twice; a wrong number resets."},
         ],
     },
     {
@@ -210,7 +220,7 @@ COMMUNITY = {
 # the defaults everyone gets; Discord needs at least 7, 5 of them postable.
 ONBOARDING_DEFAULT_CHANNELS = [
     "📌・rules", "📣・announcements", "👋・welcome", "💬・general",
-    "🤣・memes", "📸・clips", "⭐・hall-of-fame", "🕹️・gaming", "🎮・lfg", "🎨・art", "💻・code",
+    "🆘・help", "💡・suggestions", "🤣・memes", "📸・clips", "⭐・hall-of-fame", "🔢・counting", "🕹️・gaming", "🎮・lfg", "🎨・art", "💻・code",
     "👗・fashion", "♟️・chess", "🤖・bot-commands", "🔊 Lobby", "➕ New Squad", "🎮 Squad", "💤 AFK",
 ]
 # Anything public that's neither a default channel nor an Onboarding option is

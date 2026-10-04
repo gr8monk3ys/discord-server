@@ -41,6 +41,13 @@ VOICE_CATEGORY = "05 · voice"
 NEW_SQUAD_VOICE = "➕ New Squad"  # join to get your own temporary voice channel
 HYPE_ROLE = "Hype"  # shop: 24 h hoisted role
 SEASON_ROLE = "Season Champ"  # top 3 of the last finished season
+# Phase 3 (autopilot)
+COUNTING_CHANNEL = "🔢・counting"
+SUGGESTIONS_FORUM = "💡・suggestions"
+HELP_CHANNEL = "🆘・help"  # the "Contact the mods" ticket button lives here
+BIRTHDAY_ROLE = "Birthday"
+COUNTING_ROLE = "Counting Champ"
+BACKUP_DIR = r"D:\Backups\front-desk"  # bulk data lives on D: (see fleet conventions)
 SQUAD_VOICE = "🎮 Squad"
 LOBBY_VOICE = "🔊 Lobby"
 MODES = ("Ranked", "Casual")
