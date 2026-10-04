@@ -85,6 +85,7 @@ def expected_return() -> Fraction:
 # ---------------------------------------------------------------- trivia
 TRIVIA_URL = "https://opentdb.com/api.php?amount=1&type=multiple"
 TRIVIA_PRIZE = 50
+TRIVIA_DAILY_CAP = 250  # coins per member per local day: stops farming with alts
 TRIVIA_SECONDS = 20
 LABEL_MAX = 80
 TRIVIA_CATEGORIES = {  # name shown in /trivia -> Open Trivia DB category id
@@ -104,6 +105,11 @@ def trivia_url(category_id: int | None = None) -> str:
     if category_id is None:
         return TRIVIA_URL
     return f"{TRIVIA_URL}&{urlencode({'category': category_id})}"
+
+
+def trivia_payout(earned_today: int) -> int:
+    """The prize, or 0 once it would take today's trivia winnings past the cap."""
+    return TRIVIA_PRIZE if earned_today + TRIVIA_PRIZE <= TRIVIA_DAILY_CAP else 0
 
 
 @dataclass(frozen=True)

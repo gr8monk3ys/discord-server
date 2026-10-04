@@ -6,6 +6,7 @@ import asyncio
 import itertools
 import random
 from types import SimpleNamespace
+from zoneinfo import ZoneInfo
 
 import discord
 import pytest
@@ -62,7 +63,7 @@ class FakeChannel:
 class FakeBot:
     def __init__(self, db):
         self.db = db
-        self.settings = SimpleNamespace(guild_id=GUILD_ID)
+        self.settings = SimpleNamespace(guild_id=GUILD_ID, tz=ZoneInfo("America/Los_Angeles"))
         self.guild = SimpleNamespace(id=GUILD_ID, owner_id=OWNER)
         self.cogs = {}
         self.channels = {}
@@ -589,6 +590,31 @@ def test_trivia_times_out_after_the_limit():
     with_env(go)
 
 
+def test_trivia_winnings_are_capped_per_local_day():
+    """Farming with alts: once a member has won the daily cap, a right answer is
+    still announced but pays nothing; the next local day pays again."""
+    async def win(env):
+        _, view = await ask(env)
+        inter = env.inter(B)
+        await env.cog.trivia_click(inter, view=view, index=view.round.question.correct)
+        return inter.of("edit_message")[0]["embed"].description
+
+    async def go(env):
+        rounds = rules.TRIVIA_DAILY_CAP // rules.TRIVIA_PRIZE
+        assert rounds == 5
+        for _ in range(rounds):
+            assert f"+{rules.TRIVIA_PRIZE} coins" in await win(env)
+        assert await env.bal(B) == rules.TRIVIA_DAILY_CAP
+        capped = await win(env)
+        assert "Paris" in capped and "No coins" in capped and "+" not in capped
+        assert await env.bal(B) == rules.TRIVIA_DAILY_CAP
+        assert CHANNEL not in env.cog.trivia_rounds
+        env.clock[0] += 24 * 60 * 60
+        assert f"+{rules.TRIVIA_PRIZE} coins" in await win(env)
+        assert await env.bal(B) == rules.TRIVIA_DAILY_CAP + rules.TRIVIA_PRIZE
+    with_env(go)
+
+
 def test_trivia_click_after_deadline_is_closed_even_before_timer():
     async def go(env):
         _, view = await ask(env)
@@ -752,6 +778,38 @@ def test_lock_needs_creator_or_staff_and_stops_bets():
     with_env(go)
 
 
+def test_creator_cannot_cancel_once_locked_but_staff_can():
+    """Alt abuse: once locked the outcome may be known, so the creator cancelling
+    would rescue an alt's losing stake from the other side's winnings."""
+    async def go(env):
+        _, row = await create(env)
+        pid = row["id"]
+        await seed_bets(env, pid)
+        assert (await press(env, pid, CREATOR, "lock")).of("edit_message")
+        refused = await press(env, pid, CREATOR, "cancel")
+        msg = refused.of("send_message")[0]
+        assert "only a mod" in msg["content"] and msg["ephemeral"] is True
+        status = await env.db.fetchone("SELECT status FROM predictions WHERE id = ?", (pid,))
+        assert status["status"] == "locked" and await env.bal(A) == 900
+        done = await press(env, pid, KEEPER, "cancel", roles=[config.KEEPER_ROLE])
+        assert done.of("edit_message")
+        assert all([await env.bal(u) == 1000 for u in (A, B, C, D)])
+    with_env(go)
+
+
+def test_creator_cancel_loses_race_with_lock():
+    """Even if the creator's Cancel read the prediction as open, settling it must
+    not cancel a prediction that got locked in the meantime."""
+    async def go(env):
+        _, row = await create(env)
+        pid = row["id"]
+        await env.db.execute("UPDATE predictions SET status = 'locked' WHERE id = ?", (pid,))
+        assert await env.cog.settle_prediction(pid, None, only_open=True) is None
+        status = await env.db.fetchone("SELECT status FROM predictions WHERE id = ?", (pid,))
+        assert status["status"] == "locked"
+    with_env(go)
+
+
 def test_creator_cannot_resolve_but_can_lock_and_cancel():
     async def go(env):
         _, row = await create(env)
@@ -766,10 +824,16 @@ def test_creator_cannot_resolve_but_can_lock_and_cancel():
         # Other members can't resolve either.
         member = await press(env, pid, A, "resolve_a")
         assert "Only a mod can pick the winner" in member.of("send_message")[0]["content"]
-        assert (await press(env, pid, CREATOR, "lock")).of("edit_message")
-        cancelled = await press(env, pid, CREATOR, "cancel")
+        cancelled = await press(env, pid, CREATOR, "cancel")  # still open
         assert cancelled.of("edit_message")
         assert all([await env.bal(u) == 1000 for u in (A, B, C, D)])
+    with_env(go)
+
+
+def test_creator_can_lock():
+    async def go(env):
+        _, row = await create(env)
+        assert (await press(env, row["id"], CREATOR, "lock")).of("edit_message")
     with_env(go)
 
 

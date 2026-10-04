@@ -223,12 +223,12 @@ class Clips(commands.Cog):
         where = {r["message_id"]: await self.clip_channel_id(r["message_id"], channel.id) for r in rows}
         clips = []
         for r in rows:
-            reactions = 0
-            if len(rows) > L.MAX_ANSWERS:
-                reactions = await self.reaction_count(guild, where[r["message_id"]], r["message_id"])
-                if reactions is None:  # deleted while the bot was off
-                    await self.forget([r["message_id"]])
-                    continue
+            # Fetched even when every clip fits: it's also how a clip deleted while the
+            # bot was off gets noticed, so it can't sit in the poll as a dead link.
+            reactions = await self.reaction_count(guild, where[r["message_id"]], r["message_id"])
+            if reactions is None:  # deleted while the bot was off
+                await self.forget([r["message_id"]])
+                continue
             clips.append(L.Clip(r["message_id"], r["user_id"], r["posted_at"], reactions))
         entries = L.poll_entries(clips)
         if len(entries) < 2:

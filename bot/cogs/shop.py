@@ -293,8 +293,13 @@ class Shop(commands.Cog):
         for row in rows:
             try:
                 async with self.lock(row["user_id"]):
+                    # Re-read under the lock: a rebuy since the SELECT moved expires_at
+                    # on, and its role must not be taken away.
+                    row = await self.perk(row["user_id"], row["kind"])
+                    if row is None or row["expires_at"] > now():
+                        continue
                     await self.expire(guild, row)
-                    # Only the row we expired: a rebuy in between moved expires_at on.
+                    # Only the row we expired.
                     await self.db.execute("DELETE FROM perks WHERE user_id = ? AND kind = ? AND expires_at = ?",
                                           (row["user_id"], row["kind"], row["expires_at"]))
             except Exception:

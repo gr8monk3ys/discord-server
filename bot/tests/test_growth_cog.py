@@ -96,6 +96,7 @@ class FakeGuild:
         self.roles = [self.bot_role, self.bumper, self.recruiter]
         self.me = SimpleNamespace(top_role=self.bot_role)
         self.members = []
+        self.chunked = True
         self.invite_list: list[FakeInvite] = []
         self.invites_error = None
         self.vanity_url_code = None
@@ -313,6 +314,54 @@ def test_one_use_invite_consumed_and_deleted_before_join(monkeypatch):
     with_env(go, monkeypatch)
 
 
+def test_one_use_invite_gone_before_its_delete_event_is_attributed(monkeypatch):
+    async def go(env):
+        env.guild.invite("aaa", A, uses=2)
+        env.guild.invite("once", B, uses=0, max_uses=1)
+        await env.cog.on_ready()
+        await env.join(C, via="once")  # INVITE_DELETE arrives after the join
+        await env.cog.on_invite_delete(SimpleNamespace(code="once", guild=env.guild))
+        rows = await env.rows("joins")
+        assert [(r["inviter_id"], r["invite_code"]) for r in rows] == [(B, "once")]
+    with_env(go, monkeypatch)
+
+
+def test_revoked_unused_one_use_invite_never_credits_a_later_join(monkeypatch):
+    async def go(env):
+        env.guild.invite("aaa", A, uses=2)
+        env.guild.invite("revoked", B, uses=0, max_uses=1)
+        env.guild.invite("once", D, uses=0, max_uses=1)
+        await env.cog.on_ready()
+        env.guild.invite_list = [i for i in env.guild.invite_list if i.code != "revoked"]
+        await env.cog.on_invite_delete(SimpleNamespace(code="revoked", guild=env.guild))
+        # Discovery join much later: no count went up, only the revoked code is gone.
+        await env.join(C, at=T0 + 3600)
+        # A real one-use join afterwards is still attributed.
+        env.guild.use("once")
+        await env.cog.on_invite_delete(SimpleNamespace(code="once", guild=env.guild))
+        await env.join(E, at=T0 + 3610)
+        rows = await env.rows("joins")
+        assert [(r["user_id"], r["inviter_id"], r["invite_code"]) for r in rows] == [
+            (C, None, None), (E, D, "once")]
+    with_env(go, monkeypatch)
+
+
+def test_revoked_one_use_invite_does_not_spoil_the_next_one_use_join(monkeypatch):
+    async def go(env):
+        env.guild.invite("revoked", B, uses=0, max_uses=1)
+        env.guild.invite("once", D, uses=0, max_uses=1)
+        await env.cog.on_ready()
+        env.guild.invite_list = [i for i in env.guild.invite_list if i.code != "revoked"]
+        await env.cog.on_invite_delete(SimpleNamespace(code="revoked", guild=env.guild))
+        env.t = T0 + 3600
+        env.guild.use("once")
+        await env.cog.on_invite_delete(SimpleNamespace(code="once", guild=env.guild))
+        await env.join(E)
+        rows = await env.rows("joins")
+        assert [(r["inviter_id"], r["invite_code"]) for r in rows] == [(D, "once")]
+    with_env(go, monkeypatch)
+
+
 def test_ambiguous_join_records_no_inviter(monkeypatch):
     async def go(env):
         env.guild.invite("aaa", A, uses=2)
@@ -381,6 +430,62 @@ def test_leave_sets_left_at_on_latest_open_row(monkeypatch):
         await env.leave(C, at=T0 + 3 * DAY)
         rows = await env.rows("joins")
         assert [(r["joined_at"], r["left_at"]) for r in rows] == [(T0, T0 + DAY), (T0 + 2 * DAY, T0 + 3 * DAY)]
+    with_env(go, monkeypatch)
+
+
+def test_leaves_while_offline_closed_at_last_heartbeat(monkeypatch):
+    async def go(env):
+        env.guild.invite("aaa", A)
+        env.member(A)
+        await env.cog.on_ready()
+        for uid in (C, D, E):
+            await env.join(uid, via="aaa", at=T0)
+        await env.join(F, via="aaa", at=T0)  # stays
+        env.t = T0 + 600
+        await env.cog.heartbeat()  # last sign of life before the bot goes down
+        for uid in (C, D, E):  # leave while the bot is down: no on_member_remove
+            env.guild.members.remove(env.guild.get_member(uid))
+        env.t = T0 + 5 * DAY  # restart days later
+        restarted = Growth(env.bot)
+        await restarted.load_heartbeat()
+        await restarted.on_ready()
+        rows = {r["user_id"]: r["left_at"] for r in await env.rows("joins")}
+        assert rows == {C: T0 + 600, D: T0 + 600, E: T0 + 600, F: None}
+        assert await restarted.award_recruiters() == 0  # only F stayed
+        inter = env.inter(A)
+        await Growth.invites.callback(restarted, inter, None)
+        assert "`STILL HERE`  1" in inter.sent()[0]["embed"].description
+    with_env(go, monkeypatch)
+
+
+def test_leaves_during_gateway_outage_closed_at_disconnect(monkeypatch):
+    async def go(env):
+        env.guild.invite("aaa", A)
+        await env.cog.on_ready()
+        await env.join(C, via="aaa", at=T0)
+        env.t = T0 + 100
+        await env.cog.on_disconnect()
+        env.guild.members.remove(env.guild.get_member(C))
+        env.t = T0 + 200
+        await env.cog.on_disconnect()  # repeated drops keep the first time
+        env.t = T0 + 4 * DAY
+        await env.cog.on_ready()  # new session, not a RESUME
+        assert [r["left_at"] for r in await env.rows("joins")] == [T0 + 100]
+    with_env(go, monkeypatch)
+
+
+def test_leave_reconcile_needs_the_member_list(monkeypatch):
+    async def go(env):
+        env.guild.invite("aaa", A)
+        await env.cog.on_ready()
+        await env.join(C, via="aaa", at=T0)
+        env.guild.members.clear()
+        env.guild.chunked = False
+        await env.cog.on_ready()
+        env.guild.chunked = True
+        env.bot.intents.members = False
+        await env.cog.on_ready()
+        assert [r["left_at"] for r in await env.rows("joins")] == [None]
     with_env(go, monkeypatch)
 
 

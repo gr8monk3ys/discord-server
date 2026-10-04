@@ -88,6 +88,20 @@ def test_dst_fall_back_day():
         datetime(2026, 11, 1, 4, 0, tzinfo=timezone.utc)
 
 
+def test_dst_repeated_hour_compares_real_instants():
+    # 2026-11-01 01:10 PST: the second pass through 1am (fold=1), built the way the cog does.
+    now = datetime.fromtimestamp(datetime(2026, 11, 1, 9, 10, tzinfo=timezone.utc).timestamp(), TZ)
+    assert now.fold == 1
+    # 1:45am PDT (fold=0) was 25 real minutes ago: past, though its wall clock is later.
+    assert E.check_when(local(2026, 11, 1, 1, 45), now) == "past"
+    # "1:45am" means the repeated 1:45 (PST), 35 minutes from now.
+    got = parse("1:45am", now)
+    assert got.astimezone(timezone.utc) == datetime(2026, 11, 1, 9, 45, tzinfo=timezone.utc)
+    assert E.check_when(got, now) is None
+    # 1:05am has passed both times: tomorrow.
+    assert parse("1:05am", now) == local(2026, 11, 2, 1, 5)
+
+
 def test_dst_spring_forward_day():
     # 2027-03-14: PST -> PDT. 8pm is PDT (UTC-7).
     got = parse("2027-03-14 20:00", local(2027, 3, 13, 12))

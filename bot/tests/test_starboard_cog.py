@@ -147,6 +147,18 @@ class FakeText:
     def get_partial_message(self, mid):
         return FakePartial(self, mid)
 
+    async def history(self, limit=100, after=None):
+        """Our posts still in the channel, oldest first, shaped like discord.Message."""
+        for i, kw in enumerate(self.sent, start=1):
+            mid = 70_000 + i
+            if mid not in self.posted:
+                continue
+            await asyncio.sleep(0)
+            view = kw.get("view")
+            buttons = [SimpleNamespace(url=getattr(b, "url", None)) for b in (view.children if view else [])]
+            yield SimpleNamespace(id=mid, author=SimpleNamespace(id=BOTUSER),
+                                  components=[SimpleNamespace(children=buttons)])
+
 
 class FakeThread(FakeText):
     def __init__(self, name, parent, private=False):
@@ -192,6 +204,7 @@ class FakeBot:
         self.db = db
         self.guild = guild
         self.settings = SimpleNamespace(guild_id=GUILD_ID)
+        self.user = SimpleNamespace(id=BOTUSER)
 
     def get_guild(self, gid):
         return self.guild if gid == self.guild.id else None
@@ -573,4 +586,61 @@ def test_deleting_the_original_removes_the_hall_post(monkeypatch):
         assert not g.hall.posted and await env.rows() == []
         # Deleting again (or an unknown message) is a no-op.
         await env.cog.on_raw_bulk_message_delete(SimpleNamespace(message_ids={m.id, 1}, guild_id=g.id, channel_id=1))
+    with_env(go, monkeypatch)
+
+
+# ---------------------------------------------------------------- unfinished claims
+async def strand_claim(env, m, *, sent: bool):
+    """Simulate a restart mid-post: the row is left at PENDING, with or without the
+    hall send having reached Discord."""
+    if sent:
+        await env.guild.hall.send(embed=cogmod.render(m, m.channel.name, 3), view=cogmod.jump_view(m.jump_url))
+    await env.db.execute(
+        "INSERT INTO starboard (message_id, channel_id, author_id, board_message_id, stars, at)"
+        " VALUES (?, ?, ?, ?, ?, ?)", (m.id, m.channel.id, AUTHOR, S.PENDING, 3, env.t))
+
+
+def test_fresh_pending_claim_is_left_alone(monkeypatch):
+    async def go(env):
+        m = env.message(content="mid-send")
+        await strand_claim(env, m, sent=False)
+        env.t += 60
+        await env.star(m, A, B, C, D)
+        assert env.guild.hall.sent == []
+        assert (await env.rows())[0]["board_message_id"] == S.PENDING
+    with_env(go, monkeypatch)
+
+
+def test_stale_claim_that_never_sent_is_posted_on_next_star(monkeypatch):
+    async def go(env):
+        m = env.message(content="lost in a restart")
+        await strand_claim(env, m, sent=False)
+        env.t += S.CLAIM_TIMEOUT + 1
+        await env.star(m, A, B, C)
+        assert len(env.guild.hall.sent) == 1
+        (row,) = await env.rows()
+        assert row["board_message_id"] == 70_001 and row["stars"] == 3
+    with_env(go, monkeypatch)
+
+
+def test_stale_claim_that_did_send_adopts_the_post_and_updates_it(monkeypatch):
+    async def go(env):
+        m = env.message(content="sent, then crashed")
+        await strand_claim(env, m, sent=True)
+        env.t += S.CLAIM_TIMEOUT + 1
+        await env.star(m, A, B, C, D)
+        assert len(env.guild.hall.sent) == 1  # no duplicate
+        (row,) = await env.rows()
+        assert row["board_message_id"] == 70_001 and row["stars"] == 4
+        assert last_edit_embed(env).footer.text.endswith("⭐ 4")
+    with_env(go, monkeypatch)
+
+
+def test_deleting_original_removes_hall_post_of_unfinished_claim(monkeypatch):
+    async def go(env):
+        g = env.guild
+        m = env.message(content="mod removes this")
+        await strand_claim(env, m, sent=True)
+        await env.cog.on_raw_message_delete(SimpleNamespace(message_id=m.id, guild_id=g.id, channel_id=g.general.id))
+        assert not g.hall.posted and await env.rows() == []
     with_env(go, monkeypatch)

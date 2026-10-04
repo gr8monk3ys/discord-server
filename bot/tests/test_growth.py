@@ -50,6 +50,19 @@ def test_two_disappearing_is_ambiguous():
     assert G.attribute_join(old, {}) is None
 
 
+def test_disappearance_only_counts_for_used_up_codes():
+    # A one-use invite revoked unused is gone too, but nobody joined through it.
+    old = {"aaa": (A, 3), "revoked": (B, 0), "once": (C, 0)}
+    new = {"aaa": (A, 3)}
+    assert G.attribute_join(old, new, used_up=set()) is None
+    assert G.attribute_join(old, new, used_up={"once"}) == "once"
+
+
+def test_nearly_used_up():
+    assert G.nearly_used_up(1, 0) and G.nearly_used_up(5, 4) and G.nearly_used_up(5, 5)
+    assert not G.nearly_used_up(0, 0) and not G.nearly_used_up(5, 3)
+
+
 def test_increment_wins_over_a_disappearance():
     # An expired/revoked invite vanishing at the same time doesn't hide a clear +1.
     old = {"aaa": (A, 3), "old": (B, 0)}

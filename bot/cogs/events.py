@@ -169,9 +169,7 @@ class Events(commands.Cog):
             # Claim the cooldown now, with no await since the check above, so concurrent
             # submits can't both pass; give it back if this request is refused.
             self.last_created[host.id] = t
-            row = await self.db.fetchone(
-                "SELECT COUNT(*) AS n FROM gamenights WHERE host_id = ? AND starts_at > ?", (host.id, t))
-            if row["n"] >= MAX_UPCOMING_PER_HOST:
+            if await self.upcoming_for(guild, host.id, t) >= MAX_UPCOMING_PER_HOST:
                 self.release_claim(host.id, t, last)
                 await interaction.response.send_message(
                     "You already have a game night coming up. Run that one first, or ask a mod "
@@ -190,12 +188,17 @@ class Events(commands.Cog):
                 privacy_level=discord.PrivacyLevel.guild_only,
                 reason=f"/gamenight by {host} ({host.id})",
             )
-        except discord.Forbidden:
+        except discord.HTTPException as exc:
+            # Nothing was created, so give the cooldown back whatever Discord said.
             if not is_staff(host):
                 self.release_claim(host.id, t, last)
-            log.warning("can't create scheduled events: missing Manage Events")
-            await interaction.followup.send(
-                "I can't create events here: I need the Manage Events permission.", ephemeral=True)
+            if isinstance(exc, discord.Forbidden):
+                log.warning("can't create scheduled events: missing Manage Events")
+                text = "I can't create events here: I need the Manage Events permission."
+            else:
+                log.warning("creating a game night failed", exc_info=True)
+                text = "Discord wouldn't create the event. Check the time and try again in a moment."
+            await interaction.followup.send(text, ephemeral=True)
             return
         starts_at = int(start.timestamp())
         await self.db.execute(
@@ -207,6 +210,32 @@ class Events(commands.Cog):
         await interaction.followup.send(
             f"Game night is set for {discord.utils.format_dt(start, 'F')}. "
             f"People can tap Interested to get a reminder: {event.url}{extra}", ephemeral=True)
+
+    async def upcoming_for(self, guild, host_id: int, t: int) -> int:
+        """How many of `host_id`'s game nights are still upcoming. Rows for events that were
+        cancelled or deleted in Discord are marked reminded (as `remind` would) and not counted."""
+        rows = await self.db.fetchall(
+            "SELECT event_id FROM gamenights WHERE host_id = ? AND starts_at > ? AND reminded = 0",
+            (host_id, t))
+        n = 0
+        for row in rows:
+            eid = row["event_id"]
+            event = guild.get_scheduled_event(eid)
+            if event is None:
+                try:
+                    event = await guild.fetch_scheduled_event(eid)
+                except discord.NotFound:
+                    await self.mark_reminded(eid)
+                    continue
+                except discord.HTTPException:
+                    log.warning("couldn't check game night %s; counting it", eid, exc_info=True)
+                    n += 1
+                    continue
+            if event.status in ENDED:
+                await self.mark_reminded(eid)
+                continue
+            n += 1
+        return n
 
     async def announce(self, guild, g, event, voice, host, note) -> bool:
         channel = self.text_channel_for(guild, g)

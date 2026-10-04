@@ -110,11 +110,14 @@ class FakeGuild:
         self.cached: set[int] = set()  # event ids in the gateway cache
         self.next_id = 5000
         self.forbidden = False
+        self.create_error = None  # any other exception create_scheduled_event should raise
         self.fetches = 0
 
     async def create_scheduled_event(self, **kw):
         if self.forbidden:
             raise discord.Forbidden(SimpleNamespace(status=403, reason="Forbidden"), "Missing Permissions")
+        if self.create_error is not None:
+            raise self.create_error
         self.next_id += 1
         ev = FakeEvent(self.next_id, self, **kw)
         self.events[ev.id] = ev
@@ -683,4 +686,51 @@ def test_refused_request_gives_the_cooldown_back(monkeypatch):
         env.cog.last_created.clear()
         await env.gamenight(game="minecraft", uid=USER_A, staff=False)  # refused: one already upcoming
         assert USER_A not in env.cog.last_created
+    with_env(go, monkeypatch)
+
+
+@pytest.mark.parametrize("how", ["deleted", "cancelled"])
+def test_cancelled_or_deleted_night_frees_the_members_slot(monkeypatch, how):
+    """A member whose far-off night is gone in Discord can schedule another right away."""
+    async def go(env):
+        await env.gamenight(when="2026-10-27 20:00", uid=USER_A, staff=False)
+        ev = env.guild.events[env.guild.next_id]
+        if how == "deleted":
+            del env.guild.events[ev.id]
+            env.guild.cached.discard(ev.id)
+        else:
+            ev.status = discord.EventStatus.cancelled
+        env.cog.last_created.clear()  # past the cooldown
+        i = await env.gamenight(game="minecraft", uid=USER_A, staff=False)
+        assert not any("already have a game night" in t for t in i.texts())
+        rows = await env.rows("SELECT event_id, reminded FROM gamenights WHERE host_id = ? ORDER BY event_id",
+                              (USER_A,))
+        assert rows == [dict(event_id=ev.id, reminded=1), dict(event_id=ev.id + 1, reminded=0)]
+    with_env(go, monkeypatch)
+
+
+def test_uncached_live_night_still_counts(monkeypatch):
+    async def go(env):
+        await env.gamenight(when="2026-10-27 20:00", uid=USER_A, staff=False)
+        env.guild.cached.clear()  # alive in Discord, just not in the cache
+        env.cog.last_created.clear()
+        i = await env.gamenight(game="minecraft", uid=USER_A, staff=False)
+        assert "already have a game night" in i.texts()[0]
+        assert env.guild.fetches == 1
+    with_env(go, monkeypatch)
+
+
+@pytest.mark.parametrize("status", [400, 503])
+def test_discord_error_creating_event_replies_and_gives_the_cooldown_back(monkeypatch, status):
+    async def go(env):
+        env.guild.create_error = discord.HTTPException(SimpleNamespace(status=status, reason="nope"), "nope")
+        i = await env.gamenight(uid=USER_A, staff=False)
+        [msg] = i.of("followup")
+        assert msg["ephemeral"] is True and "try again" in msg["content"]
+        assert USER_A not in env.cog.last_created
+        assert await env.rows("SELECT * FROM gamenights") == []
+        env.guild.create_error = None
+        retry = await env.gamenight(uid=USER_A, staff=False)
+        assert len(env.guild.events) == 1
+        assert not any("just made a game night" in t for t in retry.texts())
     with_env(go, monkeypatch)

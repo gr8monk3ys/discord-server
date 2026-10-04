@@ -1,7 +1,7 @@
 """Growth math: invite attribution, who stayed, recruiters, Disboard bumps.
 Pure: no Discord, no database. All times are unix seconds."""
 
-from collections.abc import Iterable
+from collections.abc import Collection, Iterable
 from dataclasses import dataclass
 
 DAY = 24 * 60 * 60
@@ -16,12 +16,18 @@ BUMP_UNVERIFIED = "unverified"  # /bump reply, but the embed isn't readable
 Snapshot = dict[str, tuple[int | None, int]]
 
 
-def attribute_join(old: Snapshot, new: Snapshot) -> str | None:
+def nearly_used_up(max_uses: int, uses: int) -> bool:
+    """One use (or none) left: if this invite disappears, a join probably used it up."""
+    return bool(max_uses) and uses >= max_uses - 1
+
+
+def attribute_join(old: Snapshot, new: Snapshot, used_up: Collection[str] | None = None) -> str | None:
     """The invite code one new member used, or None if it can't be told.
 
     - Exactly one code went up, by exactly one (a code new since `old` counts from 0): that code.
     - Nothing went up and exactly one code disappeared: that code (a one-use invite is
-      deleted the moment it's used).
+      deleted the moment it's used). With `used_up`, only those codes count as
+      disappearing: one revoked or expired unused isn't evidence of anything.
     - Anything else (no change, several codes up, one code up by 2+, several gone): None.
     """
     increments = {}
@@ -34,7 +40,7 @@ def attribute_join(old: Snapshot, new: Snapshot) -> str | None:
             (code, by), = increments.items()
             return code if by == 1 else None
         return None
-    gone = [code for code in old if code not in new]
+    gone = [code for code in old if code not in new and (used_up is None or code in used_up)]
     return gone[0] if len(gone) == 1 else None
 
 

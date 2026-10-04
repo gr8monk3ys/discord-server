@@ -32,7 +32,8 @@ async def member_names_for_overwrites(guild: discord.Guild) -> dict:
     ids = set()
     for ch in guild.channels:
         for target in ch.overwrites:
-            if isinstance(target, discord.Object) and target.type is discord.Member:
+            # discord.py types uncached member targets as User, not Member
+            if isinstance(target, discord.Object) and target.type in (discord.Member, discord.User):
                 ids.add(target.id)
     names = {}
     for member_id in sorted(ids):

@@ -396,6 +396,23 @@ def test_more_than_ten_deleted_offline_clip_dropped(monkeypatch):
     with_env(go, monkeypatch)
 
 
+def test_small_week_deleted_offline_clip_dropped(monkeypatch):
+    async def go(env):
+        await env.first_run()
+        ids = await week_of_clips(env, [A, B, C])  # fits in one poll: no ranking needed
+        del env.guild.clips.messages[ids[0]]  # deleted while the bot was off
+        env.t = POLL_AT
+        await env.cog.run_weekly()
+        sent = env.guild.clips.sent[0]
+        assert len(sent["poll"].answers) == 2
+        assert f"/{ids[0]}" not in sent["content"]
+        stored = json.loads((await env.db.fetchone("SELECT value FROM meta WHERE key = ?",
+                                                   (f"clip_poll:{WEEK}",)))["value"])
+        assert [e["message_id"] for e in stored] == ids[1:]
+        assert ids[0] not in [r["message_id"] for r in await env.clips()]
+    with_env(go, monkeypatch)
+
+
 def test_poll_send_failure_retries_next_tick(monkeypatch):
     async def go(env):
         await env.first_run()

@@ -23,6 +23,7 @@ import economy
 import style
 from errors import reply_error
 from logic import blackjack as bj
+from logic import coins as C
 from logic import games as rules
 from logic.games import BetProblem, Click, PredictionRefusal, Stake
 
@@ -461,10 +462,17 @@ class Games(commands.Cog):
         result = round_.click(interaction.user.id, index)
         if result is Click.WIN:
             self.end_trivia(view)
-            await economy.apply(self.db, interaction.user.id, rules.TRIVIA_PRIZE, "trivia", self.clock(),
-                                ref=f"trivia:{view.message.id}")
-            await interaction.response.edit_message(embed=self.render_trivia(view, winner=interaction.user),
-                                                    view=view, allowed_mentions=NO_PINGS)
+            at = self.clock()
+            since, until = C.day_bounds(int(at), self.bot.settings.tz)
+            async with self.db.transaction() as tx:  # cap check and payout together
+                prize = rules.trivia_payout(
+                    await economy.earned_tx(tx, interaction.user.id, "trivia", since, until))
+                if prize:
+                    await economy.apply_tx(tx, interaction.user.id, prize, "trivia", at,
+                                           ref=f"trivia:{view.message.id}")
+            await interaction.response.edit_message(
+                embed=self.render_trivia(view, winner=interaction.user, prize=prize),
+                view=view, allowed_mentions=NO_PINGS)
             return
         text = {
             Click.WRONG: "Nope, that's not it. One guess each, so you're out for this one.",
@@ -498,13 +506,15 @@ class Games(commands.Cog):
             del self.trivia_rounds[view.channel_id]
         return True
 
-    def render_trivia(self, view: TriviaView, winner=None) -> discord.Embed:
+    def render_trivia(self, view: TriviaView, winner=None, prize: int = rules.TRIVIA_PRIZE) -> discord.Embed:
         q = view.round.question
         lines = [f"**{discord.utils.escape_markdown(q.text)}**", ""]
         lines += [f"`{chr(65 + i)}` {discord.utils.escape_markdown(a)}" for i, a in enumerate(q.answers)]
         if winner is not None:
+            reward = (f" +{prize} coins." if prize else
+                      f" No coins: they've hit today's trivia limit ({rules.TRIVIA_DAILY_CAP} coins).")
             lines += ["", f"✅ **{name_of(winner)}** got it: {discord.utils.escape_markdown(q.correct_answer)}."
-                          f" +{rules.TRIVIA_PRIZE} coins."]
+                          + reward]
             status, color = "won", style.MUTED
         elif view.round.closed:
             lines += ["", f"⏱️ Time's up. The answer was **{discord.utils.escape_markdown(q.correct_answer)}**."]
@@ -585,18 +595,25 @@ class Games(commands.Cog):
                 BetModal(self, prediction_id, action, row[f"option_{action}"], bet["amount"] if bet else 0))
             return
 
-        # Lock and Cancel are safe for the creator (cancel refunds everyone). Picking the
-        # winner moves other members' coins, so only staff may: a creator could bet
-        # through an alt and then resolve in its favour.
+        # Lock is safe for the creator, and so is Cancel while bets are open (it refunds
+        # everyone). Picking the winner moves other members' coins, so only staff may: a
+        # creator could bet through an alt and then resolve in its favour. Once locked
+        # the outcome may be known, so Cancel is staff-only too: otherwise the creator
+        # could cancel to rescue an alt's losing bet.
+        staff = self.is_staff(user)
         if action in ("resolve_a", "resolve_b"):
-            if not self.is_staff(user):
+            if not staff:
                 await interaction.response.send_message(
                     "Only a mod can pick the winner (a Keeper or Moderator), so nobody resolves their own bet."
-                    " You can still Lock or Cancel your prediction.", ephemeral=True)
+                    " You can still Lock your prediction, or Cancel it while bets are open.", ephemeral=True)
                 return
-        elif user.id != row["creator_id"] and not self.is_staff(user):
+        elif user.id != row["creator_id"] and not staff:
             await interaction.response.send_message(
                 "Only whoever made this prediction, a Keeper or a Moderator can do that.", ephemeral=True)
+            return
+        elif action == "cancel" and not staff and row["status"] == "locked":
+            await interaction.response.send_message(
+                "Bets are locked, so only a mod (a Keeper or Moderator) can cancel this now.", ephemeral=True)
             return
         if action == "lock":
             changed = await self.db.execute(
@@ -607,7 +624,8 @@ class Games(commands.Cog):
                 return
         else:
             winner = {"resolve_a": "a", "resolve_b": "b", "cancel": None}[action]
-            paid = await self.settle_prediction(prediction_id, winner)
+            # The creator's Cancel must still find it open (it may have been locked since).
+            paid = await self.settle_prediction(prediction_id, winner, only_open=not staff)
             if paid is None:
                 current = await self.db.fetchone("SELECT status FROM predictions WHERE id = ?", (prediction_id,))
                 await interaction.response.send_message(f"This prediction is already {current['status']}.",
@@ -652,14 +670,17 @@ class Games(commands.Cog):
             ephemeral=True)
         await self.refresh_prediction(prediction_id)
 
-    async def settle_prediction(self, prediction_id: int, winner: str | None) -> dict[int, int] | None:
+    async def settle_prediction(self, prediction_id: int, winner: str | None,
+                                only_open: bool = False) -> dict[int, int] | None:
         """Resolve (winner 'a'/'b') or cancel (None) and pay everyone in one
-        transaction. None if it was already settled. Refs `pred:<id>:<user>` make a
-        second payout impossible even if the status check were bypassed."""
+        transaction. None if it was already settled (or, with only_open, locked).
+        Refs `pred:<id>:<user>` make a second payout impossible even if the status
+        check were bypassed."""
         status = "resolved" if winner else "cancelled"
+        allowed = "('open')" if only_open else "('open', 'locked')"
         async with self.db.transaction() as tx:
             cur = await tx.execute(
-                "UPDATE predictions SET status = ?, winner = ? WHERE id = ? AND status IN ('open', 'locked')",
+                f"UPDATE predictions SET status = ?, winner = ? WHERE id = ? AND status IN {allowed}",
                 (status, winner, prediction_id))
             if not cur.rowcount:
                 return None

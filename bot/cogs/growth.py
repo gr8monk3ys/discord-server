@@ -24,6 +24,8 @@ log = logging.getLogger(__name__)
 WINDOW = 30 * G.DAY  # /recruiters and /bumpers look back this far
 BUMP_DUE_KEY = "bump_due"
 REMINDER_TEXT = "Time to bump! Run `/bump`"
+HEARTBEAT_KEY = "growth_heartbeat"  # last minute the bot was up, for leaves missed while it was down
+USED_UP_GRACE = 60  # seconds a deleted, nearly used-up invite can still explain a join
 
 
 def now() -> int:
@@ -61,12 +63,19 @@ class Growth(commands.Cog):
         self.join_lock = asyncio.Lock()  # one invite diff at a time
         self.invites_blocked = False  # logged the missing Manage Server once
         self.limits: dict[str, tuple[int, int]] = {}  # code -> (max_uses, uses) from the last fetch
+        self.used_up: dict[str, int] = {}  # code -> when it was deleted with (nearly) no uses left
+        self.gone_at: int | None = None  # when we stopped seeing events (process down or gateway lost)
 
     async def cog_load(self) -> None:
+        # Runs before the gateway connects, so the heartbeat is still the last one
+        # from before this start: roughly when the bot went down.
+        await self.load_heartbeat()
+        self.heartbeat.start()
         self.bump_reminder.start()
         self.recruiter_sweep.start()
 
     async def cog_unload(self) -> None:
+        self.heartbeat.cancel()
         self.bump_reminder.cancel()
         self.recruiter_sweep.cancel()
 
@@ -134,6 +143,10 @@ class Growth(commands.Cog):
             await self.sync_invites()
         except Exception:
             log.exception("invite sync failed")
+        try:
+            await self.reconcile_leaves()
+        except Exception:
+            log.exception("leave reconcile failed")
 
     @commands.Cog.listener()
     async def on_invite_create(self, invite: discord.Invite) -> None:
@@ -155,9 +168,11 @@ class Growth(commands.Cog):
             if not self.ours(invite.guild):
                 return
             max_uses, uses = self.limits.pop(invite.code, (0, 0))
-            if max_uses and uses >= max_uses - 1:
+            if G.nearly_used_up(max_uses, uses):
                 # Probably used up by a join that's about to arrive: keep it so the
-                # join's diff can see it disappear. The next diff drops it.
+                # join's diff can see it disappear. The next diff drops it. If no join
+                # comes within USED_UP_GRACE it was revoked/expired, and no longer counts.
+                self.used_up[invite.code] = now()
                 log.debug("invite %s used up; kept for the join diff", invite.code)
                 return
             await self.db.execute("DELETE FROM invite_uses WHERE code = ?", (invite.code,))
@@ -183,10 +198,15 @@ class Growth(commands.Cog):
             return False
         async with self.join_lock:
             old = await self.cached()
+            before = dict(self.limits)  # snapshot() replaces it
             new = await self.snapshot(member.guild)
-            code = G.attribute_join(old, new) if new is not None else None
-            inviter = G.inviter_of(code, old, new or {})
             t = now()
+            self.used_up = {c: at for c, at in self.used_up.items() if t - at <= USED_UP_GRACE}
+            # Codes whose disappearance can explain this join: deleted just now with no
+            # uses left, or nearly used up and gone before Discord said it was deleted.
+            used_up = set(self.used_up) | {c for c, lim in before.items() if G.nearly_used_up(*lim)}
+            code = G.attribute_join(old, new, used_up) if new is not None else None
+            inviter = G.inviter_of(code, old, new or {})
             async with self.db.transaction() as tx:
                 # A leave we missed (bot offline) shouldn't leave them "here" twice.
                 await tx.execute("UPDATE joins SET left_at = ? WHERE user_id = ? AND left_at IS NULL", (t, member.id))
@@ -208,6 +228,55 @@ class Growth(commands.Cog):
                 (now(), member.id))
         except Exception:
             log.exception("recording leave of %s failed", getattr(member, "id", "?"))
+
+    # ------------------------------------------------------------ downtime
+    async def load_heartbeat(self) -> None:
+        row = await self.db.fetchone("SELECT value FROM meta WHERE key = ?", (HEARTBEAT_KEY,))
+        if row is not None and self.gone_at is None:
+            self.gone_at = int(row["value"])
+
+    @tasks.loop(minutes=1)
+    async def heartbeat(self) -> None:
+        try:
+            await self.db.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+                                  (HEARTBEAT_KEY, str(now())))
+        except Exception:
+            log.exception("growth heartbeat failed")
+
+    @heartbeat.before_loop
+    async def before_heartbeat(self) -> None:
+        await self.bot.wait_until_ready()
+
+    @commands.Cog.listener()
+    async def on_disconnect(self) -> None:
+        if self.gone_at is None:
+            self.gone_at = now()
+
+    @commands.Cog.listener()
+    async def on_resumed(self) -> None:
+        self.gone_at = None  # a RESUME replays the missed events, leaves included
+
+    async def reconcile_leaves(self) -> int:
+        """Close joins rows of people who left while we weren't getting events (bot down,
+        or a reconnect that couldn't resume). They left at some point after we stopped
+        watching, so date the leave then; without a known time, now. Returns rows closed."""
+        guild = self.guild()
+        gone_at, self.gone_at = self.gone_at, None
+        # Without the member list every recruit would look gone.
+        if guild is None or not getattr(self.bot.intents, "members", False) or not getattr(guild, "chunked", False):
+            return 0
+        t = now() if gone_at is None else min(gone_at, now())
+        closed = 0
+        async with self.join_lock:
+            rows = await self.db.fetchall("SELECT id, user_id FROM joins WHERE left_at IS NULL")
+            async with self.db.transaction() as tx:
+                for r in rows:
+                    if guild.get_member(r["user_id"]) is None:
+                        await tx.execute("UPDATE joins SET left_at = MAX(joined_at, ?) WHERE id = ?", (t, r["id"]))
+                        closed += 1
+        if closed:
+            log.info("closed %d join(s) for members who left while I was away", closed)
+        return closed
 
     async def joins(self, inviter: int | None = None) -> list[G.Join]:
         sql = "SELECT user_id, inviter_id, joined_at, left_at FROM joins WHERE inviter_id IS NOT NULL"

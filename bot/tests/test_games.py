@@ -191,3 +191,11 @@ def test_split_pool_always_pays_exactly_the_pool():
 
 def test_refunds():
     assert games.refunds([Stake(1, "a", 10), Stake(2, "b", 20)]) == {1: 10, 2: 20}
+
+
+def test_trivia_payout_stops_at_the_daily_cap():
+    assert games.TRIVIA_DAILY_CAP == 250
+    assert games.trivia_payout(0) == games.TRIVIA_PRIZE
+    assert games.trivia_payout(games.TRIVIA_DAILY_CAP - games.TRIVIA_PRIZE) == games.TRIVIA_PRIZE
+    assert games.trivia_payout(games.TRIVIA_DAILY_CAP - games.TRIVIA_PRIZE + 1) == 0
+    assert games.trivia_payout(games.TRIVIA_DAILY_CAP) == 0

@@ -51,10 +51,20 @@ def _parse_time(text: str) -> time | None:
     return None
 
 
-def _local(day: date, at: time, tz: tzinfo) -> datetime:
+def _later(a: datetime, b: datetime) -> bool:
+    """a is after b as real instants. Datetimes sharing a tzinfo compare (and subtract) as
+    wall-clock times, ignoring fold, so compare in UTC."""
+    return a.astimezone(timezone.utc) > b.astimezone(timezone.utc)
+
+
+def _local(day: date, at: time, tz: tzinfo, now: datetime) -> datetime:
     # zoneinfo resolves wall-clock times with fold=0: on the fall-back day an ambiguous time
-    # takes the first (DST) instance; a spring-forward gap time lands an hour later.
-    return datetime.combine(day, at, tzinfo=tz)
+    # takes the first (DST) instance; a spring-forward gap time lands an hour later. If that
+    # first instance has passed but the repeated one hasn't, take the repeated one.
+    when = datetime.combine(day, at, tzinfo=tz)
+    if not _later(when, now) and _later(when.replace(fold=1), now):
+        return when.replace(fold=1)
+    return when
 
 
 def parse_when(text: str, now: datetime, tz: tzinfo) -> datetime | None:
@@ -74,7 +84,7 @@ def parse_when(text: str, now: datetime, tz: tzinfo) -> datetime | None:
         except ValueError:
             return None
         at = _parse_time(rest)
-        return _local(day, at, tz) if at else None
+        return _local(day, at, tz, now) if at else None
 
     first, _, rest = words.partition(" ")
     if first in TODAY_WORDS or first in TOMORROW_WORDS or first in WEEKDAYS:
@@ -82,25 +92,25 @@ def parse_when(text: str, now: datetime, tz: tzinfo) -> datetime | None:
         if at is None:
             return None
         if first in TODAY_WORDS:
-            return _local(today, at, tz)
+            return _local(today, at, tz, now)
         if first in TOMORROW_WORDS:
-            return _local(today + timedelta(days=1), at, tz)
+            return _local(today + timedelta(days=1), at, tz, now)
         day = today + timedelta(days=(WEEKDAYS[first] - today.weekday()) % 7)
-        when = _local(day, at, tz)
-        return when if when > now else _local(day + timedelta(days=7), at, tz)
+        when = _local(day, at, tz, now)
+        return when if _later(when, now) else _local(day + timedelta(days=7), at, tz, now)
 
     at = _parse_time(words)
     if at is None:
         return None
-    when = _local(today, at, tz)
-    return when if when > now else _local(today + timedelta(days=1), at, tz)
+    when = _local(today, at, tz, now)
+    return when if _later(when, now) else _local(today + timedelta(days=1), at, tz, now)
 
 
 def check_when(when: datetime, now: datetime) -> str | None:
     """None if `when` is usable, else "past" or "too_far"."""
-    if when <= now:
+    if not _later(when, now):
         return "past"
-    if when - now > MAX_AHEAD:
+    if when - now > MAX_AHEAD:  # calendar days: wall-clock difference is what people mean
         return "too_far"
     return None
 

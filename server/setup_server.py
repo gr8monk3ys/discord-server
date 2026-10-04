@@ -38,6 +38,26 @@ def layout_channels():
         yield from cat_spec["channels"]
 
 
+def private_overwrites(guild, role_names, known=None):
+    """Hidden from @everyone, visible to the bot and the named roles ("private_to").
+
+    known maps layout role names to roles just created (not yet in guild.roles).
+    """
+    known = known or {}
+    ow = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True,
+                                              embed_links=True, connect=True),
+    }
+    for name in role_names:
+        r = known.get(name) or discord.utils.find(lambda r: slug(r.name) == slug(name), guild.roles)
+        if r is None:
+            print(f"! role @{name} not found; it won't see the private space")
+            continue
+        ow[r] = discord.PermissionOverwrite(view_channel=True)
+    return ow
+
+
 class Makeover:
     def __init__(self, guild: discord.Guild, apply: bool):
         self.guild = guild
@@ -139,7 +159,12 @@ class Makeover:
             name = cat_spec["name"]
             print(f"\n{name.upper()}")
             cat = find(self.guild.categories, cat_spec)
-            if cat is None:
+            cat_private = cat_spec.get("private_to")
+            if cat is None and cat_private:
+                ow = private_overwrites(self.guild, cat_private, self.roles)
+                cat = await self.do("create", f"category {name} (private)",
+                                    lambda: self.guild.create_category(name, overwrites=ow))
+            elif cat is None:
                 cat = await self.do("create", f"category {name}", lambda: self.guild.create_category(name))
             elif cat.name != name:
                 cat = await self.do("rename", f"category {name} (was {cat.name})", lambda: cat.edit(name=name)) or cat
@@ -148,7 +173,7 @@ class Makeover:
 
             members = []
             for spec in cat_spec["channels"]:
-                ch = await self.make_channel(spec, cat)
+                ch = await self.make_channel(spec, cat, spec.get("private_to") or cat_private)
                 if ch is None:
                     continue
                 members.append(ch)
@@ -201,7 +226,7 @@ class Makeover:
             return ch
         return await self.do("update", f"{label}: {', '.join(changed)}", lambda: ch.edit(**kwargs)) or ch
 
-    async def make_channel(self, spec, cat):
+    async def make_channel(self, spec, cat, private_to=None):
         if spec.get("type") == "forum":
             return await self.make_forum(spec, cat)
         name = spec["name"]
@@ -218,7 +243,10 @@ class Makeover:
 
         ch = find(pool, spec)
         if ch is None:
-            if spec.get("read_only"):
+            if private_to:
+                kwargs["overwrites"] = private_overwrites(self.guild, private_to, self.roles)
+                label += " (private)"
+            elif spec.get("read_only"):
                 kwargs["overwrites"] = self.read_only_overwrites()
             create = self.guild.create_voice_channel if voice else self.guild.create_text_channel
             return await self.do("create", label, lambda: create(category=cat, **kwargs))
@@ -307,9 +335,9 @@ class Makeover:
             ch = self.channels.get(slug(spec["name"]))
             post = layout.POSTS[key]
             if ch is not None and self.guild.get_channel(ch.id) is not None:
-                mine = [m async for m in ch.history(limit=50) if m.author == self.guild.me]
-                if mine:
-                    await self.refresh_post(key, mine[-1], post)
+                old = await self.find_post(ch)
+                if old is not None:
+                    await self.refresh_post(key, old, post)
                     continue
             embed = discord.Embed(
                 title=post["title"],
@@ -324,6 +352,16 @@ class Makeover:
                 return msg
 
             await self.do("post", f"{key} -> #{spec['name']} (pinned)", send)
+
+    async def find_post(self, ch):
+        """The bot's earlier embed post: pinned first, since join messages push it out of recent history."""
+        me = self.guild.me
+        async for m in ch.pins(limit=None):
+            if m.author == me and m.embeds:
+                return m
+        # not pinned (yet): look at recent history; skip the bot's own "pinned a message" notices
+        mine = [m async for m in ch.history(limit=50) if m.author == me and m.embeds]
+        return mine[-1] if mine else None
 
     async def refresh_post(self, key, msg, post):
         """Edit the bot's earlier post if layout.py's text changed, and pin it."""

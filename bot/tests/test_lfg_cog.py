@@ -354,6 +354,23 @@ def test_create_thread_failure_removes_rows():
     with_env(go)
 
 
+@pytest.mark.parametrize("err", [OSError("network down"), asyncio.TimeoutError()],
+                         ids=["oserror", "timeout"])
+def test_create_thread_non_http_failure_removes_rows_and_unblocks(err):
+    """Finding 3: discord.py re-raises raw OSError / TimeoutError (not HTTPException).
+    The half-made row must still go, or the host is stuck on 'still being created'."""
+    async def go(env):
+        env.guild.forum.fail_next = err
+        with pytest.raises(type(err)):
+            await env.create()
+        assert await env.db.fetchall("SELECT * FROM lfg_posts") == []
+        assert await env.db.fetchall("SELECT * FROM lfg_members") == []
+        inter, post = await env.create()
+        assert post["thread_id"] is not None
+        assert "still being created" not in " ".join(inter.texts())
+    with_env(go)
+
+
 def test_not_ready_cog_replies_ephemerally():
     async def go(env):
         inter = env.inter(HOST)
@@ -399,26 +416,68 @@ def test_close_unarchives_auto_archived_thread_first():
     with_env(go)
 
 
-def test_transient_error_on_lock_reopens_for_retry():
+def flaky_lock(thread):
+    """Make locking the thread fail with a 403 (e.g. Manage Threads missing) until restored."""
+    real_edit = thread.edit
+
+    async def edit(**kwargs):
+        if kwargs.get("locked"):
+            raise discord.HTTPException(SimpleNamespace(status=403, reason="x"), "Missing Permissions")
+        return await real_edit(**kwargs)
+    thread.edit = edit
+    return real_edit
+
+
+async def tidy_pending(env):
+    rows = await env.db.fetchall("SELECT key FROM meta WHERE key LIKE 'lfg:tidy:%'")
+    return [r["key"] for r in rows]
+
+
+def test_transient_error_on_lock_keeps_post_closed_and_expiry_retries():
     async def go(env):
         _, post = await env.create()
         thread = env.thread(post)
-        real_edit = thread.edit
-
-        async def flaky_edit(**kwargs):
-            if kwargs.get("locked"):
-                raise discord.HTTPException(SimpleNamespace(status=503, reason="x"), "Service Unavailable")
-            return await real_edit(**kwargs)
-        thread.edit = flaky_edit
+        real_edit = flaky_lock(thread)
         await env.cog.close_post(post)
-        assert (await env.post(post["id"]))["closed_at"] is None  # expiry will retry
+        assert (await env.post(post["id"]))["closed_at"] is not None  # stays closed
+        assert await tidy_pending(env) == [f"lfg:tidy:{post['id']}"]
+        assert not thread.locked
         thread.edit = real_edit
-        await env.cog.close_post(await env.post(post["id"]))
-        assert thread.archived and (await env.post(post["id"]))["closed_at"] is not None
+        await env.cog.expiry.coro(env.cog)
+        assert thread.archived and thread.locked and thread.name.startswith("✓ ")
+        assert await tidy_pending(env) == []
     with_env(go)
 
 
-# ---------------------------------------------------------------- join / leave
+def test_early_manual_close_failure_is_retried_and_never_reopened():
+    """Finding 2: a host closes 10 min in and the lock fails. The post must stay
+    closed (Join refused, next /lfg is a fresh post) and expiry must retry the lock
+    even though the post is far from its 3h expiry, including after a restart."""
+    async def go(env):
+        _, post = await env.create(host=HOST, players=3)
+        thread = env.thread(post)
+        real_edit = flaky_lock(thread)
+        await env.press(HOST, "close", post)
+        assert (await env.post(post["id"]))["closed_at"] is not None
+        assert not thread.locked
+
+        joiner = await env.press(A, "join", post)
+        assert joiner.texts() == ["This squad is closed."]
+        _, fresh = await env.create(host=HOST, players=4)
+        assert fresh["id"] != post["id"] and fresh["thread_id"] != post["thread_id"]
+        assert (await env.post(post["id"]))["closed_at"] is not None
+
+        env.restart()
+        await env.cog.expiry.coro(env.cog)  # still failing: marker survives
+        assert await tidy_pending(env) == [f"lfg:tidy:{post['id']}"]
+        thread.edit = real_edit
+        await env.cog.expiry.coro(env.cog)
+        assert thread.locked and thread.archived
+        assert await tidy_pending(env) == []
+        assert (await env.post(fresh["id"]))["closed_at"] is None  # young post untouched
+    with_env(go)
+
+
 def test_join_updates_embed_count():
     async def go(env):
         _, post = await env.create(players=3)

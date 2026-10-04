@@ -11,6 +11,9 @@ TEXT_LIMIT = 1000
 DAY = 24 * 60 * 60
 MAX_AGE = 14 * DAY  # older messages are never newly posted
 PENDING = 0  # board_message_id while the post is being sent (claimed, not yet known)
+# A claim this old was never finished (crash/restart mid-send, or the final UPDATE
+# failed): the sender is gone, so the claim is recovered instead of blocking forever.
+CLAIM_TIMEOUT = 10 * 60
 IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".gif", ".webp")
 
 
@@ -42,6 +45,13 @@ class Board:
     """The starboard row for a message: its hall post and the count it shows."""
     board_message_id: int | None
     stars: int
+    at: int = 0  # when the row was claimed
+
+
+def stale_claim(board: Board | None, now_ts: float) -> bool:
+    """A PENDING claim whose sender must be gone: safe to recover."""
+    return (board is not None and board.board_message_id == PENDING
+            and now_ts - board.at > CLAIM_TIMEOUT)
 
 
 class Action(Enum):

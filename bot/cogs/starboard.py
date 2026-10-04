@@ -11,6 +11,7 @@ import functools
 import logging
 import time
 import weakref
+from datetime import datetime, timezone
 
 import discord
 from discord.ext import commands
@@ -130,13 +131,22 @@ class Starboard(commands.Cog):
         hall = self.hall(guild) if guild else None
         for mid in message_ids:
             async with self.lock(mid):
-                row = await self.db.fetchone("SELECT board_message_id FROM starboard WHERE message_id = ?", (mid,))
+                row = await self.db.fetchone(
+                    "SELECT channel_id, board_message_id, at FROM starboard WHERE message_id = ?", (mid,))
                 if row is None:
                     continue
                 await self.db.execute("DELETE FROM starboard WHERE message_id = ?", (mid,))
-                if hall is not None and row["board_message_id"]:
+                board_id = row["board_message_id"]
+                if hall is not None and board_id == S.PENDING:
+                    # An unfinished claim (we hold the lock, so nobody is sending it
+                    # now): the post may still have reached the hall.
                     try:
-                        await hall.get_partial_message(row["board_message_id"]).delete()
+                        board_id = await self.find_post(hall, row["channel_id"], mid, row["at"])
+                    except discord.HTTPException:
+                        log.warning("couldn't search the hall for deleted message %s", mid, exc_info=True)
+                if hall is not None and board_id:
+                    try:
+                        await hall.get_partial_message(board_id).delete()
                     except discord.NotFound:
                         pass
                     except discord.HTTPException:
@@ -170,9 +180,38 @@ class Starboard(commands.Cog):
         return channel
 
     async def board(self, message_id: int) -> S.Board | None:
-        row = await self.db.fetchone("SELECT board_message_id, stars FROM starboard WHERE message_id = ?",
+        row = await self.db.fetchone("SELECT board_message_id, stars, at FROM starboard WHERE message_id = ?",
                                      (message_id,))
-        return S.Board(row["board_message_id"], row["stars"]) if row else None
+        return S.Board(row["board_message_id"], row["stars"], row["at"]) if row else None
+
+    async def find_post(self, hall, channel_id: int, message_id: int, since: int) -> int | None:
+        """Our hall post for a message (found by its jump button), sent since `since`."""
+        me = getattr(self.bot, "user", None)
+        suffix = f"/{channel_id}/{message_id}"
+        after = datetime.fromtimestamp(since - 60, tz=timezone.utc)
+        async for m in hall.history(limit=200, after=after):
+            if me is not None and m.author.id != me.id:
+                continue
+            for row in getattr(m, "components", None) or ():
+                for item in getattr(row, "children", None) or ():
+                    if (getattr(item, "url", None) or "").endswith(suffix):
+                        return m.id
+        return None
+
+    async def recover(self, hall, channel, message, board: S.Board) -> S.Board | None:
+        """Settle a stale PENDING claim: adopt the hall post if the send got through,
+        otherwise drop the claim so the message can be posted again."""
+        found = await self.find_post(hall, channel.id, message.id, board.at)
+        if found:
+            await self.db.execute(
+                "UPDATE starboard SET board_message_id = ? WHERE message_id = ? AND board_message_id = ?",
+                (found, message.id, S.PENDING))
+            log.info("recovered hall post %s for message %s", found, message.id)
+            return S.Board(found, board.stars, board.at)
+        await self.db.execute("DELETE FROM starboard WHERE message_id = ? AND board_message_id = ?",
+                              (message.id, S.PENDING))
+        log.info("dropped unfinished hall claim for message %s", message.id)
+        return None
 
     @staticmethod
     async def count(message) -> int:
@@ -199,14 +238,16 @@ class Starboard(commands.Cog):
             created = discord.utils.snowflake_time(message_id).timestamp()
             if S.too_old(created, now()):
                 return  # old messages are never newly posted (already-posted ones still update)
-        elif board.board_message_id == S.PENDING:
-            return
+        elif board.board_message_id == S.PENDING and not S.stale_claim(board, now()):
+            return  # another update is posting it right now
         try:
             message = await channel.fetch_message(message_id)
         except (discord.NotFound, discord.Forbidden):
             return
         if message.author.bot:
             return
+        if S.stale_claim(board, now()):
+            board = await self.recover(hall, channel, message, board)
         stars = await self.count(message)
         action = S.plan(board, stars)
         if action is S.Action.POST:

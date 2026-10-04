@@ -28,7 +28,7 @@ from dotenv import load_dotenv
 
 import layout
 from names import slug
-from setup_server import Makeover, find
+from setup_server import Makeover, find, private_overwrites
 
 sys.stdout.reconfigure(encoding="utf-8")
 
@@ -68,11 +68,17 @@ class PublicMode:
         print("\nRoles")
         for name in BOT_ROLES:
             spec = next(r for r in layout.ROLES if r.get("name") == name)
-            if self.role(name):
+            hoist = spec.get("hoist", False)
+            role = self.role(name)
+            if role is None:
+                await self.do("create", f"@{name}", lambda: self.guild.create_role(
+                    name=name, colour=discord.Colour(spec.get("color", 0)), hoist=hoist,
+                    mentionable=spec.get("mentionable", False), reason="Public server"))
+            elif role.hoist != hoist and role < self.guild.me.top_role:
+                await self.do("update", f"@{name}: {'hoist' if hoist else 'unhoist'}",
+                              lambda: role.edit(hoist=hoist, reason="Public server"))
+            else:
                 print(f"  ok      @{name}")
-                continue
-            await self.do("create", f"@{name}", lambda: self.guild.create_role(
-                name=name, mentionable=spec.get("mentionable", False), reason="Public server"))
 
     # ------------------------------------------------------------ new public channels
     async def new_channels(self):
@@ -113,18 +119,7 @@ class PublicMode:
 
     # ------------------------------------------------------------ private spaces
     def private_overwrites(self, role_names):
-        ow = {
-            self.guild.default_role: discord.PermissionOverwrite(view_channel=False),
-            self.guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True,
-                                                       embed_links=True, connect=True),
-        }
-        for name in role_names:
-            r = self.role(name)
-            if r is None:
-                print(f"! role @{name} not found; it won't see the private space")
-                continue
-            ow[r] = discord.PermissionOverwrite(view_channel=True)
-        return ow
+        return private_overwrites(self.guild, role_names)
 
     @staticmethod
     def is_private(ch, ow) -> bool:

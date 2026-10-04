@@ -41,6 +41,13 @@ LEAVE_REPLIES = {
 }
 
 
+TIDY_PREFIX = "lfg:tidy:"  # meta: a closed post whose thread still needs locking + archiving
+
+
+def tidy_key(post_id: int) -> str:
+    return f"{TIDY_PREFIX}{post_id}"
+
+
 def now() -> int:
     return int(time.time())
 
@@ -292,7 +299,9 @@ class Lfg(commands.Cog):
                 applied_tags=self.tags_for(g.key, mode_value),
                 allowed_mentions=ping_only(roles=[r for r in (self.game_roles.get(g.key), self.lfg_role) if r]),
             )
-        except discord.HTTPException:
+        except BaseException:
+            # Any failure (HTTP error, a raw OSError or timeout from the connection,
+            # cancellation): drop the row, or the open-post index blocks this game until expiry.
             await self.bot.db.execute("DELETE FROM lfg_posts WHERE id = ?", (post_id,))
             raise
         await self.bot.db.execute(
@@ -408,21 +417,35 @@ class Lfg(commands.Cog):
 
     # ------------------------------------------------------------ closing
     async def close_post(self, post) -> None:
-        """Mark closed, then turn the buttons off, then lock + archive + rename.
-        Each Discord step is tried on its own, so one failure doesn't skip the rest.
-        A transient API error re-opens the row so the expiry job retries it."""
+        """Mark closed, then tidy the thread on Discord. The row stays closed even if
+        the Discord side fails: a meta marker makes the expiry job retry the tidy, so a
+        manual Close is never undone and the host's next /lfg makes a fresh post."""
         post_id = post["id"]
-        changed = await self.bot.db.execute(
-            "UPDATE lfg_posts SET closed_at = ? WHERE id = ? AND closed_at IS NULL", (now(), post_id))
+        async with self.bot.db.transaction() as tx:
+            cur = await tx.execute(
+                "UPDATE lfg_posts SET closed_at = ? WHERE id = ? AND closed_at IS NULL", (now(), post_id))
+            changed = cur.rowcount
+            if changed:
+                await tx.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+                                 (tidy_key(post_id), str(post_id)))
         if not changed:
             return  # someone else closed it first
+        await self.tidy(post)
+
+    async def tidy(self, post) -> None:
+        """Turn the buttons off, then lock + archive + rename. Each Discord step is tried
+        on its own, so one failure doesn't skip the rest. A transient API error leaves
+        the tidy marker in place so the expiry job retries."""
+        post_id = post["id"]
         try:
             thread = await self.fetch_thread(post["thread_id"])
         except discord.HTTPException:
-            await self.reopen(post_id, "fetching the thread")
+            log.warning("tidying closed LFG post %s failed while fetching the thread; will retry",
+                        post_id, exc_info=True)
             return
         if thread is None:
-            return  # deleted: nothing left to tidy
+            await self.tidied(post_id)  # deleted: nothing left to tidy
+            return
         roster = await self.load_roster(self.bot.db, post)
 
         if getattr(thread, "archived", False):
@@ -441,20 +464,29 @@ class Lfg(commands.Cog):
         except discord.NotFound:
             pass
         except discord.HTTPException:
-            await self.reopen(post_id, "locking the thread")
+            log.warning("tidying closed LFG post %s failed while locking the thread; will retry",
+                        post_id, exc_info=True)
+            return
+        await self.tidied(post_id)
 
-    async def reopen(self, post_id: int, step: str) -> None:
-        log.warning("closing LFG post %s failed while %s; will retry", post_id, step, exc_info=True)
-        await self.bot.db.execute("UPDATE lfg_posts SET closed_at = NULL WHERE id = ?", (post_id,))
+    async def tidied(self, post_id: int) -> None:
+        await self.bot.db.execute("DELETE FROM meta WHERE key = ?", (tidy_key(post_id),))
 
     @tasks.loop(minutes=5)
     async def expiry(self) -> None:
         current = now()
         try:
+            pending = await self.bot.db.fetchall(
+                "SELECT p.* FROM meta m JOIN lfg_posts p ON m.key = ? || p.id", (TIDY_PREFIX,))
             posts = await self.bot.db.fetchall("SELECT * FROM lfg_posts WHERE closed_at IS NULL")
         except Exception:
             log.exception("LFG expiry check failed")
             return
+        for post in pending:
+            try:
+                await self.tidy(post)
+            except Exception:
+                log.exception("couldn't tidy closed LFG post %s", post["id"])
         for post in posts:
             if not rules.is_expired(post["created_at"], current):
                 continue

@@ -19,6 +19,8 @@ log = logging.getLogger(__name__)
 
 DAY = 24 * 60 * 60
 PERIODS = {"week": 7 * DAY, "month": 30 * DAY, "all": None}
+# A heartbeat gap longer than this means the process was suspended (sleep/hibernate).
+SUSPEND_GAP = 3 * 60
 MVP_JOB = Weekly("mvp", weekday=6, hour=18, minute=0)  # Sundays 18:00 local
 BOARD_TITLES = {"voice": "Voice time", "messages": "Messages", "gaming": "Game time"}
 
@@ -38,6 +40,9 @@ def playing(member: discord.Member) -> str | None:
 class Stats(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.last_beat: int | None = None
+        # When the gateway went away (disconnect or suspend); None while connected.
+        self.gone_at: int | None = None
 
     async def cog_load(self) -> None:
         # Runs in setup_hook, before the gateway connects: no voice/presence event can
@@ -94,11 +99,26 @@ class Stats(commands.Cog):
             await tx.execute('UPDATE voice_sessions SET "end" = MAX(start, ?) WHERE "end" IS NULL', (last,))
             await tx.execute('UPDATE game_sessions SET "end" = MAX(start, ?) WHERE "end" IS NULL', (last,))
 
+    def mark_gone(self, t: int) -> None:
+        self.gone_at = t if self.gone_at is None else min(self.gone_at, t)
+
+    @commands.Cog.listener()
+    async def on_disconnect(self) -> None:
+        self.mark_gone(now())
+
+    @commands.Cog.listener()
+    async def on_resumed(self) -> None:
+        # A resumed session replays the events that were missed: nothing vanished.
+        self.gone_at = None
+
     @commands.Cog.listener()
     async def on_ready(self) -> None:
         # Fires on first connect and again after any reconnect that rebuilt the cache.
+        # Anyone who vanished meanwhile left at some point while we weren't watching:
+        # close them when the gateway went away, so the outage isn't counted.
+        gone_at, self.gone_at = self.gone_at, None
         try:
-            await self.reconcile()
+            await self.reconcile(closed_at=gone_at)
         except Exception:
             log.exception("stats reconcile failed")
 
@@ -119,13 +139,15 @@ class Stats(commands.Cog):
             return {}
         return {m.id: g for m in guild.members if not m.bot and (g := playing(m))}
 
-    async def reconcile(self) -> None:
+    async def reconcile(self, closed_at: int | None = None) -> None:
         """Make open sessions match reality: close rows for people who left (or
-        switched) while the bot wasn't watching, open rows for people already there."""
+        switched) while the bot wasn't watching (at closed_at, default now), and
+        open rows for people already there."""
         guild = self.guild()
         if guild is None:
             return
         t = now()
+        closed_at = t if closed_at is None else min(closed_at, t)
         skip = await self.optouts()
         voice = {u: c for u, c in self.current_voice(guild).items() if u not in skip}
         games = {u: g for u, g in self.current_games(guild).items() if u not in skip}
@@ -137,7 +159,8 @@ class Stats(commands.Cog):
                     if current.get(r["user_id"]) == r["k"] and r["user_id"] not in still_open:
                         still_open.add(r["user_id"])
                     else:
-                        await tx.execute(f'UPDATE {table} SET "end" = ? WHERE id = ?', (t, r["id"]))
+                        await tx.execute(f'UPDATE {table} SET "end" = MAX(start, ?) WHERE id = ?',
+                                         (closed_at, r["id"]))
                 for user_id, key in current.items():
                     if user_id not in still_open:
                         await tx.execute(f"INSERT INTO {table} (user_id, {col}, start) VALUES (?, ?, ?)",
@@ -147,8 +170,14 @@ class Stats(commands.Cog):
 
     @tasks.loop(minutes=1)
     async def heartbeat(self) -> None:
+        t = now()
+        if self.last_beat is not None and t - self.last_beat > SUSPEND_GAP:
+            # The PC slept: the gateway was effectively gone since the last beat, even
+            # though on_disconnect only fires once the dead socket is noticed on wake.
+            self.mark_gone(self.last_beat)
+        self.last_beat = t
         try:
-            await self.db.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('heartbeat', ?)", (str(now()),))
+            await self.db.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('heartbeat', ?)", (str(t),))
         except Exception:
             log.exception("heartbeat failed")
 
@@ -157,6 +186,11 @@ class Stats(commands.Cog):
         await self.bot.wait_until_ready()
 
     # ------------------------------------------------------------ recording
+    # Recorders check the opt-out inside their own write transaction: a separate
+    # tracking_allowed() call would let /privacy off commit between check and write.
+    @staticmethod
+    async def opted_out(tx, user_id: int) -> bool:
+        return await tx.fetchone("SELECT 1 FROM privacy_optout WHERE user_id = ?", (user_id,)) is not None
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before, after) -> None:
@@ -164,10 +198,10 @@ class Stats(commands.Cog):
             return
         if before.channel == after.channel:
             return  # mute/deafen/stream changes
-        if not await self.db.tracking_allowed(member.id):
-            return
         t = now()
         async with self.db.transaction() as tx:
+            if await self.opted_out(tx, member.id):
+                return
             await tx.execute('UPDATE voice_sessions SET "end" = ? WHERE user_id = ? AND "end" IS NULL', (t, member.id))
             if self.tracked_voice(after.channel):
                 await tx.execute("INSERT INTO voice_sessions (user_id, channel_id, start) VALUES (?, ?, ?)",
@@ -181,12 +215,14 @@ class Stats(commands.Cog):
             return  # join notices, boosts, pins
         if self.in_staff(message.channel):
             return
-        if not await self.db.tracking_allowed(message.author.id):
-            return
+        # The opt-out check is part of the write, so a /privacy off that commits
+        # in between can't be followed by a fresh row.
+        uid = message.author.id
         await self.db.execute(
-            "INSERT INTO message_counts (user_id, day, count) VALUES (?, ?, 1)"
+            "INSERT INTO message_counts (user_id, day, count) SELECT ?, ?, 1"
+            " WHERE NOT EXISTS (SELECT 1 FROM privacy_optout WHERE user_id = ?)"
             " ON CONFLICT (user_id, day) DO UPDATE SET count = count + 1",
-            (message.author.id, self.local_day(now())),
+            (uid, self.local_day(now()), uid),
         )
 
     @commands.Cog.listener()
@@ -196,10 +232,10 @@ class Stats(commands.Cog):
         old, new = playing(before), playing(after)
         if old == new:
             return
-        if not await self.db.tracking_allowed(after.id):
-            return
         t = now()
         async with self.db.transaction() as tx:
+            if await self.opted_out(tx, after.id):
+                return
             await tx.execute('UPDATE game_sessions SET "end" = ? WHERE user_id = ? AND "end" IS NULL', (t, after.id))
             # Short sessions (alt-tabbing, launchers) are noise: drop them when they close.
             await tx.execute('DELETE FROM game_sessions WHERE user_id = ? AND "end" = ? AND "end" - start < ?',

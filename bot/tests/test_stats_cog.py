@@ -744,3 +744,93 @@ def test_reconnect_closes_sessions_for_people_who_left_during_outage(monkeypatch
         rows = {(r["user_id"], r["end"]) for r in await env.rows("voice_sessions")}
         assert rows == {(A, None), (B, T0 + HOUR), (C, None)}
     with_env(go, monkeypatch)
+
+
+def test_reconnect_after_network_drop_closes_vanished_sessions_at_disconnect(monkeypatch):
+    """The PC stays awake (heartbeat keeps ticking) but the gateway is gone for an hour:
+    people who left meanwhile are closed when the gateway went away, not at reconnect."""
+    async def go(env):
+        g = env.guild
+        await env.voice(A, None, g.lobby, at=T0)
+        await env.voice(B, None, g.lobby, at=T0)
+        await env.presence(B, [], ["Valorant"], at=T0)
+        env.t = T0 + 10 * MIN
+        await env.cog.on_disconnect()
+        await env.cog.on_disconnect()  # repeated reconnect attempts keep the first time
+        for minute in range(11, 60):
+            env.t = T0 + minute * MIN
+            await Stats.heartbeat.coro(env.cog)
+        g.lobby.voice_states.pop(B, None)
+        g.lobby.voice_states[A] = SimpleNamespace(channel=g.lobby)
+        env.member(B).activities = []
+        env.t = T0 + HOUR
+        await env.cog.on_ready()
+        voice = {(r["user_id"], r["end"]) for r in await env.rows("voice_sessions")}
+        assert voice == {(A, None), (B, T0 + 10 * MIN)}
+        games = await env.rows("game_sessions", B)
+        assert [(r["start"], r["end"]) for r in games] == [(T0, T0 + 10 * MIN)]
+        # The outage is handled: a later READY with no new disconnect closes at now.
+        g.lobby.voice_states.pop(A, None)
+        env.t = T0 + 2 * HOUR
+        await env.cog.on_ready()
+        assert (await env.rows("voice_sessions", A))[0]["end"] == T0 + 2 * HOUR
+    with_env(go, monkeypatch)
+
+
+def test_reconnect_after_sleep_closes_vanished_sessions_at_last_heartbeat(monkeypatch):
+    """The PC sleeps: the heartbeat stops and the disconnect is only noticed on wake, so the
+    gap in heartbeats (not the late on_disconnect) marks when the gateway went away."""
+    async def go(env):
+        g = env.guild
+        await env.voice(A, None, g.lobby, at=T0)
+        await env.voice(B, None, g.lobby, at=T0)
+        for minute in range(1, 6):
+            env.t = T0 + minute * MIN
+            await Stats.heartbeat.coro(env.cog)
+        # Asleep from T0+5m to T0+9h. On wake the loop ticks before the socket error.
+        env.t = T0 + 9 * HOUR
+        await Stats.heartbeat.coro(env.cog)
+        await env.cog.on_disconnect()
+        for uid in (A, B):
+            g.lobby.voice_states.pop(uid, None)
+        await env.cog.on_ready()
+        rows = {(r["user_id"], r["end"]) for r in await env.rows("voice_sessions")}
+        assert rows == {(A, T0 + 5 * MIN), (B, T0 + 5 * MIN)}
+    with_env(go, monkeypatch)
+
+
+def test_resumed_session_forgets_the_disconnect(monkeypatch):
+    async def go(env):
+        g = env.guild
+        await env.voice(A, None, g.lobby, at=T0)
+        env.t = T0 + MIN
+        await env.cog.on_disconnect()
+        env.t = T0 + 2 * MIN
+        await env.cog.on_resumed()  # Discord replayed what was missed
+        g.lobby.voice_states.pop(A, None)
+        env.t = T0 + HOUR
+        await env.cog.on_ready()  # some later fresh IDENTIFY with no disconnect seen
+        assert (await env.rows("voice_sessions", A))[0]["end"] == T0 + HOUR
+    with_env(go, monkeypatch)
+
+
+def test_privacy_off_racing_a_recorder_leaves_no_rows(monkeypatch):
+    """/privacy off can commit between a recorder's opt-out check and its write (the
+    lock is FIFO); the write must re-check inside the same statement/transaction."""
+    async def go(env):
+        g = env.guild
+        await env.voice(B, None, g.lobby, at=T0)
+        await env.presence(C, [], ["Valorant"], at=T0)
+        env.t = T0 + HOUR
+        recorders = {
+            A: env.say(A),
+            B: env.voice(B, g.lobby, g.squad),
+            C: env.presence(C, ["Valorant"], ["Minecraft"]),
+        }
+        leaked = []
+        for uid, recorder in recorders.items():
+            await asyncio.gather(recorder, Stats.privacy.callback(env.cog, env.inter(uid), choice("off")))
+            for table in ("voice_sessions", "message_counts", "game_sessions"):
+                leaked += [(uid, table)] if await env.rows(table, uid) else []
+        assert leaked == []
+    with_env(go, monkeypatch)

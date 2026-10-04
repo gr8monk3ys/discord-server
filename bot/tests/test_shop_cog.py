@@ -579,6 +579,33 @@ def test_expiry_discord_error_retries_next_tick(monkeypatch):
     with_env(go, monkeypatch)
 
 
+def test_expiry_skips_perks_rebought_after_it_read_them(monkeypatch):
+    """A rebuy that lands between the expiry SELECT and the member's lock must keep
+    its role: expiry re-reads the row under the lock."""
+    async def go(env):
+        await env.fund(A, 10_000)
+        await env.buy(A, "color", color="#3BA55D")
+        await env.buy(A, "hype")
+        env.t = T0 + 31 * S.DAY  # both expired, loop hasn't run yet
+        lock = env.cog.lock(A)
+        await lock.acquire()  # /buy is mid-purchase
+        task = asyncio.create_task(env.cog.run_expiry())
+        for _ in range(20):
+            await asyncio.sleep(0)  # expiry reads the stale rows, then waits for the lock
+        color_role = personal_roles(env.guild)[0]
+        for key in ("hype", "color"):  # the rebuys commit under the lock
+            role_id = color_role.id if key == "color" else None
+            result = await env.cog.charge(A, S.ITEMS[key], env.t + S.DAY, role_id, f"rebuy-{key}")
+            assert result.ok
+        lock.release()
+        await task
+        a = env.member(A)
+        assert env.guild.hype in a.roles and color_role in a.roles and color_role in env.guild.roles
+        assert (await env.perk(A, "hype"))["expires_at"] == env.t + S.DAY
+        assert (await env.perk(A, "color"))["expires_at"] == env.t + S.DAY
+    with_env(go, monkeypatch)
+
+
 def test_loops_never_raise(monkeypatch):
     async def go(env):
         async def boom():
