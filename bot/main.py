@@ -35,6 +35,9 @@ MODULES = [
     ("cogs.clips", {"message_content"}),  # clip of the week
     ("cogs.tempvoice", set()),  # join-to-create voice
     ("cogs.events", set()),  # /gamenight, free games
+    ("cogs.economy", {"message_content"}),  # coins: /daily, /balance, /give, /coinflip, /richest
+    ("cogs.games", set()),  # /slots, /blackjack, /trivia, /predict
+    ("cogs.shop", {"members"}),  # /shop, /buy, /season
 ]
 
 PERMISSIONS = discord.Permissions(
