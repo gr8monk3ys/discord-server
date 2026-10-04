@@ -11,17 +11,20 @@
     "GUILD_ONBOARDING_EVER_ENABLED",
     "GUILD_ONBOARDING_HAS_PROMPTS",
     "GUILD_SERVER_GUIDE",
+    "MEMBER_VERIFICATION_GATE_ENABLED",
+    "MEMBER_VERIFICATION_MANUAL_APPROVAL",
     "NEWS",
+    "PRUNE_REQUIRES_ADMIN",
     "SOUNDBOARD",
     "WELCOME_SCREEN_ENABLED"
   ],
-  "mfa_level": "disabled",
+  "mfa_level": "require_2fa",
   "name": "Lorenzo's Server",
-  "nsfw_level": "default",
+  "nsfw_level": "age_restricted",
   "preferred_locale": "en-US",
-  "premium_progress_bar_enabled": false,
+  "premium_progress_bar_enabled": true,
   "public_updates_channel": "🛡️・mod",
   "rules_channel": "📌・rules",
   "system_channel": "👋・welcome",
-  "verification_level": "medium"
+  "verification_level": "highest"
 }

@@ -3,6 +3,119 @@
     {
       "channels": [
         {
+          "name": "🛡️・mod",
+          "nsfw": false,
+          "overwrites": {
+            "role:@everyone": {
+              "allow": [],
+              "deny": [
+                "read_messages"
+              ]
+            },
+            "role:Front Desk": {
+              "allow": [
+                "connect",
+                "embed_links",
+                "read_messages",
+                "send_messages",
+                "send_messages_in_threads"
+              ],
+              "deny": []
+            }
+          },
+          "slowmode": 0,
+          "synced": true,
+          "topic": null,
+          "type": "text"
+        },
+        {
+          "name": "🔒・admin",
+          "nsfw": false,
+          "overwrites": {
+            "role:@everyone": {
+              "allow": [],
+              "deny": [
+                "read_messages"
+              ]
+            },
+            "role:Front Desk": {
+              "allow": [
+                "connect",
+                "embed_links",
+                "read_messages",
+                "send_messages",
+                "send_messages_in_threads"
+              ],
+              "deny": []
+            }
+          },
+          "slowmode": 0,
+          "synced": true,
+          "topic": null,
+          "type": "text"
+        },
+        {
+          "name": "📋・mod-log",
+          "nsfw": false,
+          "overwrites": {
+            "member:Front Desk": {
+              "allow": [
+                "connect",
+                "embed_links",
+                "read_messages",
+                "send_messages"
+              ],
+              "deny": []
+            },
+            "role:@everyone": {
+              "allow": [],
+              "deny": [
+                "read_messages"
+              ]
+            },
+            "role:Keeper": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            },
+            "role:Moderator": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            }
+          },
+          "slowmode": 0,
+          "synced": false,
+          "topic": "",
+          "type": "text"
+        }
+      ],
+      "name": "00 · staff",
+      "overwrites": {
+        "role:@everyone": {
+          "allow": [],
+          "deny": [
+            "read_messages"
+          ]
+        },
+        "role:Front Desk": {
+          "allow": [
+            "connect",
+            "embed_links",
+            "read_messages",
+            "send_messages",
+            "send_messages_in_threads"
+          ],
+          "deny": []
+        }
+      },
+      "type": "category"
+    },
+    {
+      "channels": [
+        {
           "name": "📌・rules",
           "nsfw": false,
           "overwrites": {
@@ -79,6 +192,71 @@
           "synced": false,
           "topic": "New faces land here.",
           "type": "text"
+        },
+        {
+          "name": "💡・suggestions",
+          "nsfw": false,
+          "overwrites": {},
+          "require_tag": false,
+          "slowmode": 0,
+          "synced": true,
+          "tags": [
+            {
+              "emoji": "💡",
+              "moderated": false,
+              "name": "Idea"
+            },
+            {
+              "emoji": "✅",
+              "moderated": false,
+              "name": "Accepted"
+            },
+            {
+              "emoji": "❌",
+              "moderated": false,
+              "name": "Denied"
+            },
+            {
+              "emoji": "🎉",
+              "moderated": false,
+              "name": "Done"
+            }
+          ],
+          "topic": "One idea per post. Vote with 👍 / 👎. Mods tag it when it's decided.",
+          "type": "forum"
+        },
+        {
+          "name": "🆘・help",
+          "nsfw": false,
+          "overwrites": {
+            "member:Front Desk": {
+              "allow": [
+                "embed_links",
+                "send_messages"
+              ],
+              "deny": []
+            },
+            "role:@everyone": {
+              "allow": [
+                "add_reactions"
+              ],
+              "deny": [
+                "create_private_threads",
+                "create_public_threads",
+                "send_messages"
+              ]
+            },
+            "role:Keeper": {
+              "allow": [
+                "send_messages"
+              ],
+              "deny": []
+            }
+          },
+          "slowmode": 0,
+          "synced": false,
+          "topic": "Need a mod? Press the button to open a private ticket.",
+          "type": "text"
         }
       ],
       "name": "01 · front desk",
@@ -112,6 +290,48 @@
           "slowmode": 10,
           "synced": true,
           "topic": "Highlights, fails, and receipts.",
+          "type": "text"
+        },
+        {
+          "name": "⭐・hall-of-fame",
+          "nsfw": false,
+          "overwrites": {
+            "member:Front Desk": {
+              "allow": [
+                "embed_links",
+                "send_messages"
+              ],
+              "deny": []
+            },
+            "role:@everyone": {
+              "allow": [
+                "add_reactions"
+              ],
+              "deny": [
+                "create_private_threads",
+                "create_public_threads",
+                "send_messages"
+              ]
+            },
+            "role:Keeper": {
+              "allow": [
+                "send_messages"
+              ],
+              "deny": []
+            }
+          },
+          "slowmode": 0,
+          "synced": false,
+          "topic": "3 ⭐ on any message and it lands here.",
+          "type": "text"
+        },
+        {
+          "name": "🔢・counting",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "topic": "Count up together. Same person can't go twice; a wrong number resets.",
           "type": "text"
         }
       ],
@@ -341,7 +561,7 @@
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
-          "topic": "",
+          "topic": null,
           "type": "text"
         }
       ],
@@ -380,56 +600,20 @@
           "synced": true,
           "type": "voice",
           "user_limit": 0
+        },
+        {
+          "bitrate": 64000,
+          "name": "➕ New Squad",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "type": "voice",
+          "user_limit": 0
         }
       ],
       "name": "05 · voice",
       "overwrites": {},
-      "type": "category"
-    },
-    {
-      "channels": [
-        {
-          "name": "🛡️・mod",
-          "nsfw": false,
-          "overwrites": {
-            "role:@everyone": {
-              "allow": [],
-              "deny": [
-                "read_messages"
-              ]
-            }
-          },
-          "slowmode": 0,
-          "synced": true,
-          "topic": null,
-          "type": "text"
-        },
-        {
-          "name": "🔒・admin",
-          "nsfw": false,
-          "overwrites": {
-            "role:@everyone": {
-              "allow": [],
-              "deny": [
-                "read_messages"
-              ]
-            }
-          },
-          "slowmode": 0,
-          "synced": true,
-          "topic": null,
-          "type": "text"
-        }
-      ],
-      "name": "00 · staff",
-      "overwrites": {
-        "role:@everyone": {
-          "allow": [],
-          "deny": [
-            "read_messages"
-          ]
-        }
-      },
       "type": "category"
     },
     {
