@@ -208,8 +208,8 @@ COMMUNITY = {
 # the defaults everyone gets; Discord needs at least 7, 5 of them postable.
 ONBOARDING_DEFAULT_CHANNELS = [
     "📌・rules", "📣・announcements", "👋・welcome", "💬・general",
-    "🤣・memes", "📸・clips", "🕹️・gaming", "🎮・lfg", "🎨・art", "💻・code",
-    "👗・fashion", "♟️・chess", "🤖・bot-commands", "🔊 Lobby", "🎮 Squad", "💤 AFK",
+    "🤣・memes", "📸・clips", "⭐・hall-of-fame", "🕹️・gaming", "🎮・lfg", "🎨・art", "💻・code",
+    "👗・fashion", "♟️・chess", "🤖・bot-commands", "🔊 Lobby", "➕ New Squad", "🎮 Squad", "💤 AFK",
 ]
 # Anything public that's neither a default channel nor an Onboarding option is
 # hidden from members who went through Onboarding, so keep this list complete.

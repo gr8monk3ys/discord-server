@@ -9,7 +9,8 @@ Administrator. It needs Manage Roles, Manage Channels, Manage Server and
 Create Invite on Front Desk's role.
 
 Steps, all driven by layout.py:
-- create the roles Front Desk hands out (Recruiter, Bumper)
+- create the roles Front Desk hands out (Clip of the Week, Recruiter, Bumper)
+- create any public layout channel that doesn't exist yet (never moves or edits existing ones)
 - create private categories/channels ("private_to") and keep them private
 - set the server description and the welcome-screen text (layout.PUBLIC)
 - refresh the rules and welcome posts in place
@@ -31,6 +32,7 @@ from setup_server import Makeover, find
 
 sys.stdout.reconfigure(encoding="utf-8")
 
+BOT_ROLES = ("Clip of the Week", "Recruiter", "Bumper")  # roles Front Desk hands out
 NEEDED = ("manage_roles", "manage_channels", "manage_guild", "create_instant_invite")
 
 
@@ -64,13 +66,50 @@ class PublicMode:
     # ------------------------------------------------------------ roles
     async def roles(self):
         print("\nRoles")
-        for name in ("Recruiter", "Bumper"):
+        for name in BOT_ROLES:
             spec = next(r for r in layout.ROLES if r.get("name") == name)
             if self.role(name):
                 print(f"  ok      @{name}")
                 continue
             await self.do("create", f"@{name}", lambda: self.guild.create_role(
                 name=name, mentionable=spec.get("mentionable", False), reason="Public server"))
+
+    # ------------------------------------------------------------ new public channels
+    async def new_channels(self):
+        print("\nNew channels")
+        keeper = self.role("Keeper")
+        for cat_spec in layout.CATEGORIES:
+            if cat_spec.get("private_to"):
+                continue  # handled by private()
+            cat = find(self.guild.categories, cat_spec)
+            for spec in cat_spec["channels"]:
+                if spec.get("private_to") or spec.get("type") == "forum":
+                    continue
+                voice = spec.get("type") == "voice"
+                pool = self.guild.voice_channels if voice else self.guild.text_channels
+                label = spec["name"] if voice else f"#{spec['name']}"
+                if find(pool, spec) is not None:
+                    continue
+                if cat is None:
+                    print(f"! skip    {label}: category {cat_spec['name']} doesn't exist (run setup_server.py)")
+                    continue
+                kwargs = {}
+                if not voice:
+                    kwargs["topic"] = spec.get("topic", "")
+                    kwargs["slowmode_delay"] = spec.get("slowmode", 0)
+                if spec.get("read_only"):
+                    ow = {
+                        self.guild.default_role: discord.PermissionOverwrite(
+                            send_messages=False, create_public_threads=False,
+                            create_private_threads=False, add_reactions=True),
+                        self.guild.me: discord.PermissionOverwrite(send_messages=True, embed_links=True),
+                    }
+                    if keeper:
+                        ow[keeper] = discord.PermissionOverwrite(send_messages=True)
+                    kwargs["overwrites"] = {**cat.overwrites, **ow}
+                create = self.guild.create_voice_channel if voice else self.guild.create_text_channel
+                await self.do("create", f"{label} in {cat.name}" + (" (read-only)" if spec.get("read_only") else ""),
+                              lambda: create(spec["name"], category=cat, **kwargs))
 
     # ------------------------------------------------------------ private spaces
     def private_overwrites(self, role_names):
@@ -200,6 +239,7 @@ class PublicMode:
         if not self.preflight():
             return False
         await self.roles()
+        await self.new_channels()
         await self.private()
         await self.description()
         await self.posts()
