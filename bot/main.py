@@ -31,6 +31,10 @@ MODULES = [
     ("cogs.stats", {"members", "presences"}),  # game time; runs without them, gaming off
     ("cogs.growth", {"members", "message_content"}),  # invite tracking, Disboard bumps
     ("cogs.community", {"members"}),  # welcome flow, /report, mod log
+    ("cogs.starboard", {"message_content"}),  # hall of fame
+    ("cogs.clips", {"message_content"}),  # clip of the week
+    ("cogs.tempvoice", set()),  # join-to-create voice
+    ("cogs.events", set()),  # /gamenight, free games
 ]
 
 PERMISSIONS = discord.Permissions(

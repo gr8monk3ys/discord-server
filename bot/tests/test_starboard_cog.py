@@ -96,6 +96,12 @@ class FakePartial:
             raise http_error(discord.NotFound, 404)
         self.channel.edits.append((self.id, kwargs))
 
+    async def delete(self):
+        await asyncio.sleep(0)
+        if self.id not in self.channel.posted:
+            raise http_error(discord.NotFound, 404)
+        self.channel.posted.discard(self.id)
+
 
 class FakeText:
     _next = 300
@@ -553,4 +559,18 @@ def test_no_text_no_image_still_posts_with_placeholder(monkeypatch):
         m = env.message(content="   ")
         await env.star(m, A, B, C)
         assert posts(env)[0].description == cogmod.NO_TEXT
+    with_env(go, monkeypatch)
+
+
+def test_deleting_the_original_removes_the_hall_post(monkeypatch):
+    """Moderation: deleting a starred message must not leave its copy in the hall."""
+    async def go(env):
+        g = env.guild
+        m = env.message(channel=g.general, content="something a mod removes")
+        await env.star(m, A, B, C)
+        assert len(g.hall.sent) == 1 and g.hall.posted
+        await env.cog.on_raw_message_delete(SimpleNamespace(message_id=m.id, guild_id=g.id, channel_id=g.general.id))
+        assert not g.hall.posted and await env.rows() == []
+        # Deleting again (or an unknown message) is a no-op.
+        await env.cog.on_raw_bulk_message_delete(SimpleNamespace(message_ids={m.id, 1}, guild_id=g.id, channel_id=1))
     with_env(go, monkeypatch)

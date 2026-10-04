@@ -111,6 +111,37 @@ class Starboard(commands.Cog):
     async def on_raw_reaction_remove(self, payload: discord.RawReactionActionEvent) -> None:
         await self.handle(payload)
 
+    @commands.Cog.listener()
+    @never_raise
+    async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent) -> None:
+        await self.unpost([payload.message_id], payload.guild_id)
+
+    @commands.Cog.listener()
+    @never_raise
+    async def on_raw_bulk_message_delete(self, payload: discord.RawBulkMessageDeleteEvent) -> None:
+        await self.unpost(list(payload.message_ids), payload.guild_id)
+
+    async def unpost(self, message_ids: list[int], guild_id: int | None) -> None:
+        """A deleted original takes its hall copy with it, so a mod removing a
+        message can't be undone by the starboard keeping a copy."""
+        if guild_id != self.bot.settings.guild_id:
+            return
+        guild = self.bot.get_guild(guild_id)
+        hall = self.hall(guild) if guild else None
+        for mid in message_ids:
+            async with self.lock(mid):
+                row = await self.db.fetchone("SELECT board_message_id FROM starboard WHERE message_id = ?", (mid,))
+                if row is None:
+                    continue
+                await self.db.execute("DELETE FROM starboard WHERE message_id = ?", (mid,))
+                if hall is not None and row["board_message_id"]:
+                    try:
+                        await hall.get_partial_message(row["board_message_id"]).delete()
+                    except discord.NotFound:
+                        pass
+                    except discord.HTTPException:
+                        log.warning("couldn't remove hall post for deleted message %s", mid, exc_info=True)
+
     async def handle(self, payload) -> None:
         if payload.guild_id != self.bot.settings.guild_id or not S.is_star(payload.emoji):
             return
