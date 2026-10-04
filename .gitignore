@@ -1,5 +1,7 @@
 .env
 .venv/
 __pycache__/
-bot/data/
+bot/data/*
+!bot/data/qotd.txt
+!bot/data/polls.txt
 .pytest_cache/
