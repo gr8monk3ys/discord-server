@@ -1021,7 +1021,7 @@ def test_reminder_text_cannot_format_or_embed(monkeypatch):
         env.t += HOUR
         await env.cog.deliver_due()
         (sent,) = env.guild.general.sent
-        assert "\*\*big\*\*" in sent["content"] and sent["suppress_embeds"] is True
+        assert r"\*\*big\*\*" in sent["content"] and sent["suppress_embeds"] is True
         assert "@​everyone" in sent["content"]
     with_env(go, monkeypatch)
 
