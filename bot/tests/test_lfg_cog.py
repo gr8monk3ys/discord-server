@@ -320,7 +320,8 @@ def test_create_post_writes_rows_and_thread():
         assert env.guild.role("LFG").mention in content
         assert "needs 2 more" in content and "9pm" in content
         am = made["allowed_mentions"]
-        assert am.roles is True and am.users is False and am.everyone is False
+        assert [r.name for r in am.roles] == ["Valorant", config.LFG_ROLE]  # only these two, never any role
+        assert am.users is False and am.everyone is False
         pid = post["id"]
         assert custom_ids(made["view"]) == [f"lfg:join:{pid}", f"lfg:leave:{pid}", f"lfg:close:{pid}"]
         assert not any(i.item.disabled for i in made["view"].children)
@@ -450,7 +451,7 @@ def test_join_until_full_disables_join_and_announces():
         assert config.SQUAD_VOICE in [v.name for v in env.guild.voice_channels]
         assert env.cog.voice["squad"].mention in sent["content"]  # size 3 -> Squad voice
         am = sent["allowed_mentions"]
-        assert am.users is True and am.roles is False and am.everyone is False
+        assert sorted(u.id for u in am.users) == sorted([HOST, A, B]) and am.roles is False and am.everyone is False
 
         ((event, args),) = env.bot.dispatched
         assert event == "lfg_squad_full" and args[0] == post["id"] and args[1].members == (HOST, A, B)
@@ -782,4 +783,17 @@ def test_button_callback_errors_reply_generically():
         await LfgButton("join", post["id"]).callback(inter)
         (msg,) = inter.of("send_message")
         assert msg["ephemeral"] is True and "bot.log" in msg["content"]
+    with_env(go)
+
+
+def test_user_text_cannot_widen_role_pings():
+    """`/lfg when:<@&id>` puts a role mention in the post text; only the game role
+    and @LFG may actually ping."""
+    async def go(env):
+        await env.create(when="<@&999> @everyone")
+        kw = env.guild.forum.created[-1]
+        assert "<@&999>" in kw["content"]  # text is shown as typed...
+        am = kw["allowed_mentions"]
+        assert [r.name for r in am.roles] == ["Valorant", config.LFG_ROLE]  # ...but can't ping
+        assert am.everyone is False and am.users is False
     with_env(go)

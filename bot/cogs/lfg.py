@@ -19,8 +19,11 @@ log = logging.getLogger(__name__)
 
 GAME_CHOICES = [app_commands.Choice(name=g.role, value=g.key) for g in config.GAMES]
 MODE_CHOICES = [app_commands.Choice(name=m, value=m) for m in config.MODES]
-PING_ROLES = discord.AllowedMentions(everyone=False, roles=True, users=False)
-PING_USERS = discord.AllowedMentions(everyone=False, roles=False, users=True)
+
+def ping_only(roles=(), users=()) -> discord.AllowedMentions:
+    """Allow exactly these pings. Post text includes user input (when, names), so a
+    blanket roles=True/users=True would let `/lfg when:<@&id>` ping any role."""
+    return discord.AllowedMentions(everyone=False, roles=list(roles) or False, users=list(users) or False)
 
 BUTTONS = {
     "join": ("Join", discord.ButtonStyle.success),
@@ -287,7 +290,7 @@ class Lfg(commands.Cog):
                 embed=self.render(post, roster),
                 view=build_view(post_id, roster, closed=False),
                 applied_tags=self.tags_for(g.key, mode_value),
-                allowed_mentions=PING_ROLES,
+                allowed_mentions=ping_only(roles=[r for r in (self.game_roles.get(g.key), self.lfg_role) if r]),
             )
         except discord.HTTPException:
             await self.bot.db.execute("DELETE FROM lfg_posts WHERE id = ?", (post_id,))
@@ -396,7 +399,8 @@ class Lfg(commands.Cog):
         where = f", hop in {voice.mention}" if voice else ""
         mentions = " ".join(f"<@{uid}>" for uid in roster.members)
         try:
-            await thread.send(f"Squad's full: {mentions}{where}", allowed_mentions=PING_USERS)
+            await thread.send(f"Squad's full: {mentions}{where}",
+                          allowed_mentions=ping_only(users=[discord.Object(uid) for uid in roster.members]))
         except discord.HTTPException:
             log.warning("couldn't announce full squad for LFG post %s", post_id, exc_info=True)
         # Module 4 pays each member on this (ref lfg:<post>:<user>, so a refill pays once).
