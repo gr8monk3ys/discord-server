@@ -369,3 +369,48 @@ pass before it's built. Status: modules 1–2 are live, and 3 and up are not bui
 
 None blocking. Coin amounts and the AFK, alone and short-session rules are constants, easy to
 tune after a week of real use.
+
+## Phase 3: autopilot (added 2026-10-04)
+
+Goal: as many features as the top community servers, running with almost no owner time.
+Every feature must work unattended: scheduled jobs use `logic/schedule.py` semantics
+(catch-up, mark done after success); nothing needs a human to start it.
+
+### Module 9: Engagement autopilot
+- **Question of the day:** daily at 12:00 in 💬・general, from a bundled bank of 365+
+  original questions with no repeats until the bank runs out. Answers go in a thread.
+- **Daily poll:** at 18:00, a "this or that" native poll from a bundled bank, open 24 h.
+- **Counting channel** `🔢・counting`: the bot reacts ✅ or ❌. The same person can't count
+  twice in a row, a wrong number resets the count, and the best run is kept. A Counting
+  Champ role goes to whoever counted most in the best run.
+- **Weekly game night:** every Friday at 21:00 the bot creates the event itself if no member
+  scheduled one that week. The game is the one with the most game time that week.
+- **Birthdays:** `/birthday set month day` (no year). On the day: a shout-out, a Birthday
+  role for 24 h, and 250 coins (ref `bday:<year>:<user>`).
+
+### Module 10: Moderation autopilot
+- **Cases:** `/warn`, `/timeout`, `/untimeout` and `/cases member`, mods only. Each case is
+  stored and logged.
+- **Escalation:** 3 warnings in 30 days triggers an automatic 1 h timeout, and 5 triggers 24 h.
+- **Anti-spam:** 6 messages in 5 s, or 3 identical messages in 30 s, gets a 10-minute
+  timeout, a deletion of the burst, and a case.
+- **Anti-raid:** 8 or more joins in 60 s (accounts younger than 7 days weighted double)
+  raises the verification level to High, pauses invites for 30 minutes and alerts the mods.
+  Everything reverts automatically.
+
+### Module 11: Operations autopilot
+- **Backups:** daily SQLite online backup to `D:\Backups\front-desk\`, keeping 14.
+- **Health:** any loop or listener exception is counted. More than 5 in 10 minutes posts one
+  alert to 📋・mod-log, at most once per hour per feature.
+- **Weekly snapshot:** on Sundays, `snapshot_server` runs inside the bot and reports any
+  changes to the mod log, so manual edits get noticed.
+
+### Module 12: Utility
+- `/remind in:<text> what:<text>`, persisted so it survives restarts, at most 10 per member.
+- `/afk [reason]`: the bot auto-replies when the member is mentioned (with no pings) and
+  clears it when they next talk.
+- **Suggestions forum** `💡・suggestions`: the bot adds 👍/👎, and mods tag posts
+  Accepted, Denied or Done.
+- **Stat channels:** locked voice channels at the top showing "👥 Members: N" and
+  "🟢 Online: N", updated every 10 minutes (renames are rate-limited).
+- **Tickets:** a "Contact the mods" button opens a private thread with the mods.
