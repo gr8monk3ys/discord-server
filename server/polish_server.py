@@ -22,7 +22,7 @@ from dotenv import load_dotenv
 from pathlib import Path
 
 import layout
-from setup_server import slug
+from names import slug
 
 sys.stdout.reconfigure(encoding="utf-8")
 

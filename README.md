@@ -1,7 +1,13 @@
-# Discord makeover: Field Notebook
+# discord-server
 
-Your Discord client and server, restyled to match lscaturchio.xyz: night or
-paper ground, forest-green ink, Fraunces headings, and IBM Plex Mono wall labels.
+Everything for Lorenzo's Server in one place:
+
+1. **Client theme**: the Field Notebook look, matching lscaturchio.xyz. Night or paper
+   ground, forest-green ink, Fraunces headings and IBM Plex Mono wall labels.
+2. **Server setup** (`server/`): roles, channels, Onboarding and AutoMod as code.
+3. **Front Desk** (`bot/`): the server's own bot, with squad-up, stats and more.
+
+Roadmap and design: `docs/superpowers/specs/2026-10-01-front-desk-bot-design.md`.
 
 ## 1. Client theme (`theme/field-notebook.theme.css`)
 
@@ -85,3 +91,80 @@ in `layout.ROLES`, and every bot gets `@Bots` so they're grouped in the member l
 - Kick the bot. It doesn't need to stay, and Admin bots sitting around are a risk.
 - Reset the bot token in the portal if you shared `.env` anywhere.
 - Optional: set `ICON_PATH` in `layout.py` to a square image for the server icon.
+
+### Emoji & sounds
+
+The server has its own emoji pack (20 emoji, such as `:gg:`, `:take_w:`, `:clutch:`, `:touchgrass:`
+and `:frontdesk:`) and 8 soundboard sounds. Code generates all of them from scratch: Pillow
+draws the emoji, numpy synthesizes the sounds, and the lettering is a hand-made block font.
+No samples, fonts or outside art are used.
+
+```
+.venv\Scripts\pip install pillow numpy                     # ffmpeg must be on PATH for the MP3s
+.venv\Scripts\python ..\assets\expressions\make_emoji.py   # -> assets/expressions/emoji/*.png
+.venv\Scripts\python ..\assets\expressions\make_sounds.py  # -> assets/expressions/sounds/*.mp3
+.venv\Scripts\python expressions.py                        # dry run: what fits in your slots
+.venv\Scripts\python expressions.py --apply                # upload
+```
+
+The bot's role needs **Create Expressions**. **Manage Expressions** is only needed if you later
+want it to edit or delete them. Names that already exist are skipped, and anything over the
+emoji or soundboard slot limit (8 sounds unboosted) is listed rather than uploaded. Sounds are
+MP3 because discord.py only accepts MP3 for the soundboard.
+
+### Snapshot
+
+`snapshot_server.py` is read-only. It writes the live server's config to `server/snapshot/`
+(`server`, `roles`, `channels`, `onboarding`, `automod` and `welcome` `.json`). It uses names,
+not IDs, and sorts its output, so `git diff server/snapshot` shows exactly what changed since
+the last snapshot you committed. It never records members, messages, invites or the token.
+
+```
+cd server
+.venv/Scripts/python snapshot_server.py            # write the snapshot
+.venv/Scripts/python snapshot_server.py --compare  # also list roles/channels that differ from layout.py
+.venv/Scripts/python -m pytest tests               # unit tests
+```
+
+If the bot lacks a permission for a fetch (AutoMod rules need Manage Server), that file
+gets an `"error"` note instead and the rest is still written.
+
+## 3. Front Desk bot (`bot/`)
+
+The setup scripts were a one-shot run. `bot/` is a **persistent** bot that runs while your
+PC is on. It uses the same Front Desk app and token, re-invited **without** Administrator.
+Design: `docs/superpowers/specs/2026-10-01-front-desk-bot-design.md`.
+
+Built so far: **Squad-up** (`/lfg`). Still to come: stats and leaderboards, clip of the
+week, and coins and mini-games.
+
+**One-time setup**
+
+1. Install the extra packages into the shared virtualenv:
+   `server\.venv\Scripts\pip install -r bot\requirements.txt`
+2. Print the invite link with `server\.venv\Scripts\python bot\main.py --invite`, open it, and
+   authorize. It asks only for the permissions the bot uses.
+3. Server Settings → Roles: drag **Front Desk** above **Squad**.
+
+Later modules also need **Server Members**, **Message Content** and **Presence**, switched on
+under Developer Portal → your app → Bot → Privileged Gateway Intents. Squad-up needs none of
+them.
+
+**Run it**
+
+Double-click `bot\run_bot.bat`, or run it from a terminal. Logs go to `bot\data\bot.log`, and
+the database is `bot\data\front_desk.db`. Back that file up if you care about the stats.
+
+To start the bot when you log in, open Task Scheduler → Create Basic Task → "When I log on"
+→ Start a program → `bot\run_bot.bat`, with "Start in" set to the `bot` folder.
+
+**Tests:** `cd bot`, then `..\server\.venv\Scripts\python -m pytest`
+
+**Squad-up checklist** (do it once on the live server)
+
+- [ ] `/lfg game:Valorant players:2` creates a post in 🎮・lfg, tagged Valorant, pinging @Valorant and @LFG.
+- [ ] A second account clicks **Join**. The embed shows `2 / 2`, Join turns off, and "Squad's full" pings both people.
+- [ ] That account clicks **Leave**. The post shows `1 / 2` and Join turns back on.
+- [ ] Running `/lfg game:Valorant players:4 when:9pm` again updates the same post instead of making a new one.
+- [ ] **Close** from the second account is refused. From the host, it closes the post (`✓` title, locked, buttons off).
+- [ ] Restart the bot, then click Join on an open post. It still works.

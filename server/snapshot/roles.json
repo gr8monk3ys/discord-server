@@ -1,0 +1,353 @@
+[
+  {
+    "color": null,
+    "hoist": false,
+    "managed": true,
+    "mentionable": false,
+    "name": "Front Desk",
+    "permissions": [
+      "add_reactions",
+      "attach_files",
+      "create_expressions",
+      "create_instant_invite",
+      "create_public_threads",
+      "embed_links",
+      "manage_channels",
+      "manage_events",
+      "manage_expressions",
+      "manage_guild",
+      "manage_roles",
+      "manage_threads",
+      "move_members",
+      "read_message_history",
+      "read_messages",
+      "send_messages",
+      "send_messages_in_threads",
+      "send_polls"
+    ]
+  },
+  {
+    "color": "#42a979",
+    "hoist": true,
+    "managed": false,
+    "mentionable": false,
+    "name": "Keeper",
+    "permissions": [
+      "administrator"
+    ]
+  },
+  {
+    "color": "#2ecc71",
+    "hoist": true,
+    "managed": false,
+    "mentionable": false,
+    "name": "Moderator",
+    "permissions": [
+      "attach_files",
+      "ban_members",
+      "embed_links",
+      "kick_members",
+      "manage_messages",
+      "manage_nicknames",
+      "moderate_members"
+    ]
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": true,
+    "mentionable": false,
+    "name": "Captcha.bot",
+    "permissions": [
+      "attach_files",
+      "ban_members",
+      "embed_links",
+      "kick_members",
+      "manage_channels",
+      "manage_messages",
+      "manage_roles",
+      "read_message_history",
+      "read_messages",
+      "send_messages"
+    ]
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": true,
+    "mentionable": false,
+    "name": "GiveawayBot",
+    "permissions": [
+      "add_reactions",
+      "embed_links",
+      "external_emojis",
+      "read_message_history",
+      "read_messages",
+      "send_messages"
+    ]
+  },
+  {
+    "color": "#397f5e",
+    "hoist": true,
+    "managed": false,
+    "mentionable": false,
+    "name": "Squad",
+    "permissions": [
+      "attach_files",
+      "embed_links"
+    ]
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
+    "name": "Verified",
+    "permissions": [
+      "attach_files",
+      "embed_links"
+    ]
+  },
+  {
+    "color": "#abb0ba",
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
+    "name": "Guest",
+    "permissions": []
+  },
+  {
+    "color": "#606976",
+    "hoist": true,
+    "managed": false,
+    "mentionable": false,
+    "name": "Bots",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": true,
+    "name": "LFG",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": true,
+    "name": "Wardogs",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": true,
+    "name": "Minecraft",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": true,
+    "name": "Fortnite",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": true,
+    "name": "Valorant",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": true,
+    "name": "Call of Duty",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": true,
+    "name": "League of Legends",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": true,
+    "name": "Counter-Strike 2",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": true,
+    "name": "Apex Legends",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": true,
+    "name": "GTA Online",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": true,
+    "name": "Roblox",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": true,
+    "mentionable": false,
+    "name": "Lurkr",
+    "permissions": [
+      "add_reactions",
+      "attach_files",
+      "embed_links",
+      "external_emojis",
+      "manage_expressions",
+      "manage_messages",
+      "manage_roles",
+      "read_message_history",
+      "read_messages",
+      "send_messages",
+      "send_messages_in_threads"
+    ]
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": true,
+    "mentionable": false,
+    "name": "Jockie Music",
+    "permissions": [
+      "connect",
+      "embed_links",
+      "read_message_history",
+      "read_messages",
+      "send_messages",
+      "speak",
+      "use_voice_activation"
+    ]
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
+    "name": "Recruiter",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": true,
+    "name": "Bumper",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": true,
+    "mentionable": false,
+    "name": "DISBOARD.org",
+    "permissions": [
+      "create_instant_invite",
+      "embed_links",
+      "manage_channels",
+      "read_messages",
+      "send_messages"
+    ]
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
+    "name": "Clip of the Week",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": true,
+    "managed": false,
+    "mentionable": false,
+    "name": "Season Champ",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": true,
+    "managed": false,
+    "mentionable": false,
+    "name": "Hype",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": true,
+    "managed": false,
+    "mentionable": false,
+    "name": "Birthday",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
+    "name": "Counting Champ",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
+    "name": "@everyone",
+    "permissions": [
+      "add_reactions",
+      "connect",
+      "create_instant_invite",
+      "create_private_threads",
+      "create_public_threads",
+      "external_emojis",
+      "external_stickers",
+      "read_message_history",
+      "read_messages",
+      "request_to_speak",
+      "send_messages",
+      "send_messages_in_threads",
+      "send_polls",
+      "send_voice_messages",
+      "set_voice_channel_status",
+      "speak",
+      "stream",
+      "use_application_commands",
+      "use_embedded_activities",
+      "use_external_apps",
+      "use_external_sounds",
+      "use_soundboard",
+      "use_voice_activation"
+    ]
+  }
+]

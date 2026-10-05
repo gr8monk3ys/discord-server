@@ -1,0 +1,435 @@
+# Question of the day bank: one question per line, original to this server.
+# Lines starting with # are ignored. Questions are picked at random with no repeats
+# until every one has been used. Adding lines at the end is safe; reordering or
+# deleting lines shifts ids, so the no-repeat history may skip or repeat a few.
+What was the first video game you ever got completely hooked on?
+Which game world would you actually want to live in for a week?
+What is a game you love that almost nobody you know has played?
+If you could erase your memory of one game and play it fresh, which would it be?
+What's the best soundtrack in any game you've played?
+Which game character would you trust to plan your birthday party?
+What is a game mechanic you wish every game had?
+What's a game mechanic you could happily never see again?
+Which game has the best opening ten minutes?
+What game took you the longest to finish?
+What is the most satisfying achievement or trophy you've ever unlocked?
+Which game boss gave you the most trouble, and did you beat it?
+If your life had a loading screen tip, what would it say?
+What's your go-to snack during a long gaming session?
+Do you play with music, a podcast, game audio only, or silence?
+Which game do you always come back to when you can't decide what to play?
+What's a game you bounced off at first but ended up loving?
+What is the coziest game you've ever played?
+Which game made you laugh out loud the most?
+What's the best co-op experience you've had with friends?
+If you could add one feature to Discord, what would it be?
+What hobby outside gaming have you picked up in the last few years?
+What is something small that reliably makes your day better?
+What's a skill you'd love to learn if time and money weren't an issue?
+What is your favorite way to spend a rainy day?
+Which season of the year suits you best, and why?
+What's the best piece of advice you've ever been given?
+What is a food you could eat every week and never get tired of?
+What's a song you never skip?
+What is a movie or show you can rewatch endlessly?
+Which fictional place would you most like to visit?
+What's your favorite way to unwind after a long day?
+What's a small goal you're working toward right now?
+What's a place you've been that you'd love to go back to?
+What is the best thing you've learned from a game?
+Which game has the most memorable side character?
+What is your favorite in-game pet, mount or companion?
+What's the best plot twist you've experienced in a game?
+Which game had an ending that stuck with you for days?
+What's the most beautiful game you've ever played?
+Which game would make the best movie or TV series?
+What game do you think deserves a sequel that never got one?
+What's a franchise you've followed the longest?
+Which retro game still holds up perfectly today?
+What's a game you'd recommend to someone who has never played games?
+If you could be a developer on any game for a day, which would it be?
+What's the funniest bug or glitch you've run into?
+What is your favorite starting class or role in RPGs?
+Do you usually play as a hero, a villain, or something in between when games let you choose?
+What's your favorite game genre right now, and has it changed over the years?
+Which game has the best character creator?
+What is the longest single gaming session you've ever had?
+Which game had the best multiplayer community you've been part of?
+What is your favorite map in any multiplayer game?
+Which game has the most satisfying combat?
+What's a game that surprised you by how emotional it was?
+Which game made you feel the most powerful?
+What's a game that made you genuinely nervous to keep playing?
+Which game had puzzles that made you feel like a genius?
+What's your favorite game to play when you only have 20 minutes?
+Do you prefer short, tight games or huge open worlds?
+Which game has your favorite inventory or crafting system?
+What game would you want turned into a board game?
+What is the most underrated game console or handheld?
+What's a gaming accessory you'd recommend to anyone?
+What's your controller, keyboard or mouse of choice and why?
+Do you play games with subtitles on?
+What accessibility option in a game has made the biggest difference for you or a friend?
+Which game do you think has the best accessibility options?
+What's your favorite gaming memory from when you were younger?
+What's a game you've played with family?
+Which game would you pick for a server-wide tournament?
+What's the best game you've played this year so far?
+What upcoming game are you most looking forward to?
+Which game's lore have you gone way too deep into?
+What's a game that you think gets unfairly hated?
+What's a popular game that just isn't for you?
+If you could live in any game's city, which would it be?
+What's your favorite in-game outfit or skin you own?
+Which game has the best photo mode?
+Have you ever made friends through a game? How did it happen?
+What is your favorite fighting game character?
+Which racing game is your favorite, arcade or sim?
+What's your favorite sports game, even if you don't follow the sport?
+What's the best survival game you've played?
+Which game made you want to learn about real history?
+What's the most creative thing you've built in a sandbox game?
+Which game had the best tutorial?
+What game do you think has the best boss music?
+Which game's main menu music is stuck in your head forever?
+What is your favorite game from an indie studio?
+What's your favorite strategy or tactics game?
+Which roguelike or roguelite has eaten the most of your hours?
+What's your favorite rhythm game?
+What's a game you played for one specific friend?
+What is the best game to play while chatting on voice?
+Which game has the best clan, guild or squad features?
+Which game do you think has the best progression system?
+What's your favorite open world to just wander around in?
+Would you rather replay your favorite game or try a brand-new one tonight?
+What's the most chaotic match you've ever been in?
+What's your most clutch moment in a competitive game?
+What's your favorite thing about the people you play with most?
+What game has the best voice acting you've heard?
+Which game character do you relate to the most?
+If you could have one game item in real life, what would it be?
+What's a superpower from a game you'd want for a day?
+Which game villain do you secretly agree with a little?
+What's the best game based on a movie, show or book?
+Which game would you want to see remade from scratch?
+Which remaster or remake did it right?
+What's your favorite game save file story?
+Do you name your characters after yourself, friends or something else?
+What's the strangest name you've ever given a character?
+Which game made you lose track of time the most?
+Have you ever finished a game at 100% completion? Which one?
+What is a game you started but never finished, and do you plan to?
+What's your backlog looking like right now?
+How do you decide what to play next from your backlog?
+Which game would you pick if you could only play one game for a year?
+What is the best free-to-play game you've tried?
+Which game has the best seasonal or holiday event?
+What's your favorite in-game music player or radio station?
+Which game do you think has the best weather or day-night cycle?
+What's the best fishing minigame in any game?
+What's your favorite minigame inside a bigger game?
+Which game has the best food that you wish you could taste?
+What's the coolest spaceship, car or vehicle in a game?
+Which game has the best skill tree?
+What's a game you've recommended the most to other people?
+What's your favorite game to watch other people play or stream?
+What game taught you the most patience?
+Have you ever cried at a game? Which one, if you're comfortable sharing?
+What's a game you'd love to play with this whole server at once?
+Which game is perfect for a lazy Sunday?
+What's your favorite game to play late at night?
+Which game has the best sound design?
+What's the best game you ever got on sale?
+What's your all-time favorite gaming console?
+What's a game that made you rethink a genre you didn't like?
+What's a game you love that has a terrible name?
+Which game cover art do you find the most iconic?
+What's the best game logo or title screen?
+What's your favorite gaming catchphrase or quote?
+If your friend group were a game party, what role would you play?
+Do you prefer playing solo or with a squad?
+How did you find this server?
+What's something you'd like to see more of on this server?
+What game should we do a community game night for next?
+What's your favorite emoji to react with, and why?
+What's a game that's better with friends than solo?
+Which game has the best ranked or competitive experience?
+What's your best tip for staying calm when a match goes badly?
+What's the best way to welcome a new player into a game you love?
+What's a gaming habit you've picked up that you're proud of?
+What's your favorite thing to do in a game that has nothing to do with the main quest?
+Which game's side quests are better than its main story?
+What's your favorite in-game location to just sit and take in the view?
+Which game has the most satisfying sound when you level up?
+What's your favorite loot rarity color?
+What is the best weapon in any game ever?
+What's your favorite magic system in a game?
+Which stealth game is your favorite?
+Which game has the best heist or mission planning?
+What's the best detective or mystery game you've played?
+What's your favorite horror game, even if you only watched it?
+Which game had the best multiplayer launch party with friends?
+What is your favorite game with a day one community memory?
+What is a game you'd love to see get a big update or revival?
+Which online game do you miss now that its servers are gone?
+What's a game you've played on more than one platform?
+Do you play on PC, console, handheld, phone or a bit of everything?
+What's your favorite mobile game?
+What's your favorite handheld memory?
+Which game is perfect for a long trip?
+What's the first thing you do when you start a new open-world game?
+Do you explore every corner or rush the main story?
+Do you read every item description and lore note?
+Are you the type to reload a save after a bad conversation choice?
+What's a choice in a game you still think about?
+Which game handled player choice the best?
+What's your favorite game with a silent protagonist?
+Which game has the most lovable cast of characters?
+What's your favorite duo or partnership in a game?
+Which game animal companion deserves an award?
+Which game has the best dialogue?
+What's a game line you quote in real life?
+What would your dream game combine, from two games you love?
+If you designed a game, what genre would it be?
+What would be the main mechanic of a game made about your life?
+What would your character's special ability be in a game about this server?
+What's a game you think is perfect exactly as it is?
+What's a game you'd change just one thing about?
+Which game do you think aged the best visually?
+Do you prefer realistic graphics or a strong art style?
+What's your favorite pixel art game?
+Which game would you most like to see in virtual reality?
+Have you tried VR gaming? What did you think?
+What's your favorite party game for a group?
+What's the best game for settling friendly arguments?
+What's the most fun you've had losing a game?
+Which game has the most satisfying victory screen?
+What's your favorite emote or gesture in a game?
+What's your favorite in-game dance?
+What's your gaming setup's best feature?
+If you could upgrade one thing about your setup, what would it be?
+What's on your desk right now besides your keyboard?
+What's your favorite gaming chair or comfy spot to play?
+Do you have any good-luck rituals before a big match?
+What's the best name you've seen a squad or team use?
+What's your gamertag origin story, if you're willing to share?
+What's a username you wish you had picked instead?
+Which game has the friendliest player base?
+What game do you play to relax and switch your brain off?
+What game do you play when you want a real challenge?
+What's a game you're secretly really good at?
+What's a game you're hilariously bad at but still enjoy?
+What's the most useless skill you've mastered in a game?
+Which game feature do you always turn off in settings?
+What's your field of view or sensitivity preference, if you play shooters?
+Do you invert the Y-axis?
+What's your hottest gaming take that you'll defend forever?
+What's your mildest gaming opinion that somehow starts arguments?
+What's your favorite gaming YouTuber or streamer for chill content?
+Which esports moment do you remember the most?
+Would you ever want to try playing competitively in a tournament?
+What's your favorite game to speedrun or watch speedruns of?
+What's your favorite game soundtrack to study or work to?
+Which game's music do you listen to outside of playing?
+What's your favorite instrument to hear in game music?
+If you could have any game composer score your life, who would it be?
+What's the best sound effect in gaming history?
+What's your favorite way to celebrate finishing a game?
+What's a game that made you want to visit a real place?
+What's a real place that looks like it's straight out of a game?
+What's the best thing you've cooked lately?
+What's your comfort meal after a rough day?
+Sweet or savory breakfast?
+What's your favorite drink to have while gaming, like tea, coffee, water or soda?
+What's a snack from another country you'd recommend?
+What's your favorite pizza topping combo?
+What's your favorite dessert of all time?
+What's a food you used to hate but now like?
+What's the best thing you've baked or would like to bake?
+If you opened a restaurant, what would be on the menu?
+What's a recipe you're known for among friends?
+What's your favorite thing to do on a day off?
+Are you a morning person, a night owl or something in between?
+What's your ideal weekend look like?
+What's the best concert, show or live event you've been to?
+What's a book you'd recommend to anyone?
+What's a show you're watching right now?
+What's an anime or animated series you'd recommend?
+What's a movie you think is underrated?
+What's a movie that you think everyone should watch at least once?
+What's your favorite movie soundtrack?
+What's a song that instantly puts you in a good mood?
+What's an album you can listen to start to finish?
+What's a song that reminds you of a specific game?
+What genre of music do you listen to the most?
+If you had a walk-on song, what would it be?
+What's your favorite way to get some fresh air?
+What's a sport you enjoy playing or watching?
+What's a physical activity you actually enjoy?
+What's your favorite kind of weather?
+Beach, mountains, forest or city?
+What's a place on your travel bucket list?
+What's the farthest you've traveled from home?
+What's a tradition you enjoy, from your family, friends or culture?
+What's a holiday you look forward to every year?
+What's a fun fact about where you live?
+What's a local food from your area people should try?
+What's the best thing about your hometown?
+If you could live anywhere for a year, where would you go?
+What's a language you'd like to learn?
+What's a word in another language you love?
+What's your favorite animal and why?
+Do you have a pet, or a dream pet?
+What's the best pet name you've ever heard?
+What's the most interesting animal fact you know?
+If you could talk to one kind of animal, which would you choose?
+What's your favorite plant, flower or tree?
+Have you ever grown something yourself? How did it go?
+What's a small win you had this week?
+What's something you're looking forward to this month?
+What's a goal you reached that you're proud of?
+What's something you've changed your mind about in the last few years?
+What's the best compliment you've ever received?
+What's a kind thing a stranger did for you?
+What's a habit that's made your life better?
+What's your favorite way to help someone who's having a bad day?
+What's something you're grateful for today?
+What's a skill you've taught someone else?
+What's a skill someone taught you that you still use?
+What's your favorite way to be creative?
+Do you draw, write, make music or create in some other way?
+What's something you made that you're proud of?
+What's a craft or DIY project you'd like to try?
+What's the best gift you've ever given?
+What's the best gift you've ever received?
+What's an app you use every day that you'd recommend?
+What's a piece of tech you couldn't live without?
+What's the oldest piece of tech you still use?
+What's a gadget you bought that was totally worth it?
+What's a purchase under 20 dollars that improved your life?
+What's your favorite way to organize your day?
+How do you keep track of things you want to remember?
+What's your favorite productivity trick?
+What's your favorite way to learn something new?
+What's a topic you could talk about for an hour?
+What's a random fact you know that always surprises people?
+What's a rabbit hole you went down online recently?
+What's your favorite thing about the internet?
+What's your favorite meme format of all time?
+What's the best video you've watched this week?
+What's your favorite podcast topic or genre?
+If you started a podcast, what would it be about?
+If you had a YouTube channel, what would you make?
+If you wrote a book, what would it be about?
+What's a story from your life that sounds made up but isn't?
+What's the most spontaneous thing you've ever done?
+What's a fear you've overcome?
+What's something you'd tell your younger self?
+What's something you'd like to do before the end of the year?
+What's your dream job, realistic or not?
+If you had to teach a class on anything, what would you teach?
+What's the most interesting job you've ever heard of?
+What's a talent you have that most people don't know about?
+What's your favorite board game or card game?
+What's your favorite tabletop RPG, or one you want to try?
+What's your favorite puzzle: crosswords, sudoku, jigsaws or something else?
+Have you ever solved a Rubik's cube?
+What's your favorite childhood cartoon?
+What's a toy you had as a kid that you wish you still had?
+What was your favorite thing to do on summer break as a kid?
+What's a smell that instantly brings back a memory?
+What's a sound that you find really relaxing?
+What's your favorite color, and has it always been?
+What's your favorite time of day?
+What's your favorite day of the week and why?
+What's a word you overuse?
+What's the best joke you know that's safe for everyone?
+What's the best pun you've ever heard?
+What's your go-to karaoke song, even if you'd never actually sing it?
+If you could master any instrument instantly, which would it be?
+What's the best dance move you know?
+If you could have dinner with any fictional character, who would it be?
+If you could swap lives with a game character for a day, who would it be?
+Which fictional world would you absolutely not survive in?
+Which fictional sidekick would you pick to have your back?
+If you were an NPC, what would your one line of dialogue be?
+If you were a boss fight, what would your phase two look like?
+If your life were a game, what genre would it be?
+What would your class be in a fantasy RPG?
+What would your stats look like if you had a character sheet?
+What's your real-life special move?
+What would be the title of your autobiography?
+What's a quest you'd give a new player in your hometown?
+If you could add one zone to your favorite game, what would it be?
+What's an item you'd add to the shop in your favorite game?
+If you could ban one thing from every multiplayer lobby, what would it be?
+What's the ideal number of people for a squad?
+What's the best callout you've ever heard from a teammate?
+What's your favorite way to communicate in-game: voice, text, pings or vibes?
+How do you deal with a teammate who's having a rough game?
+What's your favorite thing someone has said to you after a match?
+What's the most wholesome thing you've seen in an online game?
+What's a game community that really made you feel welcome?
+What's your favorite charity stream or community event?
+What would make a perfect community game night?
+What prize would you want for winning a server tournament?
+If this server had a mascot, what would it be?
+What should our next server emoji be?
+Which channel on this server do you visit the most?
+What's a game you'd like to find more people to play with here?
+What's one thing you'd like other members to know about you?
+What's a game you'd teach a friend from scratch, step by step?
+What's a game you love the community of but not the game itself?
+What's the hardest game you've ever beaten?
+What's a game you think is easier than people claim?
+What's a difficulty setting you usually pick, and why?
+Do you think games should have easy modes?
+What's your favorite game that you'd describe as relaxing?
+Which game world has the best ambient sounds?
+What's your favorite city-builder or management game?
+What's a simulation game that's oddly addictive?
+Which farming game is your favorite?
+What's your favorite life sim moment?
+What's your favorite game that uses real-world physics in a fun way?
+What's the best game you've played that was made by a tiny team?
+What's a game jam or student game that impressed you?
+Would you ever want to make your own game?
+What tool or engine would you use if you made a game?
+What's a game you've modded, or would love to mod?
+What's your favorite mod of all time?
+What's your favorite custom map, level or server you've played on?
+What's the best user-made creation you've seen in a game?
+What's your favorite level editor or creative mode?
+What's a game with an awesome fan community?
+What's the best fan art or fan project you've seen for a game?
+Do you collect anything game-related, like figures, posters or physical copies?
+What's the oldest game you still own?
+What's a gaming memory you'd frame on a wall?
+What's your favorite gaming-related merch?
+Which game would you buy a soundtrack vinyl for?
+Which game do you hope someone makes a cookbook for?
+Which game's fictional sport would be fun to play in real life?
+Which in-game job would you actually want in real life?
+If you could ride any game vehicle home today, which one?
+Which game world has the best transportation system?
+What's your favorite game with great climbing or movement?
+Which game has the best grappling hook?
+What's the best double jump in gaming?
+Which game made dodging feel perfect?
+What's your favorite parry in any game?
+Which game do you think has the best enemy designs?
+What's the cutest enemy you felt bad defeating?
+Which game has the best final level?
+What's a game ending you'd change if you could?
+What's your favorite post-credits scene or secret ending?
+What's the best Easter egg you've ever found?
+What's a secret you discovered in a game before anyone told you?
+What's the most obscure piece of game trivia you know?
+What's the best game you've played because a friend wouldn't stop talking about it?
+What game would you pick to introduce someone to your favorite genre?
+What's a game you'd play with your favorite celebrity?
+What's a comfort game you return to when you're stressed?
+How has gaming helped you through a tough time?
+What's something gaming has taught you about teamwork?
+Who's a person you met through gaming that you're glad you know?
+What's your favorite thing about this community so far?

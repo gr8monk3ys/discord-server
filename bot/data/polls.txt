@@ -1,0 +1,253 @@
+# "This or that" poll bank: one "A | B" pair per line, each side at most 55 characters.
+# Lines starting with # are ignored. Adding lines at the end is safe.
+Controller | Keyboard and mouse
+Solo queue | Full squad
+Open world | Linear story
+Day one launch | Wait for reviews
+Single-player | Multiplayer
+Tank | Healer
+Sniper | Shotgun
+Speedrun it | 100% complete it
+Pixel art | Photorealistic
+Morning gaming | Late-night gaming
+Headphones | Speakers
+Voice chat | Text chat
+Ranked | Casual
+Build mode | Combat mode
+Stealth | Go in loud
+Melee | Ranged
+Explore every corner | Rush the main quest
+Story mode | Hard mode
+Dark mode | Light mode
+Indie games | AAA games
+PC | Console
+Handheld | Big screen
+Retro classics | Brand new releases
+Fantasy | Sci-fi
+Horror | Comedy
+Puzzle games | Action games
+Turn-based | Real-time
+Pets in games | Mounts in games
+Crafting | Looting
+Dungeon crawl | Open field battle
+Main character | Sidekick
+Hero | Villain
+Character creator for an hour | Default character, start now
+Read every lore note | Skip all the text
+Cozy farming | Intense survival
+Racing | Fighting
+Platformer | Shooter
+Couch co-op | Online co-op
+Big guild | Small friend group
+Silent protagonist | Fully voiced protagonist
+Subtitles on | Subtitles off
+Quick matches | Long campaigns
+Battle royale | Team deathmatch
+Build a base | Keep moving
+Magic | Swords
+Bow | Crossbow
+Dragons | Robots
+Space | Deep sea
+Zombies | Aliens
+Knights | Pirates
+Ninjas | Samurai
+Wizards | Witches
+Cyberpunk city | Medieval village
+Desert map | Snow map
+Night levels | Day levels
+Dodge roll | Parry
+Double jump | Grappling hook
+Fast travel | Walk everywhere
+Minimap | No HUD at all
+Auto-save | Manual saves
+Achievements | No achievements
+Season pass | One-time purchase
+Physical copy | Digital copy
+Skins | Emotes
+Victory dance | Respectful bow
+Lag | Low frame rate
+Spawn camping | Getting spawn camped
+Clutch 1v5 | Flawless team win
+First place | Most kills
+Be the shotcaller | Follow the calls
+Mic on | Mic muted
+Ping system | Callouts
+Sound effects | Soundtrack
+Boss fights | Puzzles
+Side quests | Main story
+Big plot twist | Happy ending
+Open-ended ending | Clear ending
+Remake | Remaster
+Sequel | Brand new game
+Game with mods | Game as intended
+Sandbox | Story-driven
+Cute enemies | Scary enemies
+Pizza | Burgers
+Tacos | Sushi
+Pancakes | Waffles
+Coffee | Tea
+Sweet snacks | Salty snacks
+Chips | Popcorn
+Ice cream | Cake
+Breakfast for dinner | Dinner for breakfast
+Spicy food | Mild food
+Homemade | Takeout
+Cereal first | Milk first
+Fruit | Veggies
+Chocolate | Vanilla
+Soup | Salad
+Noodles | Rice
+Hot drinks | Cold drinks
+Fries | Onion rings
+Cookies | Brownies
+Cats | Dogs
+Birds | Fish
+Owls | Foxes
+Penguins | Otters
+Wolves | Bears
+Sharks | Octopuses
+Frogs | Turtles
+Bunnies | Hamsters
+Beach | Mountains
+City | Countryside
+Summer | Winter
+Spring | Fall
+Sunrise | Sunset
+Rain | Snow
+Thunderstorms | Clear skies
+Hot weather | Cold weather
+Early bird | Night owl
+Road trip | Flight
+Camping | Hotel
+Plan everything | Go with the flow
+Books | Movies
+Movies | Series
+Watch at home | Go to the theater
+Anime | Cartoons
+Live action | Animated
+Podcast | Audiobook
+Music on shuffle | Full album
+Concert | Festival
+Singing | Dancing
+Drawing | Writing
+Learn guitar | Learn piano
+Board games | Card games
+Chess | Checkers
+Jigsaw puzzle | Crossword
+Sudoku | Word search
+Texting | Calling
+Emoji | Stickers
+Memes | Reaction GIFs
+Big party | Small hangout
+Stay in | Go out
+Comedy show | Magic show
+Theme park | Water park
+Roller coaster | Ferris wheel
+Museum | Aquarium
+Zoo | Botanical garden
+Bike | Skateboard
+Swimming | Hiking
+Gym | Home workout
+Run | Walk
+Yoga | Weightlifting
+Team sports | Solo sports
+Soccer | Basketball
+Tennis | Bowling
+Mini golf | Go-karts
+Laser tag | Paintball
+Escape room | Trivia night
+Time travel to the past | Time travel to the future
+Fly | Be invisible
+Super strength | Super speed
+Teleport | Read minds
+Talk to animals | Speak every language
+Live in space | Live underwater
+Never sleep again | Never eat again
+Unlimited games | Unlimited snacks
+Free flights forever | Free food forever
+Be famous | Be rich
+Know everything | Be able to do anything
+Pause time | Rewind time
+Live in a game world | Have one game item in real life
+Robot butler | Dragon pet
+Treehouse | Castle
+Cabin in the woods | Apartment in the city
+Tiny home | Huge mansion
+Smartphone | Laptop
+Text editor | Notebook and pen
+Wired headset | Wireless headset
+Mechanical keyboard | Quiet keyboard
+RGB everything | Clean minimal setup
+Big monitor | Two monitors
+High frame rate | High resolution
+Fan noise | Overheating
+Charge every night | Wait until it hits 1%
+Organize the desktop | Let the icons pile up
+Tabs open forever | Close them all
+Notifications on | Do not disturb
+Alarm with snooze | One alarm and up
+Shower in the morning | Shower at night
+Socks on | Socks off
+Hoodie | T-shirt
+Sneakers | Boots
+Hats | Sunglasses
+Window seat | Aisle seat
+Front row | Back row
+First in line | Last in line
+Surprise party | Planned party
+Give gifts | Receive gifts
+Handwritten card | Long text message
+Spoilers ok | No spoilers ever
+Read the book first | Watch the movie first
+Binge in a weekend | One episode a week
+Subtitles | Dubbed
+Rewatch a favorite | Try something new
+Superhero movies | Space movies
+Mystery | Thriller
+Fantasy books | Sci-fi books
+Comics | Manga
+Lo-fi beats | Video game soundtracks
+Old songs | New songs
+Karaoke | Air guitar
+Whistle | Hum
+Cooking | Baking
+Breakfast | Dinner
+Lunch out | Packed lunch
+Leftovers | Fresh meal
+Grocery list | Wing it at the store
+Fridge raid | Cook from scratch
+Midnight snack | Early breakfast
+Pineapple on pizza | Absolutely not
+Ketchup | Mustard
+Gaming chair | Couch
+Lights on | Lights off
+Rage quit | Play until you win
+GG and leave | Rematch right away
+Lucky streak | Skill streak
+Loot box | Shop with fixed prices
+Collect everything | Use the best thing only
+Hoard potions | Use them freely
+Save the best weapon | Use it right away
+Upgrade armor | Upgrade weapons
+Tank the hit | Dodge it
+Swap to pistol | Reload
+Leave no one behind | Complete the objective
+Hold the point | Push forward
+Rush B | Play slow
+Drop hot | Land quietly
+Third person | First person
+Top-down | Side-scroller
+2D | 3D
+Hand-drawn art | Low-poly art
+Voice acting | Text boxes
+Open-world map | Hub world
+Procedural levels | Handcrafted levels
+Permadeath | Checkpoints
+Hardcore mode | Relaxed mode
+New Game Plus | Brand new save
+Grind for gear | Craft your gear
+Trading with players | Buying from NPCs
+Fishing minigame | Cooking minigame
+Card minigame | Racing minigame
+Photo mode for an hour | Never touch photo mode
+Pet the dog | Pet the cat

@@ -1,0 +1,31 @@
+{
+  "channels": [
+    {
+      "channel": "📌・rules",
+      "description": "Short and worth reading",
+      "emoji": "📌"
+    },
+    {
+      "channel": "💬・general",
+      "description": "Say hi",
+      "emoji": "💬"
+    },
+    {
+      "channel": "🎮・lfg",
+      "description": "Find a squad for tonight",
+      "emoji": "🎮"
+    },
+    {
+      "channel": "📸・clips",
+      "description": "Post your best plays",
+      "emoji": "📸"
+    },
+    {
+      "channel": "🕹️・gaming",
+      "description": "Talk games",
+      "emoji": "🕹️"
+    }
+  ],
+  "description": "Chill 18+ gamers. No tryhards, no toxicity. Pick your games and find a squad tonight.",
+  "enabled": true
+}

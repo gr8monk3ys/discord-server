@@ -1,0 +1,117 @@
+[
+  {
+    "actions": [
+      {
+        "type": "block_member_interactions"
+      }
+    ],
+    "enabled": true,
+    "event_type": "member_update",
+    "exempt_channels": [],
+    "exempt_roles": [],
+    "name": "Block Words in Member Profile Names",
+    "trigger": {
+      "allow_list": [],
+      "keyword_filter": [],
+      "mention_limit": 0,
+      "mention_raid_protection": false,
+      "presets": [],
+      "regex_patterns": [],
+      "type": "member_profile"
+    }
+  },
+  {
+    "actions": [
+      {
+        "custom_message": "Blocked by AutoMod. Ask a Keeper if that was a mistake.",
+        "type": "block_message"
+      },
+      {
+        "channel": "🛡️・mod",
+        "type": "send_alert_message"
+      },
+      {
+        "duration_seconds": 600,
+        "type": "timeout"
+      }
+    ],
+    "enabled": true,
+    "event_type": "message_send",
+    "exempt_channels": [],
+    "exempt_roles": [
+      "Keeper",
+      "Moderator"
+    ],
+    "name": "Front Desk: mention raids",
+    "trigger": {
+      "allow_list": [],
+      "keyword_filter": [],
+      "mention_limit": 6,
+      "mention_raid_protection": true,
+      "presets": [],
+      "regex_patterns": [],
+      "type": "mention_spam"
+    }
+  },
+  {
+    "actions": [
+      {
+        "custom_message": "Blocked by AutoMod. Ask a Keeper if that was a mistake.",
+        "type": "block_message"
+      },
+      {
+        "channel": "🛡️・mod",
+        "type": "send_alert_message"
+      }
+    ],
+    "enabled": true,
+    "event_type": "message_send",
+    "exempt_channels": [],
+    "exempt_roles": [
+      "Keeper",
+      "Moderator"
+    ],
+    "name": "Front Desk: slurs",
+    "trigger": {
+      "allow_list": [],
+      "keyword_filter": [],
+      "mention_limit": 0,
+      "mention_raid_protection": false,
+      "presets": [
+        "sexual_content",
+        "slurs"
+      ],
+      "regex_patterns": [],
+      "type": "keyword_preset"
+    }
+  },
+  {
+    "actions": [
+      {
+        "custom_message": "Blocked by AutoMod. Ask a Keeper if that was a mistake.",
+        "type": "block_message"
+      },
+      {
+        "channel": "🛡️・mod",
+        "type": "send_alert_message"
+      }
+    ],
+    "enabled": true,
+    "event_type": "message_send",
+    "exempt_channels": [],
+    "exempt_roles": [
+      "Keeper",
+      "Moderator"
+    ],
+    "name": "Front Desk: spam",
+    "trigger": {
+      "allow_list": [],
+      "keyword_filter": [],
+      "mention_limit": 0,
+      "mention_raid_protection": false,
+      "presets": [],
+      "regex_patterns": [],
+      "type": "spam"
+    }
+  }
+]
