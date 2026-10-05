@@ -88,7 +88,10 @@ in `layout.ROLES`, and every bot gets `@Bots` so they're grouped in the member l
 **Afterwards**
 
 - Give yourself **@Keeper** and your friends **@Squad**.
-- Kick the bot. It doesn't need to stay, and Admin bots sitting around are a risk.
+- Take Administrator back off the bot's role. Front Desk now stays as the server's
+  permanent bot (section 3) with only the permissions it needs.
+- For later changes use `public_mode.py`: it only adds things and never reorders or deletes,
+  so it works with Front Desk sitting below the staff roles.
 - Reset the bot token in the portal if you shared `.env` anywhere.
 - Optional: set `ICON_PATH` in `layout.py` to a square image for the server icon.
 
@@ -131,40 +134,62 @@ gets an `"error"` note instead and the rest is still written.
 
 ## 3. Front Desk bot (`bot/`)
 
-The setup scripts were a one-shot run. `bot/` is a **persistent** bot that runs while your
-PC is on. It uses the same Front Desk app and token, re-invited **without** Administrator.
-Design: `docs/superpowers/specs/2026-10-01-front-desk-bot-design.md`.
+Front Desk is the server's own bot. It runs on LORENZO-COMPUTE around the clock and needs no
+day-to-day attention. Design and history:
+`docs/superpowers/specs/2026-10-01-front-desk-bot-design.md`. Privacy: [PRIVACY.md](PRIVACY.md).
 
-Built so far: **Squad-up** (`/lfg`). Still to come: stats and leaderboards, clip of the
-week, and coins and mini-games.
+### What it does
 
-**One-time setup**
+| Area | Commands and automatic jobs |
+|---|---|
+| Squad-up | `/lfg` posts in 🎮・lfg with Join/Leave/Close buttons; posts close after 3 h |
+| Stats | `/stats`, `/leaderboard`, `/privacy`; weekly MVP Sundays 18:00 |
+| Growth | `/invites`, `/recruiters` (Recruiter role), `/bumpers`, `/bumpping`; Disboard bump reminders |
+| Community | welcome after Onboarding, `/report` and "Report message", mod log |
+| Hall of fame | 3 ⭐ from other members reposts to ⭐・hall-of-fame (public channels only) |
+| Clips | clip of the week poll Sundays 18:05; winner gets Clip of the Week |
+| Voice | join ➕ New Squad for your own channel; `/squad name`, `/squad limit`, `/squad claim` |
+| Events | `/gamenight`; 15-min reminders; free Epic/Steam games Thursdays 18:00 |
+| Economy | `/daily`, `/balance`, `/give`, `/coinflip`, `/richest`; coins for voice, chat, clips, squads |
+| Games | `/slots`, `/blackjack`, `/trivia`, `/predict` |
+| Shop and seasons | `/shop`, `/buy` (colour role, Hype, shoutout), `/season`; monthly champions |
+| Engagement | question of the day 12:00, this-or-that poll 18:00, 🔢・counting, auto game night Fridays, `/birthday` |
+| Moderation | `/warn`, `/timeout`, `/untimeout`, `/cases`, `/purge`; auto-escalation, anti-spam, anti-raid |
+| Operations | daily DB backup 04:00, error alerts, back-online note, weekly config drift check, `/status` |
+| Utility | `/remind`, `/reminders`, `/afk`, suggestion voting, member/online stat channels, tickets in 🆘・help |
 
-1. Install the extra packages into the shared virtualenv:
-   `server\.venv\Scripts\pip install -r bot\requirements.txt`
-2. Print the invite link with `server\.venv\Scripts\python bot\main.py --invite`, open it, and
-   authorize. It asks only for the permissions the bot uses.
-3. Server Settings → Roles: drag **Front Desk** above **Squad**.
+All times are Pacific. Every scheduled job catches up once after downtime and never runs twice.
 
-Later modules also need **Server Members**, **Message Content** and **Presence**, switched on
-under Developer Portal → your app → Bot → Privileged Gateway Intents. Squad-up needs none of
-them.
+### How it runs
 
-**Run it**
+- **Task Scheduler task "Front Desk bot"** runs `server\.venv\Scripts\pythonw.exe main.py` in
+  `bot\`, at boot (no sign-in needed) and at logon, and restarts it if it crashes. A lock file
+  (`bot\data\bot.lock`) stops a second copy.
+- **Logs:** `bot\data\bot.log` (rotated). **Database:** `bot\data\front_desk.db`.
+  **Backups:** `D:\Backups\front-desk\`, 14 days kept, integrity-checked.
+- **Health:** errors and "back online" notes are posted in 📋・mod-log; `/status` (staff only)
+  shows uptime, latency, last backup and error counts.
 
-Double-click `bot\run_bot.bat`, or run it from a terminal. Logs go to `bot\data\bot.log`, and
-the database is `bot\data\front_desk.db`. Back that file up if you care about the stats.
+### Runbook
 
-To start the bot when you log in, open Task Scheduler → Create Basic Task → "When I log on"
-→ Start a program → `bot\run_bot.bat`, with "Start in" set to the `bot` folder.
+| Situation | Do this |
+|---|---|
+| Restart the bot | `Stop-ScheduledTask 'Front Desk bot'; Start-ScheduledTask 'Front Desk bot'` |
+| Bot offline | Check `bot\data\bot.log` (last lines), then restart. "already running" means another copy holds `bot.lock` |
+| Change the task | Needs an **elevated** PowerShell (the task runs as S4U) |
+| Restore the database | Stop the task, copy the newest `D:\Backups\front-desk\front_desk-*.db` over `bot\data\front_desk.db`, start the task |
+| A role won't be given out | The role must sit **below Front Desk** in Server Settings → Roles. Only the owner can move roles above the bot |
+| Run by hand (debugging) | Stop the task first, then `bot\run_bot.bat` |
+| Tests | `cd bot`, then `..\server\.venv\Scripts\python -m pytest -q` (about 1,200 tests) |
 
-**Tests:** `cd bot`, then `..\server\.venv\Scripts\python -m pytest`
+Required in the Developer Portal: the **Server Members**, **Message Content** and **Presence**
+intents. Required on the Front Desk role: the permissions printed by `main.py --invite`
+(includes Manage Roles/Channels/Server/Events, Timeout Members, Manage Messages, Move Members).
 
-**Squad-up checklist** (do it once on the live server)
+### Adding a module
 
-- [ ] `/lfg game:Valorant players:2` creates a post in 🎮・lfg, tagged Valorant, pinging @Valorant and @LFG.
-- [ ] A second account clicks **Join**. The embed shows `2 / 2`, Join turns off, and "Squad's full" pings both people.
-- [ ] That account clicks **Leave**. The post shows `1 / 2` and Join turns back on.
-- [ ] Running `/lfg game:Valorant players:4 when:9pm` again updates the same post instead of making a new one.
-- [ ] **Close** from the second account is refused. From the host, it closes the post (`✓` title, locked, buttons off).
-- [ ] Restart the bot, then click Join on an open post. It still works.
+1. Add tables as a **new** entry in `MIGRATIONS` (`bot/db.py`); never edit a shipped one.
+2. Pure rules go in `bot/logic/<name>.py` with tests; Discord I/O in `bot/cogs/<name>.py`.
+3. Move coins only through `bot/economy.py`. Send member text only with `ping_only(...)` or
+   `AllowedMentions.none()`, and escape markdown in bot-authored text.
+4. Register it in `MODULES` in `bot/main.py` with the privileged intents it needs.

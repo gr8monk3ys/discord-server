@@ -1,7 +1,7 @@
 # Front Desk bot: design
 
 Date: 2026-10-01
-Status: approved by Lorenzo (all recommendations accepted). Revised after spec review round 1.
+Status: modules 1–12 built and live (2026-10-04). Revised after spec review round 1.
 
 ## Goal
 
