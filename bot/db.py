@@ -253,6 +253,63 @@ MIGRATIONS = [
         closed_at INTEGER
     )""",
     ],
+    [
+        # Growth: tournaments.
+        """CREATE TABLE tournaments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        game TEXT,
+        size INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'signup',
+        channel_id INTEGER,
+        message_id INTEGER,
+        created_by INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        starts_at INTEGER,
+        winner_id INTEGER
+    )""",
+        """CREATE TABLE tournament_entries (
+        tournament_id INTEGER NOT NULL REFERENCES tournaments (id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL,
+        seed INTEGER,
+        joined_at INTEGER NOT NULL,
+        PRIMARY KEY (tournament_id, user_id)
+    )""",
+        """CREATE TABLE tournament_matches (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tournament_id INTEGER NOT NULL REFERENCES tournaments (id) ON DELETE CASCADE,
+        round INTEGER NOT NULL,
+        slot INTEGER NOT NULL,
+        p1 INTEGER,
+        p2 INTEGER,
+        winner INTEGER,
+        reported_by INTEGER,
+        status TEXT NOT NULL DEFAULT 'pending',
+        UNIQUE (tournament_id, round, slot)
+    )""",
+        # Growth: achievements.
+        """CREATE TABLE achievements (
+        user_id INTEGER NOT NULL,
+        key TEXT NOT NULL,
+        at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, key)
+    )""",
+        # Growth: creator spotlight.
+        """CREATE TABLE creators (
+        user_id INTEGER NOT NULL,
+        platform TEXT NOT NULL,
+        handle TEXT NOT NULL,
+        external_id TEXT NOT NULL,
+        added_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, platform)
+    )""",
+        """CREATE TABLE creator_seen (
+        platform TEXT NOT NULL,
+        item_id TEXT NOT NULL,
+        seen_at INTEGER NOT NULL,
+        PRIMARY KEY (platform, item_id)
+    )""",
+    ],
 ]
 
 

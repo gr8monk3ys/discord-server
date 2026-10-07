@@ -48,6 +48,11 @@ HELP_CHANNEL = "🆘・help"  # the "Contact the mods" ticket button lives here
 BIRTHDAY_ROLE = "Birthday"
 COUNTING_ROLE = "Counting Champ"
 BACKUP_DIR = r"D:\Backups\front-desk"  # bulk data lives on D: (see fleet conventions)
+# Growth features
+WELCOME_CHANNEL = "👋・welcome"  # welcome cards go here
+TOURNAMENTS_CHANNEL = "🏆・tournaments"
+CREATORS_CHANNEL = "📺・creators"  # live / new-upload announcements
+TOURNEY_ROLE = "Tournament Champ"
 SQUAD_VOICE = "🎮 Squad"
 LOBBY_VOICE = "🔊 Lobby"
 MODES = ("Ranked", "Casual")
