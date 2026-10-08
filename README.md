@@ -146,7 +146,7 @@ day-to-day attention. Design and history:
 | Stats | `/stats`, `/leaderboard`, `/privacy`; weekly MVP Sundays 18:00 |
 | Growth | `/invites`, `/recruiters` (Recruiter role), `/bumpers`, `/bumpping`; Disboard bump reminders |
 | Community | welcome after Onboarding, `/report` and "Report message", mod log |
-| Hall of fame | 3 ⭐ from other members reposts to ⭐・hall-of-fame (public channels only) |
+| Hall of fame | 3 ⭐ from other members (accounts 30+ days old) reposts to ⭐・hall-of-fame (public channels only) |
 | Clips | clip of the week poll Sundays 18:05; winner gets Clip of the Week |
 | Voice | join ➕ New Squad for your own channel; `/squad name`, `/squad limit`, `/squad claim` |
 | Events | `/gamenight`; 15-min reminders; free Epic/Steam games Thursdays 18:00 |
@@ -167,10 +167,10 @@ day-to-day attention. Design and history:
 | Partners | `/partner apply` → staff review card in 📋・mod-log → 🤝・partners; weekly dead-invite sweep; staff `/partner remove` |
 | Starter quest | `/quest`: pick roles, say hi, join a squad, claim `/daily`, join voice; 500 coins and the Settled In badge; one nudge DM after a day |
 | Heartbeat | writes `bot/data/heartbeat` every minute for the watchdog |
-| Auto tournaments | first Monday of the month: a 16-player bracket for the most-played game, Discord event, Saturday 19:00 auto-start (4+ entrants), 1 h reminder, nudges for unreported matches |
-| Weekly challenges | 3 rotating goals each week (150/250/400 coins + 300 bonus), board in 🎲・games Mondays 09:00, `/challenges` with Claim button, hourly auto-claim |
-| Daily Word | `/word guess/today/stats/leaderboard`: one 5-letter word a day, spoiler-free results in 🎲・games, coins for wins, streaks |
-| Vibes | conversation starter when 💬・general is quiet for 3 h, join anniversaries, booster thanks + 1000 coins and a monthly stipend, member of the month |
+| Auto tournaments | first Monday of the month: a 16-player bracket for the most-played game, Discord event, Saturday 19:00 auto-start (4+ entrants), 1 h reminder, nudges for unreported matches; matches still undecided after 48 h (including a report the opponent never confirmed) go to staff in mod-log |
+| Weekly challenges | 3 rotating goals each week (150/250/400 coins + 300 bonus), board in 🎲・games Mondays 09:00, `/challenges` with Claim button, hourly auto-claim; squads and voice company only count from accounts 30+ days old, a game night counts once it starts (not if cancelled), a tournament entry once it starts |
+| Daily Word | `/word guess/today/stats/leaderboard`: one 5-letter word a day (order salted with a private secret kept in the database), spoiler-free results in 🎲・games, coins for wins, streaks |
+| Vibes | conversation starter when 💬・general is quiet for 3 h, join anniversaries, booster thanks + 1000 coins and a monthly stipend, member of the month (squads = joining someone else's post) |
 
 Landing page: <https://gr8monk3ys.github.io/discord-server/> (`site/`, deployed by
 `.github/workflows/pages.yml`). Listing-site copy and banners: `docs/LISTING.md`, `assets/listing/`.

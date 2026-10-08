@@ -495,6 +495,37 @@ def test_member_of_the_month(monkeypatch):
     with_env(body, monkeypatch)
 
 
+def test_member_of_the_month_ignores_own_posts_and_alt_activity(monkeypatch):
+    """Squads only count when joining someone else's post from an established account, and
+    voice time with only a fresh account (an alt) is time alone."""
+    async def body(env):
+        await env.seen(V.MOTM_JOB, ts(2026, 10, 1))
+        env.member(1)
+        env.member(2)
+        oct10 = ts(2026, 10, 10, 20)
+        alt = discord.utils.time_snowflake(at(oct10 - 5 * DAY))
+        for i in range(10):  # 1 hosts ten squads: its own member rows aren't joins
+            await env.db.execute("INSERT INTO lfg_posts (game, host_id, size, when_text, created_at)"
+                                 " VALUES (?, 1, 4, 'now', ?)", (f"g{i}", oct10 + i))
+            post = (await env.db.fetchone("SELECT MAX(id) AS id FROM lfg_posts"))["id"]
+            await env.db.execute("INSERT INTO lfg_members (post_id, user_id, joined_at) VALUES (?, 1, ?)",
+                                 (post, oct10 + i))
+        for i in range(10):  # and joins ten squads an alt posted
+            await env.db.execute("INSERT INTO lfg_posts (game, host_id, size, when_text, created_at)"
+                                 " VALUES (?, ?, 4, 'now', ?)", (f"h{i}", alt, oct10 + i))
+            post = (await env.db.fetchone("SELECT MAX(id) AS id FROM lfg_posts"))["id"]
+            await env.db.execute("INSERT INTO lfg_members (post_id, user_id, joined_at) VALUES (?, 1, ?)",
+                                 (post, oct10 + i))
+        await voice(env, 1, alt, oct10, 20)  # 20 h "with" the alt
+        await messages(env, 2, "2026-10-11", 200)  # 2: 4 points, honestly
+        env.t = ts(2026, 11, 1, 12, 30)
+        await run_motm(env)
+        (sent,) = env.guild.announcements.sent
+        assert "<@2>" in sent["content"]
+        assert await env.refs() == {"motm:2026-10": 2}
+    with_env(body, monkeypatch)
+
+
 def test_member_of_the_month_retry_keeps_the_winner(monkeypatch):
     async def body(env):
         await env.seen(V.MOTM_JOB, ts(2026, 10, 1))

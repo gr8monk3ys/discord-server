@@ -1,15 +1,18 @@
 """Daily Word: one five-letter word a day (Pacific), six guesses, coloured-square feedback.
 Pure: no Discord, no database. The cog stores each member's game in `word_games`.
 
-The day's answer comes from the date alone: the answer list in a fixed order (sorted by a
-seeded hash, so it doesn't depend on Python's RNG or the file's order), indexed by days since
-EPOCH. Every restart, and every machine, agrees on the word.
+The day's answer comes from the date and a private salt: the answer list in a fixed order
+(sorted by a hash of SEED, the salt and the word, so it doesn't depend on Python's RNG or the
+file's order), indexed by days since EPOCH. The list, SEED and EPOCH are in the public repo, so
+without the salt anyone could compute every future word and farm the win coins; the cog makes
+the salt once (new_salt) and keeps it in the database, so every restart agrees on the word.
 
 Scoring is two-pass, so repeated letters are coloured the way players expect: greens first,
 then yellows left to right only while the answer still has unmatched copies of that letter.
 """
 
 import hashlib
+import secrets
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -53,9 +56,21 @@ def order(answers: Iterable[str], seed: str = SEED) -> list[str]:
     return sorted(set(answers), key=lambda w: hashlib.sha256(f"{seed}:{w}".encode()).hexdigest())
 
 
+def new_salt() -> str:
+    """A fresh private salt for daily_order. Never log or post it."""
+    return secrets.token_hex(32)
+
+
+def daily_order(answers: Iterable[str], salt: str) -> tuple[str, ...]:
+    """The secret daily order: like order(), keyed by SEED plus the bot's private salt."""
+    if not salt:
+        raise ValueError("daily_order needs the private salt")
+    return tuple(order(answers, f"{SEED}:{salt}"))
+
+
 @dataclass(frozen=True)
 class Words:
-    answers: tuple[str, ...]  # in daily order
+    answers: tuple[str, ...]  # in the public order(); daily_order() with the salt gives the days
     allowed: frozenset[str]  # every accepted guess (includes the answers)
 
     @classmethod

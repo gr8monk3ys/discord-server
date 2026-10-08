@@ -6,7 +6,8 @@
 - Join anniversaries: who celebrates a whole number of years on the server today (Feb 29
   joiners on Feb 28 in other years), at most ANNIV_MAX a day.
 - Boosters: when a boost starts, the refs for the thank-you payout and the monthly stipend.
-- Member of the month: voice hours + messages/50 + squads joined*2 over last month.
+- Member of the month: voice hours + messages/50 + squads joined*2 over last month (the cog
+  counts only joins of other members' posts, and fresh accounts aren't squad hosts or voice company).
 
 Coin rewards skip accounts younger than quests.MIN_ACCOUNT_DAYS (fresh alts can't farm them).
 """

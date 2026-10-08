@@ -12,7 +12,13 @@ Each payout is ledger ref challenge:WEEK:USER:KEY with a challenge_claims row in
 transaction. Last week stays claimable for a day, so the final hour isn't lost.
 
 /privacy off: tracking-based challenges show as unavailable and their data is ignored;
-the bonus then needs the others. Accounts younger than MIN_ACCOUNT_DAYS can't claim."""
+the bonus then needs the others. Accounts younger than MIN_ACCOUNT_DAYS can't claim.
+
+Anti-farming: where other people's actions earn someone progress, only accounts that were
+MIN_ACCOUNT_DAYS old at the time count (squads posted or joined, voice company, and stars via
+logic/starboard.py), so alts can't hand out progress. A game night counts once its start time
+has passed and its Discord event wasn't cancelled or deleted; a tournament entry counts once the
+tournament has started (no sign up, get paid, leave)."""
 
 import functools
 import logging
@@ -29,6 +35,7 @@ from cogs.lfg import ping_only
 from errors import reply_error
 from logic import challenges as CH
 from logic import coins as C
+from logic import quests as Q
 from logic import stats as S
 from logic.schedule import plan
 from logic.starboard import PENDING
@@ -163,8 +170,10 @@ class Challenges(commands.Cog):
         guild = self.guild()
         afk = getattr(guild, "afk_channel", None) if guild else None
         bots = {m.id for m in getattr(guild, "members", ()) if m.bot} if guild else set()
+        # Fresh accounts (likely alts) are neither paid nor company: time with only them is alone.
+        fresh = {s.user_id for s in sessions if not Q.established(s.user_id, t)}
         return S.counted_voice_seconds(sessions, week.start, week.end, t,
-                                       excluded_channels={afk.id} if afk else set(), bot_ids=bots)
+                                       excluded_channels={afk.id} if afk else set(), bot_ids=bots | fresh)
 
     async def measure(self, key: str, week: CH.Week, ids, t: int) -> dict[int, int]:
         """Per member, progress on one challenge in this week's window."""
@@ -174,11 +183,13 @@ class Challenges(commands.Cog):
             return await self.counts(
                 "SELECT m.user_id AS u, COUNT(DISTINCT m.post_id) AS n FROM lfg_members m"
                 " JOIN lfg_posts p ON p.id = m.post_id"
-                " WHERE m.user_id != p.host_id AND m.joined_at >= ? AND m.joined_at < ?", w, "m.user_id", ids)
+                " WHERE m.user_id != p.host_id AND m.joined_at >= ? AND m.joined_at < ?"
+                f" AND {Q.established_sql('p.host_id', 'p.created_at')}", w, "m.user_id", ids)
         if key == "host_squads":
             return await self.counts(
                 "SELECT p.host_id AS u, COUNT(*) AS n FROM lfg_posts p WHERE p.created_at >= ? AND p.created_at < ?"
-                " AND EXISTS (SELECT 1 FROM lfg_members m WHERE m.post_id = p.id AND m.user_id != p.host_id)",
+                " AND EXISTS (SELECT 1 FROM lfg_members m WHERE m.post_id = p.id AND m.user_id != p.host_id"
+                f" AND {Q.established_sql('m.user_id', 'm.joined_at')})",
                 w, "p.host_id", ids)
         if key == "post_clip":
             return await self.counts("SELECT user_id AS u, COUNT(*) AS n FROM clips WHERE posted_at >= ? AND posted_at < ?",
@@ -206,19 +217,48 @@ class Challenges(commands.Cog):
             return await self.counts("SELECT user_id AS u, COUNT(*) AS n FROM word_games WHERE solved = 1"
                                      " AND day >= ? AND day <= ?", days, "user_id", ids)
         if key == "tournament":
-            return await self.counts("SELECT user_id AS u, COUNT(DISTINCT tournament_id) AS n FROM tournament_entries"
-                                     " WHERE joined_at >= ? AND joined_at < ?", w, "user_id", ids)
+            return await self.counts("SELECT e.user_id AS u, COUNT(DISTINCT e.tournament_id) AS n"
+                                     " FROM tournament_entries e JOIN tournaments t ON t.id = e.tournament_id"
+                                     " WHERE e.joined_at >= ? AND e.joined_at < ? AND t.status IN ('running', 'done')",
+                                     w, "e.user_id", ids)
         if key == "hall_of_fame":
             return await self.counts("SELECT author_id AS u, COUNT(*) AS n FROM starboard WHERE at >= ? AND at < ?"
                                      " AND board_message_id IS NOT NULL AND board_message_id != ?",
                                      (*w, PENDING), "author_id", ids)
         if key == "gamenight":
-            return await self.counts("SELECT host_id AS u, COUNT(*) AS n FROM gamenights"
-                                     " WHERE starts_at >= ? AND starts_at < ?", w, "host_id", ids)
+            return await self.gamenights(week, ids, t)
         if key in ("voice_3h", "voice_8h"):
             scores = await self.voice(week, t)
             return scores if ids is None else {u: s for u, s in scores.items() if u in set(ids)}
         raise KeyError(key)
+
+    async def gamenights(self, week: CH.Week, ids, t: int) -> dict[int, int]:
+        """Game nights hosted this week whose start time has passed and whose Discord event
+        still exists and wasn't cancelled (scheduling one, then calling it off, earns nothing)."""
+        extra, extra_params = _in("host_id", ids)
+        rows = await self.db.fetchall("SELECT event_id, host_id FROM gamenights WHERE starts_at >= ? AND starts_at < ?"
+                                      " AND starts_at <= ?" + extra, (week.start, week.end, t, *extra_params))
+        out: dict[int, int] = {}
+        guild = self.guild()
+        for r in rows:
+            if r["host_id"] is not None and await self.gamenight_held(guild, r["event_id"]):
+                out[r["host_id"]] = out.get(r["host_id"], 0) + 1
+        return out
+
+    @staticmethod
+    async def gamenight_held(guild, event_id: int) -> bool:
+        if guild is None:
+            return False
+        event = guild.get_scheduled_event(event_id)
+        if event is None:
+            try:
+                event = await guild.fetch_scheduled_event(event_id)
+            except discord.NotFound:
+                return False  # deleted
+            except discord.HTTPException:
+                log.info("challenges: couldn't check game night %s; not counted yet", event_id)
+                return False
+        return event.status != discord.EventStatus.cancelled
 
     async def optouts(self) -> set[int]:
         return {r["user_id"] for r in await self.db.fetchall("SELECT user_id FROM privacy_optout")}

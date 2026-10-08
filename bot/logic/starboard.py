@@ -5,6 +5,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
 
+from logic import quests as Q
+
 STAR = "⭐"
 THRESHOLD = 3  # distinct stars (not the author's, not bots') to land in the hall
 TEXT_LIMIT = 1000
@@ -31,9 +33,11 @@ def is_star(emoji) -> bool:
     return name.replace("️", "") == STAR
 
 
-def count_stars(reactors: Iterable, author_id: int) -> int:
-    """Distinct people who starred: not the author, not bots."""
-    return len({r.id for r in reactors if not r.bot and r.id != author_id})
+def count_stars(reactors: Iterable, author_id: int, now: int | None = None) -> int:
+    """Distinct people who starred: not the author, not bots, and (given `now`) not accounts
+    younger than quests.MIN_ACCOUNT_DAYS, since a hall-of-fame post earns coins."""
+    return len({r.id for r in reactors if not r.bot and r.id != author_id
+                and (now is None or Q.established(r.id, now))})
 
 
 def reaches(stars: int) -> bool:

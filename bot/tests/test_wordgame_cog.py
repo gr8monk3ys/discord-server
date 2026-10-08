@@ -148,10 +148,65 @@ def no_letters(text):
 def test_cog_loads_the_shipped_lists():
     cog = WordGame(SimpleNamespace(db=None, settings=SimpleNamespace(guild_id=GUILD_ID, tz=TZ)))
     assert len(cog.words.answers) > 1500
-    assert cog.answer(D0) == W.answer_for(D0, W.Words.load().answers)
+
+
+def test_answer_uses_a_salt_made_once_and_kept_in_meta(caplog):
+    async def go():
+        db = dbmod.Database(":memory:")
+        await db.connect()
+        await db.migrate()
+        try:
+            bot = SimpleNamespace(db=db, settings=SimpleNamespace(guild_id=GUILD_ID, tz=TZ))
+            words = W.Words.load()
+            with caplog.at_level("INFO"):  # the bot logs at INFO (main.py)
+                cog = WordGame(bot, words)
+                first = await cog.answer(D0)
+            row = await db.fetchone("SELECT value FROM meta WHERE key = ?", (cogmod.SALT_KEY,))
+            salt = row["value"]
+            assert len(salt) == 64
+            assert salt not in caplog.text  # never logged
+            assert first == W.answer_for(D0, W.daily_order(words.answers, salt))
+            # a restart reads the same salt: same word
+            again = WordGame(bot, words)
+            assert await again.answer(D0) == first
+            assert (await db.fetchone("SELECT COUNT(*) AS n FROM meta WHERE key = ?", (cogmod.SALT_KEY,)))["n"] == 1
+            # the public order alone doesn't give the answers away
+            days = [D0 + timedelta(days=i) for i in range(10)]
+            assert [await cog.answer(d) for d in days] != [W.answer_for(d, words.answers) for d in days]
+        finally:
+            await db.close()
+    run(go())
+
+
+def test_answer_uses_an_existing_salt(monkeypatch):
+    async def go():
+        db = dbmod.Database(":memory:")
+        await db.connect()
+        await db.migrate()
+        try:
+            await db.execute("INSERT INTO meta (key, value) VALUES (?, ?)", (cogmod.SALT_KEY, "c" * 64))
+            bot = SimpleNamespace(db=db, settings=SimpleNamespace(guild_id=GUILD_ID, tz=TZ))
+            words = W.Words.load()
+            assert await WordGame(bot, words).answer(D0) == W.answer_for(D0, W.daily_order(words.answers, "c" * 64))
+        finally:
+            await db.close()
+    run(go())
 
 
 # ---------------------------------------------------------------- guessing
+def test_a_game_finished_in_the_db_stays_finished(monkeypatch):
+    """If the daily word changes under a game (the salt arrived mid-day), a finished game
+    can't be replayed for a second win."""
+    async def go(env):
+        await env.db.execute(
+            "INSERT INTO word_games (day, user_id, guesses, solved, finished_at) VALUES (?, ?, 'crane', 1, ?)",
+            (D0.isoformat(), U1, T0))
+        reply = await env.guess(U1, ANSWER)
+        assert "finished" in reply["content"]
+        assert (await env.row(U1))["guesses"] == "crane"
+    with_env(go, monkeypatch)
+
+
 def test_guess_is_ephemeral_and_recorded(monkeypatch):
     async def go(env):
         reply = await env.guess(U1, "CRANE")

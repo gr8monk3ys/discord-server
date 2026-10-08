@@ -64,6 +64,28 @@ def test_puzzle_number_and_answer_are_deterministic():
     assert len({W.answer_for(d, words.answers) for d in days}) == len(words.answers)
 
 
+def test_daily_order_depends_on_a_secret_salt():
+    """The answer list, SEED and EPOCH are public, so the daily order also mixes in a private
+    salt: without it nobody can compute today's word from the repo."""
+    answers = W.Words.load().answers
+    days = [D0 + timedelta(days=i) for i in range(10)]
+    a = W.daily_order(answers, "a" * 64)
+    b = W.daily_order(answers, "b" * 64)
+    assert sorted(a) == sorted(answers)
+    assert [W.answer_for(d, a) for d in days] != [W.answer_for(d, b) for d in days]
+    assert [W.answer_for(d, a) for d in days] != [W.answer_for(d, answers) for d in days]  # not the public order
+    # stable for one salt and day (restarts agree), whatever order the list comes in
+    assert W.answer_for(D0, W.daily_order(list(reversed(answers)), "a" * 64)) == W.answer_for(D0, a)
+    with pytest.raises(ValueError):
+        W.daily_order(answers, "")
+
+
+def test_new_salt_is_random_hex():
+    s1, s2 = W.new_salt(), W.new_salt()
+    assert len(s1) == 64 and int(s1, 16) >= 0
+    assert s1 != s2
+
+
 def test_local_day_is_pacific():
     # 2026-10-08 06:30 UTC is still the 7th in Los Angeles (UTC-7).
     ts = int(datetime(2026, 10, 8, 6, 30, tzinfo=timezone.utc).timestamp())

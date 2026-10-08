@@ -1120,10 +1120,14 @@ def test_unreported_match_nudges_then_flags_staff(monkeypatch):
     with_env(go, monkeypatch)
 
 
-def test_lone_report_stands_after_48_hours(monkeypatch):
+def test_lone_report_is_flagged_to_staff_not_accepted(monkeypatch):
+    """A player claiming a win the opponent never confirmed must not decide the match (or pay
+    the prize) on a timer: staff are flagged in mod-log once and decide."""
     async def go(env):
         await env.setup(2)
         m = await env.match(1, 0)
+        balance_p1 = await economy.balance(env.db, m.p1)
+        balance_p2 = await economy.balance(env.db, m.p2)
         env.t = T0 + 3600
         await env.press(m.p2, m.id, 2)  # "I won"
         await tick(env, T0 + DAY)
@@ -1131,15 +1135,21 @@ def test_lone_report_stands_after_48_hours(monkeypatch):
         await tick(env, T0 + 2 * DAY - 60)
         assert (await env.match(1, 0)).status == T.REPORTED
         await tick(env, T0 + 2 * DAY)
-        done = await env.match(1, 0)
-        assert (done.status, done.winner) == (T.DONE, m.p2)
-        assert (await env.cog.get(1))["status"] == "done"
-        assert await economy.balance(env.db, m.p2) == 1000
-        assert await economy.balance(env.db, m.p1) == 400
-        msg = await env.message_for(m.id)
-        assert "report stands" in msg.content and all(i.item.disabled for i in msg.view.children)
-        await tick(env, T0 + 3 * DAY)
-        assert await economy.balance(env.db, m.p2) == 1000
+        still = await env.match(1, 0)
+        assert still.status == T.REPORTED  # not decided
+        assert (await env.cog.get(1))["status"] == "running"
+        assert await economy.balance(env.db, m.p2) == balance_p2
+        assert await economy.balance(env.db, m.p1) == balance_p1
+        (flag,) = env.guild.mod_log.sent
+        assert f"<@{m.p2}>" in flag.content and "confirm" in flag.content
+        assert (await env.message_for(m.id)).jump_url in flag.content
+        assert flag.kwargs["allowed_mentions"].users is False
+        await tick(env, T0 + 5 * DAY)
+        assert len(env.guild.mod_log.sent) == 1  # once
+        assert (await env.match(1, 0)).status == T.REPORTED
+        # staff can still settle it
+        await env.press(MOD, m.id, 2)
+        assert (await env.match(1, 0)).status == T.DONE
     with_env(go, monkeypatch)
 
 
