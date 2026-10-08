@@ -52,9 +52,10 @@ ROLES = [
     {"name": "Bots", "color": SLATE, "hoist": True, "was": ["Bot"]},
     {"name": "LFG", "mentionable": True},
     # Public-server roles, handed out by Front Desk.
-    {"name": "Season Champ", "hoist": True},
+    {"name": "Season Champ", "hoist": True},  # top 3 of last month's season (Front Desk)
     {"name": "Birthday", "hoist": True},  # 24 h on your birthday (Front Desk)
-    {"name": "Counting Champ"},  # top counter of the best counting run (Front Desk)  # top 3 of last month's season (Front Desk)
+    {"name": "Tournament Champ"},  # won the latest tournament (Front Desk)
+    {"name": "Counting Champ"},  # top counter of the best counting run (Front Desk)
     {"name": "Hype", "hoist": True},  # bought in the shop, lasts 24 h (Front Desk)
     {"name": "Clip of the Week"},  # given by Front Desk to the weekly clip winner
     {"name": "Recruiter"},  # 3+ people you invited stayed
@@ -97,6 +98,8 @@ CATEGORIES = [
         "name": "03 · games",
         "channels": [
             {"name": "🕹️・gaming", "topic": "General gaming chat.", "was": ["gaming"]},
+            {"name": "🏆・tournaments", "topic": "Sign up, see brackets, report results. Join with the buttons.",
+             "read_only": True},
             {
                 # A forum: one post per session, tagged by game, so squads
                 # don't get buried in chat.
@@ -125,6 +128,7 @@ CATEGORIES = [
             {"name": "👗・fashion", "topic": "Fits and finds."},
             {"name": "♟️・chess", "topic": "Games, puzzles, and challenges."},
             {"name": "🤖・bot-commands", "topic": "Music (/play), bump reminders, and other bot spam."},
+            {"name": "📺・creators", "topic": "Members' streams and uploads. Link yours with /creator.", "read_only": True},
         ],
     },
     {
@@ -221,7 +225,8 @@ COMMUNITY = {
 ONBOARDING_DEFAULT_CHANNELS = [
     "📌・rules", "📣・announcements", "👋・welcome", "💬・general",
     "🆘・help", "💡・suggestions", "🤣・memes", "📸・clips", "⭐・hall-of-fame", "🔢・counting", "🕹️・gaming", "🎮・lfg", "🎨・art", "💻・code",
-    "👗・fashion", "♟️・chess", "🤖・bot-commands", "🔊 Lobby", "➕ New Squad", "🎮 Squad", "💤 AFK",
+    "👗・fashion", "♟️・chess", "🤖・bot-commands", "📺・creators", "🏆・tournaments",
+    "🔊 Lobby", "➕ New Squad", "🎮 Squad", "💤 AFK",
 ]
 # Anything public that's neither a default channel nor an Onboarding option is
 # hidden from members who went through Onboarding, so keep this list complete.

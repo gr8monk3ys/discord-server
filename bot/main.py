@@ -42,6 +42,10 @@ MODULES = [
     ("cogs.moderation", {"members", "message_content"}),  # /warn /timeout /cases /purge, anti-spam, anti-raid
     ("cogs.ops", set()),  # backups, health alerts, config drift, /status
     ("cogs.utility", {"presences"}),  # /remind, /afk, suggestions, stat channels, tickets
+    ("cogs.cards", {"members"}),  # welcome cards after Onboarding
+    ("cogs.tournaments", set()),  # /tournament create/start/cancel/bracket, brackets with prizes
+    ("cogs.achievements", {"members"}),  # badges, /profile, /badges
+    ("cogs.creators", set()),  # /creator link|unlink|list|remove, YouTube + Twitch alerts
 ]
 
 PERMISSIONS = discord.Permissions(

@@ -203,7 +203,7 @@ def test_public_mode_hoists_existing_unhoisted_role():
     hype = FakeRole(id=20, name="Hype", position=4, hoist=False, edit=edit)
     guild = FakeGuild(roles=[
         hype,
-        *(FakeRole(id=21 + i, name=n, position=3, hoist=n == "Season Champ")
+        *(FakeRole(id=21 + i, name=n, position=3, hoist=n in ("Season Champ", "Birthday"))
           for i, n in enumerate(public_mode.BOT_ROLES) if n != "Hype"),
     ])
     asyncio.run(public_mode.PublicMode(guild, apply=True).roles())
