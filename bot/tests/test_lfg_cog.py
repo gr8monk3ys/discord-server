@@ -887,10 +887,40 @@ def test_role_pings_have_a_per_host_cooldown(monkeypatch):
 
 def test_member_text_is_markdown_escaped():
     async def go(env):
-        await env.create(when="*9pm*", note="[Official giveaway](https://phish.example)")
+        await env.create(when="*9pm*", note="[Official giveaway](phish)")  # a real URL is refused by textfilter
         made = env.guild.forum.created[-1]
         desc = made["embed"].description
         assert not re.search(r"(?<!\\)\[Official giveaway\]\(", desc)  # the masked link is broken
         assert r"\[Official giveaway" in desc
         assert r"\*9pm\*" in desc and r"\*9pm\*" in made["content"]
+    with_env(go)
+
+
+# ---------------------------------------------------------------- textfilter
+@pytest.mark.parametrize("field, text, reason", [
+    ("note", "add me discord.gg/raid", "invite"), ("note", "rank.gg profile", "link"),
+    ("note", "no f4gg0ts", "word"), ("when", "n1gger o clock", "word"),
+])
+def test_blocked_text_is_refused_before_posting(caplog, field, text, reason):
+    from logic import textfilter
+    caplog.set_level("INFO", logger="logic.textfilter")
+
+    async def go(env):
+        inter, post = await env.create(**{field: text})
+        assert post is None and not env.guild.forum.created
+        (reply,) = inter.of("send_message")
+        assert reply["ephemeral"] is True and reply["content"] == textfilter.MESSAGES[reason]
+        assert text not in reply["content"]
+    with_env(go)
+    line = caplog.records[-1].getMessage()
+    assert str(HOST) in line and reason in line and text not in line
+
+
+def test_blocked_text_on_update_leaves_the_post_alone():
+    async def go(env):
+        _, post = await env.create(note="mic pls")
+        inter, after = await env.create(note="discord.gg/raid")
+        assert after["note"] == "mic pls" and len(env.guild.forum.created) == 1
+        assert not env.thread(post).calls
+        assert inter.of("send_message")[0]["ephemeral"] is True
     with_env(go)

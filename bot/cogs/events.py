@@ -23,6 +23,7 @@ import config
 import style
 from cogs.lfg import GAME_CHOICES, ping_only
 from logic import events as E
+from logic import textfilter
 from logic.schedule import Weekly, plan
 
 log = logging.getLogger(__name__)
@@ -141,6 +142,10 @@ class Events(commands.Cog):
         guild = interaction.guild
         if guild is None:
             await interaction.response.send_message("Use this in the server.", ephemeral=True)
+            return
+        # Bots skip AutoMod, so the note is checked here before the event or announcement exists.
+        if blocked := textfilter.screen("/gamenight", interaction.user.id, [when, note], allow_links=False):
+            await interaction.response.send_message(blocked, ephemeral=True)
             return
         local_now = datetime.fromtimestamp(now(), self.tz)
         start = E.parse_when(when, local_now, self.tz)

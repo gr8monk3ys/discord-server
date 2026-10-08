@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
 import discord
+import pytest
 from discord import app_commands
 
 import config
@@ -790,3 +791,23 @@ def test_hype_role_with_mod_permissions_is_not_sold(monkeypatch):
         assert "permissions" in i.text and await env.bal(A) == 1000
         assert env.guild.hype not in env.member(A).roles
     with_env(go, monkeypatch)
+
+
+# ---------------------------------------------------------------- textfilter
+@pytest.mark.parametrize("item", ["shoutout", "spotlight"])
+@pytest.mark.parametrize("text, reason", [
+    ("join d1sc0rd . gg/raid", "invite"), ("deals on steamgift.ru", "link"), ("all you wh0res", "word"),
+])
+def test_blocked_shoutout_or_spotlight_is_refused_uncharged(monkeypatch, caplog, item, text, reason):
+    from logic import textfilter
+    caplog.set_level("INFO", logger="logic.textfilter")
+
+    async def go(env):
+        await env.fund(A, 5000)
+        i = await env.buy(A, item, message=text)
+        assert i.text == textfilter.MESSAGES[reason] and text not in i.text
+        assert env.guild.general.sent == [] and await env.bal(A) == 5000
+        assert await env.perk(A, item) is None  # no cooldown claimed either
+    with_env(go, monkeypatch)
+    line = caplog.records[-1].getMessage()
+    assert str(A) in line and reason in line and text not in line

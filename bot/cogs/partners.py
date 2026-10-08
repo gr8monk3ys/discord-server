@@ -27,6 +27,7 @@ import style
 from errors import reply_error
 from logic import community as community_rules
 from logic import partners as P
+from logic import textfilter
 from logic.schedule import plan
 
 log = logging.getLogger(__name__)
@@ -231,6 +232,13 @@ class Partners(commands.Cog):
         problem = P.name_problem(name) or P.description_problem(desc) or (None if code else "invite_format")
         if problem:
             await interaction.response.send_message(P.reply(problem), ephemeral=True)
+            return
+        # Bots skip AutoMod: the name may not hold links; the description may link a site,
+        # but never another server's invite (their own goes in the invite field).
+        blocked = (textfilter.screen("partner name", user.id, [name], allow_links=False)
+                   or textfilter.screen("partner description", user.id, [desc], invite_allowlist=()))
+        if blocked:
+            await interaction.response.send_message(blocked, ephemeral=True)
             return
         await interaction.response.defer(ephemeral=True, thinking=True)
         check = await self.check(code)

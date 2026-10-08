@@ -46,7 +46,8 @@ MODULE_CATEGORY = {
     "events": "events", "tournaments": "events",
     "community": "community", "growth": "community", "engagement": "community", "selfroles": "community",
     "partners": "community", "quests": "community", "challenges": "community", "vibes": "community",
-    "recap": "community", "cards": "community", "starboard": "community",
+    "recap": "community", "cards": "community", "starboard": "community", "staffapps": "community",
+    "news": "games",
     "creators": "creators", "clips": "creators",
     "utility": "utility", "moderation": "utility", "ops": "utility", "helpdesk": "utility", "heartbeat": "utility",
 }

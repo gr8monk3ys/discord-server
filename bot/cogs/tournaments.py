@@ -44,6 +44,7 @@ from logic.selfroles import has_dangerous_permissions
 from logic import engagement as EG
 from logic import events as E
 from logic import stats as S
+from logic import textfilter
 from logic import tournaments as T
 from logic.quests import MIN_ACCOUNT_DAYS
 from logic.tournaments import Bracket, Match, Report, Stale
@@ -399,6 +400,11 @@ class Tournaments(commands.Cog):
         if not is_staff(interaction.user):
             await interaction.response.send_message("Only Keepers and Moderators can run tournaments.",
                                                     ephemeral=True)
+            return
+        # Staff-only, but bots skip AutoMod, so the name the card shows is checked too.
+        if blocked := textfilter.screen("/tournament create", interaction.user.id, [name, game, starts_at],
+                                        allow_links=False):
+            await interaction.response.send_message(blocked, ephemeral=True)
             return
         size_value = size.value if isinstance(size, app_commands.Choice) else int(size)
         start_ts = None

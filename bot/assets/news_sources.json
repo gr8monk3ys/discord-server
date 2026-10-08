@@ -1,0 +1,27 @@
+{
+  "_comment": "Official news feeds per game, keyed by the game's role name in server/layout.py GAMES. Each value is {\"steam_appid\": N} (public Steam news API, official announcements only) or {\"rss\": \"https://...\"} (an official RSS/Atom feed; links must stay on that feed's host). A game left out gets no news. Checked with curl on 2026-10-08; 'comment' says how.",
+  "Wardogs": {
+    "steam_appid": 1867240,
+    "comment": "Steam store search 'wardogs' -> 1867240 WARDOGS; GetNewsForApp returns its steam_community_announcements patch notes."
+  },
+  "Call of Duty": {
+    "steam_appid": 1938090,
+    "comment": "Steam store search -> 1938090 'Call of Duty' (the HQ app); GetNewsForApp returns official Black Ops/Warzone announcements."
+  },
+  "Counter-Strike 2": {
+    "steam_appid": 730,
+    "comment": "Steam app 730 is Counter-Strike 2; GetNewsForApp returns the official 'Counter-Strike 2 Update' announcements."
+  },
+  "Apex Legends": {
+    "steam_appid": 1172470,
+    "comment": "Steam store search -> 1172470 Apex Legends; GetNewsForApp returns official 'Latest Update' announcements."
+  },
+  "GTA Online": {
+    "steam_appid": 271590,
+    "comment": "Steam app 271590 is Grand Theft Auto V; Rockstar posts GTA Online event announcements there (also on 3240220, GTA V Enhanced)."
+  },
+  "Minecraft": {
+    "rss": "https://www.minecraft.net/en-us/feeds/community-content/rss",
+    "comment": "Mojang's own feed on minecraft.net: RSS 2.0 in UTF-16, article links on www.minecraft.net. The site stalls on User-Agents containing 'bot', so the fetcher sends 'Mozilla/5.0 (compatible; FrontDesk/1.0)'."
+  }
+}
