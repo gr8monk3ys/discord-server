@@ -32,7 +32,10 @@ from setup_server import Makeover, find, private_overwrites
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-BOT_ROLES = ("Season Champ", "Hype", "Birthday", "Tournament Champ", "Counting Champ", "Clip of the Week", "Recruiter", "Bumper")  # roles Front Desk hands out
+BOT_ROLES = ("Season Champ", "Hype", "Birthday", "Tournament Champ", "Counting Champ", "Clip of the Week", "Recruiter", "Bumper",
+             "Game Night", "Mythic", "Legend", "Elite", "Veteran", "Regular",
+             "PC", "PlayStation", "Xbox", "Switch", "Mobile", "NA", "EU", "LATAM", "Asia", "OCE",
+             "Early Bird", "Night Owl", "Weekend Warrior")  # roles Front Desk hands out
 NEEDED = ("manage_roles", "manage_channels", "manage_guild", "create_instant_invite")
 
 

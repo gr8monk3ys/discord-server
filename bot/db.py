@@ -310,6 +310,48 @@ MIGRATIONS = [
         PRIMARY KEY (platform, item_id)
     )""",
     ],
+    [
+        # Wave 2: levels (XP from chat and voice).
+        """CREATE TABLE xp (
+        user_id INTEGER PRIMARY KEY,
+        xp INTEGER NOT NULL DEFAULT 0 CHECK (xp >= 0),
+        level INTEGER NOT NULL DEFAULT 0,
+        last_msg_at INTEGER NOT NULL DEFAULT 0,
+        voice_seconds_counted INTEGER NOT NULL DEFAULT 0
+    )""",
+        # Partner program: applications reviewed by staff.
+        """CREATE TABLE partners (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        server_name TEXT NOT NULL,
+        invite_code TEXT NOT NULL,
+        description TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        created_at INTEGER NOT NULL,
+        decided_by INTEGER,
+        decided_at INTEGER,
+        review_message_id INTEGER,
+        post_message_id INTEGER
+    )""",
+        # Starter quest steps completed per member.
+        """CREATE TABLE quest_steps (
+        user_id INTEGER NOT NULL,
+        step TEXT NOT NULL,
+        at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, step)
+    )""",
+        # Creator verification: a code the member puts in their channel description.
+        "ALTER TABLE creators ADD COLUMN verified INTEGER NOT NULL DEFAULT 0",
+        """CREATE TABLE creator_pending (
+        user_id INTEGER NOT NULL,
+        platform TEXT NOT NULL,
+        handle TEXT NOT NULL,
+        external_id TEXT NOT NULL,
+        code TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, platform)
+    )""",
+    ],
 ]
 
 
