@@ -173,6 +173,7 @@ day-to-day attention. Design and history:
 | Vibes | conversation starter when 💬・general is quiet for 3 h, join anniversaries, booster thanks + 1000 coins and a monthly stipend, member of the month (squads = joining someone else's post) |
 | Matchmaking | `/queue join/leave/status`: pick a game, mode and size; when the queue fills, a voice channel is made and the players are pinged in 🎲・games; entries expire after 60 min |
 | Economy extras | `/raffle buy/info` (weekly draw Sundays 20:00, 80% of the pot to the winner, 20% burned), Gift Hype, Spotlight (pinned shoutout for 24 h); staff `/economy` for supply and minted vs burned. Audit: `docs/ECONOMY.md` |
+| Help | `/help` (categories built from the live command list, staff commands hidden from members, "Start here" button), `/about`; the bot's status rotates every 5 min |
 
 Landing page: <https://gr8monk3ys.github.io/discord-server/> (`site/`, deployed by
 `.github/workflows/pages.yml`). Listing-site copy and banners: `docs/LISTING.md`, `assets/listing/`.

@@ -66,6 +66,36 @@ def meta_tags(page: str) -> dict[str, str]:
     return out
 
 
+def parse_csp(value: str) -> dict[str, list[str]]:
+    """Content-Security-Policy header -> {directive: [sources]} (lower-cased names,
+    first occurrence wins, as browsers do)."""
+    out: dict[str, list[str]] = {}
+    for part in value.split(";"):
+        bits = part.split()
+        if bits and bits[0].lower() not in out:
+            out[bits[0].lower()] = bits[1:]
+    return out
+
+
+def csp_allows(sources: list[str], url: str, self_origin: bool = True) -> bool:
+    """Whether a source list admits `url` (an absolute https URL or a same-origin
+    path). Handles 'self', scheme-only and host sources with an optional path
+    prefix; enough for the static site's own policy, not a full CSP engine."""
+    if "*" in sources:
+        return True
+    if not re.match(r"^[a-z][a-z0-9+.-]*:", url, re.I):  # relative or root path
+        return self_origin and "'self'" in sources
+    scheme = url.split(":", 1)[0].lower() + ":"
+    if scheme in (s.lower() for s in sources):
+        return True
+    for src in sources:
+        if src.startswith("'") or "://" not in src:
+            continue
+        if url == src or url.startswith(src.rstrip("/") + "/") or url.startswith(src + "?"):
+            return True
+    return False
+
+
 def cover_box(src_w: int, src_h: int, dst_w: int, dst_h: int) -> tuple[int, int, int, int]:
     """Centred crop box (left, top, right, bottom) of the source with the target's aspect
     ratio, like CSS object-fit: cover. Scale the box to (dst_w, dst_h) afterwards."""

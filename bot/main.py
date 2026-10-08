@@ -56,6 +56,7 @@ MODULES = [
     ("cogs.wordgame", set()),  # Daily Word: /word guess|today|stats|leaderboard
     ("cogs.matchmaking", {"members"}),  # /queue join|leave|status, match voice channels + pings
     ("cogs.econstats", set()),  # /economy (staff): coin supply, minted vs burned, top sources and sinks
+    ("cogs.helpdesk", set()),  # /help menu from the live command tree, /about, rotating presence
     ("cogs.vibes", {"members"}),  # chat revival, join anniversaries, booster thanks + stipend, member of the month
 ]
 

@@ -311,3 +311,155 @@ def test_onboarding_prompts_fall_back_to_post_join_when_discord_caps_questions()
     assert len(edits) == 2
     assert edits[1]["prompts"][0].title == "What do you play?"
     assert all(p.in_onboarding is False for p in edits[1]["prompts"][1:])
+
+
+# ------------------------------------------------------------ AutoMod gaps
+
+
+def _rule(name, trigger):
+    async def refuse(**_):
+        raise AssertionError(f"{name} was edited or deleted")
+    return NS(name=name, trigger=trigger, edit=refuse, delete=refuse)
+
+
+def _live_rules():
+    """What the server has today (server/snapshot/automod.json): no invite-link rule."""
+    T = discord.AutoModRuleTriggerType
+    return [
+        _rule("Block Words in Member Profile Names", discord.AutoModTrigger(type=T.member_profile)),
+        _rule("Front Desk: mention raids", discord.AutoModTrigger(mention_limit=6, mention_raid_protection=True)),
+        _rule("Front Desk: slurs", discord.AutoModTrigger(
+            presets=discord.AutoModPresets(slurs=True, sexual_content=True))),
+        _rule("Front Desk: spam", discord.AutoModTrigger(type=T.spam)),
+    ]
+
+
+def _automod_guild(rules, invites=(), with_channels=True):
+    keeper = FakeRole(id=10, name="Keeper", position=60)
+    mod = FakeRole(id=12, name="Moderator", position=55)
+    guild = FakeGuild(roles=[keeper, mod])
+    if with_channels:
+        guild.categories.append(NS(id=40, name=public_mode.AUTOMOD_EXEMPT_CATEGORY))
+        guild.text_channels.append(NS(id=41, name=public_mode.AUTOMOD_ALERTS))
+    created = []
+
+    async def fetch_automod_rules():
+        return list(rules)
+
+    async def create_automod_rule(**kw):
+        created.append(kw)
+
+    async def invites_():
+        return list(invites)
+    guild.fetch_automod_rules = fetch_automod_rules
+    guild.create_automod_rule = create_automod_rule
+    guild.invites = invites_
+    guild.vanity_url_code = None
+    return guild, created
+
+
+def test_automod_gaps_adds_only_the_invite_rule_to_the_live_set():
+    invites = [NS(code="ourcode", max_age=0), NS(code="temp", max_age=3600)]
+    guild, created = _automod_guild(_live_rules(), invites)
+    asyncio.run(public_mode.PublicMode(guild, apply=True).automod_gaps())
+    [kw] = created
+    assert kw["name"] == public_mode.AUTOMOD_INVITES
+    assert kw["enabled"] is True
+    assert kw["event_type"] == discord.AutoModRuleEventType.message_send
+    t = kw["trigger"]
+    assert t.type == discord.AutoModRuleTriggerType.keyword
+    assert t.regex_patterns == public_mode.INVITE_PATTERNS
+    assert t.allow_list == ["discord.gg/ourcode"]  # our permanent invite is fine; temp ones expire
+    assert [r.name for r in kw["exempt_roles"]] == ["Keeper", "Moderator"]
+    assert [c.id for c in kw["exempt_channels"]] == [40]  # the staff category
+    types = {a.type for a in kw["actions"]}
+    assert types == {discord.AutoModRuleActionType.block_message, discord.AutoModRuleActionType.send_alert_message}
+    alert = next(a for a in kw["actions"] if a.type == discord.AutoModRuleActionType.send_alert_message)
+    assert alert.channel_id == 41  # the mod log
+
+
+def test_automod_invite_patterns_match_invites_not_other_links():
+    import re
+    pats = [re.compile(p, re.I) for p in public_mode.INVITE_PATTERNS]
+    hit = ["join discord.gg/abc123", "https://discord.com/invite/Xyz", "discordapp.com/invite/a-b", "dsc.gg/foo",
+           "DISCORD.GG/ABC"]
+    miss = ["https://discord.com/channels/1/2", "discord gg", "https://youtube.com/invite", "discord.com/store"]
+    assert all(any(p.search(s) for p in pats) for s in hit)
+    assert not any(p.search(s) for p in pats for s in miss)
+    assert all(len(p) <= 260 for p in public_mode.INVITE_PATTERNS)
+
+
+def test_automod_gaps_creates_every_missing_builtin_rule():
+    guild, created = _automod_guild([])
+    asyncio.run(public_mode.PublicMode(guild, apply=True).automod_gaps())
+    T = discord.AutoModRuleTriggerType
+    by_type = {kw["trigger"].type: kw for kw in created}
+    assert set(by_type) == {T.spam, T.mention_spam, T.keyword_preset, T.keyword}
+    preset = by_type[T.keyword_preset]["trigger"].presets
+    assert preset.slurs and preset.sexual_content and not preset.profanity  # trash talk is fine
+    mention = by_type[T.mention_spam]
+    assert mention["trigger"].mention_limit == layout.MENTION_LIMIT
+    assert mention["trigger"].mention_raid_protection is True
+    assert any(a.type == discord.AutoModRuleActionType.timeout for a in mention["actions"])
+    assert all(kw["exempt_roles"] and kw["exempt_channels"] for kw in created)
+
+
+def test_automod_gaps_dry_run_changes_nothing(capsys):
+    guild, created = _automod_guild(_live_rules())
+    asyncio.run(public_mode.PublicMode(guild, apply=False).automod_gaps())
+    assert created == []
+    out = capsys.readouterr().out
+    assert public_mode.AUTOMOD_INVITES in out
+    assert "ok      spam filter" in out
+
+
+def test_automod_gaps_rerun_is_a_noop_and_never_edits():
+    T = discord.AutoModRuleTriggerType
+    rules = [*_live_rules(), _rule("hand-made", discord.AutoModTrigger(type=T.keyword, keyword_filter=["*discord.gg/*"]))]
+    guild, created = _automod_guild(rules)
+    asyncio.run(public_mode.PublicMode(guild, apply=True).automod_gaps())
+    assert created == []
+
+
+def test_automod_gaps_reports_but_keeps_a_weaker_preset_rule(capsys):
+    T = discord.AutoModRuleTriggerType
+    rules = [_rule("spam", discord.AutoModTrigger(type=T.spam)),
+             _rule("mentions", discord.AutoModTrigger(mention_limit=10)),
+             _rule("words", discord.AutoModTrigger(presets=discord.AutoModPresets(slurs=True))),
+             _rule("invites", discord.AutoModTrigger(regex_patterns=[r"discord\.gg/\w+"]))]
+    guild, created = _automod_guild(rules)
+    asyncio.run(public_mode.PublicMode(guild, apply=True).automod_gaps())
+    assert created == []  # one preset rule per server; this step never edits it
+    assert "lacks the sexual content preset" in capsys.readouterr().out
+
+
+def test_automod_gaps_respects_keyword_rule_limit(capsys):
+    T = discord.AutoModRuleTriggerType
+    rules = [*_live_rules(), *(_rule(f"words {i}", discord.AutoModTrigger(type=T.keyword, keyword_filter=[f"w{i}"]))
+                               for i in range(public_mode.MAX_KEYWORD_RULES))]
+    guild, created = _automod_guild(rules)
+    asyncio.run(public_mode.PublicMode(guild, apply=True).automod_gaps())
+    assert created == []
+    assert "keyword rules" in capsys.readouterr().out
+
+
+def test_automod_gaps_skips_without_the_mod_log():
+    guild, created = _automod_guild([], with_channels=False)
+    asyncio.run(public_mode.PublicMode(guild, apply=True).automod_gaps())
+    assert created == []
+
+
+def test_public_mode_run_includes_automod_gaps(monkeypatch):
+    guild = FakeGuild()
+    guild.name = "test"
+    guild.me.guild_permissions = NS(**{p: True for p in public_mode.NEEDED})
+    ran = []
+    steps = ("roles", "new_channels", "private", "description", "posts", "invite", "onboarding",
+             "onboarding_prompts", "automod_gaps")
+    pm = public_mode.PublicMode(guild, apply=False)
+    for name in steps:
+        async def step(name=name):
+            ran.append(name)
+        monkeypatch.setattr(pm, name, step)
+    assert asyncio.run(pm.run()) is True
+    assert ran == list(steps)
