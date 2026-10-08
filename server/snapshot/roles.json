@@ -1,32 +1,5 @@
 [
   {
-    "color": null,
-    "hoist": false,
-    "managed": true,
-    "mentionable": false,
-    "name": "Front Desk",
-    "permissions": [
-      "add_reactions",
-      "attach_files",
-      "create_expressions",
-      "create_instant_invite",
-      "create_public_threads",
-      "embed_links",
-      "manage_channels",
-      "manage_events",
-      "manage_expressions",
-      "manage_guild",
-      "manage_roles",
-      "manage_threads",
-      "move_members",
-      "read_message_history",
-      "read_messages",
-      "send_messages",
-      "send_messages_in_threads",
-      "send_polls"
-    ]
-  },
-  {
     "color": "#42a979",
     "hoist": true,
     "managed": false,
@@ -85,6 +58,59 @@
       "read_messages",
       "send_messages"
     ]
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": true,
+    "mentionable": false,
+    "name": "Front Desk",
+    "permissions": [
+      "add_reactions",
+      "attach_files",
+      "create_expressions",
+      "create_instant_invite",
+      "create_public_threads",
+      "embed_links",
+      "manage_channels",
+      "manage_events",
+      "manage_expressions",
+      "manage_guild",
+      "manage_messages",
+      "manage_roles",
+      "manage_threads",
+      "moderate_members",
+      "move_members",
+      "read_message_history",
+      "read_messages",
+      "send_messages",
+      "send_messages_in_threads",
+      "send_polls"
+    ]
+  },
+  {
+    "color": null,
+    "hoist": true,
+    "managed": false,
+    "mentionable": false,
+    "name": "Season Champ",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": true,
+    "managed": false,
+    "mentionable": false,
+    "name": "Hype",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": true,
+    "managed": false,
+    "mentionable": false,
+    "name": "Birthday",
+    "permissions": []
   },
   {
     "color": "#397f5e",
@@ -288,26 +314,10 @@
   },
   {
     "color": null,
-    "hoist": true,
+    "hoist": false,
     "managed": false,
     "mentionable": false,
-    "name": "Season Champ",
-    "permissions": []
-  },
-  {
-    "color": null,
-    "hoist": true,
-    "managed": false,
-    "mentionable": false,
-    "name": "Hype",
-    "permissions": []
-  },
-  {
-    "color": null,
-    "hoist": true,
-    "managed": false,
-    "mentionable": false,
-    "name": "Birthday",
+    "name": "Counting Champ",
     "permissions": []
   },
   {
@@ -315,7 +325,159 @@
     "hoist": false,
     "managed": false,
     "mentionable": false,
-    "name": "Counting Champ",
+    "name": "Tournament Champ",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": true,
+    "name": "Game Night",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
+    "name": "Mythic",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
+    "name": "Legend",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
+    "name": "Elite",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
+    "name": "Veteran",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
+    "name": "Regular",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
+    "name": "PC",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
+    "name": "PlayStation",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
+    "name": "Xbox",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
+    "name": "Switch",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
+    "name": "Mobile",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
+    "name": "NA",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
+    "name": "EU",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
+    "name": "LATAM",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
+    "name": "Asia",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
+    "name": "OCE",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
+    "name": "Early Bird",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
+    "name": "Night Owl",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
+    "name": "Weekend Warrior",
     "permissions": []
   },
   {

@@ -5,8 +5,11 @@
     "⭐・hall-of-fame",
     "🆘・help",
     "🎨・art",
+    "🎭・roles",
     "🎮 Squad",
     "🎮・lfg",
+    "🎲・games",
+    "🏆・tournaments",
     "👋・welcome",
     "👗・fashion",
     "💡・suggestions",
@@ -16,10 +19,12 @@
     "📌・rules",
     "📣・announcements",
     "📸・clips",
+    "📺・creators",
     "🔊 Lobby",
     "🔢・counting",
     "🕹️・gaming",
     "🤖・bot-commands",
+    "🤝・partners",
     "🤣・memes"
   ],
   "enabled": true,
@@ -169,6 +174,132 @@
       "required": false,
       "single_select": true,
       "title": "Want squad pings?",
+      "type": "multiple_choice"
+    },
+    {
+      "in_onboarding": true,
+      "options": [
+        {
+          "channels": [],
+          "description": "",
+          "emoji": "🖥️",
+          "roles": [
+            "PC"
+          ],
+          "title": "PC"
+        },
+        {
+          "channels": [],
+          "description": "",
+          "emoji": "🟦",
+          "roles": [
+            "PlayStation"
+          ],
+          "title": "PlayStation"
+        },
+        {
+          "channels": [],
+          "description": "",
+          "emoji": "🟩",
+          "roles": [
+            "Xbox"
+          ],
+          "title": "Xbox"
+        },
+        {
+          "channels": [],
+          "description": "",
+          "emoji": "🟥",
+          "roles": [
+            "Switch"
+          ],
+          "title": "Switch"
+        },
+        {
+          "channels": [],
+          "description": "",
+          "emoji": "📱",
+          "roles": [
+            "Mobile"
+          ],
+          "title": "Mobile"
+        }
+      ],
+      "required": false,
+      "single_select": false,
+      "title": "What do you play on?",
+      "type": "multiple_choice"
+    },
+    {
+      "in_onboarding": false,
+      "options": [
+        {
+          "channels": [],
+          "description": "",
+          "emoji": "🌎",
+          "roles": [
+            "NA"
+          ],
+          "title": "North America"
+        },
+        {
+          "channels": [],
+          "description": "",
+          "emoji": "🌍",
+          "roles": [
+            "EU"
+          ],
+          "title": "Europe"
+        },
+        {
+          "channels": [],
+          "description": "",
+          "emoji": "🌎",
+          "roles": [
+            "LATAM"
+          ],
+          "title": "Latin America"
+        },
+        {
+          "channels": [],
+          "description": "",
+          "emoji": "🌏",
+          "roles": [
+            "Asia"
+          ],
+          "title": "Asia"
+        },
+        {
+          "channels": [],
+          "description": "",
+          "emoji": "🌏",
+          "roles": [
+            "OCE"
+          ],
+          "title": "Oceania"
+        }
+      ],
+      "required": false,
+      "single_select": true,
+      "title": "Where are you?",
+      "type": "multiple_choice"
+    },
+    {
+      "in_onboarding": false,
+      "options": [
+        {
+          "channels": [],
+          "description": "Get @Game Night pings when a game night starts.",
+          "emoji": "🎉",
+          "roles": [
+            "Game Night"
+          ],
+          "title": "Game nights"
+        }
+      ],
+      "required": false,
+      "single_select": false,
+      "title": "Want pings?",
       "type": "multiple_choice"
     }
   ]

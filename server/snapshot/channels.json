@@ -88,7 +88,7 @@
           },
           "slowmode": 0,
           "synced": false,
-          "topic": "",
+          "topic": null,
           "type": "text"
         }
       ],
@@ -257,6 +257,93 @@
           "synced": false,
           "topic": "Need a mod? Press the button to open a private ticket.",
           "type": "text"
+        },
+        {
+          "name": "🎭・roles",
+          "nsfw": false,
+          "overwrites": {
+            "member:Front Desk": {
+              "allow": [
+                "embed_links",
+                "send_messages"
+              ],
+              "deny": []
+            },
+            "role:@everyone": {
+              "allow": [
+                "add_reactions"
+              ],
+              "deny": [
+                "create_private_threads",
+                "create_public_threads",
+                "send_messages"
+              ]
+            },
+            "role:Keeper": {
+              "allow": [
+                "send_messages"
+              ],
+              "deny": []
+            }
+          },
+          "slowmode": 0,
+          "synced": false,
+          "topic": "Pick your platform, region and pings with the buttons.",
+          "type": "text"
+        },
+        {
+          "bitrate": 64000,
+          "name": "👥 Members: 13",
+          "nsfw": false,
+          "overwrites": {
+            "member:Front Desk": {
+              "allow": [
+                "connect",
+                "manage_channels",
+                "read_messages"
+              ],
+              "deny": []
+            },
+            "role:@everyone": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": [
+                "connect"
+              ]
+            }
+          },
+          "slowmode": 0,
+          "synced": false,
+          "type": "voice",
+          "user_limit": 0
+        },
+        {
+          "bitrate": 64000,
+          "name": "🟢 Online: 5",
+          "nsfw": false,
+          "overwrites": {
+            "member:Front Desk": {
+              "allow": [
+                "connect",
+                "manage_channels",
+                "read_messages"
+              ],
+              "deny": []
+            },
+            "role:@everyone": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": [
+                "connect"
+              ]
+            }
+          },
+          "slowmode": 0,
+          "synced": false,
+          "type": "voice",
+          "user_limit": 0
         }
       ],
       "name": "01 · front desk",
@@ -332,6 +419,15 @@
           "slowmode": 0,
           "synced": true,
           "topic": "Count up together. Same person can't go twice; a wrong number resets.",
+          "type": "text"
+        },
+        {
+          "name": "🎲・games",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "topic": "Daily word game, weekly challenges, /slots, /trivia and friends.",
           "type": "text"
         }
       ],
@@ -511,6 +607,39 @@
           "synced": true,
           "topic": "Roblox talk, squads, and strats. Ping @Roblox.",
           "type": "text"
+        },
+        {
+          "name": "🏆・tournaments",
+          "nsfw": false,
+          "overwrites": {
+            "member:Front Desk": {
+              "allow": [
+                "embed_links",
+                "send_messages"
+              ],
+              "deny": []
+            },
+            "role:@everyone": {
+              "allow": [
+                "add_reactions"
+              ],
+              "deny": [
+                "create_private_threads",
+                "create_public_threads",
+                "send_messages"
+              ]
+            },
+            "role:Keeper": {
+              "allow": [
+                "send_messages"
+              ],
+              "deny": []
+            }
+          },
+          "slowmode": 0,
+          "synced": false,
+          "topic": "Sign up, see brackets, report results. Join with the buttons.",
+          "type": "text"
         }
       ],
       "name": "03 · games",
@@ -562,6 +691,72 @@
           "slowmode": 0,
           "synced": true,
           "topic": null,
+          "type": "text"
+        },
+        {
+          "name": "📺・creators",
+          "nsfw": false,
+          "overwrites": {
+            "member:Front Desk": {
+              "allow": [
+                "embed_links",
+                "send_messages"
+              ],
+              "deny": []
+            },
+            "role:@everyone": {
+              "allow": [
+                "add_reactions"
+              ],
+              "deny": [
+                "create_private_threads",
+                "create_public_threads",
+                "send_messages"
+              ]
+            },
+            "role:Keeper": {
+              "allow": [
+                "send_messages"
+              ],
+              "deny": []
+            }
+          },
+          "slowmode": 0,
+          "synced": false,
+          "topic": "Members' streams and uploads. Link yours with /creator.",
+          "type": "text"
+        },
+        {
+          "name": "🤝・partners",
+          "nsfw": false,
+          "overwrites": {
+            "member:Front Desk": {
+              "allow": [
+                "embed_links",
+                "send_messages"
+              ],
+              "deny": []
+            },
+            "role:@everyone": {
+              "allow": [
+                "add_reactions"
+              ],
+              "deny": [
+                "create_private_threads",
+                "create_public_threads",
+                "send_messages"
+              ]
+            },
+            "role:Keeper": {
+              "allow": [
+                "send_messages"
+              ],
+              "deny": []
+            }
+          },
+          "slowmode": 0,
+          "synced": false,
+          "topic": "Servers we partner with. Apply with /partner apply.",
           "type": "text"
         }
       ],
