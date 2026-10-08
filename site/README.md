@@ -27,6 +27,17 @@ The games block between `<!-- games:start -->` and `<!-- games:end -->` is gener
 
 `bot/tests/test_sitegen.py` fails if the page and `layout.py` disagree.
 
+## Link previews
+
+`index.html` carries Open Graph and Twitter card tags, a canonical URL
+(`https://gr8monk3ys.github.io/discord-server/`) and a minimal JSON-LD Organization/WebSite
+block, so links pasted in Discord, Reddit or X unfurl with `img/og.png` (1200x630). The image is
+a centred crop of `assets/listing/hero.png`; after regenerating the hero, rebuild it from `bot/`:
+
+    ../server/.venv/Scripts/python -m logic.sitegen --og
+
+The "This week on the server" strip is static copy; update it by hand if the schedule changes.
+
 ## Enable Pages (once)
 
     gh api -X POST repos/gr8monk3ys/discord-server/pages -f build_type=workflow

@@ -54,6 +54,8 @@ MODULES = [
     ("cogs.heartbeat", set()),  # heartbeat file for server/watchdog.py
     ("cogs.challenges", {"members"}),  # weekly challenges: Monday board, /challenges, Claim button, auto-claim
     ("cogs.wordgame", set()),  # Daily Word: /word guess|today|stats|leaderboard
+    ("cogs.matchmaking", {"members"}),  # /queue join|leave|status, match voice channels + pings
+    ("cogs.econstats", set()),  # /economy (staff): coin supply, minted vs burned, top sources and sinks
     ("cogs.vibes", {"members"}),  # chat revival, join anniversaries, booster thanks + stipend, member of the month
 ]
 

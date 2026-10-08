@@ -1,7 +1,9 @@
 """Landing page (site/) helpers: the games list is generated from layout.GAMES.
 
 Pure string functions; the only I/O is the `python -m logic.sitegen` entry point
-(run from bot/), which rewrites the games block in site/index.html in place.
+(run from bot/), which rewrites the games block in site/index.html in place, and
+`python -m logic.sitegen --og`, which rebuilds the 1200x630 social card
+site/img/og.png from assets/listing/hero.png.
 tests/test_sitegen.py fails when the page drifts from layout.py.
 """
 
@@ -9,6 +11,10 @@ import html
 import re
 
 _INVITE_RE = re.compile(r"[A-Za-z0-9-]{2,32}")
+_META_RE = re.compile(r"<meta\b[^>]*>", re.I)
+_ATTR_RE = re.compile(r'([a-zA-Z:-]+)="([^"]*)"')
+
+OG_SIZE = (1200, 630)
 
 
 def render_games(games) -> str:
@@ -49,12 +55,53 @@ def valid_invite_code(code: str) -> bool:
     return bool(code) and code != "REPLACE_ME" and bool(_INVITE_RE.fullmatch(code))
 
 
+def meta_tags(page: str) -> dict[str, str]:
+    """{property-or-name: content} for every <meta> with both; attribute order doesn't matter."""
+    out: dict[str, str] = {}
+    for tag in _META_RE.findall(page):
+        attrs = dict(_ATTR_RE.findall(tag))
+        key = attrs.get("property") or attrs.get("name")
+        if key and "content" in attrs:
+            out[key] = html.unescape(attrs["content"])
+    return out
+
+
+def cover_box(src_w: int, src_h: int, dst_w: int, dst_h: int) -> tuple[int, int, int, int]:
+    """Centred crop box (left, top, right, bottom) of the source with the target's aspect
+    ratio, like CSS object-fit: cover. Scale the box to (dst_w, dst_h) afterwards."""
+    if src_w * dst_h > dst_w * src_h:  # source is wider: trim the sides
+        w = round(src_h * dst_w / dst_h)
+        left = (src_w - w) // 2
+        return left, 0, left + w, src_h
+    h = round(src_w * dst_h / dst_w)  # source is taller (or equal): trim top and bottom
+    top = (src_h - h) // 2
+    return 0, top, src_w, top + h
+
+
+def _write_og(root) -> None:  # pragma: no cover - Pillow I/O
+    from PIL import Image
+
+    src = root / "assets" / "listing" / "hero.png"
+    dst = root / "site" / "img" / "og.png"
+    with Image.open(src) as im:
+        im = im.convert("RGB")
+        card = im.crop(cover_box(*im.size, *OG_SIZE)).resize(OG_SIZE, Image.LANCZOS)
+    card.save(dst, optimize=True)
+    print("site/img/og.png written", card.size)
+
+
 if __name__ == "__main__":  # pragma: no cover
+    import sys
     from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    if "--og" in sys.argv[1:]:
+        _write_og(root)
+        raise SystemExit(0)
 
     import config
 
-    path = Path(__file__).resolve().parents[2] / "site" / "index.html"
+    path = root / "site" / "index.html"
     games = [(g.emoji, g.channel, g.role) for g in config.GAMES]
     page = path.read_text(encoding="utf-8")
     new = replace_block(page, "games", render_games(games))

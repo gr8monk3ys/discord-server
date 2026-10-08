@@ -171,6 +171,8 @@ day-to-day attention. Design and history:
 | Weekly challenges | 3 rotating goals each week (150/250/400 coins + 300 bonus), board in 🎲・games Mondays 09:00, `/challenges` with Claim button, hourly auto-claim; squads and voice company only count from accounts 30+ days old, a game night counts once it starts (not if cancelled), a tournament entry once it starts |
 | Daily Word | `/word guess/today/stats/leaderboard`: one 5-letter word a day (order salted with a private secret kept in the database), spoiler-free results in 🎲・games, coins for wins, streaks |
 | Vibes | conversation starter when 💬・general is quiet for 3 h, join anniversaries, booster thanks + 1000 coins and a monthly stipend, member of the month (squads = joining someone else's post) |
+| Matchmaking | `/queue join/leave/status`: pick a game, mode and size; when the queue fills, a voice channel is made and the players are pinged in 🎲・games; entries expire after 60 min |
+| Economy extras | `/raffle buy/info` (weekly draw Sundays 20:00, 80% of the pot to the winner, 20% burned), Gift Hype, Spotlight (pinned shoutout for 24 h); staff `/economy` for supply and minted vs burned. Audit: `docs/ECONOMY.md` |
 
 Landing page: <https://gr8monk3ys.github.io/discord-server/> (`site/`, deployed by
 `.github/workflows/pages.yml`). Listing-site copy and banners: `docs/LISTING.md`, `assets/listing/`.

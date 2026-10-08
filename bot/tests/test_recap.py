@@ -212,6 +212,15 @@ def test_contest_counts_distinct_invitees_who_stayed_and_are_still_here():
     assert R.contest_ranking(joins, START, END, NOW) == [(1, 100, 2), (2, 200, 1)]
 
 
+def test_contest_ignores_invitees_with_fresh_accounts():
+    from logic import quests as Q
+    # A snowflake whose account is a day old when it joins: an alt made for the contest.
+    joined = START + DAY
+    fresh = ((joined - DAY) * 1000 - Q.DISCORD_EPOCH_MS) << 22
+    joins = [j(1, 100, joined), j(fresh, 100, joined), j(fresh + 1, 200, joined)]
+    assert R.contest_ranking(joins, START, END, NOW) == [(1, 100, 1)]
+
+
 def test_contest_later_rejoin_after_leaving_counts_latest_row():
     joins = [j(1, 100, START + DAY, left=START + 5 * DAY), j(1, 100, START + 6 * DAY)]
     assert R.contest_ranking(joins, START, END, NOW) == [(1, 100, 1)]

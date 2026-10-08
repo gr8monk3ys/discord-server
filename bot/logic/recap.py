@@ -17,6 +17,7 @@ from datetime import date, datetime, time, timedelta, tzinfo
 import discord
 
 from logic import growth as G
+from logic import quests as Q
 from logic import shop
 from logic import stats as S
 from logic.schedule import Weekly
@@ -238,7 +239,9 @@ def contest_ranking(joins: Iterable[G.Join], start: int, end: int, now: int,
 
     A person counts for an inviter when their latest join came through that inviter (not
     themselves) inside the window, they are still in the server, and they stayed by
-    growth.stayed. Ties go to whoever reached their total first, then the lower user id."""
+    growth.stayed, and their account was established (quests.established) when they joined,
+    so fresh alts don't count. Ties go to whoever reached their total first, then the lower
+    user id."""
     latest: dict[int, G.Join] = {}
     for x in joins:
         cur = latest.get(x.user_id)
@@ -247,7 +250,8 @@ def contest_ranking(joins: Iterable[G.Join], start: int, end: int, now: int,
     people: dict[int, list[int]] = {}
     for x in latest.values():
         if (x.inviter_id is None or x.inviter_id == x.user_id or x.inviter_id in exclude
-                or x.left_at is not None or not start <= x.joined_at < end or not G.stayed(x, now)):
+                or x.left_at is not None or not start <= x.joined_at < end or not G.stayed(x, now)
+                or not Q.established(x.user_id, x.joined_at)):
             continue
         people.setdefault(x.inviter_id, []).append(x.joined_at)
     ordered = sorted(people.items(), key=lambda kv: (-len(kv[1]), max(kv[1]), kv[0]))[:n]

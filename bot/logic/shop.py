@@ -1,16 +1,20 @@
 """Module 4c: the coin shop and monthly seasons. Pure: no Discord, no database.
 
-Shop: the item list and prices, colour and shoutout checks, perk expiry maths.
+Shop: the item list and prices, colour, shoutout, gift and spotlight checks, perk expiry maths.
+Raffle: the weekly coin raffle (ticket limits, draw times, ledger refs, the winner pick).
 Seasons: one per local calendar month; points are coins *earned* in the month from
 activity reasons only (gambling, transfers and shop spending never count), plus the
 standings order and the rollover plan. Coins only ever move through bot/economy.py."""
 
+import json
 import re
 from dataclasses import dataclass
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from typing import Iterable
 
 from logic import coins as C
+from logic import quests as Q
+from logic.schedule import Weekly, occurrence
 
 HOUR = 60 * 60
 DAY = 24 * HOUR
@@ -19,7 +23,7 @@ DAY = 24 * HOUR
 SHOP_REASON = "shop"
 SEASON_REASON = "season"  # season bonuses: not a season-point reason, so they never snowball
 
-COLOR, HYPE, SHOUTOUT = "color", "hype", "shoutout"
+COLOR, HYPE, SHOUTOUT, GIFT, SPOTLIGHT = "color", "hype", "shoutout", "gift", "spotlight"
 
 
 @dataclass(frozen=True)
@@ -27,9 +31,11 @@ class Item:
     key: str
     name: str
     price: int
-    duration: int  # seconds the perk lasts (shoutout: the cooldown)
+    duration: int  # seconds the perk lasts (shoutout, spotlight: the buyer's cooldown)
     blurb: str
 
+
+SPOTLIGHT_PIN = DAY  # how long a spotlight stays pinned
 
 ITEMS = {
     COLOR: Item(COLOR, "Name colour", 2_000, 30 * DAY,
@@ -37,7 +43,54 @@ ITEMS = {
     HYPE: Item(HYPE, "Hype", 500, DAY, "The Hype role for 24 hours."),
     SHOUTOUT: Item(SHOUTOUT, "Shoutout", 300, DAY,
                    "Post a message (up to 140 characters) in general. Once per 24 hours."),
+    GIFT: Item(GIFT, "Gift Hype", 500, DAY,
+               "Give a friend the Hype role for 24 hours (`friend:`). They get a DM saying it was you."),
+    SPOTLIGHT: Item(SPOTLIGHT, "Spotlight", 1_500, 7 * DAY,
+                    "A shoutout pinned in general for 24 hours. One spotlight at a time, once a week each."),
 }
+
+
+# ---------------------------------------------------------------- gifts
+def gift_error(buyer_id: int, friend_id: int | None, friend_is_bot: bool) -> str | None:
+    if friend_id is None:
+        return "Pick who gets it, like `/buy item:gift friend:@someone`."
+    if friend_id == buyer_id:
+        return "That's you! Use `/buy item:hype` to get Hype yourself."
+    if friend_is_bot:
+        return "Bots can't be Hype."
+    return None
+
+
+# ---------------------------------------------------------------- spotlight
+SPOTLIGHT_KEY = "shop:spotlight"  # meta row: the one active spotlight, as JSON
+
+
+@dataclass(frozen=True)
+class Spotlight:
+    user_id: int
+    channel_id: int
+    message_id: int
+    expires_at: int
+
+
+def spotlight_dump(s: Spotlight) -> str:
+    return json.dumps({"user": s.user_id, "channel": s.channel_id, "message": s.message_id,
+                       "expires": s.expires_at}, sort_keys=True)
+
+
+def spotlight_load(value: str | None) -> Spotlight | None:
+    """The stored spotlight, or None if there's none (or the row is unreadable)."""
+    if not value:
+        return None
+    try:
+        d = json.loads(value)
+        return Spotlight(int(d["user"]), int(d["channel"]), int(d["message"]), int(d["expires"]))
+    except (ValueError, KeyError, TypeError):
+        return None
+
+
+def spotlight_busy(current: Spotlight | None, now: int) -> bool:
+    return current is not None and current.expires_at > now
 
 ROLE_NAME_MAX = 32
 SHOUTOUT_MAX = 140
@@ -212,3 +265,95 @@ def season_plan(now: int, tz, done_keys: set[str]) -> SeasonPlan:
     if prev in done_keys:
         return SeasonPlan(None, None)
     return SeasonPlan(prev, None)
+
+
+# ---------------------------------------------------------------- weekly raffle
+# Tickets cost coins (a sink); Sunday 20:00 local one ticket is drawn and its owner gets
+# RAFFLE_SHARE % of the pot. The rest is burned: never paid out to anyone. Tickets are
+# ledger rows (reason "raffle", ref "raffle:2026-W41:buy:<user>:<interaction>"), so the
+# pot, each member's count and the winner all come from the ledger; the `jobs` table
+# marks a draw as posted.
+RAFFLE_REASON = "raffle"
+TICKET_PRICE = 100
+MAX_TICKETS = 10  # per member per draw
+RAFFLE_SHARE = 80  # percent of the pot the winner gets; the rest is burned
+MIN_ENTRANTS = 2  # fewer people than this: everyone is refunded in full
+RAFFLE_JOB = Weekly("raffle", weekday=6, hour=20, minute=0)  # Sundays 20:00 local
+DRAW_GRACE = 60  # seconds after the draw time before drawing, so in-flight purchases land
+
+
+def next_draw(now: int, tz):
+    """The draw a ticket bought at `now` goes into: the first Sunday 20:00 strictly after now."""
+    today = datetime.fromtimestamp(now, tz).date()
+    day = today + timedelta(days=(RAFFLE_JOB.weekday - today.weekday()) % 7)
+    p = occurrence(RAFFLE_JOB, day, tz)
+    return p if p.scheduled_at > now else occurrence(RAFFLE_JOB, day + timedelta(days=7), tz)
+
+
+def draw_at(key: str, tz) -> int:
+    """When draw `key` ("raffle:2026-W41") happens, in unix seconds."""
+    year, week = key.split(":", 1)[1].split("-W")
+    return occurrence(RAFFLE_JOB, date.fromisocalendar(int(year), int(week), 7), tz).scheduled_at
+
+
+def ticket_ref(key: str, user_id: int, purchase_id: int) -> str:
+    return f"{key}:buy:{user_id}:{purchase_id}"
+
+
+def tickets_like(key: str) -> str:
+    """LIKE pattern for every ticket ref of draw `key` (keys hold no % or _)."""
+    return f"{key}:buy:%"
+
+
+def win_ref(key: str) -> str:
+    return f"{key}:win"
+
+
+def refund_ref(key: str, user_id: int) -> str:
+    return f"{key}:refund:{user_id}"
+
+
+def key_of(ref: str | None) -> str | None:
+    """'raffle:2026-W41' from a ticket ref, else None."""
+    parts = (ref or "").split(":")
+    if len(parts) >= 3 and parts[0] == RAFFLE_JOB.name and parts[2] == "buy":
+        return f"{parts[0]}:{parts[1]}"
+    return None
+
+
+def can_enter(user_id: int, now: int) -> bool:
+    """Fresh alt accounts can't buy tickets (same age rule as every other reward)."""
+    return Q.established(user_id, now)
+
+
+def ticket_error(owned: int, buying: int) -> str | None:
+    if buying < 1:
+        return "Buy at least 1 ticket."
+    if owned >= MAX_TICKETS:
+        return f"You already have the maximum {MAX_TICKETS} tickets for this draw."
+    if owned + buying > MAX_TICKETS:
+        return f"You can hold {MAX_TICKETS} tickets per draw. You have {owned}, so buy {MAX_TICKETS - owned} or fewer."
+    return None
+
+
+def prize(pot: int) -> int:
+    return pot * RAFFLE_SHARE // 100
+
+
+def due(keys: Iterable[str], done: set[str], now: int, tz) -> list[str]:
+    """Draws that have tickets, are past their time (plus grace) and haven't been posted: oldest first."""
+    out = {k for k in keys if k not in done and draw_at(k, tz) + DRAW_GRACE <= now}
+    return sorted(out, key=lambda k: draw_at(k, tz))
+
+
+def pick_winner(tickets: Iterable[tuple[int, int]], rng) -> int:
+    """One ticket at random: (user_id, count) rows, so 3 tickets = 3 chances. Rows are sorted
+    first so the result depends only on the rng, not on query order."""
+    pool = [uid for uid, n in sorted(tickets) for _ in range(max(n, 0))]
+    if not pool:
+        raise ValueError("no tickets")
+    return rng.choice(pool)
+
+
+def fmt_chance(mine: int, total: int) -> str:
+    return f"{100 * mine / total:.0f}%" if total else "0%"
