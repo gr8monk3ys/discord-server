@@ -132,8 +132,14 @@ class Quests(commands.Cog):
         return {"pick_roles"} if Q.has_picked_roles(names) else set()
 
     # ------------------------------------------------------------ recording
-    async def record(self, member, steps) -> set[str]:
-        """Insert these steps once each; on anything new, see whether the quest is finished."""
+    async def record(self, member, steps, done: set[str] | None = None) -> set[str]:
+        """Insert these steps once each; on anything new, see whether the quest is finished.
+        `done`: steps already recorded (the sweep preloads them), so nothing is written
+        when nothing is new."""
+        if done is not None:
+            steps = {s for s in steps if s in Q.BY_KEY} - done
+            if not steps:
+                return set()
         t = now()
         fresh = set()
         async with self.db.transaction() as tx:
@@ -156,15 +162,18 @@ class Quests(commands.Cog):
         if not Q.is_complete(await self.done(uid), tracking):
             return False
         t = now()
-        if not Q.eligible_for_reward(joined_ts(member), await self.started_at(), t, created_at=created_ts(member)):
-            return False
-        result = await economy.apply(self.db, uid, Q.REWARD, Q.REASON, t, ref=Q.ref(uid))
-        if not result.ok:
-            return False  # already paid
+        # The badge is for finishing; only the coins depend on eligibility.
         badge = False
         if Q.BADGE_KEY in A.BY_KEY:
             badge = bool(await self.db.execute(
                 "INSERT OR IGNORE INTO achievements (user_id, key, at) VALUES (?, ?, ?)", (uid, Q.BADGE_KEY, t)))
+        if not Q.eligible_for_reward(joined_ts(member), await self.started_at(), t, created_at=created_ts(member)):
+            if badge:
+                log.info("quests: %s finished the starter quest (badge only, no coin reward)", uid)
+            return False
+        result = await economy.apply(self.db, uid, Q.REWARD, Q.REASON, t, ref=Q.ref(uid))
+        if not result.ok:
+            return False  # already paid
         log.info("quests: %s finished the starter quest", uid)
         guild = self.guild()
         general = config.match_by_name(guild.text_channels, config.GENERAL_CHANNEL) if guild else None
@@ -273,20 +282,34 @@ class Quests(commands.Cog):
         started = await self.started_at()
         tables = await self.from_tables()
         optouts = await self.optouts()
+        # Preloaded once, so members with nothing new cost no queries or commits.
+        done_by: dict[int, set[str]] = {}
+        for r in await self.db.fetchall("SELECT user_id, step FROM quest_steps"):
+            done_by.setdefault(r["user_id"], set()).add(r["step"])
+        badge_known = Q.BADGE_KEY in A.BY_KEY
+        holders = {r["user_id"] for r in await self.db.fetchall(
+            "SELECT user_id FROM achievements WHERE key = ?", (Q.BADGE_KEY,))} if badge_known else set()
         nudged = 0
         for member in list(guild.members):
             if member.bot:
                 continue
             try:
-                await self.record(member, self.from_roles(member) | tables.get(member.id, set()))
-                nudged += await self.nudge(member, started, member.id not in optouts)
+                tracking = member.id not in optouts
+                done = done_by.get(member.id, set())
+                fresh = await self.record(member, self.from_roles(member) | tables.get(member.id, set()), done)
+                done = done | fresh
+                if (not fresh and badge_known and member.id not in holders
+                        and Q.is_complete(done, tracking)):
+                    await self.maybe_finish(member)  # finished before the badge came with it
+                nudged += await self.nudge(member, started, tracking, done)
             except Exception:
                 log.exception("quests: sweeping %s failed", member.id)
         return nudged
 
-    async def nudge(self, member, started: int, tracking: bool) -> bool:
+    async def nudge(self, member, started: int, tracking: bool, done: set[str] | None = None) -> bool:
         t = now()
-        done = await self.done(member.id)
+        if done is None:
+            done = await self.done(member.id)
         joined = joined_ts(member)
         if not Q.should_nudge(joined, started, t, Q.progress(done, tracking)[0]):
             return False
@@ -310,10 +333,12 @@ class Quests(commands.Cog):
         got, total = Q.progress(done, tracking)
         if await self.paid(uid):
             status = "reward paid"
-        elif Q.eligible_for_reward(joined_ts(member), await self.started_at(), now(), created_at=created_ts(member)):
-            status = f"{Q.REWARD:,} coins when you finish"
         else:
-            status = "no coin reward (for new members)"
+            args = (joined_ts(member), await self.started_at(), now())
+            if Q.eligible_for_reward(*args, created_at=created_ts(member)):
+                status = f"{Q.REWARD:,} coins when you finish"
+            else:
+                status = f"no coin reward ({Q.no_reward_reason(*args, created_at=created_ts(member))})"
         title = "Starter quest · done!" if got == total else f"Starter quest · {got}/{total}"
         return style.embed(title=title, description=Q.checklist(done, tracking),
                            footer=style.label("quest", status))

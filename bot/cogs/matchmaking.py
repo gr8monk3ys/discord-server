@@ -175,7 +175,7 @@ class Matchmaking(commands.Cog):
         label = bucket_label(game.key, mode, size)
         lines = [EXPIRED_NOTE] if note else []
         if picked:
-            lines.append(f"Match found: **{label}**. Check the ping for your voice channel.")
+            lines.append(f"Match found: **{label}**. Setting up your voice channel...")
         elif old is not None and old.bucket == (game.key, mode, size):
             lines.append(f"You're already in the **{label}** queue.")
         else:
@@ -186,12 +186,19 @@ class Matchmaking(commands.Cog):
         await interaction.response.send_message("\n".join(lines), ephemeral=True,
                                                 allowed_mentions=discord.AllowedMentions.none())
         if picked:
-            await self.start_match(guild, match_id, game, mode, size, [e.user_id for e in picked])
+            channel = await self.start_match(guild, match_id, game, mode, size, [e.user_id for e in picked])
+            where = (f"Your voice channel: {channel.mention}" if channel is not None
+                     else f"Grab a voice channel: join **{esc(config.NEW_SQUAD_VOICE)}** for a fresh one.")
+            try:
+                await interaction.followup.send(where, ephemeral=True, allowed_mentions=discord.AllowedMentions.none())
+            except discord.HTTPException:
+                log.info("matchmaking: couldn't tell %s the voice channel", user.id)
 
     # ------------------------------------------------------------ match channel + ping
     async def start_match(self, guild, match_id: int, game: config.Game, mode: str, size: int,
-                          members: list[int]) -> None:
-        """Voice channel and ping for a popped match. Never raises: the match row is already saved."""
+                          members: list[int]):
+        """Voice channel and ping for a popped match; returns the channel (or None). Never
+        raises: the match row is already saved."""
         channel = None
         try:
             channel = await self.create_channel(guild, game, size, members)
@@ -205,6 +212,7 @@ class Matchmaking(commands.Cog):
             log.exception("matchmaking: announcing match %s failed", match_id)
         log.info("matchmaking: match %s (%s %s %d) channel %s", match_id, game.key, mode, size,
                  channel.id if channel else None)
+        return channel
 
     async def create_channel(self, guild, game: config.Game, size: int, members: list[int]):
         if guild is None:
@@ -237,13 +245,21 @@ class Matchmaking(commands.Cog):
 
     async def announce(self, guild, game: config.Game, mode: str, size: int, members: list[int], channel) -> None:
         post = self.post_channel(guild)
-        if post is None:
-            log.warning("matchmaking: no %r or %r channel to announce in", config.GAMES_CHANNEL,
-                        config.BOT_COMMANDS_CHANNEL)
-            return
-        pings = " ".join(f"<@{u}>" for u in members)
         where = (f"Your voice channel: {channel.mention}" if channel is not None
                  else f"Grab a voice channel: join **{esc(config.NEW_SQUAD_VOICE)}** for a fresh one.")
+        if post is None:
+            log.warning("matchmaking: no %r or %r channel to announce in; DMing the players", config.GAMES_CHANNEL,
+                        config.BOT_COMMANDS_CHANNEL)
+            text = f"🎮 **Match found** · {bucket_label(game.key, mode, size)}\n{where}"
+            for uid in members:
+                member = guild.get_member(uid) if guild is not None else None
+                try:
+                    if member is not None:
+                        await member.send(text, allowed_mentions=discord.AllowedMentions.none())
+                except (discord.HTTPException, AttributeError):
+                    log.info("matchmaking: match DM to %s failed", uid)
+            return
+        pings = " ".join(f"<@{u}>" for u in members)
         text = f"🎮 **Match found** · {bucket_label(game.key, mode, size)}\n{pings}\n{where}"
         try:
             await post.send(text, allowed_mentions=ping_only(members))

@@ -40,6 +40,7 @@ import config
 import economy
 import style
 from errors import reply_error
+from logic.selfroles import has_dangerous_permissions
 from logic import engagement as EG
 from logic import events as E
 from logic import stats as S
@@ -712,7 +713,9 @@ class Tournaments(commands.Cog):
                 except discord.HTTPException:
                     log.warning("couldn't remove %s from a previous champion", config.TOURNEY_ROLE, exc_info=True)
         member = await self.member(guild, champion)
-        if member is not None and role not in member.roles:
+        if has_dangerous_permissions(role):
+            log.warning("won't give %s: it has moderator permissions", config.TOURNEY_ROLE)
+        elif member is not None and role not in member.roles:
             await member.add_roles(role, reason=reason)
 
     async def member(self, guild, uid: int):

@@ -317,23 +317,33 @@ def test_opted_out_earns_nothing(monkeypatch):
 
 def test_level_up_posts_in_channel_pinging_only_member(monkeypatch):
     async def go(env):
+        await env.set_row(U1, L.total_for_level(5) - 10)
+        await env.cog.on_message(env.say(U1))
+        assert (await env.xp(U1))["level"] == 5
+        (post,) = env.guild.gaming.sent
+        assert post["content"].startswith("<@11> reached **level 5**")
+        pinged_only(post, U1)
+    with_env(go, monkeypatch)
+
+
+def test_levels_below_the_first_reward_are_not_announced(monkeypatch):
+    # Day one would otherwise ping a newcomer for levels 1, 2 and 3 within minutes.
+    async def go(env):
         await env.set_row(U1, 90)
         await env.cog.on_message(env.say(U1))
         assert (await env.xp(U1))["level"] == 1
-        (post,) = env.guild.gaming.sent
-        assert post["content"].startswith("<@11> reached **level 1**")
-        pinged_only(post, U1)
+        assert env.guild.gaming.sent == []
     with_env(go, monkeypatch)
 
 
 def test_level_up_posts_are_rate_limited(monkeypatch):
     async def go(env):
-        await env.set_row(U1, 90)
-        await env.set_row(U2, 90)
+        await env.set_row(U1, L.total_for_level(5) - 10)
+        await env.set_row(U2, L.total_for_level(5) - 10)
         await env.cog.on_message(env.say(U1))
         await env.cog.on_message(env.say(U2))  # same channel within the gap: quiet
         assert len(env.guild.gaming.sent) == 1
-        assert (await env.xp(U2))["level"] == 1  # still levelled up
+        assert (await env.xp(U2))["level"] == 5  # still levelled up
     with_env(go, monkeypatch)
 
 
@@ -452,11 +462,11 @@ def test_voice_level_up_announced_in_bot_commands(monkeypatch):
     async def go(env):
         await env.backfilled()
         env.member(U1), env.member(U2)
-        await env.set_row(U1, 95)
+        await env.set_row(U1, L.total_for_level(5) - 5)
         await env.voice(VC1, T0 - MIN, T0, U1, U2)
         assert await env.cog.run_voice_sweep() == 1
         (post,) = env.guild.botcmds.sent
-        assert "<@11> reached **level 1**" in post["content"]
+        assert "<@11> reached **level 5**" in post["content"]
         pinged_only(post, U1)
     with_env(go, monkeypatch)
 
@@ -607,4 +617,16 @@ def test_xp_commands_staff_only(monkeypatch):
         inter = FakeInteraction(env.member(OWNER), env.guild)
         await Levels.xp_set.callback(env.cog, inter, env.member(BOTUSER, bot=True), 5)
         assert await env.xp(BOTUSER) is None
+    with_env(go, monkeypatch)
+
+
+def test_level_role_with_mod_permissions_is_not_given(monkeypatch):
+    async def go(env):
+        m = env.member(U1)
+        regular = next(r for r in env.guild.roles if r.name == "Regular")
+        regular.permissions = discord.Permissions(kick_members=True)
+        await env.set_row(U1, L.total_for_level(5) - 10)
+        await env.cog.on_message(env.say(U1))
+        assert (await env.xp(U1))["level"] == 5
+        assert "Regular" not in m.names()
     with_env(go, monkeypatch)

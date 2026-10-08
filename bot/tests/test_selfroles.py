@@ -107,3 +107,12 @@ def test_panel_key_round_trip():
     assert S.parse_panel_ref(None) is None
     assert S.parse_panel_ref("garbage") is None
     assert S.parse_panel_ref("1:x") is None
+
+
+def test_has_dangerous_permissions():
+    import discord
+    from types import SimpleNamespace
+    assert S.has_dangerous_permissions(SimpleNamespace(permissions=discord.Permissions(mention_everyone=True)))
+    assert S.has_dangerous_permissions(SimpleNamespace(permissions=discord.Permissions(manage_messages=True)))
+    assert not S.has_dangerous_permissions(SimpleNamespace(permissions=discord.Permissions(send_messages=True)))
+    assert not S.has_dangerous_permissions(SimpleNamespace())

@@ -64,3 +64,35 @@ def test_privacy_gate():
         assert await d.tracking_allowed(7)
         await d.close()
     run(go())
+
+
+
+def test_hot_query_indexes_exist_and_are_used():
+    async def go():
+        d = await fresh()
+        try:
+            names = {r["name"] for r in await d.fetchall("SELECT name FROM sqlite_master WHERE type='index'")}
+            assert {"ledger_reason_at", "ledger_at", "message_counts_day", "voice_sessions_end",
+                    "game_sessions_end", "voice_sessions_channel"} <= names
+
+            async def plan(sql):
+                return " ".join(r["detail"] for r in await d.fetchall("EXPLAIN QUERY PLAN " + sql))
+            assert "ledger_reason_at" in await plan("SELECT user_id FROM ledger WHERE reason = 'raffle' AND at >= 0")
+            assert "message_counts_day" in await plan("SELECT user_id FROM message_counts WHERE day >= '2026-01-01'")
+            assert "voice_sessions_end" in await plan('SELECT user_id FROM voice_sessions WHERE "end" IS NULL')
+            assert "game_sessions_end" in await plan('SELECT user_id FROM game_sessions WHERE "end" IS NULL')
+        finally:
+            await d.close()
+    run(go())
+
+
+def test_file_database_uses_wal_with_normal_sync(tmp_path):
+    async def go():
+        d = dbmod.Database(tmp_path / "bot.sqlite3")
+        await d.connect()
+        try:
+            assert (await d.fetchone("PRAGMA journal_mode"))[0] == "wal"
+            assert (await d.fetchone("PRAGMA synchronous"))[0] == 1  # NORMAL
+        finally:
+            await d.close()
+    run(go())

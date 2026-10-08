@@ -51,7 +51,7 @@ class Badge:
 
 BADGES: tuple[Badge, ...] = (
     Badge("first_squad", "🤝", "Squad Up", "Join someone's /lfg squad", lambda f: f.squads_joined >= 1),
-    Badge("squad_regular", "🎮", "Regular", "Join 10 /lfg squads", lambda f: f.squads_joined >= 10),
+    Badge("squad_regular", "🎮", "Squad Regular", "Join 10 /lfg squads", lambda f: f.squads_joined >= 10),
     Badge("squad_host", "📣", "Rally Point", "Host an /lfg squad", lambda f: f.squads_hosted >= 1),
     Badge("gamenight_host", "🌙", "Game Night Host", "Host a /gamenight", lambda f: f.gamenights_hosted >= 1),
     Badge("voice_10h", "🎧", "Tuned In", "10 hours in voice with others", lambda f: f.voice_seconds >= 10 * HOUR,
@@ -77,6 +77,8 @@ BADGES: tuple[Badge, ...] = (
     Badge("starter", "🧭", "Settled In", "Finish the starter quest (/quest)", lambda f: False),
 )
 BY_KEY = {b.key: b for b in BADGES}
+# Granted without a congratulation post: every early joiner gets it just for joining.
+QUIET = frozenset({"early_member"})
 TOTAL = len(BADGES)
 
 

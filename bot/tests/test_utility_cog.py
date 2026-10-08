@@ -980,7 +980,7 @@ def test_button_callbacks_reach_the_cog_and_report_errors(monkeypatch):
         monkeypatch.setattr(env.cog, "close_ticket", boom)
         inter = env.inter(A, channel=env.guild.help.threads[0])
         await TicketCloseButton().callback(inter)
-        assert "didn't work" in inter.replies()[0][0]
+        assert "went wrong" in inter.replies()[0][0]
     with_env(go, monkeypatch)
 
 

@@ -41,6 +41,7 @@ LEAVE_REPLIES = {
 }
 
 
+PING_COOLDOWN = 30 * 60  # a host's posts ping the game roles at most this often (staff: always)
 TIDY_PREFIX = "lfg:tidy:"  # meta: a closed post whose thread still needs locking + archiving
 
 
@@ -50,6 +51,11 @@ def tidy_key(post_id: int) -> str:
 
 def now() -> int:
     return int(time.time())
+
+
+def esc(text) -> str:
+    """Member-typed text in bot posts: no masked links or formatting tricks."""
+    return discord.utils.escape_markdown(str(text or ""))
 
 
 class LfgButton(discord.ui.DynamicItem[discord.ui.Button],
@@ -200,11 +206,11 @@ class Lfg(commands.Cog):
     def render(self, post, roster: Roster, closed: bool = False) -> discord.Embed:
         game = config.game_by_key(post["game"])
         name = f"{game.emoji} {game.role}" if game else post["game"]
-        lines = [f"**When** {post['when_text']}"]
+        lines = [f"**When** {esc(post['when_text'])}"]
         if post["mode"]:
             lines.append(f"**Mode** {post['mode']}")
         if post["note"]:
-            lines.append(f"**Note** {post['note']}")
+            lines.append(f"**Note** {esc(post['note'])}")
         lines += ["", f"**Squad {rules.count_label(roster)}**"]
         lines += [f"`{i:02}`  <@{uid}>" + ("  · host" if uid == roster.host_id else "")
                   for i, uid in enumerate(roster.members, start=1)]
@@ -218,10 +224,13 @@ class Lfg(commands.Cog):
             color=style.MUTED if closed else style.FOREST,
         )
 
-    def pings(self, game: config.Game, host: discord.Member, roster: Roster, when: str) -> str:
-        mentions = " ".join(r.mention for r in (self.game_roles.get(game.key), self.lfg_role) if r)
+    def ping_roles(self, game: config.Game) -> list:
+        return [r for r in (self.game_roles.get(game.key), self.lfg_role) if r]
+
+    def pings(self, game: config.Game, host: discord.Member, roster: Roster, when: str, ping: bool = True) -> str:
+        mentions = " ".join(r.mention for r in self.ping_roles(game)) if ping else ""
         need = roster.size - len(roster.members)
-        return f"{mentions} {host.display_name} needs {need} more for **{game.role}** ({when})".strip()
+        return f"{mentions} {esc(host.display_name)} needs {need} more for **{game.role}** ({esc(when)})".strip()
 
     def tags_for(self, game_key: str, mode: str | None) -> list[discord.ForumTag]:
         return [t for t in (self.game_tags.get(game_key), self.mode_tags.get(mode)) if t]
@@ -277,6 +286,10 @@ class Lfg(commands.Cog):
                 (host.id, g.key),
             )
             if existing is None:
+                last = await tx.fetchone("SELECT MAX(created_at) AS t FROM lfg_posts WHERE host_id = ?", (host.id,))
+                # Close + re-post (or one post per game) must not mass-ping the game roles.
+                ping = (last["t"] is None or created - last["t"] >= PING_COOLDOWN
+                        or (isinstance(host, discord.Member) and self.is_keeper(host)))
                 cur = await tx.execute(
                     "INSERT INTO lfg_posts (game, host_id, size, mode, when_text, note, created_at)"
                     " VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -293,11 +306,11 @@ class Lfg(commands.Cog):
         try:
             made = await self.forum.create_thread(
                 name=rules.title(g.role, mode_value),
-                content=self.pings(g, host, roster, when),
+                content=self.pings(g, host, roster, when, ping=ping),
                 embed=self.render(post, roster),
                 view=build_view(post_id, roster, closed=False),
                 applied_tags=self.tags_for(g.key, mode_value),
-                allowed_mentions=ping_only(roles=[r for r in (self.game_roles.get(g.key), self.lfg_role) if r]),
+                allowed_mentions=ping_only(roles=self.ping_roles(g)) if ping else discord.AllowedMentions.none(),
             )
         except BaseException:
             # Any failure (HTTP error, a raw OSError or timeout from the connection,

@@ -758,3 +758,13 @@ def test_mod_log_send_failure_never_raises(monkeypatch):
         env.guild.mod_log.fail = http_error()
         await env.cog.on_member_unban(env.guild, env.member(A))
     with_env(go, monkeypatch)
+
+
+def test_report_reason_and_quote_are_markdown_escaped(monkeypatch):
+    async def go(env):
+        msg = FakeMessage(4445, env.member(B), env.guild.general, "[login](https://phish.example)")
+        await env.report_message(A, msg, reason="[Jump to message](https://phish.example/login)")
+        desc = embeds(env.guild.mod_log)[0].description
+        assert r"**Reason** \[Jump to message]" in desc
+        assert r"> \[login]" in desc
+    with_env(go, monkeypatch)

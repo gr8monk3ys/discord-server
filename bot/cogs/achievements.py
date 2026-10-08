@@ -32,6 +32,7 @@ log = logging.getLogger(__name__)
 
 BACKFILL_KEY = "achievements:backfilled"  # meta: set once the first (silent) sweep is done
 MESSAGE_COOLDOWN = 10 * 60  # re-check a chatter at most this often
+INTERACTION_COOLDOWN = 2 * 60  # and a clicker (commands, buttons) at most this often
 EVENT_DELAY = 5  # seconds: let the other cogs write their rows first
 SWEEP_POST_LIMIT = 10  # congratulation posts per sweep at most; the rest are granted quietly
 # Never congratulate in these (counting would break, the others are read-only or curated).
@@ -69,6 +70,7 @@ class Achievements(commands.Cog):
         self.delay = EVENT_DELAY
         self.pending: dict[int, asyncio.Task] = {}
         self.last_message_check: dict[int, int] = {}
+        self.last_interaction_check: dict[int, int] = {}
 
     async def cog_load(self) -> None:
         self.sweep.start()
@@ -116,10 +118,14 @@ class Achievements(commands.Cog):
         excluded = {afk.id} if afk is not None else set()
         t = now()
         sessions = [S.Session(r["user_id"], r["channel_id"], r["start"], r["end"]) for r in rows]
-        return S.counted_voice_seconds(sessions, 0, t, t, excluded_channels=excluded)
+        # Sorting every join/leave is CPU work: keep it off the event loop.
+        return await asyncio.to_thread(S.counted_voice_seconds, sessions, 0, t, t, excluded_channels=excluded)
 
-    async def recruiters(self) -> set[int]:
-        rows = await self.db.fetchall("SELECT user_id, inviter_id, joined_at, left_at FROM joins")
+    async def recruiters(self, ids=None) -> set[int]:
+        """Recruiters among `ids` (None: everyone). Only these inviters' joins are read."""
+        extra, params = _in("inviter_id", ids)
+        rows = await self.db.fetchall(
+            f"SELECT user_id, inviter_id, joined_at, left_at FROM joins WHERE 1 = 1{extra}", params)
         joins = [G.Join(r["user_id"], r["inviter_id"], r["joined_at"], r["left_at"]) for r in rows]
         return G.recruiters(G.stayed_counts(joins, now()))
 
@@ -147,7 +153,7 @@ class Achievements(commands.Cog):
         extra, params = _in("user_id", ids)
         optout = {r["user_id"] for r in await self.db.fetchall(
             f"SELECT user_id FROM privacy_optout WHERE 1 = 1{extra}", params)}
-        recruiters = await self.recruiters()
+        recruiters = await self.recruiters(ids)
         guild = self.guild()
 
         everyone = set(ids) if ids is not None else (
@@ -218,12 +224,17 @@ class Achievements(commands.Cog):
         ids = None if user_ids is None else {u for u in user_ids}
         facts = await self.gather(ids)
         announce = announce and await self.backfilled()
+        held_by: dict[int, set[str]] | None = None
+        if ids is None:  # the sweep: one read for everyone instead of one per member
+            held_by = {}
+            for r in await self.db.fetchall("SELECT user_id, key FROM achievements"):
+                held_by.setdefault(r["user_id"], set()).add(r["key"])
         posts = 0
         for uid in sorted(facts):
             member = guild.get_member(uid)
             if member is None or member.bot:
                 continue  # left (or never in) the server: nothing to grant
-            held = await self.held(uid)
+            held = held_by.get(uid, set()) if held_by is not None else await self.held(uid)
             new = A.new_badges(facts[uid], held)
             for key in (extra or {}).get(uid, ()):
                 if key in A.BY_KEY and key not in held and A.BY_KEY[key] not in new:
@@ -231,8 +242,9 @@ class Achievements(commands.Cog):
             if not new:
                 continue
             fresh = await self.grant(uid, new)
-            if fresh and announce and (user_ids is not None or posts < SWEEP_POST_LIMIT):
-                posts += await self.announce(guild, uid, fresh, channel)
+            loud = [b for b in fresh if b.key not in A.QUIET]
+            if loud and announce and (user_ids is not None or posts < SWEEP_POST_LIMIT):
+                posts += await self.announce(guild, uid, loud, channel)
             if fresh:
                 log.info("achievements: %s earned %s", uid, ", ".join(b.key for b in fresh))
         return posts
@@ -279,6 +291,10 @@ class Achievements(commands.Cog):
         user = interaction.user
         if user is None or getattr(user, "bot", False) or not self.ours(interaction.guild):
             return
+        t = now()
+        if t - self.last_interaction_check.get(user.id, 0) < INTERACTION_COOLDOWN:
+            return  # the hourly sweep catches anything earned in between
+        self.last_interaction_check[user.id] = t
         self.soon(user.id, interaction.channel)
 
     @commands.Cog.listener()

@@ -512,3 +512,64 @@ def test_young_account_finishes_but_is_not_paid(monkeypatch):
         assert await env.done(U1) == {s.key for s in Q.STEPS}
         assert await economy.balance(env.db, U1) == 0
     with_env(go, monkeypatch)
+
+
+# ---------------------------------------------------------------- badge without coins, sweep cost
+def test_ineligible_finisher_still_gets_settled_in_quietly(monkeypatch):
+    async def go(env):
+        await env.start()
+        env.member(U1, joined=T0 - DAY, roles=[config.PLATFORM_ROLES[0]])
+        await env.voice(U1)
+        await finish_all_but_voice(env, U1)
+        assert await env.db.fetchone("SELECT 1 FROM achievements WHERE user_id = ? AND key = ?", (U1, Q.BADGE_KEY))
+        assert await economy.balance(env.db, U1) == 0 and env.guild.general.sent == []
+    with_env(go, monkeypatch)
+
+
+def test_sweep_backfills_settled_in_for_members_already_done(monkeypatch):
+    async def go(env):
+        await env.start()
+        env.member(U1, joined=T0 - DAY)
+        for s in Q.STEPS:
+            await env.db.execute("INSERT INTO quest_steps (user_id, step, at) VALUES (?, ?, ?)", (U1, s.key, T0))
+        await env.cog.run_sweep()
+        assert await env.db.fetchone("SELECT 1 FROM achievements WHERE user_id = ? AND key = ?", (U1, Q.BADGE_KEY))
+    with_env(go, monkeypatch)
+
+
+def test_sweep_with_nothing_new_opens_no_transactions(monkeypatch):
+    async def go(env):
+        await env.start()
+        m = env.member(U1, joined=T0 + 10, roles=[config.REGION_ROLES[0]])
+        await env.squad(U1)
+        await env.cog.run_sweep()
+        assert await env.done(U1) == {"pick_roles", "join_squad"}
+        calls = {"tx": 0, "done": 0}
+        real_tx, real_done = env.db.transaction, env.cog.done
+
+        def tx():
+            calls["tx"] += 1
+            return real_tx()
+
+        async def done(uid):
+            calls["done"] += 1
+            return await real_done(uid)
+        monkeypatch.setattr(env.db, "transaction", tx)
+        monkeypatch.setattr(env.cog, "done", done)
+        await env.cog.run_sweep()
+        assert calls == {"tx": 0, "done": 0}
+        await env.daily(U1)  # something new: recorded as before
+        await env.cog.run_sweep()
+        assert "claim_daily" in await real_done(U1)
+        assert m.dms == []
+    with_env(go, monkeypatch)
+
+
+def test_quest_footer_explains_a_young_account(monkeypatch):
+    async def go(env):
+        await env.start()
+        m = env.member(U1, created_at=at(env.t - 2 * DAY))
+        inter = FakeInteraction(m, env.guild)
+        await Quests.quest.callback(env.cog, inter)
+        assert "30+ DAYS OLD" in inter.of("send_message")[0]["embed"].footer.text.upper()
+    with_env(go, monkeypatch)

@@ -938,7 +938,7 @@ def test_prediction_button_errors_reply_instead_of_raising():
         inter = env.inter(A)
         env.bot.cogs["Games"] = None  # handle_prediction_button blows up
         await PredictionButton("lock", 1).callback(inter)
-        assert "didn't work" in inter.of("send_message")[0]["content"]
+        assert "went wrong" in inter.of("send_message")[0]["content"]
     with_env(go)
 
 

@@ -89,8 +89,7 @@ class GameSelect(discord.ui.DynamicItem[discord.ui.Select], template=PREFIX + r"
 
 
 def is_dangerous(role) -> bool:
-    perms = getattr(role, "permissions", None)
-    return perms is not None and any(getattr(perms, p, False) for p in rules.DANGEROUS)
+    return rules.has_dangerous_permissions(role)
 
 
 def assignable(guild, role) -> bool:

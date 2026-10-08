@@ -16,7 +16,7 @@ from discord.ext import commands
 
 import config
 from db import Database
-from errors import reply_error
+from errors import reply_error, reply_for
 
 # Logs go to stderr; emoji in channel names break the Windows codepage when
 # output is redirected. Under pythonw (the startup task) there is no console at all.
@@ -132,7 +132,7 @@ class FrontDesk(commands.Bot):
     async def on_app_command_error(self, interaction: discord.Interaction,
                                    error: app_commands.AppCommandError) -> None:
         log.error("/%s failed", interaction.command.name if interaction.command else "?", exc_info=error)
-        await reply_error(interaction)
+        await reply_error(interaction, reply_for(error))
 
 
 def app_id_from_token(token: str) -> int:

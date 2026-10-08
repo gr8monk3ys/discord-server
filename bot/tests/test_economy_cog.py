@@ -611,3 +611,29 @@ def test_lfg_cap_holds_under_concurrent_squads(monkeypatch):
         await asyncio.gather(*(env.cog.on_lfg_squad_full(p, SimpleNamespace(members=(A, B))) for p in range(10)))
         assert await env.bal(A) == C.LFG_DAILY_CAP and await env.bal(B) == C.LFG_DAILY_CAP
     with_env(go, monkeypatch)
+
+
+def test_fresh_accounts_cannot_give(monkeypatch):
+    # Alts farm /daily, voice and trivia; /give is how that would reach a main account.
+    from logic import quests as Q
+
+    async def go(env):
+        fresh = ((env.t - 2 * 24 * 3600) * 1000 - Q.DISCORD_EPOCH_MS) << 22
+        assert not Q.established(fresh, env.t)
+        await env.fund(fresh, 500)
+        i = await env.give(fresh, env.member(B), 100)
+        assert i.ephemeral and "30+ days old" in i.text
+        assert (await env.bal(fresh), await env.bal(B)) == (500, 0)
+    with_env(go, monkeypatch)
+
+
+def test_weekly_mvp_is_not_paid_to_a_fresh_account(monkeypatch):
+    from logic import quests as Q
+
+    async def go(env):
+        fresh = ((env.t - 2 * 24 * 3600) * 1000 - Q.DISCORD_EPOCH_MS) << 22
+        await env.cog.on_weekly_mvp("mvp:2026-W41", fresh)
+        assert await env.bal(fresh) == 0
+        await env.cog.on_weekly_mvp("mvp:2026-W41", A)
+        assert await env.bal(A) == C.MVP_COINS
+    with_env(go, monkeypatch)

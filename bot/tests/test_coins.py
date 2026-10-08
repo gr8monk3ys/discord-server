@@ -178,3 +178,17 @@ def test_capped():
 def test_deafened_neither_earn_nor_count():
     assert C.voice_earners([[(1, False), (2, False, True)]]) == []
     assert C.voice_earners([[(1, False), (2, False, False), (3, False, True)]]) == [1, 2]
+
+
+def test_give_error_refuses_fresh_givers():
+    assert "30+ days old" in C.give_error(1, 2, False, 10, giver_established=False)
+    assert C.give_error(1, 2, False, 10, giver_established=True) is None
+
+
+def test_next_daily_reset_is_the_next_local_midnight():
+    from datetime import datetime
+    t = int(datetime(2026, 10, 8, 23, 30, tzinfo=TZ).timestamp())
+    assert C.next_daily_reset(t, TZ) == int(datetime(2026, 10, 9, 0, 0, tzinfo=TZ).timestamp())
+    # across the DST change (Nov 1): still local midnight, a 25-hour day
+    t = int(datetime(2026, 11, 1, 0, 30, tzinfo=TZ).timestamp())
+    assert C.next_daily_reset(t, TZ) == int(datetime(2026, 11, 2, 0, 0, tzinfo=TZ).timestamp())

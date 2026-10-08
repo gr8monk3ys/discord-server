@@ -389,6 +389,16 @@ MIGRATIONS = [
         created_at INTEGER NOT NULL
     )""",
     ],
+    [
+        # Indexes for the hot periodic queries (raffles, challenges, stats, recaps): without
+        # them these scan the whole ledger / message_counts / session tables.
+        "CREATE INDEX ledger_reason_at ON ledger (reason, at)",
+        "CREATE INDEX ledger_at ON ledger (at)",
+        "CREATE INDEX message_counts_day ON message_counts (day, user_id)",
+        'CREATE INDEX voice_sessions_end ON voice_sessions ("end")',
+        'CREATE INDEX game_sessions_end ON game_sessions ("end")',
+        "CREATE INDEX voice_sessions_channel ON voice_sessions (channel_id)",
+    ],
 ]
 
 
@@ -423,6 +433,9 @@ class Database:
         self.conn = await aiosqlite.connect(self.path, isolation_level=None)
         self.conn.row_factory = aiosqlite.Row
         await self.conn.execute("PRAGMA journal_mode = WAL")
+        # In WAL mode NORMAL can't corrupt the DB; a power cut may lose only the last commits,
+        # and commits stop paying an fsync each (they all run under the one lock).
+        await self.conn.execute("PRAGMA synchronous = NORMAL")
         await self.conn.execute("PRAGMA foreign_keys = ON")
 
     async def close(self) -> None:

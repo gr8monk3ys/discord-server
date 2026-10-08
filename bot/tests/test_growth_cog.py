@@ -723,3 +723,13 @@ def test_setup_loads_without_members_intent(monkeypatch):
         await cogmod.setup(env.bot)
         assert isinstance(added[0], Growth)
     with_env(go, monkeypatch)
+
+
+def test_bumpping_refuses_a_role_with_mod_permissions(monkeypatch):
+    async def go(env):
+        env.guild.bumper.permissions = discord.Permissions(mention_everyone=True)
+        inter = env.inter(A)
+        await Growth.bumpping.callback(env.cog, inter, ping("on"))
+        assert "can't hand out" in inter.sent()[0]["content"]
+        assert env.member(A).roles == []
+    with_env(go, monkeypatch)

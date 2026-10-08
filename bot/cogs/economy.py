@@ -20,6 +20,7 @@ from cogs.clips import Clips
 from cogs.stats import Stats
 from logic import clips as clip_rules
 from logic import coins as C
+from logic import quests as Q
 from logic import stats as S
 
 log = logging.getLogger(__name__)
@@ -173,6 +174,9 @@ class Economy(commands.Cog):
 
     @commands.Cog.listener()
     async def on_weekly_mvp(self, period_key: str, winner_id: int) -> None:
+        if not Q.established(winner_id, now()):
+            log.info("mvp coins for %s skipped: %s is a fresh account", period_key, winner_id)
+            return
         try:
             await self.pay_event(winner_id, C.MVP_COINS, C.MVP, C.mvp_ref(period_key, winner_id))
         except Exception:
@@ -203,7 +207,9 @@ class Economy(commands.Cog):
                     await tx.execute("UPDATE wallets SET daily_streak = ?, last_daily = ? WHERE user_id = ?",
                                      (claim.streak, claim.day, uid))
         if claim is None or not result.ok:
-            await self.reply(interaction, "You've already claimed today's coins. Come back after midnight.")
+            reset = C.next_daily_reset(t, self.tz)
+            await self.reply(interaction, f"You've already claimed today's coins. Next claim <t:{reset}:R>"
+                                          f" (<t:{reset}:t> your time).")
             return
         streak = f"Day {claim.streak} streak." + ("" if claim.amount < C.daily_amount(99) else " Max bonus.")
         await self.reply(interaction, f"+{coins(claim.amount)}. {streak}\nBalance: {coins(result.balance)}.",
@@ -236,7 +242,8 @@ class Economy(commands.Cog):
     @app_commands.describe(member="Who gets the coins", amount="How many")
     async def give(self, interaction: discord.Interaction, member: discord.Member, amount: int) -> None:
         giver = interaction.user
-        error = C.give_error(giver.id, member.id, member.bot, amount)
+        error = C.give_error(giver.id, member.id, member.bot, amount,
+                             giver_established=Q.established(giver.id, now()))
         if error:
             await self.reply(interaction, error)
             return

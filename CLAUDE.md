@@ -29,7 +29,7 @@ The bot and scripts share one virtualenv at `server/.venv` (gitignored); it runs
 
 - Install: `python -m venv server/.venv`, then `pip install -r bot/requirements.txt` (a superset
   of `server/requirements.txt`, adds pytest). `server/tests` also need `pillow`.
-- Bot tests: `cd bot && ../server/.venv/Scripts/python -m pytest -q` (~1,900 tests, about a minute)
+- Bot tests: `cd bot && ../server/.venv/Scripts/python -m pytest -q` (~2,300 tests, about a minute)
 - Server tests: `cd server && .venv/Scripts/python -m pytest -q tests`
 - Every server script dry-runs by default and changes Discord only with `--apply`.
 - `python main.py --invite` (in `bot/`) prints the invite link with the permissions the bot needs.

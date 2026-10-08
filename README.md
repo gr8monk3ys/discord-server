@@ -75,7 +75,7 @@ The server icon comes from `assets/make_icon.py` (`pip install pillow`).
 | Bot | Job | Setup |
 |---|---|---|
 | [Captcha.bot](https://captcha.bot) | DMs new members a web captcha; passing gives **@Verified** | Verification channel `#💬・general`, role `@Verified` (Add role). Its role must sit above @Verified. |
-| [Lurkr](https://lurkr.gg) | Free leveling | Enable leveling, level-up messages in `#💬・general`. |
+| ~~[Lurkr](https://lurkr.gg)~~ | Replaced by Front Desk Levels | Turn leveling off in its dashboard, then kick it and delete its role, so members don't get two level numbers and two sets of level-up pings. |
 | [GiveawayBot](https://giveawaybot.party) | Giveaways | Nothing to set up: `/gstart <time> <winners> <prize>`. |
 
 MEE6 was tried and dropped: its Levels and Welcome plugins now need Premium.
@@ -142,31 +142,31 @@ day-to-day attention. Design and history:
 
 | Area | Commands and automatic jobs |
 |---|---|
-| Squad-up | `/lfg` posts in 🎮・lfg with Join/Leave/Close buttons; posts close after 3 h |
-| Stats | `/stats`, `/leaderboard`, `/privacy`; weekly MVP Sundays 18:00 |
+| Squad-up | `/lfg` posts in 🎮・lfg with Join/Leave/Close buttons; posts close after 3 h; a host's posts ping the game roles at most once per 30 min (later ones post without pings) |
+| Stats | `/stats`, `/leaderboard`, `/privacy`; weekly MVP Sundays 18:00 (accounts 30+ days old; fresh accounts don't count as voice company for it) |
 | Growth | `/invites`, `/recruiters` (Recruiter role), `/bumpers`, `/bumpping`; Disboard bump reminders |
 | Community | welcome after Onboarding, `/report` and "Report message", mod log |
 | Hall of fame | 3 ⭐ from other members (accounts 30+ days old) reposts to ⭐・hall-of-fame (public channels only) |
-| Clips | clip of the week poll Sundays 18:05; winner gets Clip of the Week |
+| Clips | clip of the week poll Sundays 18:05; winner gets Clip of the Week (only votes from accounts 30+ days old count, and not the clip author's own) |
 | Voice | join ➕ New Squad for your own channel; `/squad name`, `/squad limit`, `/squad claim` |
 | Events | `/gamenight`; 15-min reminders; free Epic/Steam games Thursdays 18:00 |
-| Economy | `/daily`, `/balance`, `/give`, `/coinflip`, `/richest`; coins for voice, chat, clips, squads |
+| Economy | `/daily`, `/balance`, `/give` (accounts 30+ days old), `/coinflip`, `/richest`; coins for voice, chat, clips, squads |
 | Games | `/slots`, `/blackjack`, `/trivia`, `/predict` |
 | Shop and seasons | `/shop`, `/buy` (colour role, Hype, shoutout), `/season`; monthly champions |
 | Engagement | question of the day 12:00, this-or-that poll 18:00, 🔢・counting, auto game night Fridays, `/birthday` |
-| Moderation | `/warn`, `/timeout`, `/untimeout`, `/cases`, `/purge`; auto-escalation, anti-spam, anti-raid |
+| Moderation | `/warn`, `/timeout`, `/untimeout`, `/cases`, `/purge` (shown only to members with Timeout Members, like `/xp` and `/suggestion`); auto-escalation, anti-spam, anti-raid |
 | Operations | daily DB backup 04:00, error alerts, back-online note, weekly config drift check, `/status` |
 | Utility | `/remind`, `/reminders`, `/afk`, suggestion voting, member/online stat channels, tickets in 🆘・help |
-| Welcome cards | an image card in 👋・welcome when someone finishes Onboarding |
+| Welcome cards | an image card in 👋・welcome when someone finishes Onboarding (names them without a ping; the #general welcome is the one ping) |
 | Tournaments | `/tournament create/start/cancel/bracket`; sign-up buttons, brackets with byes, both players confirm results, 1000/400 coin prizes, Tournament Champ role |
-| Achievements | 21 badges, `/profile`, `/badges`; checked on activity and hourly |
+| Achievements | 21 badges, `/profile`, `/badges`; checked on activity and hourly; Founding Member is granted without a post |
 | Creators | `/creator link/verify/unlink/list` (members prove ownership with a code in their channel description), staff `/creator approve/remove`; YouTube uploads and Twitch go-live in 📺・creators |
-| Levels | XP from chat (60 s cooldown) and voice; Regular/Veteran/Elite/Legend/Mythic at levels 5/10/20/30/50; `/rank` card, `/levels`, staff `/xp` |
+| Levels | XP from chat (60 s cooldown) and voice; Regular/Veteran/Elite/Legend/Mythic at levels 5/10/20/30/50; `/rank` card, `/levels`, staff `/xp`; level-ups are announced from level 5 (the first reward role) |
 | Recap | weekly recap in 📣・announcements Mondays 10:00, owner digest by DM 10:05, member milestones, monthly invite contest (1500/750/300 coins) on the 1st |
 | Self roles | button panel in 🎭・roles (platform, region, play time, pings, games), `/roles`; Game Night role pinged when a game night starts |
 | Partners | `/partner apply` → staff review card in 📋・mod-log → 🤝・partners; weekly dead-invite sweep; staff `/partner remove` |
-| Starter quest | `/quest`: pick roles, say hi, join a squad, claim `/daily`, join voice; 500 coins and the Settled In badge; one nudge DM after a day |
-| Heartbeat | writes `bot/data/heartbeat` every minute for the watchdog |
+| Starter quest | `/quest`: pick roles, say hi, join a squad, claim `/daily`, join voice; the Settled In badge, plus 500 coins for new members (account 30+ days old, finished within 30 days of joining); one nudge DM after a day |
+| Heartbeat | writes `bot/data/heartbeat` every minute while connected to the gateway (stops during a reconnect loop, so the watchdog alerts); logs a warning when the event loop stalls for 1 s+ |
 | Auto tournaments | first Monday of the month: a 16-player bracket for the most-played game, Discord event, Saturday 19:00 auto-start (4+ entrants), 1 h reminder, nudges for unreported matches; matches still undecided after 48 h (including a report the opponent never confirmed) go to staff in mod-log |
 | Weekly challenges | 3 rotating goals each week (150/250/400 coins + 300 bonus), board in 🎲・games Mondays 09:00, `/challenges` with Claim button, hourly auto-claim; squads and voice company only count from accounts 30+ days old, a game night counts once it starts (not if cancelled), a tournament entry once it starts |
 | Daily Word | `/word guess/today/stats/leaderboard`: one 5-letter word a day (order salted with a private secret kept in the database), spoiler-free results in 🎲・games, coins for wins, streaks |
@@ -205,7 +205,7 @@ All times are Pacific. Every scheduled job catches up once after downtime and ne
 | A role won't be given out | The role must sit **below Front Desk** in Server Settings → Roles. Only the owner can move roles above the bot |
 | Run by hand (debugging) | `python server\watchdog.py --pause 60` first (or it restarts the task), stop the task, then `bot\run_bot.bat`; `--resume` afterwards |
 | Watchdog status | `python server\watchdog.py --check` |
-| Tests | `cd bot`, then `..\server\.venv\Scripts\python -m pytest -q` (about 1,900 tests) |
+| Tests | `cd bot`, then `..\server\.venv\Scripts\python -m pytest -q` (about 2,300 tests) |
 
 Required in the Developer Portal: the **Server Members**, **Message Content** and **Presence**
 intents. Required on the Front Desk role: the permissions printed by `main.py --invite`

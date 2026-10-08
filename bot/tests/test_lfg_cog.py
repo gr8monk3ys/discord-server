@@ -12,6 +12,7 @@ from discord import app_commands
 
 import config
 import db as dbmod
+import errors
 from cogs import lfg as cogmod
 from cogs.lfg import Lfg, LfgButton
 from logic import lfg as rules
@@ -841,7 +842,7 @@ def test_button_callback_errors_reply_generically():
         inter = env.inter(A, thread=env.thread(post))
         await LfgButton("join", post["id"]).callback(inter)
         (msg,) = inter.of("send_message")
-        assert msg["ephemeral"] is True and "bot.log" in msg["content"]
+        assert msg["ephemeral"] is True and msg["content"] == errors.ERROR_REPLY
     with_env(go)
 
 
@@ -855,4 +856,41 @@ def test_user_text_cannot_widen_role_pings():
         am = kw["allowed_mentions"]
         assert [r.name for r in am.roles] == ["Valorant", config.LFG_ROLE]  # ...but can't ping
         assert am.everyone is False and am.users is False
+    with_env(go)
+
+
+# ---------------------------------------------------------------- ping limits, markdown
+def test_role_pings_have_a_per_host_cooldown(monkeypatch):
+    clock = {"t": 1_800_000_000}
+    monkeypatch.setattr(cogmod, "now", lambda: clock["t"])
+
+    async def go(env):
+        _, first = await env.create(game="valorant")
+        assert env.guild.forum.created[-1]["allowed_mentions"].roles
+        await env.press(HOST, "close", first)
+        clock["t"] += 60
+        _, again = await env.create(game="valorant")  # close and re-post: still posted, no pings
+        quiet = env.guild.forum.created[-1]
+        assert again["id"] != first["id"] and again["thread_id"]
+        assert env.guild.role("Valorant").mention not in quiet["content"]
+        am = quiet["allowed_mentions"]
+        assert am.roles is False and am.users is False and am.everyone is False
+        await env.create(game="fortnite")  # another game inside the cooldown: quiet too
+        assert env.guild.forum.created[-1]["allowed_mentions"].roles is False
+        await env.create(host=A, game="minecraft")  # someone else: pings as usual
+        assert env.guild.forum.created[-1]["allowed_mentions"].roles
+        clock["t"] += cogmod.PING_COOLDOWN
+        await env.create(game="wardogs")
+        assert env.guild.forum.created[-1]["allowed_mentions"].roles
+    with_env(go)
+
+
+def test_member_text_is_markdown_escaped():
+    async def go(env):
+        await env.create(when="*9pm*", note="[Official giveaway](https://phish.example)")
+        made = env.guild.forum.created[-1]
+        desc = made["embed"].description
+        assert not re.search(r"(?<!\\)\[Official giveaway\]\(", desc)  # the masked link is broken
+        assert r"\[Official giveaway" in desc
+        assert r"\*9pm\*" in desc and r"\*9pm\*" in made["content"]
     with_env(go)

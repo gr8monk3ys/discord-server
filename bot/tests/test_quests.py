@@ -127,3 +127,20 @@ def test_established_sql_matches_python():
         uid = discord.utils.time_snowflake(datetime.fromtimestamp(t - days * Q.DAY, timezone.utc))
         (got,) = con.execute(f"SELECT {Q.established_sql(str(uid), str(t))}").fetchone()
         assert bool(got) == Q.established(uid, t), days
+
+
+def test_congrats_names_the_real_badge():
+    from logic import achievements as A
+    badge = A.BY_KEY[Q.BADGE_KEY]
+    assert Q.BADGE_LABEL == f"{badge.emoji} **{badge.name}**"
+    assert Q.BADGE_LABEL in Q.congrats("<@42>", Q.REWARD, badge=True)
+    assert "Starter badge" not in Q.congrats("<@42>", Q.REWARD, badge=True)
+
+
+def test_no_reward_reason_says_why():
+    now = 1_800_000_000
+    young = now - 5 * DAY
+    old = now - 400 * DAY
+    assert "30+ days old" in Q.no_reward_reason(now - DAY, now - 2 * DAY, now, created_at=young)
+    assert "before quests started" in Q.no_reward_reason(now - 3 * DAY, now - 2 * DAY, now, created_at=old)
+    assert "first 30 days" in Q.no_reward_reason(now - 40 * DAY, now - 50 * DAY, now, created_at=old)
