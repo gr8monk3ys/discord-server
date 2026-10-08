@@ -34,6 +34,7 @@ import economy as E
 import style
 from cogs.lfg import ping_only
 from logic import shop as S
+from logic import textfilter
 from logic.selfroles import has_dangerous_permissions
 
 log = logging.getLogger(__name__)
@@ -42,6 +43,11 @@ def esc(text: str | None) -> str:
     """Member text inside bot-authored embeds: no markdown tricks (links and mentions are
     already refused by shoutout_error)."""
     return discord.utils.escape_markdown((text or "").strip())
+
+
+def blocked_text(where: str, user_id: int, message: str | None) -> str | None:
+    """Bots skip AutoMod, so a shoutout/Spotlight is filtered before it's posted or paid for."""
+    return textfilter.screen(where, user_id, [message], allow_links=False)
 
 
 ITEM_CHOICES = [app_commands.Choice(name=f"{i.name} ({i.price:,} coins)", value=i.key) for i in S.ITEMS.values()]
@@ -287,7 +293,7 @@ class Shop(commands.Cog):
 
     async def buy_shoutout(self, guild, member, message: str | None, ref: str) -> str:
         item = S.ITEMS[S.SHOUTOUT]
-        if problem := S.shoutout_error(message):
+        if problem := S.shoutout_error(message) or blocked_text("shoutout", member.id, message):
             return problem
         t = now()
         row = await self.perk(member.id, S.SHOUTOUT)
@@ -365,7 +371,7 @@ class Shop(commands.Cog):
     async def buy_spotlight(self, guild, member, message: str | None, ref: str) -> str:
         """Callers hold self.spotlight_lock: there's one slot for the whole server."""
         item = S.ITEMS[S.SPOTLIGHT]
-        if problem := S.shoutout_error(message):
+        if problem := S.shoutout_error(message) or blocked_text("spotlight", member.id, message):
             return problem
         t = now()
         row = await self.spotlight_row()

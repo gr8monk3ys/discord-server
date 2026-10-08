@@ -399,6 +399,25 @@ MIGRATIONS = [
         'CREATE INDEX game_sessions_end ON game_sessions ("end")',
         "CREATE INDEX voice_sessions_channel ON voice_sessions (channel_id)",
     ],
+    [
+        # Wave 6: game news items already posted, and staff applications.
+        """CREATE TABLE news_seen (
+        source TEXT NOT NULL,
+        item_id TEXT NOT NULL,
+        seen_at INTEGER NOT NULL,
+        PRIMARY KEY (source, item_id)
+    )""",
+        """CREATE TABLE staff_apps (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        answers TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        created_at INTEGER NOT NULL,
+        decided_by INTEGER,
+        decided_at INTEGER,
+        review_message_id INTEGER
+    )""",
+    ],
 ]
 
 

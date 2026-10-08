@@ -13,6 +13,7 @@ import config
 import style
 from errors import reply_error
 from logic import lfg as rules
+from logic import textfilter
 from logic.lfg import Join, Leave, Roster
 
 log = logging.getLogger(__name__)
@@ -272,6 +273,10 @@ class Lfg(commands.Cog):
             text = (f"Squad-up isn't available: I couldn't find the {config.LFG_FORUM} forum."
                     if self.resolved else "I'm still starting up. Try again in a few seconds.")
             await interaction.response.send_message(text, ephemeral=True)
+            return
+        # Bots skip AutoMod, so the note and time are checked here before anything is posted.
+        if blocked := textfilter.screen("/lfg", interaction.user.id, [when, note], allow_links=False):
+            await interaction.response.send_message(blocked, ephemeral=True)
             return
         await interaction.response.defer(ephemeral=True, thinking=True)
         g = config.game_by_key(game.value)

@@ -754,9 +754,29 @@ def test_discord_error_creating_event_replies_and_gives_the_cooldown_back(monkey
 
 def test_gamenight_note_markdown_is_escaped(monkeypatch):
     async def go(env):
-        await env.gamenight(note="[Claim Nitro](https://phish.example)")
+        await env.gamenight(note="[Claim Nitro](phish)")  # a real URL is refused by textfilter
         [post] = env.guild.valorant.sent
         assert r"> \[Claim Nitro]" in post["content"]
         ev = next(iter(env.guild.events.values()))
         assert r"\[Claim Nitro]" in ev.kwargs["description"]
     with_env(go, monkeypatch)
+
+
+# ---------------------------------------------------------------- textfilter
+@pytest.mark.parametrize("note, reason", [
+    ("join discord.gg/raid", "invite"), ("free nitro at https://phish.example", "link"), ("you c.u.n.t", "word"),
+])
+def test_gamenight_blocked_note_is_refused_before_anything_is_made(monkeypatch, caplog, note, reason):
+    from logic import textfilter
+    caplog.set_level("INFO", logger="logic.textfilter")
+
+    async def go(env):
+        i = await env.gamenight(note=note)
+        (reply,) = i.of("send_message")
+        assert reply["ephemeral"] is True and reply["content"] == textfilter.MESSAGES[reason]
+        assert note not in reply["content"]
+        assert not env.guild.events and not env.guild.valorant.sent
+        assert await env.rows("SELECT * FROM gamenights") == []
+    with_env(go, monkeypatch)
+    line = caplog.records[-1].getMessage()
+    assert str(HOST) in line and reason in line and note not in line

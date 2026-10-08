@@ -57,6 +57,8 @@ MODULES = [
     ("cogs.matchmaking", {"members"}),  # /queue join|leave|status, match voice channels + pings
     ("cogs.econstats", set()),  # /economy (staff): coin supply, minted vs burned, top sources and sinks
     ("cogs.helpdesk", set()),  # /help menu from the live command tree, /about, rotating presence
+    ("cogs.news", set()),  # game news: official Steam/RSS feeds into each game's channel, /news test (staff)
+    ("cogs.staffapps", set()),  # /apply staff|status, /apps list, staff application review cards
     ("cogs.vibes", {"members"}),  # chat revival, join anniversaries, booster thanks + stipend, member of the month
 ]
 

@@ -348,7 +348,7 @@ def test_modal_has_three_fields():
 
 def test_description_is_one_paragraph_and_escaped(monkeypatch):
     async def go(env):
-        await env.apply(A, name="**Cozy** [x](https://evil.example)",
+        await env.apply(A, name="**Cozy** [x](evil)",  # a URL in the name is refused by textfilter
                         desc="Line one about the server\n\nline two with __style__ and [a](https://evil.example)")
         (row,) = await env.rows()
         assert "\n" not in row["description"]
@@ -722,4 +722,32 @@ def test_cog_load_registers_buttons(monkeypatch):
         assert PartnerButton in env.bot.dynamic
         await env.cog.cog_unload()
         assert PartnerButton not in env.bot.dynamic
+    with_env(go, monkeypatch)
+
+
+# ---------------------------------------------------------------- textfilter
+@pytest.mark.parametrize("kw, reason", [
+    ({"name": "Cozy https://evil.example"}, "link"),
+    ({"name": "Cozy Cunts"}, "word"),
+    ({"desc": DESC + " Also try our backup at discord . gg/other"}, "invite"),
+    ({"desc": DESC + " No n1ggers allowed."}, "word"),
+])
+def test_blocked_name_or_description_is_refused_before_any_check(monkeypatch, caplog, kw, reason):
+    from logic import textfilter
+    caplog.set_level("INFO", logger="logic.textfilter")
+
+    async def go(env):
+        inter = await env.apply(A, **kw)
+        (reply,) = inter.of("send_message")
+        assert reply["ephemeral"] is True and reply["content"] == textfilter.MESSAGES[reason]
+        assert env.invites.calls == [] and await env.rows() == [] and env.guild.mod_log.sent == []
+    with_env(go, monkeypatch)
+    line = caplog.records[-1].getMessage()
+    assert str(A) in line and reason in line and "evil" not in line and "n1gg" not in line
+
+
+def test_description_may_link_a_website(monkeypatch):
+    async def go(env):
+        await env.apply(A, desc=DESC + " Rules at https://cozy.example/rules")
+        assert len(await env.rows()) == 1
     with_env(go, monkeypatch)

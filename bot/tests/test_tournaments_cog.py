@@ -448,7 +448,7 @@ def test_create_rejects_bad_time_and_non_staff(monkeypatch):
 
 def test_create_escapes_name_markdown(monkeypatch):
     async def go(env):
-        await env.create(name="[free nitro](https://x.example) **cup**")
+        await env.create(name="[free nitro](x) **cup**")  # a real URL is refused by textfilter
         title = env.card().embed.title
         assert "\\[" in title and "\\*\\*" in title
     with_env(go, monkeypatch)
@@ -1173,3 +1173,22 @@ def test_tick_never_raises(monkeypatch):
         monkeypatch.setattr(env.cog, "sweep_matches", boom)
         await tick(env, T0)
     with_env(go, monkeypatch)
+
+
+# ---------------------------------------------------------------- textfilter
+@pytest.mark.parametrize("kw, reason", [
+    ({"name": "Cup at discord.gg/raid"}, "invite"), ({"name": "Cup www.example.org"}, "link"),
+    ({"name": "R3tard Cup"}, "word"), ({"game": "p0rn"}, "word"),
+])
+def test_create_refuses_blocked_names_before_posting(monkeypatch, caplog, kw, reason):
+    from logic import textfilter
+    caplog.set_level("INFO", logger="logic.textfilter")
+
+    async def go(env):
+        inter = await env.create(**kw)
+        (reply,) = inter.of("send_message")
+        assert reply["ephemeral"] is True and reply["content"] == textfilter.MESSAGES[reason]
+        assert env.guild.tourney.sent == [] and await env.rows("SELECT * FROM tournaments") == []
+    with_env(go, monkeypatch)
+    line = caplog.records[-1].getMessage()
+    assert str(MOD) in line and reason in line
