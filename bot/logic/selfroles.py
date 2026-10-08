@@ -20,6 +20,13 @@ DANGEROUS = (
 )
 
 
+def has_dangerous_permissions(role) -> bool:
+    """Any DANGEROUS permission on this role? Every role Front Desk hands out (self-roles,
+    bought or earned) is checked, so a role edited to carry mod powers can't be farmed."""
+    perms = getattr(role, "permissions", None)
+    return perms is not None and any(getattr(perms, p, False) for p in DANGEROUS)
+
+
 @dataclass(frozen=True)
 class Section:
     key: str

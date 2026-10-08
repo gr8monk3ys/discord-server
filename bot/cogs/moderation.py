@@ -200,6 +200,7 @@ class Moderation(commands.Cog):
 
     # ------------------------------------------------------------ commands
     @app_commands.command(name="warn", description="Warn a member (mods only)")
+    @app_commands.default_permissions(moderate_members=True)  # hidden from members' picker
     @app_commands.describe(member="Who to warn", reason="Why (they get this in a DM)")
     @app_commands.guild_only()
     async def warn(self, interaction: discord.Interaction, member: discord.Member,
@@ -244,6 +245,7 @@ class Moderation(commands.Cog):
         return f"That's {warns} warnings, so case #{case_id}: automatic {M.fmt_duration(seconds)} timeout."
 
     @app_commands.command(name="timeout", description="Time out a member (mods only)")
+    @app_commands.default_permissions(moderate_members=True)  # hidden from members' picker
     @app_commands.describe(member="Who to time out", minutes="How long (max 28 days)",
                            reason="Why (they get this in a DM)")
     @app_commands.guild_only()
@@ -265,6 +267,7 @@ class Moderation(commands.Cog):
         await self.done(interaction, f"Case #{case_id}: timed out {member.mention} for {M.fmt_duration(seconds)}.")
 
     @app_commands.command(name="untimeout", description="Remove a member's timeout (mods only)")
+    @app_commands.default_permissions(moderate_members=True)  # hidden from members' picker
     @app_commands.describe(member="Whose timeout to lift", reason="Optional note for the log")
     @app_commands.guild_only()
     async def untimeout(self, interaction: discord.Interaction, member: discord.Member,
@@ -288,6 +291,7 @@ class Moderation(commands.Cog):
         await self.done(interaction, f"Case #{case_id}: lifted {member.mention}'s timeout.")
 
     @app_commands.command(name="cases", description="A member's last moderation cases (mods only)")
+    @app_commands.default_permissions(moderate_members=True)  # hidden from members' picker
     @app_commands.describe(member="Whose cases to show")
     @app_commands.guild_only()
     async def cases(self, interaction: discord.Interaction, member: discord.User) -> None:
@@ -305,6 +309,7 @@ class Moderation(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True, allowed_mentions=NO_PINGS)
 
     @app_commands.command(name="purge", description="Delete the last messages in this channel (mods only)")
+    @app_commands.default_permissions(moderate_members=True)  # hidden from members' picker
     @app_commands.describe(count="How many messages (1 to 100)")
     @app_commands.guild_only()
     async def purge(self, interaction: discord.Interaction, count: app_commands.Range[int, 1, M.PURGE_MAX]) -> None:

@@ -15,6 +15,8 @@ from discord.ext import commands, tasks
 
 import config
 from logic import clips as L
+from logic import quests as Q
+from logic.selfroles import has_dangerous_permissions
 from logic.schedule import Weekly, plan
 
 log = logging.getLogger(__name__)
@@ -140,9 +142,11 @@ class Clips(commands.Cog):
         🛡️・mod, at most once per local day)."""
         role = config.match_by_name(guild.roles, config.CLIP_ROLE)
         me = getattr(guild, "me", None)
-        if role is not None and me is not None and me.top_role > role:
+        if role is not None and me is not None and me.top_role > role and not has_dangerous_permissions(role):
             return role
         problem = (f"There's no `{config.CLIP_ROLE}` role." if role is None else
+                   f"`{config.CLIP_ROLE}` has moderator permissions, so it isn't handed out."
+                   if has_dangerous_permissions(role) else
                    f"Front Desk's role has to be above `{config.CLIP_ROLE}` to hand it out.")
         await self.note_mods(guild, f"Clip of the week: {problem} Winners are still announced.")
         return None
@@ -300,7 +304,13 @@ class Clips(commands.Cog):
 
         row = await self.db.fetchone("SELECT value FROM meta WHERE key = ?", (entries_key(week),))
         entries = json.loads(row["value"]) if row else []
-        votes = {a.id: a.vote_count for a in poll.answers}
+        try:
+            votes = await self.counted_votes(poll, entries, ends_at)
+        except discord.HTTPException:
+            log.warning("clip poll %s: couldn't read the voters", week)
+            if late:
+                await self.mark_poll(week, None)
+            return  # retry on the next tick
         index = L.winner_index(len(entries), votes)
         if index is None:
             log.info("clip poll %s: no votes, no winner", week)
@@ -319,6 +329,20 @@ class Clips(commands.Cog):
         self.bot.dispatch("clip_of_the_week", week, winner_id)
         await self.mark_poll(week, winner_id)
         log.info("clip of the week %s: %s", week, winner_id)
+
+    @staticmethod
+    async def counted_votes(poll, entries: list[dict], ends_at: int) -> dict[int, int]:
+        """Answer number -> votes from established accounts other than that clip's author,
+        so alts (or a self-vote) can't hand someone the coins and the role."""
+        votes = {}
+        for answer in poll.answers:
+            author = entries[answer.id - 1]["user_id"] if 0 < answer.id <= len(entries) else None
+            n = 0
+            async for voter in answer.voters():
+                if not getattr(voter, "bot", False) and voter.id != author and Q.established(voter.id, ends_at):
+                    n += 1
+            votes[answer.id] = n
+        return votes
 
     async def swap_role(self, guild, role, winner_id: int) -> None:
         reason = "Clip of the week"

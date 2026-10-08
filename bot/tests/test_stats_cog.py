@@ -834,3 +834,32 @@ def test_privacy_off_racing_a_recorder_leaves_no_rows(monkeypatch):
                 leaked += [(uid, table)] if await env.rows(table, uid) else []
         assert leaked == []
     with_env(go, monkeypatch)
+
+
+def test_weekly_mvp_ignores_fresh_alts_as_company_and_as_winners(monkeypatch):
+    from logic import quests as Q
+
+    async def go(env):
+        g = env.guild
+        env.t = T0
+        await env.cog.run_weekly()
+        thu = ts(2026, 10, 1, 20)
+        alt = ((thu - 3 * 24 * HOUR) * 1000 - Q.DISCORD_EPOCH_MS) << 22
+        alt2 = alt + (1 << 22)
+        assert not Q.established(alt, thu)
+        # A main sits with a fresh alt; two alts keep each other company and chat a lot.
+        for uid in (A, alt, alt2):
+            await env.voice(uid, None, g.lobby, at=thu)
+        for uid in (A, alt, alt2):
+            await env.voice(uid, g.lobby, None, at=thu + 3 * HOUR)
+        for _ in range(9):
+            await env.say(alt, at=thu + 4 * HOUR)
+        for _ in range(3):
+            await env.say(B, at=thu + 4 * HOUR)
+        await env.say(A, at=thu + 4 * HOUR)
+        env.t = ts(2026, 10, 4, 18, 0)
+        await env.cog.run_weekly()
+        (sent,) = g.general.sent
+        assert sent["content"] == f"MVP this week: <@{B}>"
+        assert f"<@{alt}>" not in sent["embed"].description
+    with_env(go, monkeypatch)

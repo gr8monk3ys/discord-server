@@ -457,3 +457,68 @@ def test_badges_lists_all_with_held_marked(monkeypatch):
         assert sum(line.startswith("✅") for line in lines) == 1
         assert sent["ephemeral"] is True
     with_env(go, monkeypatch)
+
+
+# ---------------------------------------------------------------- load limits
+def test_interactions_have_a_per_member_cooldown(monkeypatch):
+    async def go(env):
+        await env.backfill()
+        await env.squad(U2, U1)
+        await env.cog.on_interaction(FakeInteraction(env.member(U1), env.guild, env.guild.gaming))
+        await env.cog.drain()
+        assert await env.held(U1) == {"first_squad"}
+        await env.db.execute("INSERT INTO birthdays (user_id, month, day) VALUES (?, 1, 1)", (U1,))
+        # a click right away doesn't start another full check
+        await env.cog.on_interaction(FakeInteraction(env.member(U1), env.guild, env.guild.gaming))
+        assert env.cog.pending == {}
+        assert "birthday" not in await env.held(U1)
+        env.t += cogmod.INTERACTION_COOLDOWN
+        await env.cog.on_interaction(FakeInteraction(env.member(U1), env.guild, env.guild.gaming))
+        await env.cog.drain()
+        assert "birthday" in await env.held(U1)
+    with_env(go, monkeypatch)
+
+
+def test_single_member_check_still_finds_recruiters(monkeypatch):
+    async def go(env):
+        await env.backfill()
+        env.member(U1), env.member(U2)
+        for n, uid in enumerate((201, 202, 203)):
+            await env.db.execute("INSERT INTO joins (user_id, joined_at, inviter_id) VALUES (?, ?, ?)",
+                                 (uid, env.t - 5 * DAY - n, U1))
+        await env.cog.evaluate({U2})
+        assert "recruiter" not in await env.held(U2)
+        await env.cog.evaluate({U1})
+        assert "recruiter" in await env.held(U1)
+    with_env(go, monkeypatch)
+
+
+def test_founding_member_is_granted_without_a_post(monkeypatch):
+    async def go(env):
+        await env.backfill()
+        env.member(U1, joined_at=OLD)
+        env.member(U2, joined_at=OLD)
+        await env.db.execute("INSERT INTO birthdays (user_id, month, day) VALUES (?, 1, 1)", (U2,))
+        assert await env.cog.run_sweep() == 1
+        assert "early_member" in await env.held(U1) and "early_member" in await env.held(U2)
+        (post,) = env.guild.general.sent
+        assert "<@12>" in post["content"] and "Party Planner" in post["content"]
+        assert "Founding Member" not in post["content"]
+    with_env(go, monkeypatch)
+
+
+def test_sweep_reads_held_badges_once(monkeypatch):
+    async def go(env):
+        await env.backfill()
+        for uid in (U1, U2, U3):
+            env.member(uid)
+        calls = []
+        real = env.cog.held
+
+        async def held(uid):
+            calls.append(uid)
+            return await real(uid)
+        monkeypatch.setattr(env.cog, "held", held)
+        await env.cog.run_sweep()
+        assert calls == []
+    with_env(go, monkeypatch)

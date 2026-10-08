@@ -319,8 +319,9 @@ class Community(commands.Cog):
 
     @staticmethod
     def render_report(report_id: int, reporter, target, channel, message, reason: str) -> discord.Embed:
-        lines = [f"**Reason** {reason}"]
-        quoted = rules.quote(message.content) if message is not None else None
+        esc = discord.utils.escape_markdown
+        lines = [f"**Reason** {esc(reason)}"]  # member text: no masked links in the mod log
+        quoted = rules.quote(esc(message.content)) if message is not None and message.content else None
         if quoted:
             lines += ["", quoted]
         e = style.embed(title=f"Report #{report_id}", description="\n".join(lines),

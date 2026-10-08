@@ -101,9 +101,23 @@ class FakeThread(FakeChannel):
         self.parent = parent
 
 
+class FakeAnswer:
+    """`votes`: a count (that many distinct established voters) or a list of voter ids."""
+
+    def __init__(self, number, votes):
+        self.id = number
+        ids = votes if isinstance(votes, list) else [10_000 + 100 * number + i for i in range(votes)]
+        self.vote_count = len(ids)
+        self._voters = [SimpleNamespace(id=v, bot=False) for v in ids]
+
+    async def voters(self, limit=None):
+        for v in self._voters:
+            yield v
+
+
 class FakePoll:
     def __init__(self, votes, finalized=True):
-        self.answers = [SimpleNamespace(id=k, vote_count=v) for k, v in votes.items()]
+        self.answers = [FakeAnswer(k, v) for k, v in votes.items()]
         self.finalized = finalized
 
     def is_finalized(self):
@@ -630,4 +644,22 @@ def test_announce_failure_retries_next_tick(monkeypatch):
         await env.cog.check_polls()
         assert (await env.polls())[0]["winner_id"] == A
         assert env.bot.dispatched == [("clip_of_the_week", (WEEK, A))]
+    with_env(go, monkeypatch)
+
+
+def test_votes_from_fresh_accounts_and_the_author_dont_count(monkeypatch):
+    from logic import quests as Q
+
+    async def go(env):
+        await polled(env)
+        stored = json.loads((await env.db.fetchone("SELECT value FROM meta WHERE key = ?",
+                                                   (f"clip_poll:{WEEK}",)))["value"])
+        author1 = stored[0]["user_id"]
+        ends = POLL_AT + 24 * HOUR
+        alts = [(((ends - 2 * 24 * HOUR) * 1000 - Q.DISCORD_EPOCH_MS) << 22) + i for i in range(3)]
+        assert not any(Q.established(a, ends) for a in alts)
+        env.set_votes({1: [*alts, author1], 2: [20_001], 3: []})
+        env.t = ends
+        await env.cog.check_polls()
+        assert env.bot.dispatched == [("clip_of_the_week", (WEEK, stored[1]["user_id"]))]
     with_env(go, monkeypatch)

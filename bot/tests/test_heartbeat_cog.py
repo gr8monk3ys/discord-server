@@ -110,3 +110,41 @@ def test_setup_adds_cog():
 
     run(cogmod.setup(B()))
     assert isinstance(added[0], Heartbeat)
+
+
+def test_gateway_disconnect_stops_writes_until_resumed(tmp_path):
+    # discord.py keeps is_ready() True through a reconnect loop, so track it ourselves.
+    hb = tmp_path / "heartbeat"
+    cog = Heartbeat(FakeBot(), path=hb)
+    run(cog.on_disconnect())
+    assert run(cog.write_once()) is False and not hb.exists()
+    run(cog.on_resumed())
+    assert run(cog.write_once()) is True
+    run(cog.on_disconnect())
+    run(cog.on_ready())
+    assert run(cog.write_once()) is True
+
+
+def test_stale_keep_alive_or_missing_socket_counts_as_offline(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    hb = tmp_path / "heartbeat"
+    bot = FakeBot()
+    bot.ws = None
+    assert run(Heartbeat(bot, path=hb).write_once()) is False
+    monkeypatch.setattr(cogmod.time, "perf_counter", lambda: 1000.0)
+    bot.ws = SimpleNamespace(_keep_alive=SimpleNamespace(interval=41.25, _last_ack=1000.0 - 3 * 41.25))
+    assert run(Heartbeat(bot, path=hb).write_once()) is False
+    bot.ws = SimpleNamespace(_keep_alive=SimpleNamespace(interval=41.25, _last_ack=1000.0 - 10))
+    assert run(Heartbeat(bot, path=hb).write_once()) is True
+    bot.ws, bot.latency = SimpleNamespace(_keep_alive=None), float("nan")
+    assert run(Heartbeat(bot, path=hb).write_once()) is False
+
+
+def test_loop_lag_probe_warns_on_stalls(tmp_path, caplog):
+    cog = Heartbeat(FakeBot(), path=tmp_path / "hb")
+    assert cog.note_tick(100.0) is None  # first tick: nothing to compare
+    assert cog.note_tick(100.0 + cogmod.LAG_INTERVAL + 0.2) is None  # normal jitter
+    with caplog.at_level("WARNING"):
+        lag = cog.note_tick(100.0 + 2 * cogmod.LAG_INTERVAL + 0.2 + 3.0)
+    assert lag is not None and abs(lag - 3.0) < 1e-6
+    assert "event loop was blocked" in caplog.text

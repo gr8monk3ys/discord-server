@@ -125,7 +125,7 @@ class Events(commands.Cog):
     @app_commands.command(name="gamenight", description="Schedule a game night: a server event people can mark Interested")
     @app_commands.describe(
         game="Which game (or Anything)",
-        when="Local time, e.g. 9pm, tomorrow 8pm, fri 9pm, 2026-10-10 20:00",
+        when="Server time (Pacific), e.g. 9pm, tomorrow 8pm, fri 9pm, 2026-10-10 20:00",
         size="How many players (over 5 uses the Lobby)",
         note="Anything else people should know",
     )
@@ -181,7 +181,8 @@ class Events(commands.Cog):
         try:
             event = await guild.create_scheduled_event(
                 name=E.event_name(g.role if g else None),
-                description=E.event_description(host.display_name, note, size),
+                description=E.event_description(discord.utils.escape_markdown(host.display_name),
+                                                discord.utils.escape_markdown(note) if note else note, size),
                 start_time=E.to_utc(start),
                 entity_type=discord.EntityType.voice,
                 channel=voice,
@@ -250,7 +251,7 @@ class Events(commands.Cog):
             f"in {voice.mention}, hosted by {host.mention}.",
         ]
         if note:
-            lines.append(f"> {note}")
+            lines.append(f"> {discord.utils.escape_markdown(note)}")
         lines.append(f"Tap Interested for a reminder: {event.url}")
         try:
             # Only the game role may ping: note/names are user text and can't widen it.

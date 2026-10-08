@@ -30,6 +30,7 @@ from cogs.lfg import ping_only
 from logic import community as community_rules
 from logic import levels as L
 from logic import stats as S
+from logic.selfroles import has_dangerous_permissions
 
 log = logging.getLogger(__name__)
 
@@ -71,7 +72,8 @@ def esc(text) -> str:
 
 
 class Levels(commands.Cog):
-    xp = app_commands.Group(name="xp", description="Staff: adjust a member's XP", guild_only=True)
+    xp = app_commands.Group(name="xp", description="Staff: adjust a member's XP", guild_only=True,
+                            default_permissions=discord.Permissions(moderate_members=True))
 
     def __init__(self, bot, rng: random.Random | None = None):
         self.bot = bot
@@ -170,6 +172,8 @@ class Levels(commands.Cog):
                     log.info("levels: no %s role on the server; skipped it for %s", add_name, member.id)
                 elif not self.manageable(guild, role):
                     log.warning("levels: can't give %s: it isn't below the bot's role", role.name)
+                elif has_dangerous_permissions(role):
+                    log.warning("levels: won't give %s: it has moderator permissions", role.name)
                 else:
                     await member.add_roles(role, reason=f"Levels: reached level {level}")
                     added = role.name
@@ -180,6 +184,9 @@ class Levels(commands.Cog):
     async def level_up(self, member, level: int, channel, announce: bool = True) -> bool:
         """Roles, then (rate-limited) one short post. True if posted."""
         added = await self.sync_roles(member, level)
+        # Levels below the first reward role (1-4 come within a newcomer's first hour) stay quiet.
+        if L.reward_role(level) is None:
+            return False
         if not announce or channel is None or not self.limiter.allow(member.id, channel.id, now()):
             return False
         try:
@@ -213,7 +220,9 @@ class Levels(commands.Cog):
             afk = getattr(guild, "afk_channel", None)
             excluded = {afk.id} if afk is not None else set()
             sessions = [S.Session(r["user_id"], r["channel_id"], r["start"], r["end"]) for r in rows]
-            totals = S.counted_voice_seconds(sessions, 0, t, t, excluded_channels=excluded)
+            # Sorting every join/leave is CPU work: keep it off the event loop.
+            totals = await asyncio.to_thread(S.counted_voice_seconds, sessions, 0, t, t,
+                                             excluded_channels=excluded)
             first = await self.db.fetchone("SELECT 1 FROM meta WHERE key = ?", (BACKFILL_KEY,)) is None
             leveled: list[tuple[int, int]] = []
             async with self.db.transaction() as tx:

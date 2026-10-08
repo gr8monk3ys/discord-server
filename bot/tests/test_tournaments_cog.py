@@ -787,7 +787,7 @@ def test_button_errors_reply_generically(monkeypatch):
         monkeypatch.setattr(env.cog, "handle_report", boom)
         m = await env.match(1, 0)
         inter = await env.press(m.p1, m.id, 1)
-        assert inter.replies() and "didn't work" in inter.replies()[0]
+        assert inter.replies() and "went wrong" in inter.replies()[0]
     with_env(go, monkeypatch)
 
 

@@ -16,6 +16,7 @@ from discord.ext import commands, tasks
 import config
 import style
 from errors import reply_error
+from logic.selfroles import has_dangerous_permissions
 from logic import growth as G
 from logic import stats as S
 
@@ -53,8 +54,9 @@ def bump_command(message) -> tuple[str | None, object | None]:
 
 
 def can_manage(guild, role) -> bool:
+    """Below Front Desk and without mod powers (those are never handed out)."""
     me = getattr(guild, "me", None)
-    return me is not None and me.top_role > role
+    return me is not None and me.top_role > role and not has_dangerous_permissions(role)
 
 
 class Growth(commands.Cog):
@@ -444,8 +446,8 @@ class Growth(commands.Cog):
         if role is None:
             await reply_error(interaction, f"There's no {config.BUMPER_ROLE} role on this server yet. Ask a mod.")
             return
-        cant = (f"I can't hand out the {config.BUMPER_ROLE} role: it's above my highest role. "
-                "Ask a mod to move my role up.")
+        cant = (f"I can't hand out the {config.BUMPER_ROLE} role: it's above my highest role or has "
+                "moderator permissions. Ask a mod to fix the role.")
         if not can_manage(guild, role):
             await reply_error(interaction, cant)
             return

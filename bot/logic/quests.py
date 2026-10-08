@@ -15,6 +15,7 @@ DAY = 24 * 60 * 60
 REWARD = 500
 REASON = "quest"
 BADGE_KEY = "starter"  # granted on completion when logic/achievements.py has it
+BADGE_LABEL = "🧭 **Settled In**"  # that badge's emoji and name (a test keeps them in step)
 NEW_MEMBER_DAYS = 30  # finish within this many days of joining to be paid
 MIN_ACCOUNT_DAYS = 30  # accounts younger than this are not paid (alt farming via /give)
 DISCORD_EPOCH_MS = 1420070400000  # snowflake ids count milliseconds from here
@@ -91,6 +92,16 @@ def eligible_for_reward(joined_at: int | None, started_at: int | None, now: int,
             and now - created_at >= MIN_ACCOUNT_DAYS * DAY)
 
 
+def no_reward_reason(joined_at: int | None, started_at: int | None, now: int, *,
+                     created_at: int | None) -> str:
+    """Why eligible_for_reward is False, in words for the member."""
+    if created_at is None or now - created_at < MIN_ACCOUNT_DAYS * DAY:
+        return f"your Discord account must be {MIN_ACCOUNT_DAYS}+ days old"
+    if joined_at is None or started_at is None or joined_at < started_at:
+        return "you joined before quests started"
+    return f"coins are for your first {NEW_MEMBER_DAYS} days here"
+
+
 def should_nudge(joined_at: int | None, started_at: int | None, now: int, done_count: int) -> bool:
     if joined_at is None or started_at is None or joined_at < started_at:
         return False
@@ -113,7 +124,7 @@ def checklist(done: Collection[str], tracking: bool) -> str:
 
 
 def congrats(mention: str, coins: int, badge: bool) -> str:
-    extra = " and the Starter badge" if badge else ""
+    extra = f" and the {BADGE_LABEL} badge" if badge else ""
     return (f"🎉 {mention} finished the starter quest and earned **{coins:,} coins**{extra}. "
             "Welcome in!")
 

@@ -12,6 +12,7 @@ from discord.ext import commands, tasks
 
 import config
 import style
+from logic import quests as Q
 from logic import stats as S
 from logic.schedule import Weekly, plan
 
@@ -252,10 +253,13 @@ class Stats(commands.Cog):
         )
         return [S.Session(r["user_id"], r["k"], r["start"], r["end"]) for r in rows]
 
-    async def voice_scores(self, start: int, end: int) -> dict[int, int]:
+    async def voice_scores(self, start: int, end: int, established_only: bool = False) -> dict[int, int]:
+        """`established_only`: fresh accounts (quests.established) neither score nor count as
+        company, so alts can't build each other's voice time (used for the paid MVP)."""
         excluded = {self.afk_id()} - {None}
-        return S.counted_voice_seconds(await self.sessions("voice_sessions", "channel_id", start, end),
-                                       start, end, now(), excluded_channels=excluded)
+        sessions = await self.sessions("voice_sessions", "channel_id", start, end)
+        fresh = {s.user_id for s in sessions if not Q.established(s.user_id, end)} if established_only else set()
+        return S.counted_voice_seconds(sessions, start, end, now(), excluded_channels=excluded, bot_ids=fresh)
 
     async def game_scores(self, start: int, end: int) -> dict[int, dict[str, int]]:
         return S.game_seconds(await self.sessions("game_sessions", "game", start, end), start, end, now())
@@ -269,13 +273,16 @@ class Stats(commands.Cog):
         )
         return {r["user_id"]: r["n"] for r in rows}
 
-    async def boards(self, start: int, end: int) -> dict[str, dict[int, int]]:
+    async def boards(self, start: int, end: int, established_only: bool = False) -> dict[str, dict[int, int]]:
         boards = {
-            "voice": await self.voice_scores(start, end),
+            "voice": await self.voice_scores(start, end, established_only),
             "messages": await self.message_scores(start, end),
         }
         if self.gaming_enabled:
             boards["gaming"] = S.gaming_totals(await self.game_scores(start, end))
+        if established_only:
+            boards = {name: {u: v for u, v in scores.items() if Q.established(u, end)}
+                      for name, scores in boards.items()}
         return boards
 
     def window(self, period: str) -> tuple[int, int]:
@@ -397,7 +404,8 @@ class Stats(commands.Cog):
             await self.db.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (todo.run.key, now()))
 
     async def post_mvp(self, period) -> None:
-        boards = await self.boards(period.window_start, period.window_end)
+        # The MVP is paid: fresh accounts (alts) can't win it or pad anyone's voice time.
+        boards = await self.boards(period.window_start, period.window_end, established_only=True)
         winner = S.mvp(boards)
         guild = self.guild()
         channel = config.match_by_name(guild.text_channels, config.GENERAL_CHANNEL) if guild else None

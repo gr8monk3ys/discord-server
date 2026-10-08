@@ -610,3 +610,31 @@ def test_autocomplete(monkeypatch):
         assert [c.value for c in out] == ["valorant"]
         assert len(await env.cog.game_choices(None, "")) == len(config.GAMES)
     with_env(body, monkeypatch)
+
+
+def test_joiner_is_told_the_voice_channel_directly(monkeypatch):
+    async def body(env):
+        await env.join(101, size=2)
+        inter = await env.join(102, size=2)
+        [ch] = env.guild.category.created
+        assert ch.mention in inter.text
+        assert all(c.get("ephemeral") for c in inter.calls)
+    with_env(body, monkeypatch)
+
+
+def test_no_post_channel_dms_the_players(monkeypatch):
+    async def body(env):
+        env.guild.text_channels = []
+        dms = []
+        for uid in (101, 102):
+            m = env.member(uid)
+
+            async def send(content=None, _uid=uid, **kw):
+                dms.append((_uid, content))
+            m.send = send
+        await env.join(101, size=2)
+        await env.join(102, size=2)
+        [ch] = env.guild.category.created
+        assert sorted(u for u, _ in dms) == [101, 102]
+        assert all(ch.mention in text for _, text in dms)
+    with_env(body, monkeypatch)

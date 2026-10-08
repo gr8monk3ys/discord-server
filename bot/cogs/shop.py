@@ -34,6 +34,7 @@ import economy as E
 import style
 from cogs.lfg import ping_only
 from logic import shop as S
+from logic.selfroles import has_dangerous_permissions
 
 log = logging.getLogger(__name__)
 
@@ -129,7 +130,8 @@ class Shop(commands.Cog):
     async def shop(self, interaction: discord.Interaction) -> None:
         lines = [f"**{i.name}** · `{i.price:,}` coins · `/buy item:{i.key}`\n{i.blurb}" for i in S.ITEMS.values()]
         lines.append(f"**Raffle ticket** · `{S.TICKET_PRICE:,}` coins · `/raffle buy`\nUp to {S.MAX_TICKETS} a week. "
-                     f"Sundays 20:00 one ticket wins {S.RAFFLE_SHARE}% of the pot; the rest is burned.")
+                     f"Next draw <t:{S.next_draw(now(), self.tz).scheduled_at}:F>: one ticket wins "
+                     f"{S.RAFFLE_SHARE}% of the pot; the rest is burned.")
         balance = await E.balance(self.db, interaction.user.id)
         embed = style.embed(title="Shop", description="\n\n".join(lines),
                             footer=style.label("shop", f"you have {balance:,} coins"))
@@ -315,6 +317,8 @@ class Shop(commands.Cog):
         role = config.match_by_name(guild.roles, config.HYPE_ROLE)
         if role is None:
             return None, f"There's no `{config.HYPE_ROLE}` role on the server yet, so Hype isn't for sale. Ask a Keeper."
+        if has_dangerous_permissions(role):
+            return None, (f"`{config.HYPE_ROLE}` has moderator permissions, so Hype isn't for sale. Ask a Keeper.")
         if not self.manageable(guild, role):
             return None, (f"Front Desk's role has to be above `{config.HYPE_ROLE}` to hand it out, so Hype isn't "
                           "for sale right now. Ask a Keeper.")
@@ -685,7 +689,7 @@ class Shop(commands.Cog):
 
     async def swap_season_role(self, guild, winners: list[int]) -> None:
         role = config.match_by_name(guild.roles, config.SEASON_ROLE)
-        if not self.manageable(guild, role):
+        if not self.manageable(guild, role) or has_dangerous_permissions(role):
             log.info("season role %s missing or above Front Desk: skipped", config.SEASON_ROLE)
             return
         for member in list(role.members):

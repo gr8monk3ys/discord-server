@@ -780,3 +780,13 @@ def test_rollover_waits_when_guild_unavailable(monkeypatch):
         assert await env.db.fetchone("SELECT 1 FROM seasons WHERE key = '2026-09'") is None
         assert await env.bal(A) == 300
     with_env(go, monkeypatch)
+
+
+def test_hype_role_with_mod_permissions_is_not_sold(monkeypatch):
+    async def go(env):
+        await env.fund(A, 1000)
+        env.guild.hype.permissions = discord.Permissions(manage_messages=True)
+        i = await env.buy(A, "hype")
+        assert "permissions" in i.text and await env.bal(A) == 1000
+        assert env.guild.hype not in env.member(A).roles
+    with_env(go, monkeypatch)

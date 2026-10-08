@@ -119,3 +119,8 @@ def test_congrats_one_and_many():
 def test_season_points_window_and_reasons():
     from logic import shop
     assert A.SEASON_REASONS == shop.SEASON_REASONS
+
+
+def test_squad_badge_name_differs_from_the_level_role():
+    import config
+    assert A.BY_KEY["squad_regular"].name not in {name for _, name in config.LEVEL_ROLES}

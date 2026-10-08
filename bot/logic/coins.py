@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from typing import Iterable
 
+from logic.quests import MIN_ACCOUNT_DAYS
+
 # ---------------------------------------------------------------- amounts
 DAILY_BASE = 100
 DAILY_STEP = 20  # per day of streak after the first
@@ -62,6 +64,13 @@ class DailyClaim:
     day: str  # local date, ISO
     streak: int
     amount: int
+
+
+def next_daily_reset(now: int, tz) -> int:
+    """When the next /daily opens: the next local midnight (shown as a Discord timestamp,
+    so members in other time zones see their own time)."""
+    tomorrow = local_date(now, tz) + timedelta(days=1)
+    return int(datetime.combine(tomorrow, time(0), tz).timestamp())
 
 
 def claim_daily(last_daily: str | None, streak: int, now: int, tz) -> DailyClaim | None:
@@ -137,7 +146,12 @@ def clip_week_ref(week: str) -> str:
 
 
 # ---------------------------------------------------------------- /give
-def give_error(giver_id: int, target_id: int, target_is_bot: bool, amount: int) -> str | None:
+def give_error(giver_id: int, target_id: int, target_is_bot: bool, amount: int, *,
+               giver_established: bool = True) -> str | None:
+    """`giver_established`: quests.established(giver). Fresh accounts can earn coins but
+    not pass them on, so alts can't farm the faucets for a main account."""
+    if not giver_established:
+        return f"You can give coins once your Discord account is {MIN_ACCOUNT_DAYS}+ days old."
     if amount < GIVE_MIN:
         return f"You can give {GIVE_MIN} coin or more."
     if target_id == giver_id:

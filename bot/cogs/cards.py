@@ -15,7 +15,6 @@ import discord
 from discord.ext import commands
 
 import config
-from cogs.lfg import ping_only
 from logic import cards
 
 log = logging.getLogger(__name__)
@@ -115,8 +114,9 @@ class Cards(commands.Cog):
             avatar = await self.avatar_bytes(member)
             png = await asyncio.to_thread(cards.render_card, member.display_name, guild.member_count,
                                           guild.name, avatar, member.name)
+            # Named, not pinged: the welcome in general already pings them once.
             await channel.send(member.mention, file=discord.File(io.BytesIO(png), filename=FILENAME),
-                               allowed_mentions=ping_only(users=[member]))
+                               allowed_mentions=discord.AllowedMentions.none())
         except Exception:
             await self.db.execute("DELETE FROM meta WHERE key = ?", (key,))  # let a later event retry
             raise

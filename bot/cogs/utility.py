@@ -115,7 +115,8 @@ TICKET_POST = ("Need a mod? Press **Contact the mods** and I'll open a private t
 # ---------------------------------------------------------------- the cog
 class Utility(commands.Cog):
     suggestion = app_commands.Group(name="suggestion", description="Suggestion forum tools (mods)",
-                                    guild_only=True)
+                                    guild_only=True,
+                                    default_permissions=discord.Permissions(moderate_members=True))
 
     def __init__(self, bot):
         self.bot = bot

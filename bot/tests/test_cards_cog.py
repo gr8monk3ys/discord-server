@@ -150,7 +150,8 @@ def env_run(monkeypatch):
 def assert_card(sent, member):
     assert sent["content"] == member.mention
     am = sent["allowed_mentions"]
-    assert am.everyone is False and am.roles is False and [u.id for u in am.users] == [member.id]
+    # Named but not pinged: the #general welcome is the one ping a newcomer gets.
+    assert am.everyone is False and am.roles is False and am.users is False
     assert sent["file"].filename == "welcome.png"
     img = Image.open(io.BytesIO(sent["png"]))
     assert img.format == "PNG" and img.size == (1100, 400)

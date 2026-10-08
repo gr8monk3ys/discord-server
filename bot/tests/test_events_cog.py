@@ -750,3 +750,13 @@ def test_discord_error_creating_event_replies_and_gives_the_cooldown_back(monkey
         assert len(env.guild.events) == 1
         assert not any("just made a game night" in t for t in retry.texts())
     with_env(go, monkeypatch)
+
+
+def test_gamenight_note_markdown_is_escaped(monkeypatch):
+    async def go(env):
+        await env.gamenight(note="[Claim Nitro](https://phish.example)")
+        [post] = env.guild.valorant.sent
+        assert r"> \[Claim Nitro]" in post["content"]
+        ev = next(iter(env.guild.events.values()))
+        assert r"\[Claim Nitro]" in ev.kwargs["description"]
+    with_env(go, monkeypatch)
