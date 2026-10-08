@@ -87,3 +87,43 @@ def test_texts():
     assert "/quest" in nudge and "✅" in nudge and f"{Q.REWARD:,}" in nudge
     assert "/quest" in Q.nudge_text(set(), True, rewarded=False)
     assert f"{Q.REWARD:,}" not in Q.nudge_text(set(), True, rewarded=False)
+
+
+# ---------------------------------------------------------------- account age from the id
+def test_account_created_reads_the_snowflake():
+    from datetime import datetime, timezone
+
+    import discord
+
+    when = datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc)
+    uid = discord.utils.time_snowflake(when)
+    assert Q.account_created(uid) == int(when.timestamp())
+    assert Q.account_created(discord.utils.time_snowflake(when, high=True)) == int(when.timestamp())
+
+
+def test_established_needs_min_account_days_at_that_time():
+    from datetime import datetime, timezone
+
+    import discord
+
+    created = datetime(2026, 9, 1, tzinfo=timezone.utc)
+    uid = discord.utils.time_snowflake(created)
+    t = int(created.timestamp())
+    assert not Q.established(uid, t)
+    assert not Q.established(uid, t + Q.MIN_ACCOUNT_DAYS * Q.DAY - 1)
+    assert Q.established(uid, t + Q.MIN_ACCOUNT_DAYS * Q.DAY)
+    assert Q.established(12, t)  # a tiny test id is from 2015
+
+
+def test_established_sql_matches_python():
+    import sqlite3
+    from datetime import datetime, timezone
+
+    import discord
+
+    con = sqlite3.connect(":memory:")
+    t = int(datetime(2026, 10, 7, tzinfo=timezone.utc).timestamp())
+    for days in (0, 29, 30, 31, 400):
+        uid = discord.utils.time_snowflake(datetime.fromtimestamp(t - days * Q.DAY, timezone.utc))
+        (got,) = con.execute(f"SELECT {Q.established_sql(str(uid), str(t))}").fetchone()
+        assert bool(got) == Q.established(uid, t), days

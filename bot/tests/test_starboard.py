@@ -161,3 +161,20 @@ def test_no_attachments_no_embeds():
 # ---------------------------------------------------------------- footer
 def test_footer_shows_channel_and_count():
     assert S.footer("general", 4) == "#general · ⭐ 4"
+
+
+def test_fresh_accounts_do_not_count_when_now_is_given():
+    """A hall-of-fame post earns coins (weekly challenge), so stars from accounts younger
+    than MIN_ACCOUNT_DAYS (likely alts) don't count."""
+    from datetime import datetime, timezone
+
+    import discord
+
+    from logic import quests as Q
+
+    now = T0
+    young = discord.utils.time_snowflake(datetime.fromtimestamp(now - 5 * DAY, timezone.utc))
+    old = discord.utils.time_snowflake(datetime.fromtimestamp(now - (Q.MIN_ACCOUNT_DAYS + 1) * DAY, timezone.utc))
+    reactors = [u(young), u(young + 1), u(old), u(2)]
+    assert S.count_stars(reactors, AUTHOR, now) == 2
+    assert S.count_stars(reactors, AUTHOR) == 4  # without a time: unchanged

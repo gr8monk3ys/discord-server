@@ -390,11 +390,15 @@ def test_stale_action_open_match():
     assert T.stale_action(T.OPEN, o, o + 10 * DAY, True, True) is None  # flagged once, staff decide
 
 
-def test_stale_action_reported_match_stands_after_48h():
+def test_stale_action_lone_report_is_flagged_never_accepted():
+    """A report the opponent never confirmed doesn't decide the match by itself (a player
+    could claim a win against someone who's away); staff are flagged once instead."""
     o = 1_000_000
     assert T.stale_action(T.REPORTED, o, o + T.STALE_AFTER - 1, False, False) is None
     assert T.stale_action(T.REPORTED, o, o + T.NUDGE_AFTER, False, False) is None  # no nudge
-    assert T.stale_action(T.REPORTED, o, o + T.STALE_AFTER, False, False) == T.Stale.ACCEPT
+    assert T.stale_action(T.REPORTED, o, o + T.STALE_AFTER, False, False) == T.Stale.FLAG
+    assert T.stale_action(T.REPORTED, o, o + 10 * DAY, False, True) is None  # flagged once
+    assert not hasattr(T.Stale, "ACCEPT")
 
 
 @pytest.mark.parametrize("status", [T.CONFLICT, T.DONE, T.BYE, T.PENDING])

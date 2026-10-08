@@ -1,7 +1,8 @@
 """Daily Word: /word guess, /word today, /word stats, /word leaderboard.
 
-One five-letter word a day (Pacific midnight), the same for everyone, picked from the date by
-logic/wordgame.py so restarts agree. Every reply about the game is ephemeral so nobody is
+One five-letter word a day (Pacific midnight), the same for everyone, picked from the date and
+a private salt by logic/wordgame.py. The salt is made once and kept in meta (SALT_KEY), so
+restarts agree and the public repo can't be used to work out the word; it's never logged. Every reply about the game is ephemeral so nobody is
 spoiled. Each member's game is one `word_games` row (day, user): guesses as a comma string,
 solved, finished_at. A finished game posts a squares-only share line in the games channel
 (no letters, no pings) and a win pays 50 coins + 10 per unused guess once per day (ledger ref
@@ -28,6 +29,7 @@ from logic import wordgame as W
 log = logging.getLogger(__name__)
 
 FOOTER = style.label("daily word", "new word at midnight pacific")
+SALT_KEY = "wordgame:salt"  # meta: the private salt for the daily order (never log or post it)
 
 
 def now() -> int:
@@ -80,6 +82,7 @@ class WordGame(commands.Cog):
     def __init__(self, bot, words: W.Words | None = None):
         self.bot = bot
         self.words = words or W.Words.load()
+        self.order: tuple[str, ...] | None = None  # the salted daily order, once loaded
 
     @property
     def db(self):
@@ -91,8 +94,16 @@ class WordGame(commands.Cog):
     def today(self, t: int | None = None) -> date:
         return W.local_day(now() if t is None else t, self.bot.settings.tz)
 
-    def answer(self, day: date) -> str:
-        return W.answer_for(day, self.words.answers)
+    async def daily_order(self) -> tuple[str, ...]:
+        if self.order is None:
+            # INSERT OR IGNORE then read back: two first callers end up with the same salt.
+            await self.db.execute("INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)", (SALT_KEY, W.new_salt()))
+            row = await self.db.fetchone("SELECT value FROM meta WHERE key = ?", (SALT_KEY,))
+            self.order = W.daily_order(self.words.answers, row["value"])
+        return self.order
+
+    async def answer(self, day: date) -> str:
+        return W.answer_for(day, await self.daily_order())
 
     # ------------------------------------------------------------ state
     async def game(self, day: date, user_id: int) -> list[str]:
@@ -104,13 +115,13 @@ class WordGame(commands.Cog):
         """Validate and record one guess; on a win, pay once. All in one transaction so two
         quick guesses can't both land as guess six or pay twice."""
         day = self.today(t)
-        out = Outcome(day=day, answer=self.answer(day))
+        out = Outcome(day=day, answer=await self.answer(day))
         uid = member.id
         async with self.db.transaction() as tx:
-            row = await tx.fetchone("SELECT guesses FROM word_games WHERE day = ? AND user_id = ?",
+            row = await tx.fetchone("SELECT guesses, finished_at FROM word_games WHERE day = ? AND user_id = ?",
                                     (day.isoformat(), uid))
             out.guesses = W.parse_guesses(row["guesses"]) if row else []
-            if out.done:
+            if out.done or (row is not None and row["finished_at"] is not None):
                 out.error = "You've finished today's word. A new one drops at midnight Pacific."
                 return out
             guess, error = W.validate(raw, self.words.allowed, out.guesses)
@@ -195,7 +206,7 @@ class WordGame(commands.Cog):
     @word.command(name="today", description="Your board for today's word (only you see it)")
     async def today_cmd(self, interaction: discord.Interaction) -> None:
         day = self.today()
-        out = Outcome(day=day, answer=self.answer(day), guesses=await self.game(day, interaction.user.id))
+        out = Outcome(day=day, answer=await self.answer(day), guesses=await self.game(day, interaction.user.id))
         await interaction.response.send_message(embed=self.board_embed(out), ephemeral=True)
 
     async def results(self, user_id: int) -> list[W.Result]:

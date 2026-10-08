@@ -14,7 +14,8 @@
   The 1st at 12:00 local: a 500-coin stipend for every booster (ref booststipend:YYYY-MM:USER).
 - Member of the month: the 1st at 12:30 local, the member with the most counted voice hours
   + messages/50 + squads joined*2 last month (opted-out members, bots and Keeper/Moderator
-  excluded) is announced in 📣・announcements with 1000 coins (ref motm:YYYY-MM).
+  excluded; a squad is someone else's post, and only established accounts count as squad
+  hosts or voice company, so alts can't pad a score) is announced in 📣・announcements with 1000 coins (ref motm:YYYY-MM).
 
 Coins skip accounts younger than quests.MIN_ACCOUNT_DAYS. Scheduled jobs follow
 logic/schedule.py semantics. Needs the Server Members intent (members, joined_at, boosts).
@@ -32,6 +33,7 @@ import config
 import economy
 from cogs.lfg import ping_only
 from logic import engagement as E
+from logic import quests as Q
 from logic import recap as R
 from logic import shop
 from logic import stats as S
@@ -329,14 +331,19 @@ class Vibes(commands.Cog):
         rows = await self.db.fetchall('SELECT user_id, channel_id AS k, start, "end" FROM voice_sessions'
                                       ' WHERE start < ? AND ("end" IS NULL OR "end" > ?)', (end, start))
         afk = getattr(guild, "afk_channel", None)
-        voice = S.counted_voice_seconds([S.Session(r["user_id"], r["k"], r["start"], r["end"]) for r in rows],
-                                        start, end, now(), excluded_channels={afk.id} if afk else set(),
-                                        bot_ids=bots)
+        sessions = [S.Session(r["user_id"], r["k"], r["start"], r["end"]) for r in rows]
+        fresh = {s.user_id for s in sessions if not Q.established(s.user_id, end)}  # alts aren't company
+        voice = S.counted_voice_seconds(sessions, start, end, now(), excluded_channels={afk.id} if afk else set(),
+                                        bot_ids=bots | fresh)
         rows = await self.db.fetchall("SELECT user_id, SUM(count) AS n FROM message_counts WHERE day LIKE ?"
                                       " GROUP BY user_id", (f"{month}-%",))
         messages = {r["user_id"]: r["n"] for r in rows}
-        rows = await self.db.fetchall("SELECT user_id, COUNT(DISTINCT post_id) AS n FROM lfg_members"
-                                      " WHERE joined_at >= ? AND joined_at < ? GROUP BY user_id", (start, end))
+        # Joins of someone else's post (the host's own row isn't a join) by an established host.
+        rows = await self.db.fetchall(
+            "SELECT m.user_id, COUNT(DISTINCT m.post_id) AS n FROM lfg_members m JOIN lfg_posts p ON p.id = m.post_id"
+            " WHERE m.user_id != p.host_id AND m.joined_at >= ? AND m.joined_at < ?"
+            f" AND {Q.established_sql('p.host_id', 'p.created_at')}"
+            " GROUP BY m.user_id", (start, end))
         squads = {r["user_id"]: r["n"] for r in rows}
         skip = hidden | bots
         return tuple({u: v for u, v in d.items() if u not in skip} for d in (voice, messages, squads))

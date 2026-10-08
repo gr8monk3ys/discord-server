@@ -17,9 +17,28 @@ REASON = "quest"
 BADGE_KEY = "starter"  # granted on completion when logic/achievements.py has it
 NEW_MEMBER_DAYS = 30  # finish within this many days of joining to be paid
 MIN_ACCOUNT_DAYS = 30  # accounts younger than this are not paid (alt farming via /give)
+DISCORD_EPOCH_MS = 1420070400000  # snowflake ids count milliseconds from here
 NUDGE_AFTER = DAY  # one DM this long after joining...
 NUDGE_UNTIL = 7 * DAY  # ...unless they joined longer ago than this (bot was down)
 NUDGE_BELOW = 3  # ...and only when fewer steps than this are done
+
+
+def account_created(user_id: int) -> int:
+    """When a Discord account was created (unix seconds), read from its snowflake id. Works
+    for members who have left, and in SQL as ((id >> 22) + DISCORD_EPOCH_MS) / 1000."""
+    return ((user_id >> 22) + DISCORD_EPOCH_MS) // 1000
+
+
+def established(user_id: int, at: int) -> bool:
+    """The account was at least MIN_ACCOUNT_DAYS old at `at`. Rewards that other people's
+    actions earn someone (joins, stars, voice company) only count established accounts, so
+    fresh alts can't farm them."""
+    return at - account_created(user_id) >= MIN_ACCOUNT_DAYS * DAY
+
+
+def established_sql(user_col: str, at_col: str) -> str:
+    """established() as an SQLite expression over two column names (ours, never user input)."""
+    return f"({at_col} - (({user_col} >> 22) + {DISCORD_EPOCH_MS}) / 1000 >= {MIN_ACCOUNT_DAYS * DAY})"
 
 
 @dataclass(frozen=True)

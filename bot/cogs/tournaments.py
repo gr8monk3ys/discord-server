@@ -18,8 +18,9 @@ The bot also runs tournaments by itself (a one-minute tick, logic/schedule.py se
 - At the start time an auto tournament starts itself with at least 4 entrants; otherwise it is
   cancelled with a note and its event is cancelled.
 - Every tournament with a start time pings its entrants once in the hour before it.
-- A match with no report 24 h after it opened pings both players once; after 48 h a lone
-  report stands, and a match nobody reported is flagged to staff in mod-log (once).
+- A match with no report 24 h after it opened pings both players once; after 48 h a match
+  still undecided (nobody reported, or one player's report the other never confirmed) is
+  flagged to staff in mod-log (once). A lone report never decides a match by itself.
 - Discord accounts younger than logic/quests.py MIN_ACCOUNT_DAYS can't sign up (alt farming).
 """
 
@@ -1036,8 +1037,6 @@ class Tournaments(commands.Cog):
                         await self.nudge(t, bracket, m)
                     elif action is Stale.FLAG:
                         await self.flag_stale(t, bracket, m)
-                    elif action is Stale.ACCEPT:
-                        await self.accept_report(t, m)
                 except Exception:
                     log.exception("tournament %s match %s: %s failed", t["id"], m.id, action)
 
@@ -1066,8 +1065,14 @@ class Tournaments(commands.Cog):
         guild = self.guild()
         channel = self.channel(guild, config.MOD_LOG_CHANNEL)
         if channel is not None:
+            if m.status == T.REPORTED and m.reported_by in m.players:
+                other = m.p2 if m.reported_by == m.p1 else m.p1
+                what = (f"<@{m.reported_by}> reported <@{m.winner}> as the winner and <@{other}> hasn't "
+                        "confirmed it in 48 hours.")
+            else:
+                what = "has had no report for 48 hours."
             text = (f"🏆 **{esc(t['name'])}** · {T.round_name(m.round, bracket.final_round)} match {m.slot + 1}: "
-                    f"<@{m.p1}> vs <@{m.p2}> has had no report for 48 hours. A Keeper or Moderator, press "
+                    f"<@{m.p1}> vs <@{m.p2}> {what} A Keeper or Moderator, press "
                     f"**P1 won** or **P2 won** on the match message to decide it.{await self.match_link(guild, m)}")
             try:
                 await channel.send(text, allowed_mentions=discord.AllowedMentions.none())
@@ -1077,33 +1082,6 @@ class Tournaments(commands.Cog):
         else:
             log.warning("tournament %s match %s is stale (no %s channel)", t["id"], m.id, config.MOD_LOG_CHANNEL)
         await self.set_meta(flagged_key(m.id), str(now()))
-
-    async def accept_report(self, t, m: Match) -> None:
-        """Nobody answered a lone report for 48 hours: it stands, like a confirmation."""
-        tid = t["id"]
-        async with self.db.transaction() as tx:
-            t = await self.get(tid, tx)
-            if t is None or t["status"] != RUNNING:
-                return
-            bracket = await self.bracket(tid, tx)
-            current = next((x for x in bracket.matches if x.id == m.id), None)
-            opened = await self.meta(opened_key(m.id), tx)
-            if current is None or opened is None or \
-                    T.stale_action(current.status, int(opened), now(), True, True) is not Stale.ACCEPT:
-                return  # answered (or decided by staff) in the meantime
-            reporter = current.reported_by
-            await self.decide_tx(tx, t, bracket, current, current.winner, reporter)
-        try:
-            message = await self.partial(self.guild(), await self.meta(match_key(m.id)))
-            if message is not None:
-                await message.edit(content=f"{match_text(t, current, bracket.final_round)}\n"
-                                           f"No answer in 48 hours, so <@{reporter}>'s report stands.",
-                                   view=match_view(m.id, closed=True),
-                                   allowed_mentions=discord.AllowedMentions.none())
-        except discord.HTTPException:
-            log.warning("couldn't close match %s after its report stood", m.id, exc_info=True)
-        log.info("tournament %s match %s: the lone report stood after 48 h", tid, m.id)
-        await self.sync(tid)
 
     start.autocomplete("tournament")(tournament_choices)
     cancel.autocomplete("tournament")(tournament_choices)

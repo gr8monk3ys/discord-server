@@ -1,6 +1,7 @@
 """Module 6: Hall of fame. When a message gets 3 ⭐ from people other than its
-author (bots don't count), the bot reposts it in the hall-of-fame channel with a
-jump link, then keeps the star count on that post up to date. Each message is
+author (bots and accounts younger than quests.MIN_ACCOUNT_DAYS don't count: a
+hall post earns coins in weekly challenges), the bot reposts it in the
+hall-of-fame channel with a jump link, then keeps the star count on that post up to date. Each message is
 posted at most once; the post stays even if stars drop below the threshold.
 
 Uses raw reaction events, so it works for messages that aren't cached. Copying
@@ -218,7 +219,7 @@ class Starboard(commands.Cog):
         reaction = next((r for r in message.reactions if S.is_star(r.emoji)), None)
         if reaction is None:
             return 0
-        return S.count_stars([u async for u in reaction.users(limit=None)], message.author.id)
+        return S.count_stars([u async for u in reaction.users(limit=None)], message.author.id, now())
 
     async def refresh(self, guild_id: int, channel_id: int, message_id: int) -> None:
         """Bring the hall in line with a message's current stars."""

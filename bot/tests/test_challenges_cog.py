@@ -70,9 +70,25 @@ class FakeGuild:
         self.text_channels = [self.general, self.games]
         self.afk_channel = None
         self.members = []
+        self.events = {}  # event_id -> SimpleNamespace(status=...), all "uncached"
+        self.fetches = []
 
     def get_member(self, uid):
         return next((m for m in self.members if m.id == uid), None)
+
+    def get_scheduled_event(self, eid):
+        return None
+
+    async def fetch_scheduled_event(self, eid):
+        self.fetches.append(eid)
+        if eid not in self.events:
+            raise discord.NotFound(SimpleNamespace(status=404, reason="nope"), "Unknown Guild Scheduled Event")
+        return self.events[eid]
+
+
+def young_id(at: int, n: int = 0) -> int:
+    """A Discord id for an account created 5 days before `at` (under MIN_ACCOUNT_DAYS)."""
+    return discord.utils.time_snowflake(datetime.fromtimestamp(at - 5 * DAY, timezone.utc)) + n
 
 
 class FakeBot:
@@ -263,14 +279,95 @@ def test_messages_daily_word_games_tournament_clip_gamenight(monkeypatch):
         for day, solved in (("2026-10-05", 1), ("2026-10-06", 0), ("2026-10-07", 1), ("2026-10-04", 1)):
             await env.db.execute("INSERT INTO word_games (day, user_id, solved) VALUES (?, ?, ?)", (day, U1, solved))
         assert await env.cog.measure("word_games", WEEK, None, t) == {U1: 2}
-        await env.db.execute("INSERT INTO tournaments (name, size, created_by, created_at) VALUES ('cup', 8, 1, ?)", (t,))
+        await env.db.execute("INSERT INTO tournaments (name, size, status, created_by, created_at)"
+                             " VALUES ('cup', 8, 'running', 1, ?)", (t,))
         await env.db.execute("INSERT INTO tournament_entries (tournament_id, user_id, joined_at) VALUES (1, ?, ?)", (U2, t))
         assert await env.cog.measure("tournament", WEEK, None, t) == {U2: 1}
         await env.db.execute("INSERT INTO clips (message_id, user_id, url, posted_at) VALUES (1, ?, 'u', ?)", (U3, t))
         assert await env.cog.measure("post_clip", WEEK, None, t) == {U3: 1}
-        await env.db.execute("INSERT INTO gamenights (event_id, host_id, starts_at) VALUES (1, ?, ?)", (U1, t + DAY))
+        env.guild.events[1] = SimpleNamespace(status=discord.EventStatus.scheduled)
+        await env.db.execute("INSERT INTO gamenights (event_id, host_id, starts_at) VALUES (1, ?, ?)", (U1, t - HOUR))
         await env.db.execute("INSERT INTO gamenights (event_id, host_id, starts_at) VALUES (2, ?, ?)", (U2, WEEK.end + 1))
         assert await env.cog.measure("gamenight", WEEK, None, t) == {U1: 1}
+    with_env(body, monkeypatch)
+
+
+def test_join_squads_ignores_posts_by_fresh_accounts(monkeypatch):
+    """An alt posting squads for its main to join doesn't count."""
+    async def body(env):
+        alt1, alt2 = young_id(env.t), young_id(env.t, 1)
+        await env.post(alt1, joiners=(U1,))
+        await env.post(alt2, joiners=(U1,))
+        await env.post(77, joiners=(U1,))
+        assert await env.cog.measure("join_squads", WEEK, None, env.t) == {U1: 1}
+        assert await env.cog.claim(env.member(U1)) == []
+    with_env(body, monkeypatch)
+
+
+def test_host_squads_ignores_joins_by_fresh_accounts(monkeypatch):
+    """Alts joining your own posts don't make them count."""
+    async def body(env):
+        alt = young_id(env.t)
+        await env.post(U1, joiners=(alt,))
+        await env.post(U1, joiners=(alt, young_id(env.t, 1)))
+        await env.post(U1, joiners=(alt, U2))
+        assert await env.cog.measure("host_squads", WEEK, None, env.t) == {U1: 1}
+    with_env(body, monkeypatch)
+
+
+def test_voice_with_only_a_fresh_account_does_not_count(monkeypatch):
+    async def body(env):
+        s = WEEK.start
+        alt = young_id(env.t)
+        await env.voice(U1, s, s + 4 * HOUR)
+        await env.voice(alt, s, s + 4 * HOUR)
+        assert await env.cog.measure("voice_3h", WEEK, None, env.t) == {}
+        await env.voice(U2, s, s + HOUR)
+        assert await env.cog.measure("voice_3h", WEEK, None, env.t) == {U1: HOUR, U2: HOUR}
+    with_env(body, monkeypatch)
+
+
+def test_gamenight_counts_only_after_it_starts_and_if_not_cancelled(monkeypatch):
+    """Scheduling a game night and having it called off (or never reaching its start) earns nothing."""
+    async def body(env):
+        t = env.t
+        rows = ((1, U1, t + HOUR), (2, U2, t - HOUR), (3, U3, t - HOUR), (4, 77, t - 2 * HOUR))
+        for eid, host, at in rows:
+            await env.db.execute("INSERT INTO gamenights (event_id, host_id, starts_at) VALUES (?, ?, ?)",
+                                 (eid, host, at))
+        env.guild.events[1] = SimpleNamespace(status=discord.EventStatus.scheduled)  # not started yet
+        env.guild.events[2] = SimpleNamespace(status=discord.EventStatus.cancelled)
+        # 3: deleted in Discord
+        env.guild.events[4] = SimpleNamespace(status=discord.EventStatus.completed)
+        assert await env.cog.measure("gamenight", WEEK, None, t) == {77: 1}
+        assert 1 not in env.guild.fetches  # future nights aren't even looked up
+        assert await env.cog.measure("gamenight", WEEK, {U1}, t + 2 * HOUR) == {U1: 1}
+    with_env(body, monkeypatch)
+
+
+def test_gamenight_unverifiable_is_not_counted_yet(monkeypatch):
+    async def body(env):
+        await env.db.execute("INSERT INTO gamenights (event_id, host_id, starts_at) VALUES (1, ?, ?)",
+                             (U1, env.t - HOUR))
+
+        async def down(eid):
+            raise discord.HTTPException(SimpleNamespace(status=503, reason="down"), "down")
+        env.guild.fetch_scheduled_event = down
+        assert await env.cog.measure("gamenight", WEEK, None, env.t) == {}
+    with_env(body, monkeypatch)
+
+
+def test_tournament_entry_counts_only_once_it_starts(monkeypatch):
+    """Signing up, getting paid by the sweep, then leaving must not work."""
+    async def body(env):
+        t = env.t
+        for tid, status in ((1, "signup"), (2, "running"), (3, "done"), (4, "cancelled")):
+            await env.db.execute("INSERT INTO tournaments (id, name, size, status, created_by, created_at)"
+                                 " VALUES (?, 'cup', 8, ?, 1, ?)", (tid, status, t))
+        for tid, uid in ((1, U1), (2, U2), (3, U3), (4, 77)):
+            await env.db.execute("INSERT INTO tournament_entries (tournament_id, user_id, joined_at) VALUES (?, ?, ?)",
+                                 (tid, uid, t))
+        assert await env.cog.measure("tournament", WEEK, None, t) == {U2: 1, U3: 1}
     with_env(body, monkeypatch)
 
 

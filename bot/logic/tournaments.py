@@ -399,14 +399,15 @@ def reminder_due(starts_at: int | None, created_at: int, now: int, reminded: boo
 
 class Stale(Enum):
     NUDGE = "nudge"  # nobody reported after NUDGE_AFTER: ping both, once
-    ACCEPT = "accept"  # one report and no answer after STALE_AFTER: it stands
-    FLAG = "flag"  # no report at all after STALE_AFTER: staff decide (once)
+    FLAG = "flag"  # still undecided after STALE_AFTER: staff decide (flagged once)
 
 
 def stale_action(status: str, opened_at: int, now: int, nudged: bool, flagged: bool) -> Stale | None:
+    """A lone report is never accepted on a timer: the opponent may simply be away, and a
+    player could otherwise claim a win (and the prize) nobody agreed to. Staff decide."""
     age = now - opened_at
     if status == REPORTED:
-        return Stale.ACCEPT if age >= STALE_AFTER else None
+        return Stale.FLAG if age >= STALE_AFTER and not flagged else None
     if status != OPEN:
         return None
     if age >= STALE_AFTER:
