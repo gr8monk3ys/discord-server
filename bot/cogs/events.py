@@ -331,7 +331,12 @@ class Events(commands.Cog):
             text += " " + " ".join(f"<@{u.id}>" for u in shown)
             if len(users) > len(shown):
                 text += f" and {len(users) - len(shown)} more"
-        await channel.send(text, allowed_mentions=ping_only(users=[discord.Object(u.id) for u in shown]))
+        # Opt-in Game Night role (self-assign panel): pinged for every game night that starts.
+        gamenight_role = config.match_by_name(guild.roles, config.GAMENIGHT_ROLE)
+        if gamenight_role is not None:
+            text = f"{gamenight_role.mention} {text}"
+        await channel.send(text, allowed_mentions=ping_only(
+            roles=[gamenight_role] if gamenight_role else (), users=[discord.Object(u.id) for u in shown]))
         self.reminded.add(eid)
         await self.mark_reminded(eid)
 

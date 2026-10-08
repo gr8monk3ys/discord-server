@@ -16,6 +16,7 @@ Steps, all driven by layout.py:
 - refresh the rules and welcome posts in place
 - keep one permanent invite for listings and print it
 - add any missing Onboarding default channels
+- add the self-assign Onboarding prompts (platform, region, Game Night pings) if missing
 """
 
 import argparse
@@ -37,6 +38,30 @@ BOT_ROLES = ("Season Champ", "Hype", "Birthday", "Tournament Champ", "Counting C
              "PC", "PlayStation", "Xbox", "Switch", "Mobile", "NA", "EU", "LATAM", "Asia", "OCE",
              "Early Bird", "Night Owl", "Weekend Warrior")  # roles Front Desk hands out
 NEEDED = ("manage_roles", "manage_channels", "manage_guild", "create_instant_invite")
+
+# Onboarding questions added after the existing ones (matched by title; existing prompts are
+# never removed or reordered). The same roles are on Front Desk's 🎭・roles panel.
+ONBOARDING_PROMPTS = [
+    {"title": "What do you play on?", "multi": True, "options": [
+        {"title": "PC", "emoji": "🖥️", "role": "PC"},
+        {"title": "PlayStation", "emoji": "🟦", "role": "PlayStation"},
+        {"title": "Xbox", "emoji": "🟩", "role": "Xbox"},
+        {"title": "Switch", "emoji": "🟥", "role": "Switch"},
+        {"title": "Mobile", "emoji": "📱", "role": "Mobile"},
+    ]},
+    {"title": "Where are you?", "multi": False, "options": [
+        {"title": "North America", "emoji": "🌎", "role": "NA"},
+        {"title": "Europe", "emoji": "🌍", "role": "EU"},
+        {"title": "Latin America", "emoji": "🌎", "role": "LATAM"},
+        {"title": "Asia", "emoji": "🌏", "role": "Asia"},
+        {"title": "Oceania", "emoji": "🌏", "role": "OCE"},
+    ]},
+    {"title": "Want pings?", "multi": True, "options": [
+        {"title": "Game nights", "emoji": "🎉", "role": "Game Night",
+         "description": "Get @Game Night pings when a game night starts."},
+    ]},
+]
+MAX_PROMPTS = 15  # Discord's limit
 
 
 class PublicMode:
@@ -246,6 +271,44 @@ class PublicMode:
         await self.do("add", "default channels: " + ", ".join(c.name for c in add),
                       lambda: self.guild.edit_onboarding(default_channels=[*ob.default_channels, *add]))
 
+    async def onboarding_prompts(self):
+        print("\nOnboarding prompts")
+        try:
+            ob = await self.guild.onboarding()
+        except discord.HTTPException as e:
+            print(f"  skip    ({e.text or e})")
+            return
+        have = {slug(p.title) for p in ob.prompts}
+        add = []
+        for spec in ONBOARDING_PROMPTS:
+            if slug(spec["title"]) in have:
+                print(f"  ok      {spec['title']}")
+                continue
+            options = []
+            for o in spec["options"]:
+                role = self.role(o["role"])
+                if role is None:
+                    print(f"! skip    {spec['title']} -> {o['title']}: no @{o['role']} role yet "
+                          "(re-run once it exists)")
+                    continue
+                options.append(discord.OnboardingPromptOption(
+                    title=o["title"], emoji=o["emoji"], description=o.get("description"), roles=[role]))
+            if options:
+                add.append((spec, options))
+        if not add:
+            return
+        if len(ob.prompts) + len(add) > MAX_PROMPTS:
+            print(f"! skip    Onboarding already has {len(ob.prompts)} prompts (Discord allows {MAX_PROMPTS})")
+            return
+        # edit_onboarding replaces the whole list, so the existing prompts go first, as they are.
+        prompts = [*ob.prompts, *(
+            discord.OnboardingPrompt(type=discord.OnboardingPromptType.multiple_choice, title=spec["title"],
+                                     options=options, single_select=not spec["multi"], required=False)
+            for spec, options in add)]
+        await self.do("add", "onboarding prompts: " + "; ".join(
+            f"{spec['title']} ({', '.join(o.title for o in options)})" for spec, options in add),
+            lambda: self.guild.edit_onboarding(prompts=prompts))
+
     async def run(self) -> bool:
         mode = "APPLYING" if self.apply else "DRY RUN (nothing changes; add --apply to do it)"
         print(f"{self.guild.name}: {mode}")
@@ -258,6 +321,7 @@ class PublicMode:
         await self.posts()
         await self.invite()
         await self.onboarding()
+        await self.onboarding_prompts()
         print("\nDone." if self.apply else "\nThat's the plan. Run again with --apply.")
         return True
 

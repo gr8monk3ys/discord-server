@@ -1,5 +1,8 @@
 """Pure creator-spotlight rules: parsing what members link, YouTube feeds, Twitch streams."""
 
+import html
+import json
+
 import pytest
 
 from logic import creators as C
@@ -200,3 +203,122 @@ def test_clean_title():
     assert len(C.clean_title("x" * 500)) == C.MAX_TITLE
     assert C.clean_title("x" * 500).endswith("…")
     assert C.clean_title("") == "Untitled"
+
+
+# ---------------------------------------------------------------- ownership verification
+def test_new_code_shape_and_alphabet():
+    codes = {C.new_code() for _ in range(200)}
+    assert len(codes) > 190  # random, not a counter
+    for code in codes:
+        assert C.CODE.fullmatch(code)
+        assert code.startswith("FD-") and len(code) == 3 + C.CODE_LEN
+        assert not set(code[3:]) & set("01OIL")  # nothing easy to misread
+
+
+def test_new_code_uses_given_choice():
+    picks = iter("7K2Q9X")
+    assert C.new_code(choice=lambda alphabet: next(picks)) == "FD-7K2Q9X"
+
+
+@pytest.mark.parametrize("text", [
+    "my code FD-7K2Q9X thanks", "FD-7K2Q9X", "fd-7k2q9x", "(FD-7K2Q9X)", "line\nFD-7K2Q9X\nline",
+    "FD‑7K2Q9X", "FD–7K2Q9X",
+])
+def test_code_in_finds_code(text):
+    assert C.code_in("FD-7K2Q9X", [text])
+
+
+@pytest.mark.parametrize("texts", [
+    [], [""], ["FD-7K2Q9"], ["FD-7K2Q9XY"], ["XFD-7K2Q9X"], ["FD 7K2Q9X"], ["FD-7K2Q9Z"], [None],
+])
+def test_code_in_rejects(texts):
+    assert not C.code_in("FD-7K2Q9X", texts)
+
+
+def test_code_in_any_of_several_texts():
+    assert C.code_in("FD-7K2Q9X", ["nope", "", "about me FD-7K2Q9X"])
+
+
+def test_pending_expiry():
+    assert not C.expired(1000, 1000 + C.CODE_TTL - 1)
+    assert C.expired(1000, 1000 + C.CODE_TTL)
+    assert C.expired(1000, 1000 + C.CODE_TTL * 5)
+
+
+def test_cooldown_left():
+    assert C.cooldown_left(None, 5000) == 0
+    assert C.cooldown_left(5000, 5000) == C.VERIFY_COOLDOWN
+    assert C.cooldown_left(5000, 5000 + 15) == C.VERIFY_COOLDOWN - 15
+    assert C.cooldown_left(5000, 5000 + C.VERIFY_COOLDOWN) == 0
+
+
+def channel_page(description="", og=None, meta=None, channel_id=UC):
+    og = description if og is None else og
+    meta = description if meta is None else meta
+    data = json.dumps({"metadata": {"channelMetadataRenderer": {
+        "title": "Cool Kid", "description": description, "externalId": channel_id}}})
+    return (f'<html><head><link rel="canonical" href="https://www.youtube.com/channel/{channel_id}">'
+            f'<meta name="description" content="{html.escape(meta)}">'
+            f'<meta content="{html.escape(og)}" property="og:description">'
+            f'</head><body><script>var ytInitialData = {data};</script></body></html>')
+
+
+def test_youtube_descriptions_reads_meta_og_and_json():
+    page = channel_page("hello & welcome\nFD-7K2Q9X")
+    texts = C.youtube_descriptions(page)
+    assert "hello & welcome\nFD-7K2Q9X" in texts  # from the JSON, newlines kept
+    assert any(t.startswith("hello & welcome") for t in texts)
+    assert C.code_in("FD-7K2Q9X", C.youtube_descriptions(page.encode()))
+
+
+def test_youtube_descriptions_each_source_alone():
+    assert C.code_in("FD-7K2Q9X", C.youtube_descriptions(channel_page("", og="FD-7K2Q9X")))
+    assert C.code_in("FD-7K2Q9X", C.youtube_descriptions(channel_page("", meta="FD-7K2Q9X")))
+    only_json = channel_page("x FD-7K2Q9X", og="", meta="")
+    assert C.code_in("FD-7K2Q9X", C.youtube_descriptions(only_json))
+
+
+def test_youtube_descriptions_new_header_view_model():
+    page = '{"descriptionPreviewViewModel":{"description":{"content":"bio \u0026 FD-7K2Q9X"}}}'
+    assert C.code_in("FD-7K2Q9X", C.youtube_descriptions(page))
+
+
+def test_youtube_descriptions_ignores_other_description_keys():
+    """A "description" elsewhere on the page (another channel, a video) is not the channel's."""
+    page = '{"videoRenderer":{"description":"FD-7K2Q9X"}} <meta name="keywords" content="FD-7K2Q9X">'
+    assert C.youtube_descriptions(page) == []
+
+
+def test_youtube_descriptions_caps_size():
+    huge = "x" * (C.MAX_DESCRIPTION * 3) + " FD-7K2Q9X"
+    texts = C.youtube_descriptions(channel_page(huge))
+    assert texts and all(len(t) <= C.MAX_DESCRIPTION for t in texts)
+    assert not C.code_in("FD-7K2Q9X", texts)
+    assert C.youtube_descriptions("") == [] and C.youtube_descriptions(b"\xff\xfe junk") == []
+
+
+def test_youtube_descriptions_survives_broken_json_escapes():
+    page = '"channelMetadataRenderer":{"title":"x","description":"bad \q escape FD-7K2Q9X"}'
+    assert isinstance(C.youtube_descriptions(page), list)
+
+
+def test_parse_feed_keeps_video_descriptions_without_changing_equality():
+    data = (f'<?xml version="1.0"?><feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" '
+            f'xmlns:media="http://search.yahoo.com/mrss/" xmlns="http://www.w3.org/2005/Atom"><title>t</title>'
+            f'<entry><yt:videoId>abcdefghijk</yt:videoId><title>v</title>'
+            f'<media:group><media:description>code FD-7K2Q9X</media:description></media:group></entry>'
+            f'</feed>').encode()
+    (v,) = C.parse_feed(data).videos
+    assert v.description == "code FD-7K2Q9X"
+    assert v == C.Video("abcdefghijk", "v")
+    assert C.code_in("FD-7K2Q9X", C.feed_descriptions(C.parse_feed(data)))
+
+
+def test_twitch_bio():
+    data = {"data": [{"id": "77", "login": "coolkid", "description": "streams FD-7K2Q9X"}]}
+    assert C.twitch_bio(data, "77") == "streams FD-7K2Q9X"
+    assert C.twitch_bio(data, "78") is None  # a different account answered
+    assert C.twitch_bio({"data": [{"id": "77", "description": None}]}, "77") == ""
+    assert C.twitch_bio({"data": []}, "77") is None and C.twitch_bio(None, "77") is None
+    long = {"data": [{"id": "77", "description": "y" * (C.MAX_DESCRIPTION + 50)}]}
+    assert len(C.twitch_bio(long, "77")) == C.MAX_DESCRIPTION

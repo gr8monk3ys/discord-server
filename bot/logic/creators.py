@@ -3,12 +3,19 @@ reading YouTube upload feeds and Twitch Helix stream lists. Pure: no Discord, no
 
 Everything that ends up in a post is rebuilt from validated ids (a watch URL from an
 11-character video id, a channel URL from a UC id, a Twitch URL from a login), never
-copied from a feed or from what a member typed."""
+copied from a feed or from what a member typed.
 
+Ownership: /creator link only starts a claim. The member puts a random code (FD-XXXXXX)
+in their channel description or Twitch bio and runs /creator verify; only verified links
+are announced, so nobody can claim a channel they don't control."""
+
+import html
+import json
 import re
+import secrets
 import xml.etree.ElementTree as ET
-from collections.abc import Collection, Iterable
-from dataclasses import dataclass
+from collections.abc import Callable, Collection, Iterable
+from dataclasses import dataclass, field
 from urllib.parse import urlsplit
 
 PLATFORMS = ("youtube", "twitch")
@@ -20,12 +27,19 @@ MAX_TITLE = 200
 MAX_NEW_PER_POLL = 3  # uploads announced per channel per poll; older extras are marked seen
 TOKEN_MARGIN = 5 * 60  # refresh the Twitch app token this long before it expires
 STREAMS_BATCH = 100  # Helix accepts up to 100 user_id params per request
+CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"  # no 0/O, 1/I/L
+CODE_LEN = 6
+CODE_TTL = 24 * 3600  # a pending claim must be verified within a day
+VERIFY_COOLDOWN = 60  # one /creator verify per member per minute
+MAX_DESCRIPTION = 5000  # YouTube allows 1,000 characters, Twitch 300; anything longer is cut
+MAX_DESCRIPTIONS = 6  # description candidates read from one page
 
 CHANNEL_ID = re.compile(r"UC[A-Za-z0-9_-]{22}")
 VIDEO_ID = re.compile(r"[A-Za-z0-9_-]{11}")
 HANDLE = re.compile(r"[A-Za-z0-9._-]{3,30}")
 TWITCH_LOGIN = re.compile(r"[a-z0-9_]{3,25}")
 TWITCH_ID = re.compile(r"[0-9]{1,20}")
+CODE = re.compile(rf"FD-[{CODE_ALPHABET}]{{{CODE_LEN}}}")
 YOUTUBE_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com"}
 TWITCH_HOSTS = {"twitch.tv", "www.twitch.tv", "m.twitch.tv"}
 # twitch.tv/<these> are site pages, not channels
@@ -33,6 +47,7 @@ TWITCH_RESERVED = {"directory", "videos", "settings", "downloads", "jobs", "p", 
                    "inventory", "wallet", "drops", "friends", "messages", "store", "turbo", "prime"}
 
 ATOM = "{http://www.w3.org/2005/Atom}"
+MEDIA = "{http://search.yahoo.com/mrss/}"
 YT = "{http://www.youtube.com/xml/schemas/2015}"
 
 
@@ -154,6 +169,7 @@ def extract_channel_id(html: str | bytes) -> str | None:
 class Video:
     id: str
     title: str
+    description: str = field(default="", compare=False, repr=False)  # only read when verifying
 
 
 @dataclass(frozen=True)
@@ -180,7 +196,8 @@ def parse_feed(data: bytes) -> Feed:
     for entry in root.findall(f"{ATOM}entry"):
         vid = (entry.findtext(f"{YT}videoId") or "").strip()
         if VIDEO_ID.fullmatch(vid):
-            videos.append(Video(vid, clean_title(entry.findtext(f"{ATOM}title") or "")))
+            desc = entry.findtext(f"{MEDIA}group/{MEDIA}description") or ""
+            videos.append(Video(vid, clean_title(entry.findtext(f"{ATOM}title") or ""), desc[:MAX_DESCRIPTION]))
     return Feed(clean_title(root.findtext(f"{ATOM}title") or ""), videos)
 
 
@@ -248,3 +265,91 @@ def token_expires_at(now: int, expires_in) -> int:
     except (TypeError, ValueError):
         seconds = 3600
     return now + max(seconds - TOKEN_MARGIN, 60)
+
+
+# ---------------------------------------------------------------- ownership verification
+def new_code(choice: Callable[[str], str] = secrets.choice) -> str:
+    """A fresh claim code like FD-7K2Q9X (about 30 bits from `secrets`)."""
+    return "FD-" + "".join(choice(CODE_ALPHABET) for _ in range(CODE_LEN))
+
+
+# Unicode hyphens and dashes that phones and text editors swap in for "-"
+_DASHES = str.maketrans(dict.fromkeys("‐‑‒–—−﹣－", "-"))
+
+
+def code_in(code: str, texts: Iterable[str | None]) -> bool:
+    """True if `code` appears as a whole word (any case, any dash) in one of `texts`."""
+    pattern = re.compile(rf"(?<![A-Z0-9]){re.escape(code.upper())}(?![A-Z0-9])")
+    for text in texts:
+        if isinstance(text, str) and text and pattern.search(text[:MAX_DESCRIPTION].translate(_DASHES).upper()):
+            return True
+    return False
+
+
+def expired(created_at: int, now: int) -> bool:
+    return now - created_at >= CODE_TTL
+
+
+def cooldown_left(last: int | None, now: int, period: int = VERIFY_COOLDOWN) -> int:
+    """Seconds until the member may run /creator verify again (0 = now)."""
+    if last is None:
+        return 0
+    return max(0, last + period - now)
+
+
+_META = re.compile(r"<meta\s[^>]{0,4000}>", re.IGNORECASE)
+_ATTR = re.compile(r"""([a-zA-Z:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')""")
+_JSON_STRING = r'"((?:[^"\\]|\\.){0,20000})"'
+# Only the channel's own description: its metadata renderer and the page header's preview.
+_JSON_DESCRIPTIONS = (
+    re.compile(r'"channelMetadataRenderer"\s*:\s*\{[^{}]{0,4000}?"description"\s*:\s*' + _JSON_STRING),
+    re.compile(r'"descriptionPreviewViewModel"\s*:\s*\{\s*"description"\s*:\s*\{\s*"content"\s*:\s*'
+               + _JSON_STRING),
+)
+
+
+def _cap(text: str) -> str:
+    return text[:MAX_DESCRIPTION]
+
+
+def youtube_descriptions(page: str | bytes) -> list[str]:
+    """Every copy of the channel description on a channel page: the description and
+    og:description meta tags and the description in the page's JSON. Other "description"
+    keys (videos, other channels) are ignored. Each is cut to MAX_DESCRIPTION."""
+    if isinstance(page, bytes):
+        page = page[:MAX_PAGE_BYTES].decode("utf-8", "replace")
+    page = page[:MAX_PAGE_BYTES]
+    out: list[str] = []
+    for tag in _META.finditer(page):
+        attrs = {m.group(1).lower(): m.group(2) if m.group(2) is not None else m.group(3)
+                 for m in _ATTR.finditer(tag.group(0))}
+        if (attrs.get("name", "").lower() == "description"
+                or attrs.get("property", "").lower() == "og:description") and attrs.get("content"):
+            out.append(_cap(html.unescape(attrs["content"])))
+    for pattern in _JSON_DESCRIPTIONS:
+        m = pattern.search(page)
+        if m:
+            try:
+                text = json.loads(f'"{m.group(1)}"')
+            except ValueError:
+                continue
+            if isinstance(text, str) and text:
+                out.append(_cap(text))
+    return out[:MAX_DESCRIPTIONS]
+
+
+def feed_descriptions(feed: Feed) -> list[str]:
+    """Descriptions of the uploads in a feed (only the channel owner can write these)."""
+    return [v.description for v in feed.videos if v.description]
+
+
+def twitch_bio(data, expected_id: str) -> str | None:
+    """The bio from a Helix /users reply, if the reply is for `expected_id`; else None."""
+    items = data.get("data") if isinstance(data, dict) else None
+    if not isinstance(items, list) or not items or not isinstance(items[0], dict):
+        return None
+    u = items[0]
+    if str(u.get("id", "")) != expected_id:
+        return None
+    bio = u.get("description")
+    return _cap(bio) if isinstance(bio, str) else ""

@@ -352,8 +352,11 @@ class Stats(commands.Cog):
         if tracking.value == "off":
             async with self.db.transaction() as tx:
                 await tx.execute("INSERT OR IGNORE INTO privacy_optout (user_id, at) VALUES (?, ?)", (uid, now()))
-                for table in ("voice_sessions", "game_sessions", "message_counts"):
+                for table in ("voice_sessions", "game_sessions", "message_counts", "xp"):
                     await tx.execute(f"DELETE FROM {table} WHERE user_id = ?", (uid,))
+                # Starter-quest steps that came from tracking (logic/quests.py).
+                await tx.execute("DELETE FROM quest_steps WHERE user_id = ? AND step IN ('say_hi', 'join_voice')",
+                                 (uid,))
             text = ("Done. Front Desk no longer tracks your voice time, messages or games, and your past stats "
                     "are deleted. Run `/privacy tracking:on` any time to start again.")
         else:
