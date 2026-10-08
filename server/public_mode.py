@@ -17,9 +17,13 @@ Steps, all driven by layout.py:
 - keep one permanent invite for listings and print it
 - add any missing Onboarding default channels
 - add the self-assign Onboarding prompts (platform, region, Game Night pings) if missing
+- fill AutoMod gaps: create Discord's built-in rules the server doesn't have yet (spam,
+  mention spam, slur/sexual-content preset, invite links to other servers); never edits or
+  deletes an existing rule
 """
 
 import argparse
+import datetime
 import os
 import sys
 from pathlib import Path
@@ -65,6 +69,21 @@ MAX_PROMPTS = 15  # Discord's limit
 # Discord also caps the questions shown before joining; the others go to Channels & Roles
 # (post-join). If Discord still says there are too many, every new one goes post-join.
 TOO_MANY_QUESTIONS = "Too many questions"
+
+
+# AutoMod gaps (matched by trigger type, not name, so rules made by hand in Server Settings count).
+# Alerts go to the mod log; Keeper/Moderator and the staff category are exempt. Front Desk itself
+# has Manage Server, which AutoMod always exempts, so its partner posts are never blocked.
+AUTOMOD_ALERTS = "📋・mod-log"
+AUTOMOD_EXEMPT_CATEGORY = "00 · staff"
+AUTOMOD_BLOCKED = "Blocked by AutoMod. Ask a Keeper if that was a mistake."
+AUTOMOD_INVITES = "Front Desk: invite links"
+AUTOMOD_INVITE_BLOCKED = "Invite links to other servers aren't allowed. Partners apply with /partner apply."
+# Discord's regex flavour (Rust); at most 260 characters each.
+INVITE_PATTERNS = [r"(?i)discord(?:app)?\.com/invite/[a-z0-9-]+", r"(?i)discord\.gg/[a-z0-9-]+", r"(?i)dsc\.gg/[a-z0-9-]+"]
+INVITE_MARKERS = ("discord.gg", r"discord\.gg", "/invite")  # an existing rule with any of these counts
+MAX_KEYWORD_RULES = 6  # Discord's per-server limit for keyword rules
+MAX_ALLOW_LIST = 100
 
 
 class PublicMode:
@@ -323,6 +342,91 @@ class PublicMode:
         await self.do("add", "onboarding prompts: " + "; ".join(
             f"{spec['title']} ({', '.join(o.title for o in options)})" for spec, options in add), edit)
 
+    # ------------------------------------------------------------ automod gaps
+    @staticmethod
+    def blocks_invites(rule) -> bool:
+        t = rule.trigger
+        if t.type != discord.AutoModRuleTriggerType.keyword:
+            return False
+        text = " ".join([*t.keyword_filter, *t.regex_patterns]).lower()
+        return any(m in text for m in INVITE_MARKERS)
+
+    async def own_invite_codes(self):
+        """This server's permanent invites (and vanity URL): sharing those is fine."""
+        codes = []
+        try:
+            codes = [i.code for i in await self.guild.invites() if i.max_age == 0]
+        except discord.HTTPException as e:
+            print(f"  note    couldn't list invites ({e.text or e}); own invites won't be allow-listed")
+        vanity = getattr(self.guild, "vanity_url_code", None)
+        if vanity:
+            codes.append(vanity)
+        return [f"discord.gg/{c}" for c in dict.fromkeys(codes)][:MAX_ALLOW_LIST]
+
+    async def automod_gaps(self):
+        print("\nAutoMod gaps")
+        try:
+            rules = await self.guild.fetch_automod_rules()
+        except discord.HTTPException as e:
+            print(f"  skip    ({e.text or e})")
+            return
+        T = discord.AutoModRuleTriggerType
+        have = {r.trigger.type for r in rules}
+        alerts = self.channel(AUTOMOD_ALERTS)
+        if alerts is None:
+            print(f"! skip    no {AUTOMOD_ALERTS} channel for alerts (run setup_server.py)")
+            return
+        exempt_roles = [r for r in map(self.role, layout.AUTOMOD_EXEMPT_ROLES) if r]
+        staff = self.channel(AUTOMOD_EXEMPT_CATEGORY)
+        exempt_channels = [staff] if staff is not None else []
+        alert = discord.AutoModRuleAction(channel_id=alerts.id)
+
+        def block(msg=AUTOMOD_BLOCKED):
+            return discord.AutoModRuleAction(custom_message=msg)
+
+        wanted = []  # (name, trigger, actions, summary)
+        if T.spam in have:
+            print("  ok      spam filter")
+        else:
+            wanted.append(("Front Desk: spam", discord.AutoModTrigger(type=T.spam), [block(), alert],
+                           "suspected spam"))
+        if T.mention_spam in have:
+            print("  ok      mention spam limit")
+        else:
+            wanted.append(("Front Desk: mention raids",
+                           discord.AutoModTrigger(mention_limit=layout.MENTION_LIMIT, mention_raid_protection=True),
+                           [block(), alert, discord.AutoModRuleAction(duration=datetime.timedelta(minutes=10))],
+                           f"more than {layout.MENTION_LIMIT} mentions, raid protection, 10 min timeout"))
+        preset = next((r for r in rules if r.trigger.type == T.keyword_preset), None)
+        if preset is None:
+            wanted.append(("Front Desk: slurs",
+                           discord.AutoModTrigger(presets=discord.AutoModPresets(slurs=True, sexual_content=True)),
+                           [block(), alert], "slurs and sexual content presets"))
+        else:
+            lacking = [p for p in ("slurs", "sexual_content") if not getattr(preset.trigger.presets, p)]
+            if lacking:  # Discord allows one preset rule; this step never edits it
+                print(f"! note    {preset.name} lacks the {' and '.join(p.replace('_', ' ') for p in lacking)} "
+                      "preset: turn it on in Server Settings -> AutoMod")
+            else:
+                print("  ok      slur and sexual-content presets")
+        if any(self.blocks_invites(r) for r in rules):
+            print("  ok      invite links")
+        elif sum(r.trigger.type == T.keyword for r in rules) >= MAX_KEYWORD_RULES:
+            print(f"! skip    invite links: the server already has {MAX_KEYWORD_RULES} keyword rules (Discord's limit)")
+        else:
+            allow = await self.own_invite_codes()
+            wanted.append((AUTOMOD_INVITES,
+                           discord.AutoModTrigger(type=T.keyword, regex_patterns=INVITE_PATTERNS, allow_list=allow),
+                           [block(AUTOMOD_INVITE_BLOCKED), alert],
+                           f"invite links to other servers ({len(allow)} of ours allowed)"))
+        exempt = ", ".join([*(f"@{r.name}" for r in exempt_roles), *(c.name for c in exempt_channels)]) or "nobody"
+        for name, trigger, actions, summary in wanted:
+            await self.do("create", f"{name}: {summary}; alerts to #{alerts.name}; exempt {exempt}",
+                          lambda name=name, trigger=trigger, actions=actions: self.guild.create_automod_rule(
+                              name=name, event_type=discord.AutoModRuleEventType.message_send, trigger=trigger,
+                              actions=actions, enabled=True, exempt_roles=exempt_roles,
+                              exempt_channels=exempt_channels, reason="Public server: AutoMod gaps"))
+
     async def run(self) -> bool:
         mode = "APPLYING" if self.apply else "DRY RUN (nothing changes; add --apply to do it)"
         print(f"{self.guild.name}: {mode}")
@@ -336,6 +440,7 @@ class PublicMode:
         await self.invite()
         await self.onboarding()
         await self.onboarding_prompts()
+        await self.automod_gaps()
         print("\nDone." if self.apply else "\nThat's the plan. Run again with --apply.")
         return True
 
