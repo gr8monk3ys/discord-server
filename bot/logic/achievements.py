@@ -73,6 +73,8 @@ BADGES: tuple[Badge, ...] = (
     Badge("birthday", "🎂", "Party Planner", "Set your birthday with /birthday", lambda f: f.birthday_set),
     Badge("recruiter", "🧲", "Recruiter", "Invite 3 people who stay", lambda f: f.recruiter),
     Badge("early_member", "🌱", "Founding Member", "Joined before November 2026", lambda f: f.early_member),
+    # Granted by cogs/quests.py when the starter quest is finished, never by the sweep.
+    Badge("starter", "🧭", "Settled In", "Finish the starter quest (/quest)", lambda f: False),
 )
 BY_KEY = {b.key: b for b in BADGES}
 TOTAL = len(BADGES)

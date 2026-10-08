@@ -45,7 +45,13 @@ MODULES = [
     ("cogs.cards", {"members"}),  # welcome cards after Onboarding
     ("cogs.tournaments", set()),  # /tournament create/start/cancel/bracket, brackets with prizes
     ("cogs.achievements", {"members"}),  # badges, /profile, /badges
-    ("cogs.creators", set()),  # /creator link|unlink|list|remove, YouTube + Twitch alerts
+    ("cogs.creators", set()),  # /creator link|verify|approve|unlink|list|remove, YouTube + Twitch alerts
+    ("cogs.levels", {"members", "message_content"}),  # XP from chat + voice, level roles, /rank, /levels, /xp
+    ("cogs.recap", {"members"}),  # weekly recap, owner digest, member milestones, monthly invite contest
+    ("cogs.selfroles", set()),  # #roles self-assign panel + /roles
+    ("cogs.partners", set()),  # /partner apply|remove, partner review cards, weekly dead-invite sweep
+    ("cogs.quests", {"members"}),  # starter quest: /quest, 500-coin reward, day-1 nudge DM
+    ("cogs.heartbeat", set()),  # heartbeat file for server/watchdog.py
 ]
 
 PERMISSIONS = discord.Permissions(

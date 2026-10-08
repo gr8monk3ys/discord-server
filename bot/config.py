@@ -53,6 +53,15 @@ WELCOME_CHANNEL = "👋・welcome"  # welcome cards go here
 TOURNAMENTS_CHANNEL = "🏆・tournaments"
 CREATORS_CHANNEL = "📺・creators"  # live / new-upload announcements
 TOURNEY_ROLE = "Tournament Champ"
+# Wave 2
+ROLES_CHANNEL = "🎭・roles"  # self-assign role panel
+PARTNERS_CHANNEL = "🤝・partners"  # approved partner servers
+GAMENIGHT_ROLE = "Game Night"  # opt-in: pinged when a game night starts
+LEVEL_ROLES = [(5, "Regular"), (10, "Veteran"), (20, "Elite"), (30, "Legend"), (50, "Mythic")]
+PLATFORM_ROLES = ["PC", "PlayStation", "Xbox", "Switch", "Mobile"]
+REGION_ROLES = ["NA", "EU", "LATAM", "Asia", "OCE"]
+PLAYTIME_ROLES = ["Early Bird", "Night Owl", "Weekend Warrior"]
+HEARTBEAT_FILE = DATA_DIR / "heartbeat"  # written every minute; server/watchdog.py reads it
 SQUAD_VOICE = "🎮 Squad"
 LOBBY_VOICE = "🔊 Lobby"
 MODES = ("Ranked", "Casual")

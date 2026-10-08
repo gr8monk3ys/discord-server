@@ -29,7 +29,7 @@ The bot and scripts share one virtualenv at `server/.venv` (gitignored); it runs
 
 - Install: `python -m venv server/.venv`, then `pip install -r bot/requirements.txt` (a superset
   of `server/requirements.txt`, adds pytest). `server/tests` also need `pillow`.
-- Bot tests: `cd bot && ../server/.venv/Scripts/python -m pytest -q` (~1,200 tests, about a minute)
+- Bot tests: `cd bot && ../server/.venv/Scripts/python -m pytest -q` (~1,900 tests, about a minute)
 - Server tests: `cd server && .venv/Scripts/python -m pytest -q tests`
 - Every server script dry-runs by default and changes Discord only with `--apply`.
 - `python main.py --invite` (in `bot/`) prints the invite link with the permissions the bot needs.
@@ -55,6 +55,8 @@ There is no CI; run both test suites before pushing.
   `public_mode.py`, which only adds. Roles the bot hands out must sit below it.
 - The live bot runs from a scheduled task and holds `bot/data/bot.lock`; stop the task before
   running `main.py` by hand (README runbook).
+- The "Front Desk watchdog" task restarts the bot if `bot/data/heartbeat` goes stale; run
+  `python server/watchdog.py --pause 60` before stopping the bot on purpose.
 - Keep the `front-desk-bot` branch: the bot's public privacy-policy link points at `PRIVACY.md`
   on that branch. After changing `PRIVACY.md` on `main`, fast-forward that branch to `main`.
 - Soundboard uploads must be MP3 (discord.py only accepts MP3); `make_sounds.py` needs ffmpeg.

@@ -157,6 +157,19 @@ day-to-day attention. Design and history:
 | Moderation | `/warn`, `/timeout`, `/untimeout`, `/cases`, `/purge`; auto-escalation, anti-spam, anti-raid |
 | Operations | daily DB backup 04:00, error alerts, back-online note, weekly config drift check, `/status` |
 | Utility | `/remind`, `/reminders`, `/afk`, suggestion voting, member/online stat channels, tickets in 🆘・help |
+| Welcome cards | an image card in 👋・welcome when someone finishes Onboarding |
+| Tournaments | `/tournament create/start/cancel/bracket`; sign-up buttons, brackets with byes, both players confirm results, 1000/400 coin prizes, Tournament Champ role |
+| Achievements | 21 badges, `/profile`, `/badges`; checked on activity and hourly |
+| Creators | `/creator link/verify/unlink/list` (members prove ownership with a code in their channel description), staff `/creator approve/remove`; YouTube uploads and Twitch go-live in 📺・creators |
+| Levels | XP from chat (60 s cooldown) and voice; Regular/Veteran/Elite/Legend/Mythic at levels 5/10/20/30/50; `/rank` card, `/levels`, staff `/xp` |
+| Recap | weekly recap in 📣・announcements Mondays 10:00, owner digest by DM 10:05, member milestones, monthly invite contest (1500/750/300 coins) on the 1st |
+| Self roles | button panel in 🎭・roles (platform, region, play time, pings, games), `/roles`; Game Night role pinged when a game night starts |
+| Partners | `/partner apply` → staff review card in 📋・mod-log → 🤝・partners; weekly dead-invite sweep; staff `/partner remove` |
+| Starter quest | `/quest`: pick roles, say hi, join a squad, claim `/daily`, join voice; 500 coins and the Settled In badge; one nudge DM after a day |
+| Heartbeat | writes `bot/data/heartbeat` every minute for the watchdog |
+
+Landing page: <https://gr8monk3ys.github.io/discord-server/> (`site/`, deployed by
+`.github/workflows/pages.yml`). Listing-site copy and banners: `docs/LISTING.md`, `assets/listing/`.
 
 All times are Pacific. Every scheduled job catches up once after downtime and never runs twice.
 
@@ -169,6 +182,10 @@ All times are Pacific. Every scheduled job catches up once after downtime and ne
   **Backups:** `D:\Backups\front-desk\`, 14 days kept, integrity-checked.
 - **Health:** errors and "back online" notes are posted in 📋・mod-log; `/status` (staff only)
   shows uptime, latency, last backup and error counts.
+- **Watchdog:** Task Scheduler task "Front Desk watchdog" runs `server\watchdog.py` every 5
+  minutes. If the heartbeat is older than 10 minutes it restarts the bot task (at most 3 times an
+  hour) and alerts 📋・mod-log through the webhook in `server\.env` (`WATCHDOG_WEBHOOK_URL`,
+  `WATCHDOG_PING_USER_ID`). Install or update it with `server\install_watchdog.ps1`.
 
 ### Runbook
 
@@ -179,8 +196,9 @@ All times are Pacific. Every scheduled job catches up once after downtime and ne
 | Change the task | Needs an **elevated** PowerShell (the task runs as S4U) |
 | Restore the database | Stop the task, copy the newest `D:\Backups\front-desk\front_desk-*.db` over `bot\data\front_desk.db`, start the task |
 | A role won't be given out | The role must sit **below Front Desk** in Server Settings → Roles. Only the owner can move roles above the bot |
-| Run by hand (debugging) | Stop the task first, then `bot\run_bot.bat` |
-| Tests | `cd bot`, then `..\server\.venv\Scripts\python -m pytest -q` (about 1,200 tests) |
+| Run by hand (debugging) | `python server\watchdog.py --pause 60` first (or it restarts the task), stop the task, then `bot\run_bot.bat`; `--resume` afterwards |
+| Watchdog status | `python server\watchdog.py --check` |
+| Tests | `cd bot`, then `..\server\.venv\Scripts\python -m pytest -q` (about 1,900 tests) |
 
 Required in the Developer Portal: the **Server Members**, **Message Content** and **Presence**
 intents. Required on the Front Desk role: the permissions printed by `main.py --invite`

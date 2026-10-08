@@ -209,3 +209,77 @@ def test_public_mode_hoists_existing_unhoisted_role():
     asyncio.run(public_mode.PublicMode(guild, apply=True).roles())
     assert edits == [{"hoist": True, "reason": "Public server"}]
     assert not [c for c in guild.calls if c[0] == "role"]
+
+
+# ------------------------------------------------------------ onboarding prompts (self-assign roles)
+
+
+def _onboarding_guild(prompts=(), role_names=None):
+    names = role_names if role_names is not None else [
+        o["role"] for p in public_mode.ONBOARDING_PROMPTS for o in p["options"]]
+    guild = FakeGuild(roles=[FakeRole(id=200 + i, name=n, position=5) for i, n in enumerate(names)])
+    ob = NS(prompts=list(prompts))
+    edits = []
+
+    async def onboarding():
+        return ob
+
+    async def edit_onboarding(**kw):
+        edits.append(kw)
+    guild.onboarding = onboarding
+    guild.edit_onboarding = edit_onboarding
+    return guild, edits
+
+
+def _existing_prompt(title):
+    return discord.OnboardingPrompt(type=discord.OnboardingPromptType.multiple_choice, title=title,
+                                    options=[discord.OnboardingPromptOption(title="x", roles=[discord.Object(9)])])
+
+
+def test_onboarding_prompts_added_after_existing_ones():
+    old = [_existing_prompt("What do you play?"), _existing_prompt("Want squad pings?")]
+    guild, edits = _onboarding_guild(old)
+    asyncio.run(public_mode.PublicMode(guild, apply=True).onboarding_prompts())
+    [kw] = edits
+    assert set(kw) == {"prompts"}  # default channels and the enabled flag are left alone
+    prompts = kw["prompts"]
+    assert prompts[:2] == old  # never removed or reordered
+    new = {p.title: p for p in prompts[2:]}
+    assert list(new) == ["What do you play on?", "Where are you?", "Want pings?"]
+    assert new["What do you play on?"].single_select is False
+    assert new["Where are you?"].single_select is True
+    assert all(p.required is False for p in new.values())
+    by_name = {r.name: r.id for r in guild.roles}
+    assert [o.role_ids for o in new["What do you play on?"].options] == [
+        {by_name[n]} for n in ("PC", "PlayStation", "Xbox", "Switch", "Mobile")]
+    assert [o.role_ids for o in new["Want pings?"].options] == [{by_name["Game Night"]}]
+
+
+def test_onboarding_prompts_dry_run_changes_nothing(capsys):
+    guild, edits = _onboarding_guild()
+    asyncio.run(public_mode.PublicMode(guild, apply=False).onboarding_prompts())
+    assert edits == []
+    assert "Where are you?" in capsys.readouterr().out
+
+
+def test_onboarding_prompts_rerun_is_a_noop():
+    have = [_existing_prompt(p["title"]) for p in public_mode.ONBOARDING_PROMPTS]
+    guild, edits = _onboarding_guild(have)
+    asyncio.run(public_mode.PublicMode(guild, apply=True).onboarding_prompts())
+    assert edits == []
+
+
+def test_onboarding_prompts_skip_missing_roles():
+    guild, edits = _onboarding_guild(role_names=["PC", "Xbox"])
+    asyncio.run(public_mode.PublicMode(guild, apply=True).onboarding_prompts())
+    [kw] = edits
+    [p] = kw["prompts"]  # region and ping roles don't exist yet: those prompts wait for a re-run
+    assert p.title == "What do you play on?"
+    assert [o.title for o in p.options] == ["PC", "Xbox"]
+
+
+def test_onboarding_prompts_respect_discord_limit():
+    full = [_existing_prompt(f"q{i}") for i in range(public_mode.MAX_PROMPTS - 1)]
+    guild, edits = _onboarding_guild(full)
+    asyncio.run(public_mode.PublicMode(guild, apply=True).onboarding_prompts())
+    assert edits == []

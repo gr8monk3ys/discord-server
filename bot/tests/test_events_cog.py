@@ -448,6 +448,22 @@ def test_reminder_event_name_with_role_mention_cannot_ping(monkeypatch):
     with_env(go, monkeypatch)
 
 
+def test_reminder_pings_game_night_role_when_it_exists(monkeypatch):
+    async def go(env):
+        gn = FakeRole(710, config.GAMENIGHT_ROLE)
+        env.guild.roles.append(gn)
+        ev = await make_night(env, interested=[A])
+        ev.name = "<@&700> @everyone"
+        env.t = ts(2026, 10, 7, 21) - 10 * MIN
+        await env.cog.run_reminders()
+        [post] = env.guild.valorant.sent
+        assert post["content"].startswith(gn.mention)
+        am = post["allowed_mentions"]
+        assert [r.id for r in am.roles] == [gn.id]  # never the game role named in the title
+        assert [u.id for u in am.users] == [A] and am.everyone is False
+    with_env(go, monkeypatch)
+
+
 def test_reminder_cancelled_and_deleted_events(monkeypatch):
     async def go(env):
         ev1 = await make_night(env, interested=[A])

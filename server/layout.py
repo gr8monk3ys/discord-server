@@ -60,6 +60,13 @@ ROLES = [
     {"name": "Clip of the Week"},  # given by Front Desk to the weekly clip winner
     {"name": "Recruiter"},  # 3+ people you invited stayed
     {"name": "Bumper", "mentionable": True},  # opt-in: /bumpping on
+    {"name": "Game Night", "mentionable": True},  # opt-in: pinged when a game night starts
+    # Level rewards (Front Desk, from XP).
+    {"name": "Mythic"}, {"name": "Legend"}, {"name": "Elite"}, {"name": "Veteran"}, {"name": "Regular"},
+    # Self-assign: platform, region, play time (#roles panel and Onboarding).
+    *({"name": n} for n in ("PC", "PlayStation", "Xbox", "Switch", "Mobile")),
+    *({"name": n} for n in ("NA", "EU", "LATAM", "Asia", "OCE")),
+    *({"name": n} for n in ("Early Bird", "Night Owl", "Weekend Warrior")),
     *({"name": role, "mentionable": True} for _, _, role in GAMES),
 ]
 
@@ -76,6 +83,7 @@ CATEGORIES = [
             {"name": "📣・announcements", "topic": "Game nights, updates, server news.", "read_only": True},
             {"name": "👋・welcome", "topic": "New faces land here.", "read_only": True, "system": True, "post": "welcome"},
             {"name": "🆘・help", "topic": "Need a mod? Press the button to open a private ticket.", "read_only": True},
+            {"name": "🎭・roles", "topic": "Pick your platform, region and pings with the buttons.", "read_only": True},
             {
                 "name": "💡・suggestions",
                 "type": "forum",
@@ -129,6 +137,7 @@ CATEGORIES = [
             {"name": "♟️・chess", "topic": "Games, puzzles, and challenges."},
             {"name": "🤖・bot-commands", "topic": "Music (/play), bump reminders, and other bot spam."},
             {"name": "📺・creators", "topic": "Members' streams and uploads. Link yours with /creator.", "read_only": True},
+            {"name": "🤝・partners", "topic": "Servers we partner with. Apply with /partner apply.", "read_only": True},
         ],
     },
     {
@@ -225,7 +234,7 @@ COMMUNITY = {
 ONBOARDING_DEFAULT_CHANNELS = [
     "📌・rules", "📣・announcements", "👋・welcome", "💬・general",
     "🆘・help", "💡・suggestions", "🤣・memes", "📸・clips", "⭐・hall-of-fame", "🔢・counting", "🕹️・gaming", "🎮・lfg", "🎨・art", "💻・code",
-    "👗・fashion", "♟️・chess", "🤖・bot-commands", "📺・creators", "🏆・tournaments",
+    "👗・fashion", "♟️・chess", "🤖・bot-commands", "📺・creators", "🏆・tournaments", "🎭・roles", "🤝・partners",
     "🔊 Lobby", "➕ New Squad", "🎮 Squad", "💤 AFK",
 ]
 # Anything public that's neither a default channel nor an Onboarding option is
