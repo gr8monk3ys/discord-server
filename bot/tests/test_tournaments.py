@@ -269,3 +269,134 @@ def test_render_marks_reported_and_disputed():
 def test_render_unknown_name_falls_back():
     b = Bracket.build([1, 2])
     assert "?" in T.render_bracket(b, lambda uid: None)
+
+
+# ---------------------------------------------------------------- the monthly auto tournament
+from datetime import date, datetime  # noqa: E402
+from zoneinfo import ZoneInfo  # noqa: E402
+
+import config  # noqa: E402
+from logic.quests import MIN_ACCOUNT_DAYS  # noqa: E402
+
+TZ = ZoneInfo("America/Los_Angeles")
+HOUR, DAY = 3600, 86400
+
+
+def ts(y, mo, d, h=0, mi=0):
+    return int(datetime(y, mo, d, h, mi, tzinfo=TZ).timestamp())
+
+
+@pytest.mark.parametrize("y,m,d", [(2026, 10, 5), (2026, 11, 2), (2026, 12, 7), (2027, 2, 1), (2026, 6, 1)])
+def test_first_monday(y, m, d):
+    assert T.first_monday(y, m) == date(y, m, d)
+
+
+def test_monthly_occurrence_key_time_and_window():
+    p = T.monthly_occurrence(T.AUTO_JOB, 2026, 10, TZ)
+    assert p.key == "autotourney:2026-10"
+    assert p.scheduled_at == ts(2026, 10, 5, 12)
+    assert p.window_end == p.scheduled_at
+    assert p.window_start == ts(2026, 9, 5, 12)  # 30 local days back
+
+
+def test_latest_monthly_before_and_after_the_first_monday():
+    assert T.latest_monthly(T.AUTO_JOB, ts(2026, 10, 5, 11, 59), TZ).key == "autotourney:2026-09"
+    assert T.latest_monthly(T.AUTO_JOB, ts(2026, 10, 5, 12), TZ).key == "autotourney:2026-10"
+    assert T.latest_monthly(T.AUTO_JOB, ts(2026, 10, 31, 23), TZ).key == "autotourney:2026-10"
+    assert T.latest_monthly(T.AUTO_JOB, ts(2027, 1, 1), TZ).key == "autotourney:2026-12"
+
+
+def test_plan_monthly_first_run_only_marks_done():
+    p = T.plan_monthly(T.AUTO_JOB, ts(2026, 10, 7), TZ, set(), None)
+    assert p.run is None and [x.key for x in p.mark_done] == ["autotourney:2026-10"]
+
+
+def test_plan_monthly_period_before_first_seen_is_marked_not_run():
+    p = T.plan_monthly(T.AUTO_JOB, ts(2026, 10, 7), TZ, set(), ts(2026, 10, 6))
+    assert p.run is None and [x.key for x in p.mark_done] == ["autotourney:2026-10"]
+
+
+def test_plan_monthly_runs_latest_and_marks_missed():
+    first_seen = ts(2026, 8, 20)
+    p = T.plan_monthly(T.AUTO_JOB, ts(2026, 11, 3), TZ, set(), first_seen)
+    assert p.run.key == "autotourney:2026-11"
+    assert [x.key for x in p.mark_done] == ["autotourney:2026-09", "autotourney:2026-10"]
+
+
+def test_plan_monthly_done_is_nothing():
+    p = T.plan_monthly(T.AUTO_JOB, ts(2026, 11, 3), TZ, {"autotourney:2026-11"}, ts(2026, 1, 1))
+    assert p.run is None and p.mark_done == []
+
+
+def test_auto_start_is_the_following_saturday_evening():
+    assert T.auto_starts_at(date(2026, 10, 5), TZ) == ts(2026, 10, 10, 19)
+    assert T.auto_starts_at(date(2026, 11, 2), TZ) == ts(2026, 11, 7, 19)  # across the DST change
+
+
+def test_auto_game_prefers_the_top_game_else_rotates():
+    games = config.GAMES
+    top = games[2]
+    assert T.auto_game(top, 2026, 10, games) is top
+    picks = [T.auto_game(None, 2026, m, games) for m in range(1, len(games) + 1)]
+    assert len({g.key for g in picks}) == len(games)  # every game once a cycle
+    assert T.auto_game(None, 2027, 1, games) is T.auto_game(None, 2027, 1, games)  # deterministic
+    assert T.auto_game(None, 2026, 12, games) is not T.auto_game(None, 2027, 1, games)  # keeps rotating
+
+
+def test_auto_name_fits_the_column():
+    name = T.auto_name(config.GAMES[0], date(2026, 10, 5))
+    assert "October 2026" in name and config.GAMES[0].role in name and len(name) <= 60
+    assert T.auto_name(None, date(2026, 10, 5)) == "Monthly Cup · October 2026"
+
+
+def test_too_late_to_create():
+    start = ts(2026, 10, 10, 19)
+    assert not T.too_late_to_create(start - 2 * DAY, start)
+    assert T.too_late_to_create(start - T.CREATE_MARGIN + 1, start)
+
+
+def test_can_join_needs_an_old_enough_account():
+    t = ts(2026, 10, 7)
+    assert T.can_join(t - MIN_ACCOUNT_DAYS * DAY, t)
+    assert not T.can_join(t - MIN_ACCOUNT_DAYS * DAY + 1, t)
+    assert not T.can_join(None, t)
+
+
+def test_auto_start_outcome():
+    assert T.start_outcome(T.AUTO_MIN_ENTRANTS) == "start"
+    assert T.start_outcome(T.AUTO_MIN_ENTRANTS - 1) == "cancel"
+    assert T.start_outcome(0) == "cancel"
+
+
+def test_reminder_due_window():
+    start = ts(2026, 10, 10, 19)
+    created = start - 3 * DAY
+    assert not T.reminder_due(start, created, start - T.REMIND_BEFORE - 1, False)
+    assert T.reminder_due(start, created, start - T.REMIND_BEFORE, False)
+    assert T.reminder_due(start, created, start - 1, False)
+    assert not T.reminder_due(start, created, start, False)  # it's starting: no reminder
+    assert not T.reminder_due(start, created, start - 60, True)  # once
+    assert not T.reminder_due(None, created, start - 60, False)
+    assert not T.reminder_due(start, start - 30 * 60, start - 60, False)  # made inside the hour
+
+
+def test_stale_action_open_match():
+    o = 1_000_000
+    assert T.stale_action(T.OPEN, o, o + T.NUDGE_AFTER - 1, False, False) is None
+    assert T.stale_action(T.OPEN, o, o + T.NUDGE_AFTER, False, False) == T.Stale.NUDGE
+    assert T.stale_action(T.OPEN, o, o + T.NUDGE_AFTER + 5, True, False) is None
+    assert T.stale_action(T.OPEN, o, o + T.STALE_AFTER, True, False) == T.Stale.FLAG
+    assert T.stale_action(T.OPEN, o, o + T.STALE_AFTER, False, False) == T.Stale.FLAG  # missed the 24 h
+    assert T.stale_action(T.OPEN, o, o + 10 * DAY, True, True) is None  # flagged once, staff decide
+
+
+def test_stale_action_reported_match_stands_after_48h():
+    o = 1_000_000
+    assert T.stale_action(T.REPORTED, o, o + T.STALE_AFTER - 1, False, False) is None
+    assert T.stale_action(T.REPORTED, o, o + T.NUDGE_AFTER, False, False) is None  # no nudge
+    assert T.stale_action(T.REPORTED, o, o + T.STALE_AFTER, False, False) == T.Stale.ACCEPT
+
+
+@pytest.mark.parametrize("status", [T.CONFLICT, T.DONE, T.BYE, T.PENDING])
+def test_stale_action_ignores_other_states(status):
+    assert T.stale_action(status, 0, 100 * DAY, False, False) is None

@@ -5,14 +5,22 @@ Rounds are numbered from 1; slots from 0. The winner of (round, slot) plays in
 (round + 1, slot // 2), as P1 from an even slot and P2 from an odd one. The bracket
 is sized to the next power of two of the entrant count, so byes (< half the slots)
 always face a real player and go to the top seeds.
+
+The monthly auto tournament (first Monday 12:00 local, starts the following Saturday 19:00)
+is planned like logic/schedule.py's weekly jobs: only the latest due month can run, the first
+run only marks it done, and missed months are marked done without running.
 """
 
 from __future__ import annotations
 
 import random
 from dataclasses import dataclass, replace
+from datetime import date, datetime, time, timedelta, tzinfo
 from enum import Enum
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Sequence
+
+from logic.quests import MIN_ACCOUNT_DAYS
+from logic.schedule import Plan
 
 SIZES = (4, 8, 16, 32)  # signup caps staff can pick
 PRIZE_FIRST = 1000
@@ -254,3 +262,155 @@ def render_bracket(bracket: Bracket, name_of: Callable[[int], str | None]) -> st
     if champ is not None:
         lines += ["", f"Champion: {name(champ)}"]
     return "```\n" + "\n".join(lines) + "\n```"
+
+
+# ---------------------------------------------------------------- joining
+DAY = 24 * 60 * 60
+HOUR = 60 * 60
+
+
+def can_join(created_at: int | None, now: int) -> bool:
+    """Discord accounts younger than MIN_ACCOUNT_DAYS (from logic/quests.py) can't sign up,
+    so fresh alts can't fill a bracket and hand someone a walkover to the prize."""
+    return created_at is not None and now - created_at >= MIN_ACCOUNT_DAYS * DAY
+
+
+# ---------------------------------------------------------------- the monthly auto tournament
+AUTO_SIZE = 16
+AUTO_MIN_ENTRANTS = 4  # fewer than this at the start time: cancelled
+AUTO_WINDOW_DAYS = 30  # "most played game" looks this far back
+AUTO_START_WEEKDAY = 5  # Saturday
+AUTO_START = time(19, 0)
+CREATE_MARGIN = DAY  # a creation this close to the start (bot was down) is skipped
+REMIND_BEFORE = HOUR
+NUDGE_AFTER = DAY  # an unreported match pings both players once
+STALE_AFTER = 2 * DAY  # then: a lone report stands, or staff are flagged
+
+
+@dataclass(frozen=True)
+class Monthly:
+    name: str
+    hour: int
+    minute: int
+
+
+AUTO_JOB = Monthly("autotourney", 12, 0)
+
+
+@dataclass(frozen=True)
+class MonthlyPeriod:
+    key: str  # f"{name}:{year}-{month:02}"
+    scheduled_at: int
+    window_start: int  # AUTO_WINDOW_DAYS local days earlier, same wall-clock time
+    window_end: int  # == scheduled_at
+
+    @property
+    def year(self) -> int:
+        return int(self.key.rsplit(":", 1)[1].split("-")[0])
+
+    @property
+    def month(self) -> int:
+        return int(self.key.rsplit("-", 1)[1])
+
+
+def first_monday(year: int, month: int) -> date:
+    d = date(year, month, 1)
+    return d + timedelta(days=(0 - d.weekday()) % 7)
+
+
+def _prev_month(year: int, month: int) -> tuple[int, int]:
+    return (year - 1, 12) if month == 1 else (year, month - 1)
+
+
+def monthly_occurrence(job: Monthly, year: int, month: int, tz: tzinfo) -> MonthlyPeriod:
+    day = first_monday(year, month)
+    at = int(datetime.combine(day, time(job.hour, job.minute), tzinfo=tz).timestamp())
+    start = int(datetime.combine(day - timedelta(days=AUTO_WINDOW_DAYS), time(job.hour, job.minute),
+                                 tzinfo=tz).timestamp())
+    return MonthlyPeriod(f"{job.name}:{year}-{month:02}", at, start, at)
+
+
+def latest_monthly(job: Monthly, now: int, tz: tzinfo) -> MonthlyPeriod:
+    """The most recent period with scheduled_at <= now."""
+    local = datetime.fromtimestamp(now, tz)
+    p = monthly_occurrence(job, local.year, local.month, tz)
+    return p if p.scheduled_at <= now else monthly_occurrence(job, *_prev_month(local.year, local.month), tz)
+
+
+def plan_monthly(job: Monthly, now: int, tz: tzinfo, done_keys: set[str], first_seen: int | None) -> Plan:
+    """logic/schedule.plan for a monthly job: run only the latest due period; on the very first
+    run (or when it predates the bot) just mark it done; mark missed periods since first_seen."""
+    latest = latest_monthly(job, now, tz)
+    if latest.key in done_keys:
+        return Plan(None, [])
+    if first_seen is None or latest.scheduled_at < first_seen:
+        return Plan(None, [latest])
+    missed: list[MonthlyPeriod] = []
+    y, m = latest.year, latest.month
+    while True:
+        y, m = _prev_month(y, m)
+        p = monthly_occurrence(job, y, m, tz)
+        if p.scheduled_at < first_seen:
+            break
+        missed.append(p)
+    return Plan(latest, [p for p in reversed(missed) if p.key not in done_keys])
+
+
+def auto_starts_at(monday: date, tz: tzinfo) -> int:
+    """The Saturday after that Monday, 19:00 local."""
+    sat = monday + timedelta(days=(AUTO_START_WEEKDAY - monday.weekday()) % 7)
+    return int(datetime.combine(sat, AUTO_START, tzinfo=tz).timestamp())
+
+
+def auto_game(top, year: int, month: int, games: Sequence):
+    """The most played server game, else the next game in a by-month rotation (None if the
+    server lists no games)."""
+    if top is not None:
+        return top
+    if not games:
+        return None
+    return games[(year * 12 + month - 1) % len(games)]
+
+
+MONTH_NAMES = ("January", "February", "March", "April", "May", "June", "July", "August", "September",
+               "October", "November", "December")
+
+
+def auto_name(game, day: date) -> str:
+    when = f"{MONTH_NAMES[day.month - 1]} {day.year}"
+    name = f"{game.role} Monthly Cup · {when}" if game is not None else f"Monthly Cup · {when}"
+    return name if len(name) <= 60 else f"Monthly Cup · {when}"
+
+
+def too_late_to_create(now: int, starts_at: int) -> bool:
+    return now > starts_at - CREATE_MARGIN
+
+
+def start_outcome(entrants: int) -> str:
+    return "start" if entrants >= AUTO_MIN_ENTRANTS else "cancel"
+
+
+def reminder_due(starts_at: int | None, created_at: int, now: int, reminded: bool) -> bool:
+    """One ping in the hour before the start; not for tournaments made inside that hour."""
+    if starts_at is None or reminded or created_at > starts_at - REMIND_BEFORE:
+        return False
+    return starts_at - REMIND_BEFORE <= now < starts_at
+
+
+class Stale(Enum):
+    NUDGE = "nudge"  # nobody reported after NUDGE_AFTER: ping both, once
+    ACCEPT = "accept"  # one report and no answer after STALE_AFTER: it stands
+    FLAG = "flag"  # no report at all after STALE_AFTER: staff decide (once)
+
+
+def stale_action(status: str, opened_at: int, now: int, nudged: bool, flagged: bool) -> Stale | None:
+    age = now - opened_at
+    if status == REPORTED:
+        return Stale.ACCEPT if age >= STALE_AFTER else None
+    if status != OPEN:
+        return None
+    if age >= STALE_AFTER:
+        return None if flagged else Stale.FLAG
+    if age >= NUDGE_AFTER and not nudged:
+        return Stale.NUDGE
+    return None
