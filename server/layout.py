@@ -100,6 +100,7 @@ CATEGORIES = [
             {"name": "📸・clips", "topic": "Highlights, fails, and receipts.", "slowmode": 10},
             {"name": "⭐・hall-of-fame", "topic": "3 ⭐ on any message and it lands here.", "read_only": True},
             {"name": "🔢・counting", "topic": "Count up together. Same person can't go twice; a wrong number resets."},
+            {"name": "🎲・games", "topic": "Daily word game, weekly challenges, /slots, /trivia and friends."},
         ],
     },
     {
@@ -233,7 +234,7 @@ COMMUNITY = {
 # the defaults everyone gets; Discord needs at least 7, 5 of them postable.
 ONBOARDING_DEFAULT_CHANNELS = [
     "📌・rules", "📣・announcements", "👋・welcome", "💬・general",
-    "🆘・help", "💡・suggestions", "🤣・memes", "📸・clips", "⭐・hall-of-fame", "🔢・counting", "🕹️・gaming", "🎮・lfg", "🎨・art", "💻・code",
+    "🆘・help", "💡・suggestions", "🤣・memes", "📸・clips", "⭐・hall-of-fame", "🔢・counting", "🎲・games", "🕹️・gaming", "🎮・lfg", "🎨・art", "💻・code",
     "👗・fashion", "♟️・chess", "🤖・bot-commands", "📺・creators", "🏆・tournaments", "🎭・roles", "🤝・partners",
     "🔊 Lobby", "➕ New Squad", "🎮 Squad", "💤 AFK",
 ]

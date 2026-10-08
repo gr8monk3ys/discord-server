@@ -4,7 +4,7 @@ bot, guild, channels, messages, members and interactions. No network."""
 import asyncio
 import random
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
@@ -23,6 +23,8 @@ OWNER, MOD, KEEPER = 1, 20, 21
 PLAYERS = list(range(101, 133))
 TZ = ZoneInfo("America/Los_Angeles")
 T0 = int(datetime(2026, 10, 7, 12, 0, tzinfo=TZ).timestamp())  # a Wednesday noon
+OLD_ACCOUNT = datetime(2020, 1, 1, tzinfo=timezone.utc)
+BOTUSER = 50
 
 
 def run(coro):
@@ -106,10 +108,11 @@ class FakeText:
 
 
 class FakeMember:
-    def __init__(self, uid, guild, roles=(), admin=False):
+    def __init__(self, uid, guild, roles=(), admin=False, created_at=OLD_ACCOUNT):
         self.id = uid
         self.guild = guild
         self.bot = False
+        self.created_at = created_at
         self.name = f"user{uid}"
         self.display_name = f"player{uid}"
         self.mention = f"<@{uid}>"
@@ -130,6 +133,27 @@ class FakeMember:
         self.roles = [r for r in self.roles if r not in roles]
 
 
+class FakeEvent:
+    def __init__(self, eid, **kwargs):
+        self.id = eid
+        self.kwargs = kwargs
+        self.name = kwargs.get("name")
+        self.status = discord.EventStatus.scheduled
+        self.calls = []
+
+    async def start(self, reason=None):
+        self.calls.append("start")
+        self.status = discord.EventStatus.active
+
+    async def end(self, reason=None):
+        self.calls.append("end")
+        self.status = discord.EventStatus.completed
+
+    async def cancel(self, reason=None):
+        self.calls.append("cancel")
+        self.status = discord.EventStatus.cancelled
+
+
 class FakeGuild:
     def __init__(self):
         self.id = GUILD_ID
@@ -141,10 +165,27 @@ class FakeGuild:
         names = ["@everyone", config.TOURNEY_ROLE, "Front Desk", config.MOD_ROLE, config.KEEPER_ROLE]
         self.roles = [FakeRole(self, n, i) for i, n in enumerate(names)]
         self.members: dict[int, FakeMember] = {}
-        self.me = FakeMember(50, self, roles=["Front Desk"])
+        self.me = FakeMember(BOTUSER, self, roles=["Front Desk"])
+        self.events: dict[int, FakeEvent] = {}
+        self.created_events: list[dict] = []
+        self.event_fail = None
 
     def role(self, name):
         return config.match_by_name(self.roles, name)
+
+    async def create_scheduled_event(self, **kwargs):
+        if self.event_fail is not None:
+            raise self.event_fail
+        self.created_events.append(kwargs)
+        ev = FakeEvent(7000 + len(self.created_events), **kwargs)
+        self.events[ev.id] = ev
+        return ev
+
+    def get_scheduled_event(self, eid):
+        return self.events.get(eid)
+
+    async def fetch_scheduled_event(self, eid):
+        raise discord.NotFound(SimpleNamespace(status=404, reason="gone"), "gone")
 
     def get_channel(self, cid):
         return next((c for c in self.text_channels if c.id == cid), None)
@@ -166,6 +207,10 @@ class FakeBot:
         self.dynamic = set()
         self.cogs = {}
         self.dispatched = []
+        self.user = SimpleNamespace(id=BOTUSER)
+
+    async def wait_until_ready(self):
+        await asyncio.Event().wait()  # the tick never runs by itself in tests
 
     def get_guild(self, gid):
         return self.guild if gid == self.guild.id else None
@@ -812,4 +857,309 @@ def test_tournament_autocomplete(monkeypatch):
         assert [c.value for c in choices] == [1]
         games = await env.cog.game_choices(env.inter(MOD), "val")
         assert games and all("val" in c.name.lower() for c in games)
+    with_env(go, monkeypatch)
+
+
+# ---------------------------------------------------------------- automation
+def ts(y, mo, d, h=0, mi=0):
+    return int(datetime(y, mo, d, h, mi, tzinfo=TZ).timestamp())
+
+
+NOV_FIRST_MONDAY = ts(2026, 11, 2, 12)
+NOV_START = ts(2026, 11, 7, 19)  # the Saturday after
+DAY = 86400
+
+
+async def tick(env, at):
+    env.t = at
+    await Tournaments.tick.coro(env.cog)
+
+
+async def make_auto(env):
+    """First startup in October, then the November first Monday: tournament #1 is the auto one."""
+    await tick(env, ts(2026, 10, 7, 12))
+    await tick(env, NOV_FIRST_MONDAY)
+    t = await env.cog.get(1)
+    assert t is not None
+    return t
+
+
+def nudges(env):
+    return [x for x in env.guild.tourney.sent if x.content and x.content.startswith("⏳")]
+
+
+def test_first_run_only_marks_this_month_done(monkeypatch):
+    async def go(env):
+        await tick(env, ts(2026, 10, 7, 12))  # October's first Monday has passed
+        assert await env.rows("SELECT * FROM tournaments") == []
+        assert await env.rows("SELECT key FROM jobs WHERE key LIKE 'autotourney:%'") == [
+            {"key": "autotourney:2026-10"}]
+        await tick(env, NOV_FIRST_MONDAY - 60)
+        assert await env.rows("SELECT * FROM tournaments") == []
+    with_env(go, monkeypatch)
+
+
+def test_monthly_auto_tournament_is_created_once(monkeypatch):
+    async def go(env):
+        t = await make_auto(env)
+        assert (t["size"], t["status"], t["created_by"], t["starts_at"]) == (16, "signup", BOTUSER, NOV_START)
+        assert "November 2026" in t["name"]
+        assert env.card().embed is not None
+        assert env.card().kwargs["allowed_mentions"].users is False
+        assert (t["channel_id"], t["message_id"]) == (env.guild.tourney.id, env.card().id)
+        [ev] = env.guild.created_events
+        assert ev["entity_type"] == discord.EntityType.external
+        assert ev["location"] == f"#{config.TOURNAMENTS_CHANNEL}"
+        assert int(ev["start_time"].timestamp()) == NOV_START and ev["end_time"] > ev["start_time"]
+        assert await env.cog.meta(cogmod.auto_key(1)) == "7001"
+        env.new_cog()  # a restart changes nothing
+        await tick(env, NOV_FIRST_MONDAY + 60)
+        await tick(env, ts(2026, 11, 3, 12))
+        assert len(await env.rows("SELECT * FROM tournaments")) == 1
+        assert len(env.guild.created_events) == 1
+    with_env(go, monkeypatch)
+
+
+def test_auto_tournament_uses_the_most_played_game(monkeypatch):
+    async def go(env):
+        g = config.GAMES[-1]
+        start = ts(2026, 10, 20, 20)
+        for uid in PLAYERS[:3]:
+            await env.db.execute('INSERT INTO game_sessions (user_id, game, start, "end") VALUES (?, ?, ?, ?)',
+                                 (uid, g.role, start, start + 3 * 3600))
+        t = await make_auto(env)
+        assert t["game"] == g.role and g.role in t["name"]
+    with_env(go, monkeypatch)
+
+
+def test_auto_tournament_rotates_games_without_play_data(monkeypatch):
+    async def go(env):
+        t = await make_auto(env)
+        assert t["game"] == T.auto_game(None, 2026, 11, config.GAMES).role
+    with_env(go, monkeypatch)
+
+
+def test_no_auto_tournament_while_one_is_on(monkeypatch):
+    async def go(env):
+        await tick(env, ts(2026, 10, 7, 12))
+        await env.create()
+        await tick(env, NOV_FIRST_MONDAY)
+        assert len(await env.rows("SELECT * FROM tournaments")) == 1
+        assert env.guild.created_events == []
+        assert await env.rows("SELECT key FROM jobs WHERE key = 'autotourney:2026-11'")
+    with_env(go, monkeypatch)
+
+
+def test_auto_tournament_retries_when_the_card_fails(monkeypatch):
+    async def go(env):
+        await tick(env, ts(2026, 10, 7, 12))
+        env.guild.tourney.fail = http_error()
+        await tick(env, NOV_FIRST_MONDAY)
+        assert await env.rows("SELECT * FROM tournaments") == []
+        assert await env.cog.meta(cogmod.auto_key(1)) is None
+        assert not await env.rows("SELECT key FROM jobs WHERE key = 'autotourney:2026-11'")
+        env.guild.tourney.fail = None
+        await tick(env, NOV_FIRST_MONDAY + 60)
+        assert len(await env.rows("SELECT * FROM tournaments")) == 1
+    with_env(go, monkeypatch)
+
+
+def test_auto_tournament_without_an_event_still_opens(monkeypatch):
+    async def go(env):
+        env.guild.event_fail = http_error(403)
+        t = await make_auto(env)
+        assert t["status"] == "signup"
+        assert await env.cog.meta(cogmod.auto_key(t["id"])) == ""
+        assert await env.rows("SELECT key FROM jobs WHERE key = 'autotourney:2026-11'")
+    with_env(go, monkeypatch)
+
+
+def test_too_late_after_downtime_skips_the_month(monkeypatch):
+    async def go(env):
+        await tick(env, ts(2026, 10, 7, 12))
+        await tick(env, NOV_START - 3600)  # the bot was off all week
+        assert await env.rows("SELECT * FROM tournaments") == []
+        assert await env.rows("SELECT key FROM jobs WHERE key = 'autotourney:2026-11'")
+    with_env(go, monkeypatch)
+
+
+def test_fresh_accounts_cant_sign_up(monkeypatch):
+    async def go(env):
+        await env.create()
+        fresh = 999_001
+        env.member(fresh, created_at=datetime.fromtimestamp(env.t - 5 * DAY, timezone.utc))
+        inter = await env.join(fresh)
+        assert "days old" in inter.replies()[0]
+        assert await env.cog.entrants(1) == []
+    with_env(go, monkeypatch)
+
+
+def test_reminder_pings_entrants_once_an_hour_before(monkeypatch):
+    async def go(env):
+        await make_auto(env)
+        for uid in PLAYERS[:4]:
+            await env.join(uid)
+        before = len(env.guild.tourney.sent)
+        await tick(env, NOV_START - 3600 - 60)
+        assert len(env.guild.tourney.sent) == before
+        await tick(env, NOV_START - 3500)
+        [msg] = env.guild.tourney.sent[before:]
+        assert all(f"<@{u}>" in msg.content for u in PLAYERS[:4])
+        allowed = msg.kwargs["allowed_mentions"]
+        assert {u.id for u in allowed.users} == set(PLAYERS[:4])
+        assert allowed.roles is False and allowed.everyone is False
+        await tick(env, NOV_START - 600)
+        assert len(env.guild.tourney.sent) == before + 1
+    with_env(go, monkeypatch)
+
+
+def test_reminder_says_when_more_players_are_needed(monkeypatch):
+    async def go(env):
+        await make_auto(env)
+        await env.join(PLAYERS[0])
+        await tick(env, NOV_START - 1800)
+        assert "needs 4 players" in env.guild.tourney.sent[-1].content
+    with_env(go, monkeypatch)
+
+
+def test_auto_tournament_starts_itself(monkeypatch):
+    async def go(env):
+        await make_auto(env)
+        for uid in PLAYERS[:5]:
+            await env.join(uid)
+        await tick(env, NOV_START - 60)
+        assert (await env.cog.get(1))["status"] == "signup"
+        await tick(env, NOV_START)
+        assert (await env.cog.get(1))["status"] == "running"
+        assert len(env.match_messages()) == 2  # 5 players: three byes, so 4v5 and the 2v3 semifinal
+        assert env.guild.events[7001].calls == ["start"]
+        env.new_cog()
+        await tick(env, NOV_START + 60)
+        assert len(env.match_messages()) == 2
+    with_env(go, monkeypatch)
+
+
+def test_auto_tournament_with_too_few_players_is_cancelled(monkeypatch):
+    async def go(env):
+        await make_auto(env)
+        for uid in PLAYERS[:3]:
+            await env.join(uid)
+        env.guild.tourney.fail = http_error()
+        await tick(env, NOV_START)
+        assert (await env.cog.get(1))["status"] == "cancelled"
+        assert await env.cog.meta(cogmod.autocancel_key(1)) is not None  # the note is still owed
+        assert env.guild.events[7001].calls == []
+        env.guild.tourney.fail = None
+        env.new_cog()
+        await tick(env, NOV_START + 60)
+        note = env.guild.tourney.sent[-1]
+        assert "needed 4 players" in note.content and "3 signed up" in note.content
+        assert note.kwargs["allowed_mentions"].users is False
+        assert env.guild.events[7001].calls == ["cancel"]
+        assert await env.cog.meta(cogmod.autocancel_key(1)) is None
+        assert "cancelled" in env.card().embed.footer.text.lower()
+        await tick(env, NOV_START + 120)
+        assert env.guild.tourney.sent[-1] is note
+    with_env(go, monkeypatch)
+
+
+def test_staff_tournaments_are_not_auto_started(monkeypatch):
+    async def go(env):
+        await env.create(starts_at="sat 8pm")
+        for uid in PLAYERS[:4]:
+            await env.join(uid)
+        t = await env.cog.get(1)
+        assert t["starts_at"] is not None
+        await tick(env, t["starts_at"] + 60)
+        assert (await env.cog.get(1))["status"] == "signup"
+    with_env(go, monkeypatch)
+
+
+def test_staff_cancel_cancels_the_event(monkeypatch):
+    async def go(env):
+        await make_auto(env)
+        inter = env.inter(MOD)
+        await Tournaments.cancel.callback(env.cog, inter, None)
+        assert env.guild.events[7001].calls == ["cancel"]
+    with_env(go, monkeypatch)
+
+
+def test_auto_tournament_finish_ends_the_event(monkeypatch):
+    async def go(env):
+        await make_auto(env)
+        for uid in PLAYERS[:4]:
+            await env.join(uid)
+        await tick(env, NOV_START)
+        await env.play_all()
+        assert env.guild.events[7001].calls == ["start", "end"]
+    with_env(go, monkeypatch)
+
+
+def test_unreported_match_nudges_then_flags_staff(monkeypatch):
+    async def go(env):
+        await env.setup(4)
+        await tick(env, T0 + DAY - 60)
+        assert nudges(env) == [] and env.guild.mod_log.sent == []
+        await tick(env, T0 + DAY)
+        sent = nudges(env)
+        assert len(sent) == 2
+        b = await env.cog.bracket(1)
+        for m, n in zip(b.round(1), sent):
+            assert f"<@{m.p1}>" in n.content and f"<@{m.p2}>" in n.content
+            assert {u.id for u in n.kwargs["allowed_mentions"].users} == {m.p1, m.p2}
+            assert "https://discord.com/channels/" in n.content
+        await tick(env, T0 + DAY + 3600)
+        assert len(nudges(env)) == 2  # once
+        await tick(env, T0 + 2 * DAY)
+        assert len(env.guild.mod_log.sent) == 2
+        assert all(f.kwargs["allowed_mentions"].users is False for f in env.guild.mod_log.sent)
+        assert all("48 hours" in f.content for f in env.guild.mod_log.sent)
+        await tick(env, T0 + 5 * DAY)
+        assert len(env.guild.mod_log.sent) == 2  # flagged once; staff decide
+        assert all(m.status == T.OPEN for m in (await env.cog.bracket(1)).round(1))
+    with_env(go, monkeypatch)
+
+
+def test_lone_report_stands_after_48_hours(monkeypatch):
+    async def go(env):
+        await env.setup(2)
+        m = await env.match(1, 0)
+        env.t = T0 + 3600
+        await env.press(m.p2, m.id, 2)  # "I won"
+        await tick(env, T0 + DAY)
+        assert env.guild.mod_log.sent == [] and nudges(env) == []  # a report: no nudge
+        await tick(env, T0 + 2 * DAY - 60)
+        assert (await env.match(1, 0)).status == T.REPORTED
+        await tick(env, T0 + 2 * DAY)
+        done = await env.match(1, 0)
+        assert (done.status, done.winner) == (T.DONE, m.p2)
+        assert (await env.cog.get(1))["status"] == "done"
+        assert await economy.balance(env.db, m.p2) == 1000
+        assert await economy.balance(env.db, m.p1) == 400
+        msg = await env.message_for(m.id)
+        assert "report stands" in msg.content and all(i.item.disabled for i in msg.view.children)
+        await tick(env, T0 + 3 * DAY)
+        assert await economy.balance(env.db, m.p2) == 1000
+    with_env(go, monkeypatch)
+
+
+def test_stale_clock_starts_for_matches_opened_before_tracking(monkeypatch):
+    async def go(env):
+        await env.setup(2)
+        m = await env.match(1, 0)
+        await env.db.execute("DELETE FROM meta WHERE key = ?", (cogmod.opened_key(m.id),))
+        await tick(env, T0 + 3 * DAY)  # starts the clock instead of flagging at once
+        assert env.guild.mod_log.sent == [] and nudges(env) == []
+        await tick(env, T0 + 4 * DAY)
+        assert len(nudges(env)) == 1 and env.guild.mod_log.sent == []
+    with_env(go, monkeypatch)
+
+
+def test_tick_never_raises(monkeypatch):
+    async def go(env):
+        async def boom(*a, **k):
+            raise RuntimeError("boom")
+        monkeypatch.setattr(env.cog, "run_auto_create", boom)
+        monkeypatch.setattr(env.cog, "sweep_matches", boom)
+        await tick(env, T0)
     with_env(go, monkeypatch)

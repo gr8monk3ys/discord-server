@@ -52,6 +52,9 @@ MODULES = [
     ("cogs.partners", set()),  # /partner apply|remove, partner review cards, weekly dead-invite sweep
     ("cogs.quests", {"members"}),  # starter quest: /quest, 500-coin reward, day-1 nudge DM
     ("cogs.heartbeat", set()),  # heartbeat file for server/watchdog.py
+    ("cogs.challenges", {"members"}),  # weekly challenges: Monday board, /challenges, Claim button, auto-claim
+    ("cogs.wordgame", set()),  # Daily Word: /word guess|today|stats|leaderboard
+    ("cogs.vibes", {"members"}),  # chat revival, join anniversaries, booster thanks + stipend, member of the month
 ]
 
 PERMISSIONS = discord.Permissions(

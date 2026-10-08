@@ -9,6 +9,18 @@ player presses the same button, or when staff press one; a disagreement flags st
 Everything lives in SQLite (tournaments, tournament_entries, tournament_matches, plus meta
 keys for the Discord message ids), buttons are DynamicItems, and `sync` re-posts whatever a
 restart interrupted, so a tournament survives the bot going down mid-bracket.
+
+The bot also runs tournaments by itself (a one-minute tick, logic/schedule.py semantics):
+- Monthly auto tournament: the first Monday of each month at 12:00 local, if no tournament is
+  in signups or running, it opens a 16-player one for the most played server game of the last
+  30 days (else a by-month rotation), starting the following Saturday 19:00, with a Discord
+  scheduled event. The meta key tourney:<id>:auto marks it (value: the event id, or "").
+- At the start time an auto tournament starts itself with at least 4 entrants; otherwise it is
+  cancelled with a note and its event is cancelled.
+- Every tournament with a start time pings its entrants once in the hour before it.
+- A match with no report 24 h after it opened pings both players once; after 48 h a lone
+  report stands, and a match nobody reported is flagged to staff in mod-log (once).
+- Discord accounts younger than logic/quests.py MIN_ACCOUNT_DAYS can't sign up (alt farming).
 """
 
 from __future__ import annotations
@@ -17,19 +29,22 @@ import asyncio
 import logging
 import random
 import time
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 import config
 import economy
 import style
 from errors import reply_error
+from logic import engagement as EG
 from logic import events as E
+from logic import stats as S
 from logic import tournaments as T
-from logic.tournaments import Bracket, Match, Report
+from logic.quests import MIN_ACCOUNT_DAYS
+from logic.tournaments import Bracket, Match, Report, Stale
 
 log = logging.getLogger(__name__)
 
@@ -88,6 +103,41 @@ def match_key(match_id: int) -> str:
 
 def announce_key(tid: int) -> str:
     return f"tourney:{tid}:announce"
+
+
+def auto_key(tid: int) -> str:
+    """Present for auto tournaments; the value is the scheduled event id ("" if none)."""
+    return f"tourney:{tid}:auto"
+
+
+def reminded_key(tid: int) -> str:
+    return f"tourney:{tid}:reminded"
+
+
+def autocancel_key(tid: int) -> str:
+    """Owed: the "not enough players" note and the event cancel of an auto tournament."""
+    return f"tourney:{tid}:autocancel"
+
+
+def opened_key(match_id: int) -> str:
+    return f"tourney:match:{match_id}:opened"
+
+
+def nudged_key(match_id: int) -> str:
+    return f"tourney:match:{match_id}:nudged"
+
+
+def flagged_key(match_id: int) -> str:
+    return f"tourney:match:{match_id}:flagged"
+
+
+EVENT_HOURS = 4  # how long the scheduled event says it runs
+EVENT_LOCATION = f"#{config.TOURNAMENTS_CHANNEL}"
+
+
+def created_ts(user) -> int | None:
+    created = getattr(user, "created_at", None)
+    return int(created.timestamp()) if created is not None else None
 
 
 def pack(channel_id: int, message_id: int) -> str:
@@ -223,9 +273,11 @@ class Tournaments(commands.Cog):
 
     async def cog_load(self) -> None:
         self.bot.add_dynamic_items(SignupButton, MatchButton)
+        self.tick.start()
 
     async def cog_unload(self) -> None:
         self.bot.remove_dynamic_items(SignupButton, MatchButton)
+        self.tick.cancel()
 
     @commands.Cog.listener()
     async def on_ready(self) -> None:
@@ -403,6 +455,9 @@ class Tournaments(commands.Cog):
                 if action == "join":
                     if user.id in entrants:
                         reply = "You're already signed up."
+                    elif not T.can_join(created_ts(user), now()):
+                        reply = (f"Your Discord account has to be at least {MIN_ACCOUNT_DAYS} days old "
+                                 "to enter tournaments.")
                     elif len(entrants) >= t["size"]:
                         reply = "This tournament is full."
                     else:
@@ -434,11 +489,25 @@ class Tournaments(commands.Cog):
         if t is None:
             return
         tid = t["id"]
+        problem, t, entrants = await self.begin(tid)
+        if problem:
+            await interaction.response.send_message(problem, ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.edit_card(t)
+        await self.sync(tid)
+        await self.event_action(tid, "start")
+        await interaction.followup.send(
+            f"Tournament #{tid} started with {len(entrants)} players. Round 1 is up.", ephemeral=True)
+
+    async def begin(self, tid: int):
+        """Close signups, seed and store the bracket in one transaction.
+        Returns (problem or None, the tournament row, the entrants)."""
         problem = None
         async with self.db.transaction() as tx:
             t = await self.get(tid, tx)
             entrants = await self.entrants(tid, tx)
-            if t["status"] != SIGNUP:
+            if t is None or t["status"] != SIGNUP:
                 problem = "That tournament already started."
             elif len(entrants) < 2:
                 problem = "A tournament needs at least two entrants."
@@ -455,14 +524,7 @@ class Tournaments(commands.Cog):
                         (tid, m.round, m.slot, m.p1, m.p2, m.winner, m.reported_by, m.status))
                 await tx.execute("UPDATE tournaments SET status = ? WHERE id = ?", (RUNNING, tid))
                 t = await self.get(tid, tx)
-        if problem:
-            await interaction.response.send_message(problem, ephemeral=True)
-            return
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        await self.edit_card(t)
-        await self.sync(tid)
-        await interaction.followup.send(
-            f"Tournament #{tid} started with {len(entrants)} players. Round 1 is up.", ephemeral=True)
+        return problem, t, entrants
 
     # ------------------------------------------------------------ sync: Discord catches up with the DB
     async def sync(self, tid: int) -> None:
@@ -519,6 +581,7 @@ class Tournaments(commands.Cog):
             log.warning("couldn't post match %s of tournament %s", m.id, t["id"], exc_info=True)
             return
         await self.set_meta(match_key(m.id), pack(channel.id, sent.id))
+        await self.db.execute("INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)", (opened_key(m.id), str(now())))
 
     # ------------------------------------------------------------ match reports
     async def handle_report(self, interaction: discord.Interaction, match_id: int, pick: int) -> None:
@@ -536,12 +599,7 @@ class Tournaments(commands.Cog):
                 outcome, updated = T.report(current, user.id, pick, staff)
                 reply = REPORT_REPLIES.get(outcome)
                 if outcome.final:
-                    changed = bracket.decide(current.round, current.slot, updated.winner)
-                    current.reported_by = updated.reported_by
-                    for m in changed:
-                        await self.save_match(tx, m)
-                    if bracket.champion() is not None:
-                        await self.close_out_tx(tx, t, bracket)
+                    await self.decide_tx(tx, t, bracket, current, updated.winner, updated.reported_by)
                 elif outcome in (Report.RECORDED, Report.CONFLICT):
                     current = updated
                     await self.save_match(tx, updated)
@@ -555,6 +613,15 @@ class Tournaments(commands.Cog):
             await self.flag_conflict(t, current, bracket, interaction.message)
         if outcome.final or outcome is Report.RECORDED or outcome is Report.CONFLICT:
             await self.sync(t["id"])
+
+    async def decide_tx(self, tx, t, bracket: Bracket, current: Match, winner: int, reported_by) -> None:
+        """Make `winner` the winner of `current`, move them on and close out after the final."""
+        changed = bracket.decide(current.round, current.slot, winner)
+        current.reported_by = reported_by
+        for m in changed:
+            await self.save_match(tx, m)
+        if bracket.champion() is not None:
+            await self.close_out_tx(tx, t, bracket)
 
     async def save_match(self, tx, m: Match) -> None:
         await tx.execute("UPDATE tournament_matches SET p1 = ?, p2 = ?, winner = ?, reported_by = ?, status = ?"
@@ -610,6 +677,7 @@ class Tournaments(commands.Cog):
             except discord.HTTPException:
                 log.warning("couldn't announce the champion of tournament %s", t["id"], exc_info=True)
         self.bot.dispatch("tournament_won", t["id"], champion)
+        await self.event_action(t["id"], "end")
 
     async def swap_role(self, t, guild, champion: int) -> None:
         role = config.match_by_name(guild.roles, config.TOURNEY_ROLE)
@@ -688,6 +756,7 @@ class Tournaments(commands.Cog):
             except discord.HTTPException:
                 log.warning("couldn't close match %s of cancelled tournament %s", m.id, tid, exc_info=True)
         await self.sync(tid)
+        await self.event_action(tid, "cancel")
         await interaction.followup.send(f"Tournament #{tid} is cancelled. No prizes were paid.", ephemeral=True)
 
     # ------------------------------------------------------------ /tournament bracket
@@ -709,6 +778,332 @@ class Tournaments(commands.Cog):
         else:
             embed = bracket_embed(t, await self.bracket(t["id"]), self.name_of(self.guild()))
         await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    # ------------------------------------------------------------ automation: the tick
+    @tasks.loop(minutes=1)
+    async def tick(self) -> None:
+        jobs = (
+            ("monthly auto tournament", self.run_auto_create),
+            ("start reminders", self.send_reminders),
+            ("auto start", self.auto_start_due),
+            ("stale matches", self.sweep_matches),
+        )
+        for name, job in jobs:
+            try:
+                await job()
+            except Exception:
+                log.exception("tournaments: %s failed", name)
+
+    @tick.before_loop
+    async def before_tick(self) -> None:
+        await self.bot.wait_until_ready()
+
+    async def due(self, name: str, make_plan):
+        """Record first_seen and skipped periods; return the period to run now, if any."""
+        seen_key = f"first_seen:{name}"
+        first = await self.meta(seen_key)
+        first_seen = int(first) if first is not None else None
+        done = {r["key"] for r in await self.db.fetchall("SELECT key FROM jobs WHERE key LIKE ?", (f"{name}:%",))}
+        t = now()
+        todo = make_plan(t, done, first_seen)
+        async with self.db.transaction() as tx:
+            if first_seen is None:
+                await tx.execute("INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)", (seen_key, str(t)))
+            for period in todo.mark_done:
+                await tx.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (period.key, t))
+        return todo.run
+
+    # ------------------------------------------------------------ automation: the monthly tournament
+    async def run_auto_create(self) -> None:
+        job = T.AUTO_JOB
+        period = await self.due(job.name, lambda t, done, seen: T.plan_monthly(job, t, self.tz, done, seen))
+        # Marked done only after it worked: an error retries on the next tick.
+        if period is not None and await self.auto_create(period):
+            await self.db.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (period.key, now()))
+
+    async def auto_create(self, period: T.MonthlyPeriod) -> bool:
+        guild = self.guild()
+        if guild is None:
+            return False
+        active = await self.db.fetchone("SELECT id FROM tournaments WHERE status IN (?, ?) LIMIT 1", ACTIVE)
+        if active is not None:
+            log.info("auto tournament %s: #%s is already on", period.key, active["id"])
+            return True
+        monday = T.first_monday(period.year, period.month)
+        starts = T.auto_starts_at(monday, self.tz)
+        if T.too_late_to_create(now(), starts):
+            log.info("auto tournament %s: too late to open signups", period.key)
+            return True
+        channel = self.channel(guild, config.TOURNAMENTS_CHANNEL)
+        if channel is None:
+            log.warning("auto tournament %s: no %s channel", period.key, config.TOURNAMENTS_CHANNEL)
+            return True
+        top = await self.top_game(period.window_start, period.window_end)
+        game = T.auto_game(top, period.year, period.month, config.GAMES)
+        name = T.auto_name(game, monday)
+        async with self.db.transaction() as tx:
+            cur = await tx.execute(
+                "INSERT INTO tournaments (name, game, size, status, created_by, created_at, starts_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (name, game.role if game else None, T.AUTO_SIZE, SIGNUP, self.bot.user.id, now(), starts))
+            tid = cur.lastrowid
+            await tx.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", (auto_key(tid), ""))
+            t = await self.get(tid, tx)
+        try:
+            message = await channel.send(embed=card_embed(t, []), view=signup_view(tid, False, False),
+                                         allowed_mentions=discord.AllowedMentions.none())
+        except BaseException as exc:
+            async with self.db.transaction() as tx:
+                await tx.execute("DELETE FROM tournaments WHERE id = ?", (tid,))
+                await tx.execute("DELETE FROM meta WHERE key = ?", (auto_key(tid),))
+            if not isinstance(exc, Exception):
+                raise  # cancelled: don't swallow it
+            log.warning("auto tournament %s: couldn't post the signup card; retrying", period.key, exc_info=True)
+            return False
+        await self.db.execute("UPDATE tournaments SET channel_id = ?, message_id = ? WHERE id = ?",
+                              (channel.id, message.id, tid))
+        await self.create_event(guild, t, channel)
+        log.info("auto tournament %s: opened #%s (%s)", period.key, tid, game.key if game else "anything")
+        return True
+
+    async def create_event(self, guild, t, channel) -> None:
+        when = datetime.fromtimestamp(t["starts_at"], timezone.utc)
+        description = (f"The monthly community tournament: single elimination, up to {t['size']} players. "
+                       f"Sign up with the Join button in #{config.TOURNAMENTS_CHANNEL}. "
+                       f"The winner gets {T.PRIZE_FIRST:,} coins and the {config.TOURNEY_ROLE} role, "
+                       f"the runner-up {T.PRIZE_SECOND:,} coins. It needs at least {T.AUTO_MIN_ENTRANTS} players.")
+        try:
+            event = await guild.create_scheduled_event(
+                name=t["name"][:100],
+                description=description,
+                start_time=when,
+                end_time=when + timedelta(hours=EVENT_HOURS),
+                entity_type=discord.EntityType.external,
+                location=EVENT_LOCATION,
+                privacy_level=discord.PrivacyLevel.guild_only,
+                reason="Monthly auto tournament",
+            )
+        except discord.HTTPException:
+            # The signups are up either way; the event is a nice-to-have (needs Manage Events).
+            log.warning("auto tournament #%s: Discord wouldn't create the event", t["id"], exc_info=True)
+            return
+        await self.set_meta(auto_key(t["id"]), str(event.id))
+
+    async def top_game(self, start: int, end: int):
+        rows = await self.db.fetchall(
+            'SELECT user_id, game AS k, start, "end" FROM game_sessions WHERE start < ? AND ("end" IS NULL OR "end" > ?)',
+            (end, start))
+        per_user = S.game_seconds([S.Session(r["user_id"], r["k"], r["start"], r["end"]) for r in rows],
+                                  start, end, now())
+        totals: dict[str, int] = {}
+        for games in per_user.values():
+            for game, secs in games.items():
+                totals[game] = totals.get(game, 0) + secs
+        return EG.top_game(totals)
+
+    async def event_action(self, tid: int, action: str) -> None:
+        """Start, end or cancel an auto tournament's scheduled event. Best effort: never raises."""
+        try:
+            value = await self.meta(auto_key(tid))
+            guild = self.guild()
+            if not value or guild is None:
+                return
+            event = guild.get_scheduled_event(int(value))
+            if event is None:
+                try:
+                    event = await guild.fetch_scheduled_event(int(value))
+                except discord.NotFound:
+                    return
+            status = event.status
+            if action == "start" and status == discord.EventStatus.scheduled:
+                await event.start(reason="The tournament started")
+            elif action == "end" and status == discord.EventStatus.active:
+                await event.end(reason="The tournament is over")
+            elif action == "cancel" and status == discord.EventStatus.scheduled:
+                await event.cancel(reason="The tournament was called off")
+            elif action == "cancel" and status == discord.EventStatus.active:
+                await event.end(reason="The tournament was called off")
+        except Exception:
+            log.warning("tournament %s: couldn't %s its scheduled event", tid, action, exc_info=True)
+
+    # ------------------------------------------------------------ automation: start time
+    async def send_reminders(self) -> None:
+        rows = await self.db.fetchall("SELECT * FROM tournaments WHERE status = ? AND starts_at IS NOT NULL",
+                                      (SIGNUP,))
+        for t in rows:
+            reminded = await self.meta(reminded_key(t["id"])) is not None
+            if not T.reminder_due(t["starts_at"], t["created_at"], now(), reminded):
+                continue
+            try:
+                await self.remind(t)
+            except Exception:
+                log.exception("tournament %s: reminder failed", t["id"])
+
+    async def remind(self, t) -> None:
+        tid = t["id"]
+        entrants = await self.entrants(tid)
+        channel = self.channel(self.guild(), config.TOURNAMENTS_CHANNEL)
+        if entrants and channel is not None:
+            auto = await self.meta(auto_key(tid)) is not None
+            start = t["starts_at"]
+            if auto and len(entrants) < T.AUTO_MIN_ENTRANTS:
+                how = (f"It needs {T.AUTO_MIN_ENTRANTS} players to go ahead and has {len(entrants)}, "
+                       "so bring a friend.")
+            elif auto:
+                how = "The bracket goes up by itself at the start time, so be around."
+            else:
+                how = "Staff post the bracket at the start time, so be around."
+            pings = " ".join(f"<@{uid}>" for uid in entrants)
+            text = f"⏰ **{esc(t['name'])}** starts <t:{start}:R> (<t:{start}:t>). {how}\n{pings}"
+            try:
+                await channel.send(text, allowed_mentions=ping_only([discord.Object(u) for u in entrants]))
+            except discord.HTTPException:
+                log.warning("tournament %s: couldn't post the reminder; retrying", tid, exc_info=True)
+                return
+        await self.set_meta(reminded_key(tid), str(now()))
+
+    async def auto_start_due(self) -> None:
+        rows = await self.db.fetchall(
+            "SELECT * FROM tournaments WHERE status = ? AND starts_at IS NOT NULL AND starts_at <= ?", (SIGNUP, now()))
+        for t in rows:
+            tid = t["id"]
+            if await self.meta(auto_key(tid)) is None:
+                continue  # staff tournaments are started by staff
+            try:
+                if T.start_outcome(len(await self.entrants(tid))) == "start":
+                    problem, t, entrants = await self.begin(tid)
+                    if problem is None:
+                        await self.edit_card(t)
+                        await self.sync(tid)
+                        await self.event_action(tid, "start")
+                        log.info("auto tournament #%s started with %d players", tid, len(entrants))
+                else:
+                    async with self.db.transaction() as tx:
+                        cur = await tx.execute("UPDATE tournaments SET status = ? WHERE id = ? AND status = ?",
+                                               (CANCELLED, tid, SIGNUP))
+                        if cur.rowcount:
+                            await tx.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+                                             (autocancel_key(tid), str(now())))
+            except Exception:
+                log.exception("auto tournament #%s: start failed", tid)
+        owed = await self.db.fetchall("SELECT key FROM meta WHERE key LIKE 'tourney:%:autocancel'")
+        for r in owed:
+            tid = int(r["key"].split(":")[1])
+            try:
+                await self.settle_autocancel(tid)
+            except Exception:
+                log.exception("auto tournament #%s: cancel note failed", tid)
+
+    async def settle_autocancel(self, tid: int) -> None:
+        """The card, the friendly note and the event, then the marker goes (retried until then)."""
+        t = await self.get(tid)
+        if t is None:
+            await self.db.execute("DELETE FROM meta WHERE key = ?", (autocancel_key(tid),))
+            return
+        await self.edit_card(t)
+        channel = self.channel(self.guild(), config.TOURNAMENTS_CHANNEL)
+        if channel is not None:
+            n = len(await self.entrants(tid))
+            signed = "nobody signed up" if n == 0 else f"{n} signed up"
+            text = (f"🏆 **{esc(t['name'])}** needed {T.AUTO_MIN_ENTRANTS} players and {signed}, so it's off this "
+                    "time. Thanks to everyone who joined! There's a new one next month, and staff can run one "
+                    "any time.")
+            try:
+                await channel.send(text, allowed_mentions=discord.AllowedMentions.none())
+            except discord.HTTPException:
+                log.warning("auto tournament #%s: couldn't post the cancel note; retrying", tid, exc_info=True)
+                return
+        await self.event_action(tid, "cancel")
+        await self.db.execute("DELETE FROM meta WHERE key = ?", (autocancel_key(tid),))
+
+    # ------------------------------------------------------------ automation: stale matches
+    async def sweep_matches(self) -> None:
+        running = await self.db.fetchall("SELECT * FROM tournaments WHERE status = ?", (RUNNING,))
+        for t in running:
+            bracket = await self.bracket(t["id"])
+            for m in bracket.open_matches():
+                opened = await self.meta(opened_key(m.id))
+                if opened is None:
+                    # Opened before this was tracked, or its message isn't up yet: start the clock now.
+                    await self.db.execute("INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)",
+                                          (opened_key(m.id), str(now())))
+                    continue
+                nudged = await self.meta(nudged_key(m.id)) is not None
+                flagged = await self.meta(flagged_key(m.id)) is not None
+                action = T.stale_action(m.status, int(opened), now(), nudged, flagged)
+                try:
+                    if action is Stale.NUDGE:
+                        await self.nudge(t, bracket, m)
+                    elif action is Stale.FLAG:
+                        await self.flag_stale(t, bracket, m)
+                    elif action is Stale.ACCEPT:
+                        await self.accept_report(t, m)
+                except Exception:
+                    log.exception("tournament %s match %s: %s failed", t["id"], m.id, action)
+
+    async def match_link(self, guild, m: Match) -> str:
+        value = await self.meta(match_key(m.id))
+        if value is None or guild is None:
+            return ""
+        channel_id, message_id = unpack(value)
+        return f" https://discord.com/channels/{guild.id}/{channel_id}/{message_id}"
+
+    async def nudge(self, t, bracket: Bracket, m: Match) -> None:
+        guild = self.guild()
+        channel = self.channel(guild, config.TOURNAMENTS_CHANNEL)
+        if channel is not None:
+            text = (f"⏳ <@{m.p1}> <@{m.p2}>, your {T.round_name(m.round, bracket.final_round)} match in "
+                    f"**{esc(t['name'])}** has been open for a day with no result. Play it, then press who won "
+                    f"on the match message. After 48 hours staff step in.{await self.match_link(guild, m)}")
+            try:
+                await channel.send(text, allowed_mentions=ping_only([discord.Object(m.p1), discord.Object(m.p2)]))
+            except discord.HTTPException:
+                log.warning("couldn't nudge match %s; retrying", m.id, exc_info=True)
+                return
+        await self.set_meta(nudged_key(m.id), str(now()))
+
+    async def flag_stale(self, t, bracket: Bracket, m: Match) -> None:
+        guild = self.guild()
+        channel = self.channel(guild, config.MOD_LOG_CHANNEL)
+        if channel is not None:
+            text = (f"🏆 **{esc(t['name'])}** · {T.round_name(m.round, bracket.final_round)} match {m.slot + 1}: "
+                    f"<@{m.p1}> vs <@{m.p2}> has had no report for 48 hours. A Keeper or Moderator, press "
+                    f"**P1 won** or **P2 won** on the match message to decide it.{await self.match_link(guild, m)}")
+            try:
+                await channel.send(text, allowed_mentions=discord.AllowedMentions.none())
+            except discord.HTTPException:
+                log.warning("couldn't flag stale match %s; retrying", m.id, exc_info=True)
+                return
+        else:
+            log.warning("tournament %s match %s is stale (no %s channel)", t["id"], m.id, config.MOD_LOG_CHANNEL)
+        await self.set_meta(flagged_key(m.id), str(now()))
+
+    async def accept_report(self, t, m: Match) -> None:
+        """Nobody answered a lone report for 48 hours: it stands, like a confirmation."""
+        tid = t["id"]
+        async with self.db.transaction() as tx:
+            t = await self.get(tid, tx)
+            if t is None or t["status"] != RUNNING:
+                return
+            bracket = await self.bracket(tid, tx)
+            current = next((x for x in bracket.matches if x.id == m.id), None)
+            opened = await self.meta(opened_key(m.id), tx)
+            if current is None or opened is None or \
+                    T.stale_action(current.status, int(opened), now(), True, True) is not Stale.ACCEPT:
+                return  # answered (or decided by staff) in the meantime
+            reporter = current.reported_by
+            await self.decide_tx(tx, t, bracket, current, current.winner, reporter)
+        try:
+            message = await self.partial(self.guild(), await self.meta(match_key(m.id)))
+            if message is not None:
+                await message.edit(content=f"{match_text(t, current, bracket.final_round)}\n"
+                                           f"No answer in 48 hours, so <@{reporter}>'s report stands.",
+                                   view=match_view(m.id, closed=True),
+                                   allowed_mentions=discord.AllowedMentions.none())
+        except discord.HTTPException:
+            log.warning("couldn't close match %s after its report stood", m.id, exc_info=True)
+        log.info("tournament %s match %s: the lone report stood after 48 h", tid, m.id)
+        await self.sync(tid)
 
     start.autocomplete("tournament")(tournament_choices)
     cancel.autocomplete("tournament")(tournament_choices)

@@ -23,6 +23,8 @@ _Last updated: 2026-10-07_
 | Starter-quest steps you've done | `/quest` and its one-time reward |
 | YouTube/Twitch channels you choose to link with `/creator` | Announcing your uploads and streams |
 | Partner applications you submit | Staff review and the partners channel |
+| Your Daily Word guesses and results | The game, streaks and its leaderboard |
+| Weekly challenges you've claimed | Paying each reward once |
 
 Front Desk does **not** store the text of your messages. The only exceptions are a message you
 report (a short quote goes to the moderators) and a message copied to the hall of fame.

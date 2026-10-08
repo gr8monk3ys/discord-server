@@ -352,6 +352,25 @@ MIGRATIONS = [
         PRIMARY KEY (user_id, platform)
     )""",
     ],
+    [
+        # Wave 3: weekly challenges (rewards claimed per ISO week).
+        """CREATE TABLE challenge_claims (
+        week TEXT NOT NULL,
+        user_id INTEGER NOT NULL,
+        key TEXT NOT NULL,
+        at INTEGER NOT NULL,
+        PRIMARY KEY (week, user_id, key)
+    )""",
+        # Daily word game: one game per member per day.
+        """CREATE TABLE word_games (
+        day TEXT NOT NULL,
+        user_id INTEGER NOT NULL,
+        guesses TEXT NOT NULL DEFAULT '',
+        solved INTEGER NOT NULL DEFAULT 0,
+        finished_at INTEGER,
+        PRIMARY KEY (day, user_id)
+    )""",
+    ],
 ]
 
 

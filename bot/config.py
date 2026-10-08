@@ -62,6 +62,8 @@ PLATFORM_ROLES = ["PC", "PlayStation", "Xbox", "Switch", "Mobile"]
 REGION_ROLES = ["NA", "EU", "LATAM", "Asia", "OCE"]
 PLAYTIME_ROLES = ["Early Bird", "Night Owl", "Weekend Warrior"]
 HEARTBEAT_FILE = DATA_DIR / "heartbeat"  # written every minute; server/watchdog.py reads it
+# Wave 3
+GAMES_CHANNEL = "🎲・games"  # daily word game results, challenge board
 SQUAD_VOICE = "🎮 Squad"
 LOBBY_VOICE = "🔊 Lobby"
 MODES = ("Ranked", "Casual")

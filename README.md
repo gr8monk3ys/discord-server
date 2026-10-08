@@ -167,6 +167,10 @@ day-to-day attention. Design and history:
 | Partners | `/partner apply` → staff review card in 📋・mod-log → 🤝・partners; weekly dead-invite sweep; staff `/partner remove` |
 | Starter quest | `/quest`: pick roles, say hi, join a squad, claim `/daily`, join voice; 500 coins and the Settled In badge; one nudge DM after a day |
 | Heartbeat | writes `bot/data/heartbeat` every minute for the watchdog |
+| Auto tournaments | first Monday of the month: a 16-player bracket for the most-played game, Discord event, Saturday 19:00 auto-start (4+ entrants), 1 h reminder, nudges for unreported matches |
+| Weekly challenges | 3 rotating goals each week (150/250/400 coins + 300 bonus), board in 🎲・games Mondays 09:00, `/challenges` with Claim button, hourly auto-claim |
+| Daily Word | `/word guess/today/stats/leaderboard`: one 5-letter word a day, spoiler-free results in 🎲・games, coins for wins, streaks |
+| Vibes | conversation starter when 💬・general is quiet for 3 h, join anniversaries, booster thanks + 1000 coins and a monthly stipend, member of the month |
 
 Landing page: <https://gr8monk3ys.github.io/discord-server/> (`site/`, deployed by
 `.github/workflows/pages.yml`). Listing-site copy and banners: `docs/LISTING.md`, `assets/listing/`.
