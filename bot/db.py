@@ -371,6 +371,24 @@ MIGRATIONS = [
         PRIMARY KEY (day, user_id)
     )""",
     ],
+    [
+        # Wave 4: matchmaking queue (one entry per member).
+        """CREATE TABLE mm_queue (
+        user_id INTEGER PRIMARY KEY,
+        game TEXT NOT NULL,
+        mode TEXT NOT NULL,
+        size INTEGER NOT NULL,
+        joined_at INTEGER NOT NULL
+    )""",
+        """CREATE TABLE mm_matches (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        game TEXT NOT NULL,
+        mode TEXT NOT NULL,
+        members TEXT NOT NULL,
+        channel_id INTEGER,
+        created_at INTEGER NOT NULL
+    )""",
+    ],
 ]
 
 

@@ -102,3 +102,95 @@ def test_site_assets_referenced_exist():
     page = (SITE / "index.html").read_text(encoding="utf-8")
     for src in set(re.findall(r'(?:src|href)="((?:img/)[^"]+)"', page)):
         assert (SITE / src).is_file(), src
+
+
+# ------------------------------------------------------- social cards / SEO
+
+CANONICAL = "https://gr8monk3ys.github.io/discord-server/"
+
+
+def test_meta_tags_reads_property_and_name_in_any_attribute_order():
+    page = (
+        '<meta property="og:title" content="A &amp; B">'
+        '<meta content="Big" name="twitter:card">'
+        "<meta charset=\"utf-8\">"
+    )
+    assert sitegen.meta_tags(page) == {"og:title": "A & B", "twitter:card": "Big"}
+
+
+def test_cover_box_crops_the_long_side_centred():
+    # 1920x1080 into 1200x630 (wider): keep full width, trim top and bottom equally
+    left, top, right, bottom = sitegen.cover_box(1920, 1080, 1200, 630)
+    assert (left, right) == (0, 1920)
+    assert abs((right - left) / (bottom - top) - 1200 / 630) < 0.01
+    assert abs(top - (1080 - bottom)) <= 1
+    # a square target from a wide source keeps the full height and trims the sides
+    assert sitegen.cover_box(1920, 1080, 1080, 1080) == (420, 0, 1500, 1080)
+
+
+def test_cover_box_same_ratio_is_the_whole_image():
+    assert sitegen.cover_box(2400, 1260, 1200, 630) == (0, 0, 2400, 1260)
+
+
+def _page():
+    return (SITE / "index.html").read_text(encoding="utf-8")
+
+
+def test_site_has_canonical_url():
+    assert f'<link rel="canonical" href="{CANONICAL}">' in _page()
+
+
+def test_site_has_open_graph_and_twitter_cards():
+    meta = sitegen.meta_tags(_page())
+    for key in ("og:title", "og:description", "og:image", "og:url", "og:type", "og:site_name",
+                "og:image:alt", "twitter:card", "twitter:title", "twitter:description",
+                "twitter:image", "twitter:image:alt", "description"):
+        assert meta.get(key, "").strip(), key
+    assert meta["og:url"] == CANONICAL
+    assert meta["og:image"] == CANONICAL + "img/og.png"  # crawlers need an absolute URL
+    assert meta["twitter:image"] == meta["og:image"]
+    assert meta["twitter:card"] == "summary_large_image"
+    assert (meta["og:image:width"], meta["og:image:height"]) == ("1200", "630")
+    assert len(meta["og:description"]) <= 200 and len(meta["og:title"]) <= 70
+
+
+def test_og_image_exists_and_is_1200x630():
+    pil = pytest.importorskip("PIL.Image")
+    path = SITE / "img" / "og.png"
+    assert path.is_file()
+    with pil.open(path) as im:
+        assert im.size == (1200, 630)
+    assert path.stat().st_size < 1_000_000  # unfurlers skip huge images
+
+
+def test_site_json_ld_is_minimal_organization_and_website():
+    import json
+
+    blocks = re.findall(r'<script type="application/ld\+json">(.*?)</script>', _page(), re.S)
+    assert len(blocks) == 1
+    data = json.loads(blocks[0])
+    types = {node["@type"]: node for node in data["@graph"]}
+    assert set(types) == {"Organization", "WebSite"}
+    assert types["WebSite"]["url"] == CANONICAL and types["Organization"]["url"] == CANONICAL
+    assert types["Organization"]["logo"].startswith(CANONICAL + "img/")
+    assert (SITE / types["Organization"]["logo"][len(CANONICAL):]).is_file()
+
+
+def test_site_feature_cards_cover_the_current_server():
+    features = re.search(r'<section id="features".*?</section>', _page(), re.S).group(0)
+    cards = re.findall(r"<li\b", features)
+    assert 9 <= len(cards) <= 12
+    for want in ("Levels", "rank card", "tournament", "Weekly challenges", "Daily Word",
+                 "Starter quest", "Creator spotlight", "Self roles", "Partners"):
+        assert want.lower() in features.lower(), want
+
+
+def test_site_has_this_week_strip_and_updated_faq():
+    page = _page()
+    week = re.search(r'<section id="week".*?</section>', page, re.S)
+    assert week, "This week on the server strip"
+    assert "This week on the server" in week.group(0)
+    faq = re.search(r'<section id="faq".*?</section>', page, re.S).group(0).lower()
+    for want in ("level", "roles", "partner"):
+        assert want in faq, want
+    assert '<p class="counts" id="counts"' in page  # live counts stay
