@@ -283,3 +283,31 @@ def test_onboarding_prompts_respect_discord_limit():
     guild, edits = _onboarding_guild(full)
     asyncio.run(public_mode.PublicMode(guild, apply=True).onboarding_prompts())
     assert edits == []
+
+
+def test_onboarding_prompts_only_platform_is_pre_join():
+    guild, edits = _onboarding_guild([_existing_prompt("What do you play?")])
+    asyncio.run(public_mode.PublicMode(guild, apply=True).onboarding_prompts())
+    new = {p.title: p for p in edits[0]["prompts"][1:]}
+    assert new["What do you play on?"].in_onboarding is True
+    assert new["Where are you?"].in_onboarding is False
+    assert new["Want pings?"].in_onboarding is False
+
+
+def test_onboarding_prompts_fall_back_to_post_join_when_discord_caps_questions():
+    guild, edits = _onboarding_guild([_existing_prompt("What do you play?")])
+
+    class Resp:
+        status, reason = 400, "Bad Request"
+
+    async def edit_onboarding(**kw):
+        edits.append(kw)
+        if len(edits) == 1:
+            raise discord.HTTPException(Resp(), {"code": 50035, "message": "Invalid Form Body",
+                                                 "errors": {"prompts": {"_errors": [{"code": "x",
+                                                 "message": "Too many questions in onboarding."}]}}})
+    guild.edit_onboarding = edit_onboarding
+    asyncio.run(public_mode.PublicMode(guild, apply=True).onboarding_prompts())
+    assert len(edits) == 2
+    assert edits[1]["prompts"][0].title == "What do you play?"
+    assert all(p.in_onboarding is False for p in edits[1]["prompts"][1:])

@@ -42,7 +42,7 @@ NEEDED = ("manage_roles", "manage_channels", "manage_guild", "create_instant_inv
 # Onboarding questions added after the existing ones (matched by title; existing prompts are
 # never removed or reordered). The same roles are on Front Desk's 🎭・roles panel.
 ONBOARDING_PROMPTS = [
-    {"title": "What do you play on?", "multi": True, "options": [
+    {"title": "What do you play on?", "multi": True, "pre_join": True, "options": [
         {"title": "PC", "emoji": "🖥️", "role": "PC"},
         {"title": "PlayStation", "emoji": "🟦", "role": "PlayStation"},
         {"title": "Xbox", "emoji": "🟩", "role": "Xbox"},
@@ -62,6 +62,9 @@ ONBOARDING_PROMPTS = [
     ]},
 ]
 MAX_PROMPTS = 15  # Discord's limit
+# Discord also caps the questions shown before joining; the others go to Channels & Roles
+# (post-join). If Discord still says there are too many, every new one goes post-join.
+TOO_MANY_QUESTIONS = "Too many questions"
 
 
 class PublicMode:
@@ -300,14 +303,25 @@ class PublicMode:
         if len(ob.prompts) + len(add) > MAX_PROMPTS:
             print(f"! skip    Onboarding already has {len(ob.prompts)} prompts (Discord allows {MAX_PROMPTS})")
             return
-        # edit_onboarding replaces the whole list, so the existing prompts go first, as they are.
-        prompts = [*ob.prompts, *(
-            discord.OnboardingPrompt(type=discord.OnboardingPromptType.multiple_choice, title=spec["title"],
-                                     options=options, single_select=not spec["multi"], required=False)
-            for spec, options in add)]
+        def build(pre_join_ok):
+            # edit_onboarding replaces the whole list, so the existing prompts go first, as they are.
+            return [*ob.prompts, *(
+                discord.OnboardingPrompt(type=discord.OnboardingPromptType.multiple_choice, title=spec["title"],
+                                         options=options, single_select=not spec["multi"], required=False,
+                                         in_onboarding=pre_join_ok and spec.get("pre_join", False))
+                for spec, options in add)]
+
+        async def edit():
+            try:
+                return await self.guild.edit_onboarding(prompts=build(True))
+            except discord.HTTPException as e:
+                if TOO_MANY_QUESTIONS not in (e.text or str(e)):
+                    raise
+                print("  retry   Discord caps pre-join questions: adding them under Channels & Roles instead")
+                return await self.guild.edit_onboarding(prompts=build(False))
+
         await self.do("add", "onboarding prompts: " + "; ".join(
-            f"{spec['title']} ({', '.join(o.title for o in options)})" for spec, options in add),
-            lambda: self.guild.edit_onboarding(prompts=prompts))
+            f"{spec['title']} ({', '.join(o.title for o in options)})" for spec, options in add), edit)
 
     async def run(self) -> bool:
         mode = "APPLYING" if self.apply else "DRY RUN (nothing changes; add --apply to do it)"

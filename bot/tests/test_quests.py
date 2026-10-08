@@ -5,6 +5,7 @@ from logic import quests as Q
 
 DAY = 24 * 3600
 T0 = 1_790_000_000
+OLD = T0 - 365 * DAY  # an established account
 ALL = {s.key for s in Q.STEPS}
 
 
@@ -41,12 +42,17 @@ def test_has_picked_roles_platform_region_or_game():
 
 def test_reward_only_for_members_who_joined_after_start_and_recently():
     start = T0
-    assert Q.eligible_for_reward(start + 10, start, start + 20)
-    assert Q.eligible_for_reward(start, start, start + Q.NEW_MEMBER_DAYS * DAY)
-    assert not Q.eligible_for_reward(start - 1, start, start + 10)  # joined before the module
-    assert not Q.eligible_for_reward(start + 10, start, start + 10 + Q.NEW_MEMBER_DAYS * DAY + 1)  # too late
-    assert not Q.eligible_for_reward(None, start, start + 10)
-    assert not Q.eligible_for_reward(start + 10, None, start + 20)
+    assert Q.eligible_for_reward(start + 10, start, start + 20, created_at=OLD)
+    assert Q.eligible_for_reward(start, start, start + Q.NEW_MEMBER_DAYS * DAY, created_at=OLD)
+    assert not Q.eligible_for_reward(start - 1, start, start + 10, created_at=OLD)  # joined before the module
+    assert not Q.eligible_for_reward(start + 10, start, start + 10 + Q.NEW_MEMBER_DAYS * DAY + 1, created_at=OLD)  # too late
+    assert not Q.eligible_for_reward(None, start, start + 10, created_at=OLD)
+    assert not Q.eligible_for_reward(start + 10, None, start + 20, created_at=OLD)
+    # Young accounts (likely alts) are never paid; unknown age isn't either.
+    young = start + 20 - (Q.MIN_ACCOUNT_DAYS * DAY - 1)
+    assert not Q.eligible_for_reward(start + 10, start, start + 20, created_at=young)
+    assert Q.eligible_for_reward(start + 10, start, start + 20, created_at=young - 1)
+    assert not Q.eligible_for_reward(start + 10, start, start + 20, created_at=None)
 
 
 def test_nudge_window():

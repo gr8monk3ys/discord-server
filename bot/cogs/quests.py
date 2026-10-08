@@ -57,6 +57,11 @@ def joined_ts(member) -> int | None:
     return int(joined.timestamp()) if joined is not None else None
 
 
+def created_ts(member) -> int | None:
+    created = getattr(member, "created_at", None)
+    return int(created.timestamp()) if created is not None else None
+
+
 class Quests(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -151,7 +156,7 @@ class Quests(commands.Cog):
         if not Q.is_complete(await self.done(uid), tracking):
             return False
         t = now()
-        if not Q.eligible_for_reward(joined_ts(member), await self.started_at(), t):
+        if not Q.eligible_for_reward(joined_ts(member), await self.started_at(), t, created_at=created_ts(member)):
             return False
         result = await economy.apply(self.db, uid, Q.REWARD, Q.REASON, t, ref=Q.ref(uid))
         if not result.ok:
@@ -290,7 +295,7 @@ class Quests(commands.Cog):
                                      (NUDGE_KEY.format(member.id), str(t))):
             return False
         try:
-            await member.send(Q.nudge_text(done, tracking, rewarded=Q.eligible_for_reward(joined, started, t)),
+            await member.send(Q.nudge_text(done, tracking, rewarded=Q.eligible_for_reward(joined, started, t, created_at=created_ts(member))),
                               allowed_mentions=discord.AllowedMentions.none())
         except Exception as e:  # DMs closed: fine, they can still run /quest
             log.info("quests: nudge DM to %s failed (%s)", member.id, type(e).__name__)
@@ -305,7 +310,7 @@ class Quests(commands.Cog):
         got, total = Q.progress(done, tracking)
         if await self.paid(uid):
             status = "reward paid"
-        elif Q.eligible_for_reward(joined_ts(member), await self.started_at(), now()):
+        elif Q.eligible_for_reward(joined_ts(member), await self.started_at(), now(), created_at=created_ts(member)):
             status = f"{Q.REWARD:,} coins when you finish"
         else:
             status = "no coin reward (for new members)"
