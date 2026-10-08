@@ -59,8 +59,10 @@ class FakeRole:
 
 
 class FakeMember:
-    def __init__(self, uid, guild, bot=False, joined_at=None, roles=()):
+    def __init__(self, uid, guild, bot=False, joined_at=None, roles=(), created_at=None):
         self.id = uid
+        # An established account by default; young accounts aren't paid (alt farming).
+        self.created_at = created_at or datetime(2020, 1, 1, tzinfo=timezone.utc)
         self.bot = bot
         self.guild = guild
         self.name = f"user{uid}"
@@ -497,4 +499,16 @@ def test_quest_command_for_old_member_mentions_no_reward(monkeypatch):
         await Quests.quest.callback(env.cog, inter)
         embed = inter.of("send_message")[0]["embed"]
         assert "0/5" in embed.title and "NO COIN REWARD" in embed.footer.text
+    with_env(go, monkeypatch)
+
+
+
+def test_young_account_finishes_but_is_not_paid(monkeypatch):
+    async def go(env):
+        await env.start()
+        env.member(U1, created_at=at(env.t - 3 * DAY), roles=[config.PLATFORM_ROLES[0]])
+        await env.voice(U1)
+        await finish_all_but_voice(env, U1)
+        assert await env.done(U1) == {s.key for s in Q.STEPS}
+        assert await economy.balance(env.db, U1) == 0
     with_env(go, monkeypatch)

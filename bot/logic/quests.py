@@ -16,6 +16,7 @@ REWARD = 500
 REASON = "quest"
 BADGE_KEY = "starter"  # granted on completion when logic/achievements.py has it
 NEW_MEMBER_DAYS = 30  # finish within this many days of joining to be paid
+MIN_ACCOUNT_DAYS = 30  # accounts younger than this are not paid (alt farming via /give)
 NUDGE_AFTER = DAY  # one DM this long after joining...
 NUDGE_UNTIL = 7 * DAY  # ...unless they joined longer ago than this (bot was down)
 NUDGE_BELOW = 3  # ...and only when fewer steps than this are done
@@ -61,11 +62,14 @@ def has_picked_roles(role_names: Iterable[str]) -> bool:
     return any(slug(n) in PICK_ROLE_SLUGS for n in role_names)
 
 
-def eligible_for_reward(joined_at: int | None, started_at: int | None, now: int) -> bool:
-    """Joined after the module went live, and finished within NEW_MEMBER_DAYS of joining."""
-    if joined_at is None or started_at is None:
+def eligible_for_reward(joined_at: int | None, started_at: int | None, now: int, *,
+                        created_at: int | None) -> bool:
+    """Joined after the module went live, finished within NEW_MEMBER_DAYS of joining, and the
+    Discord account is at least MIN_ACCOUNT_DAYS old (fresh alts can't farm the reward)."""
+    if joined_at is None or started_at is None or created_at is None:
         return False
-    return joined_at >= started_at and now - joined_at <= NEW_MEMBER_DAYS * DAY
+    return (joined_at >= started_at and now - joined_at <= NEW_MEMBER_DAYS * DAY
+            and now - created_at >= MIN_ACCOUNT_DAYS * DAY)
 
 
 def should_nudge(joined_at: int | None, started_at: int | None, now: int, done_count: int) -> bool:
