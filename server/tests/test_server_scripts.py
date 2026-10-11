@@ -496,3 +496,12 @@ def test_bot_posting_dry_run_changes_nothing():
     _, sets = _read_only_channel(guild, "👋・welcome", ["view_channel"])
     asyncio.run(public_mode.PublicMode(guild, apply=False).bot_posting())
     assert sets == []
+
+
+def test_bot_posting_lets_the_bot_open_ticket_threads_in_help():
+    guild = FakeGuild()
+    _, sets = _read_only_channel(guild, "🆘・help", ["send_messages", "embed_links", "attach_files"])
+    asyncio.run(public_mode.PublicMode(guild, apply=True).bot_posting())
+    [(target, ow)] = sets
+    assert target is guild.me
+    assert ow.create_private_threads is True and ow.send_messages_in_threads is True and ow.manage_threads is True
