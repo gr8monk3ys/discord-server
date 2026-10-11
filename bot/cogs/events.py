@@ -6,7 +6,7 @@
 - Thursdays 18:00 local, the bot posts new free-to-keep PC games from GamerPower in
   🕹️・gaming. `free_games` stops a giveaway from being posted twice.
 
-Needs the Manage Events permission. No privileged intents.
+Needs the Create Events and Manage Events permissions. No privileged intents.
 """
 
 import asyncio
@@ -32,10 +32,12 @@ DAY = 24 * 60 * 60
 ANYTHING = "anything"
 GAMENIGHT_CHOICES = GAME_CHOICES + [app_commands.Choice(name="Anything", value=ANYTHING)]
 FREE_GAMES_JOB = Weekly("freegames", weekday=3, hour=18, minute=0)  # Thursdays 18:00 local
-FREE_GAMES_URL = "https://www.gamerpower.com/api/giveaways?platform=epic-games-store.steam&type=game"
+# Several platforms at once only work on /filter; /giveaways answers 404 for a platform list.
+FREE_GAMES_URL = "https://www.gamerpower.com/api/filter?platform=epic-games-store.steam&type=game"
 FREE_GAMES_GIVE_UP = DAY  # API down this long after the scheduled time: skip the week
 FETCH_TIMEOUT = 10
 MAX_REMINDER_PINGS = 60  # keeps the message well under 2000 characters
+EVENT_WARN_EVERY = 30 * 60  # one "missing Create Events" warning per half hour, however often it's tried
 ENDED = (discord.EventStatus.cancelled, discord.EventStatus.completed)
 
 WHEN_PROBLEMS = {
@@ -85,6 +87,7 @@ class Events(commands.Cog):
         self.last_created: dict[int, int] = {}  # host id -> unix time of their last /gamenight
         self.fetch_json = fetch_json or http_get_json  # injectable: tests never hit the network
         self.reminded: set[int] = set()  # sent this run, in case the DB write after it failed
+        self.event_warned_at = 0  # last "missing Create Events" warning
 
     async def cog_load(self) -> None:
         self.reminders.start()
@@ -199,8 +202,12 @@ class Events(commands.Cog):
             if not is_staff(host):
                 self.release_claim(host.id, t, last)
             if isinstance(exc, discord.Forbidden):
-                log.warning("can't create scheduled events: missing Manage Events")
-                text = "I can't create events here: I need the Manage Events permission."
+                if now() - self.event_warned_at >= EVENT_WARN_EVERY:
+                    self.event_warned_at = now()
+                    log.warning("can't create scheduled events: Front Desk is missing the Create Events "
+                                "permission (Server Settings -> Roles -> Front Desk)")
+                text = ("I can't create events here: I need the Create Events permission "
+                        "(Server Settings -> Roles -> Front Desk). Ask a Keeper.")
             else:
                 log.warning("creating a game night failed", exc_info=True)
                 text = "Discord wouldn't create the event. Check the time and try again in a moment."
@@ -389,6 +396,9 @@ class Events(commands.Cog):
         """True when this week is handled (posted, or nothing new); False to retry."""
         try:
             data = await self.fetch_json(FREE_GAMES_URL)
+            if not isinstance(data, list):
+                log.info("free games %s: GamerPower sent no list (%s), so nothing matches this week",
+                         period.key, type(data).__name__)
             seen = {r["id"] for r in await self.db.fetchall("SELECT id FROM free_games")}
             games = E.select_giveaways(data, seen)
         except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as exc:

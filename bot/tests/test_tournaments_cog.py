@@ -2,6 +2,7 @@
 bot, guild, channels, messages, members and interactions. No network."""
 
 import asyncio
+import logging
 import random
 import re
 from datetime import datetime, timedelta, timezone
@@ -971,6 +972,32 @@ def test_auto_tournament_without_an_event_still_opens(monkeypatch):
         assert t["status"] == "signup"
         assert await env.cog.meta(cogmod.auto_key(t["id"])) == ""
         assert await env.rows("SELECT key FROM jobs WHERE key = 'autotourney:2026-11'")
+    with_env(go, monkeypatch)
+
+
+def test_auto_tournament_event_is_retried_every_half_hour(monkeypatch, caplog):
+    async def go(env):
+        attempts = []
+        real = env.guild.create_scheduled_event
+
+        async def counting(**kwargs):
+            attempts.append(env.t)
+            return await real(**kwargs)
+        env.guild.create_scheduled_event = counting
+        env.guild.event_fail = discord.Forbidden(SimpleNamespace(status=403, reason="no"), "Missing Permissions")
+        t = await make_auto(env)
+        opened = env.t
+        for minute in range(1, 61):
+            await tick(env, opened + minute * 60)
+        assert attempts == [opened, opened + 30 * 60, opened + 60 * 60]  # not once a minute
+        warnings = [r for r in caplog.records if r.name == "cogs.tournaments" and r.levelno >= logging.WARNING]
+        assert len(warnings) == 1 and "Create Events" in warnings[0].getMessage()
+        env.guild.event_fail = None  # the owner turned the permission on
+        await tick(env, opened + 90 * 60)
+        assert len(env.guild.created_events) == 1
+        assert await env.cog.meta(cogmod.auto_key(t["id"])) == "7001"
+        await tick(env, opened + 150 * 60)
+        assert len(env.guild.created_events) == 1  # and only one event
     with_env(go, monkeypatch)
 
 

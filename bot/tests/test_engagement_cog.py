@@ -3,6 +3,7 @@ lightweight fakes for the bot, guild, channels, members and interactions. No net
 Time is controlled by patching cogs.engagement.now."""
 
 import asyncio
+import logging
 import random
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
@@ -668,6 +669,30 @@ def test_auto_gamenight_ignores_other_evenings(monkeypatch):
         await env.db.execute("INSERT INTO gamenights VALUES (5, ?, NULL, ?, 0)", (A, ts(2026, 10, 8, 21)))
         await env.tick(ts(2026, 10, 9, 12, 0))
         assert len(env.guild.created) == 1
+    with_env(go, monkeypatch)
+
+
+def test_auto_gamenight_missing_create_events_retries_every_half_hour(monkeypatch, caplog):
+    async def go(env):
+        await env.tick(ts(2026, 10, 2, 13))
+        attempts = []
+        real = env.guild.create_scheduled_event
+
+        async def counting(**kwargs):
+            attempts.append(env.t)
+            return await real(**kwargs)
+        env.guild.create_scheduled_event = counting
+        env.guild.create_fail = http_error(403, discord.Forbidden)
+        start = ts(2026, 10, 9, 12, 0)
+        for minute in range(0, 61):
+            await env.tick(start + minute * 60)
+        assert attempts == [start, start + 30 * 60, start + 60 * 60]  # not once a minute
+        warnings = [r for r in caplog.records if r.name == "cogs.engagement" and r.levelno >= logging.WARNING]
+        assert len(warnings) == 1 and "Create Events" in warnings[0].getMessage()  # one per week
+        assert "autogamenight:2026-W41" not in await env.jobs()
+        env.guild.create_fail = None  # the owner turned the permission on
+        await env.tick(start + 91 * 60)
+        assert len(env.guild.created) == 1 and "autogamenight:2026-W41" in await env.jobs()
     with_env(go, monkeypatch)
 
 

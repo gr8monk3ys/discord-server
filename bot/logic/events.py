@@ -150,10 +150,6 @@ def reminder_state(starts_at: int, now: int) -> str:
 
 
 # ---------------------------------------------------------------- free games
-class MalformedFeed(ValueError):
-    """The API answered with something that isn't a giveaway list."""
-
-
 @dataclass(frozen=True)
 class Giveaway:
     id: int
@@ -191,12 +187,11 @@ def _text(value, limit: int) -> str | None:
 
 
 def select_giveaways(data, seen: set[int]) -> list[Giveaway]:
-    """New, active giveaways with a safe link, in feed order. Raises MalformedFeed if `data`
-    isn't a list (GamerPower's "nothing right now" object counts as an empty list)."""
-    if isinstance(data, dict) and data.get("status") == 0:
-        return []
+    """New, active giveaways with a safe link, in feed order. Anything that isn't a list
+    means "nothing this week": when no giveaway matches, GamerPower's /filter answers 201
+    with an object ({"status": 0, "status_message": ...}) instead of a list."""
     if not isinstance(data, list):
-        raise MalformedFeed(f"expected a list, got {type(data).__name__}")
+        return []
     out: list[Giveaway] = []
     taken = set(seen)
     for raw in data:

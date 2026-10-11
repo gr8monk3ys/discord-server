@@ -155,9 +155,9 @@ day-to-day attention. Design and history:
 | Shop and seasons | `/shop`, `/buy` (colour role, Hype, shoutout), `/season`; monthly champions |
 | Engagement | question of the day 12:00, this-or-that poll 18:00, 🔢・counting, auto game night Fridays, `/birthday` |
 | Moderation | `/warn`, `/timeout`, `/untimeout`, `/cases`, `/purge` (shown only to members with Timeout Members, like `/xp` and `/suggestion`); auto-escalation, anti-spam, anti-raid |
-| Operations | daily DB backup 04:00, error alerts, back-online note, weekly config drift check, `/status` |
+| Operations | daily DB backup 04:00, error alerts, back-online note, weekly config drift check, `/status`; permission self-check a minute after start and daily at 09:00 (every channel, permission and role the loaded modules need: one mod-log note when something is missing, one when it is fixed, and a line in `/status`) |
 | Utility | `/remind`, `/reminders`, `/afk`, suggestion voting, member/online stat channels, tickets in 🆘・help |
-| Welcome cards | an image card in 👋・welcome when someone finishes Onboarding (names them without a ping; the #general welcome is the one ping) |
+| Welcome cards | an image card in 👋・welcome when someone finishes Onboarding (names them without a ping; the #general welcome is the one ping); a card that fails to post is retried every 10 minutes for up to 24 hours while the member is still here |
 | Tournaments | `/tournament create/start/cancel/bracket`; sign-up buttons, brackets with byes, both players confirm results, 1000/400 coin prizes, Tournament Champ role |
 | Achievements | 21 badges, `/profile`, `/badges`; checked on activity and hourly; Founding Member is granted without a post |
 | Creators | `/creator link/verify/unlink/list` (members prove ownership with a code in their channel description), staff `/creator approve/remove`; YouTube uploads and Twitch go-live in 📺・creators |
@@ -208,11 +208,12 @@ All times are Pacific. Every scheduled job catches up once after downtime and ne
 | A role won't be given out | The role must sit **below Front Desk** in Server Settings → Roles. Only the owner can move roles above the bot |
 | Run by hand (debugging) | `python server\watchdog.py --pause 60` first (or it restarts the task), stop the task, then `bot\run_bot.bat`; `--resume` afterwards |
 | Watchdog status | `python server\watchdog.py --check` |
-| Tests | `cd bot`, then `..\server\.venv\Scripts\python -m pytest -q` (about 2,300 tests) |
+| Tests | `cd bot`, then `..\server\.venv\Scripts\python -m pytest -q` (about 2,600 tests) |
 
 Required in the Developer Portal: the **Server Members**, **Message Content** and **Presence**
 intents. Required on the Front Desk role: the permissions printed by `main.py --invite`
-(includes Manage Roles/Channels/Server/Events, Timeout Members, Manage Messages, Move Members).
+(includes Manage Roles/Channels/Server/Events, Create Events, Timeout Members, Manage Messages, Move Members;
+Create Events is separate from Manage Events, and without it game nights and tournament events fail with 403).
 
 ### Adding a module
 

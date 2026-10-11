@@ -184,10 +184,24 @@ def test_select_no_giveaways_object_is_empty():
     assert E.select_giveaways({"status": 0, "status_message": "No active giveaways"}, set()) == []
 
 
-@pytest.mark.parametrize("data", [None, "oops", 42, {"unexpected": True}])
-def test_select_malformed_raises(data):
-    with pytest.raises(E.MalformedFeed):
-        E.select_giveaways(data, set())
+@pytest.mark.parametrize("data", [None, "oops", 42, {"unexpected": True},
+                                  {"status": 0, "status_message": "No active giveaways available at the moment"}])
+def test_select_non_list_means_nothing_this_week(data):
+    # /filter answers 201 with an object when nothing matches: not an error.
+    assert E.select_giveaways(data, set()) == []
+
+
+def test_select_reads_the_filter_endpoint_shape():
+    # One entry as /api/filter returns it (same fields as /api/giveaways).
+    raw = {"id": 3301, "title": "Some Game (Epic Games) Giveaway", "worth": "$19.99",
+           "thumbnail": "https://www.gamerpower.com/offers/1/x.jpg", "image": "https://www.gamerpower.com/offers/1b/x.jpg",
+           "description": "Grab it.", "instructions": "1. Click.", "open_giveaway_url": "https://www.gamerpower.com/open/some-game",
+           "published_date": "2026-10-08 12:00:00", "type": "Game", "platforms": "PC, Epic Games Store",
+           "end_date": "2026-10-15 23:59:00", "users": 1200, "status": "Active",
+           "gamerpower_url": "https://www.gamerpower.com/some-game", "open_giveaway": "https://www.gamerpower.com/open/some-game"}
+    (g,) = E.select_giveaways([raw], set())
+    assert (g.id, g.title, g.worth, g.end_date) == (3301, "Some Game (Epic Games) Giveaway", "$19.99", "2026-10-15")
+    assert g.url == "https://www.gamerpower.com/open/some-game" and g.platforms == "PC, Epic Games Store"
 
 
 def test_safe_url():

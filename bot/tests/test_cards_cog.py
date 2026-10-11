@@ -76,6 +76,18 @@ class FakeGuild:
         self.onboarding_on = True
         self.onboarding_error = None
         self.onboarding_calls = 0
+        self.members = {}  # still in the server
+        self.fetch_error = None
+
+    def get_member(self, uid):
+        return None  # nothing cached: the retry loop has to ask Discord
+
+    async def fetch_member(self, uid):
+        if self.fetch_error is not None:
+            raise self.fetch_error
+        if uid not in self.members:
+            raise discord.NotFound(SimpleNamespace(status=404, reason="gone"), "gone")
+        return self.members[uid]
 
     async def onboarding(self):
         self.onboarding_calls += 1
@@ -93,6 +105,8 @@ class FakeMember:
         self.display_name = name
         self.mention = f"<@{uid}>"
         self.flags = SimpleNamespace(completed_onboarding=completed)
+        if not bot and hasattr(guild, "members"):
+            guild.members[uid] = self
         self.display_avatar = avatar or FakeAsset()
 
     def finished(self, done=True):
@@ -106,6 +120,14 @@ class FakeBot:
         self.db = db
         self.settings = SimpleNamespace(guild_id=GUILD_ID)
         self.cogs = []
+        self.guild = None
+        self.ready = asyncio.Event()  # never set: the retry loop stays parked
+
+    def get_guild(self, guild_id):
+        return self.guild if self.guild is not None and self.guild.id == guild_id else None
+
+    async def wait_until_ready(self):
+        await self.ready.wait()
 
     async def add_cog(self, cog):
         self.cogs.append(cog)
@@ -127,6 +149,10 @@ class Env:
     async def meta(self, uid):
         return await self.db.fetchone("SELECT value FROM meta WHERE key = ?", (cards.card_key(uid),))
 
+    async def retry(self, uid):
+        row = await self.db.fetchone("SELECT value FROM meta WHERE key = ?", (cards.retry_key(uid),))
+        return int(row["value"]) if row else None
+
 
 @pytest.fixture
 def env_run(monkeypatch):
@@ -137,6 +163,7 @@ def env_run(monkeypatch):
             await db.migrate()
             guild = FakeGuild()
             bot = FakeBot(db)
+            bot.guild = guild
             env = Env(db, guild, bot, Cards(bot))
             monkeypatch.setattr(cogmod, "now", lambda: env.t)
             try:
@@ -324,6 +351,123 @@ def test_render_failure_never_raises(env_run, monkeypatch):
         await env.finish(FakeMember(12, env.guild))
         assert env.guild.welcome.sent == []
         assert await env.meta(11) is None and await env.meta(12) is None
+    env_run(t)
+
+
+# ---------------------------------------------------------------- retries
+def forbidden():
+    return discord.Forbidden(SimpleNamespace(status=403, reason="Missing Permissions"), "Missing Permissions")
+
+
+def test_failed_card_is_retried_until_it_posts(env_run):
+    async def t(env):
+        env.guild.welcome.fail = forbidden()
+        m = FakeMember(11, env.guild)
+        await env.finish(m)
+        assert await env.retry(11) == T0 and await env.meta(11) is None
+        env.t += cards.RETRY_EVERY
+        assert await env.cog.retry_failed() == 0  # still forbidden
+        assert await env.retry(11) == T0  # the first failure time is kept
+        env.guild.welcome.fail = None  # the owner fixed the channel
+        env.t += cards.RETRY_EVERY
+        assert await env.cog.retry_failed() == 1
+        assert len(env.guild.welcome.sent) == 1
+        assert_card(env.guild.welcome.sent[0], m)
+        assert await env.retry(11) is None and await env.meta(11) is not None
+        assert await env.cog.retry_failed() == 0
+        await env.finish(m)
+        assert len(env.guild.welcome.sent) == 1  # never twice
+    env_run(t)
+
+
+def test_retry_survives_a_restart_and_gives_up_after_a_day(env_run, caplog):
+    async def t(env):
+        env.guild.welcome.fail = forbidden()
+        await env.finish(FakeMember(11, env.guild))
+        env.restart()
+        env.t += cards.RETRY_FOR - 1
+        await env.cog.retry_failed()
+        assert await env.retry(11) == T0  # still trying
+        env.t += 1
+        env.guild.welcome.fail = None
+        assert await env.cog.retry_failed() == 0
+        assert await env.retry(11) is None and env.guild.welcome.sent == []
+        assert any("giving up" in r.getMessage() for r in caplog.records)
+    env_run(t)
+
+
+def test_retry_stops_when_the_member_left(env_run):
+    async def t(env):
+        env.guild.welcome.fail = forbidden()
+        await env.finish(FakeMember(11, env.guild))
+        del env.guild.members[11]
+        env.guild.welcome.fail = None
+        assert await env.cog.retry_failed() == 0
+        assert await env.retry(11) is None and env.guild.welcome.sent == []
+    env_run(t)
+
+
+def test_retry_waits_when_discord_cannot_say_who_is_here(env_run):
+    async def t(env):
+        env.guild.welcome.fail = forbidden()
+        await env.finish(FakeMember(11, env.guild))
+        env.guild.welcome.fail = None
+        env.guild.fetch_error = http_error(503)
+        assert await env.cog.retry_failed() == 0
+        assert await env.retry(11) == T0
+        env.guild.fetch_error = None
+        assert await env.cog.retry_failed() == 1
+    env_run(t)
+
+
+def test_retry_never_posts_twice_when_an_event_got_there_first(env_run):
+    async def t(env):
+        env.guild.welcome.fail = forbidden()
+        m = FakeMember(11, env.guild)
+        await env.finish(m)
+        env.guild.welcome.fail = None
+        # Rejoined and onboarded again while the retry was pending, racing the loop.
+        await asyncio.gather(env.finish(m), env.cog.retry_failed(), env.cog.retry_failed())
+        await env.cog.retry_failed()
+        assert len(env.guild.welcome.sent) == 1 and await env.retry(11) is None
+    env_run(t)
+
+
+def test_missing_channel_and_render_failures_are_retried_too(env_run, monkeypatch):
+    async def t(env):
+        env.guild.text_channels.remove(env.guild.welcome)
+        await env.finish(FakeMember(11, env.guild))
+        assert await env.retry(11) == T0
+        real = cogmod.cards.render_card
+
+        def boom(*args):
+            raise RuntimeError("render")
+        monkeypatch.setattr(cogmod.cards, "render_card", boom)
+        env.guild.text_channels.append(env.guild.welcome)
+        await env.finish(FakeMember(12, env.guild))
+        assert await env.cog.retry_failed() == 0  # logs, never raises
+        monkeypatch.setattr(cogmod.cards, "render_card", real)
+        assert await env.cog.retry_failed() == 2
+        assert len(env.guild.welcome.sent) == 2
+    env_run(t)
+
+
+def test_retry_ignores_junk_records_and_other_guilds(env_run):
+    async def t(env):
+        await env.db.execute("INSERT INTO meta (key, value) VALUES ('card:retry:abc', '1'), ('card:retry:5', 'x')")
+        assert await env.cog.retry_failed() == 0
+        assert await env.db.fetchall("SELECT key FROM meta WHERE key LIKE 'card:retry:%'") == []
+        env.bot.guild = None
+        assert await env.cog.retry_failed() == 0
+    env_run(t)
+
+
+def test_retry_loop_starts_and_stops_with_the_cog(env_run):
+    async def t(env):
+        await env.cog.cog_load()
+        assert env.cog.retry_loop.is_running()
+        assert env.cog.retry_loop.seconds == cards.RETRY_EVERY == 600
+        await env.cog.cog_unload()
     env_run(t)
 
 

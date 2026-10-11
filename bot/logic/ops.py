@@ -5,12 +5,17 @@
 - The error monitor's sliding window and alert cooldown, plus token redaction.
 - The "back online" decision.
 - Config drift: comparing snapshot dicts built by server/snapshot_lib.py.
+- Permission self-check: what each cog needs (channels, permissions, roles) and which
+  of those the bot is missing.
 """
 
+import hashlib
 import re
 from collections import deque
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, tzinfo
+
+import config
 
 DAY = timedelta(days=1)
 
@@ -281,3 +286,232 @@ def fmt_uptime(seconds: int) -> str:
     if seconds < 86400:
         return f"{seconds // 3600}h {seconds % 3600 // 60}m"
     return f"{seconds // 86400}d {seconds % 86400 // 3600}h"
+
+
+# ---------------------------------------------------------------- permission self-check
+# What each cog needs to do its job, so a missing permission is reported in the mod log
+# instead of failing quietly at 3 a.m. Names are discord.Permissions flag names. A need
+# only counts while its cog is loaded.
+
+VIEW = ("view_channel",)
+POST = ("view_channel", "send_messages", "embed_links")
+SERVER = "Server"  # problem group for server-wide permissions
+ROLES = "Roles"  # problem group for roles the bot hands out
+OK_DIGEST = "ok"
+
+
+@dataclass(frozen=True)
+class Need:
+    cog: str  # extension name without "cogs."
+    channel: str  # as in config.py
+    perms: tuple[str, ...]
+    kind: str = "text"  # text | forum | voice | category
+
+
+@dataclass(frozen=True)
+class GuildNeed:
+    perm: str
+    cogs: tuple[str, ...]
+    hint: str = ""
+
+
+@dataclass(frozen=True)
+class Problem:
+    where: str  # channel name, SERVER or ROLES
+    text: str
+
+
+def _game_channels(cog: str) -> list[Need]:
+    return [Need(cog, g.channel_name, POST) for g in config.GAMES]
+
+
+CHANNEL_NEEDS: list[Need] = [
+    # forum posts: Send Messages creates the post, Manage Threads locks and reopens it
+    Need("lfg", config.LFG_FORUM, POST + ("send_messages_in_threads", "manage_threads"), "forum"),
+    Need("community", config.GENERAL_CHANNEL, POST),
+    Need("community", config.MOD_LOG_CHANNEL, POST),
+    Need("starboard", config.HALL_OF_FAME_CHANNEL, POST + ("read_message_history",)),
+    Need("clips", config.CLIPS_CHANNEL, POST + ("send_polls", "read_message_history")),
+    Need("clips", config.MOD_CHANNEL, POST),
+    Need("tempvoice", config.VOICE_CATEGORY, VIEW + ("manage_channels", "move_members", "connect"), "category"),
+    Need("tempvoice", config.NEW_SQUAD_VOICE, VIEW + ("connect",), "voice"),
+    Need("events", config.GAMING_CHANNEL, POST),
+    Need("events", config.SQUAD_VOICE, VIEW + ("connect",), "voice"),  # voice events
+    Need("events", config.LOBBY_VOICE, VIEW + ("connect",), "voice"),
+    *_game_channels("events"),
+    Need("shop", config.GENERAL_CHANNEL, POST + ("manage_messages",)),  # the Spotlight pin
+    Need("shop", config.ANNOUNCEMENTS_CHANNEL, POST),  # season results
+    # QOTD answers thread, daily poll
+    Need("engagement", config.GENERAL_CHANNEL, POST + ("create_public_threads", "send_polls")),
+    Need("engagement", config.COUNTING_CHANNEL, POST + ("add_reactions", "read_message_history")),
+    Need("engagement", config.GAMING_CHANNEL, POST),
+    Need("engagement", config.SQUAD_VOICE, VIEW + ("connect",), "voice"),
+    *_game_channels("engagement"),
+    Need("moderation", config.MOD_LOG_CHANNEL, POST),
+    Need("ops", config.MOD_LOG_CHANNEL, POST),
+    # tickets are private threads under the help channel
+    Need("utility", config.HELP_CHANNEL, POST + ("create_private_threads", "send_messages_in_threads",
+                                                 "manage_threads", "read_message_history")),
+    Need("utility", config.SUGGESTIONS_FORUM, VIEW + ("manage_threads", "add_reactions", "read_message_history"),
+         "forum"),
+    Need("cards", config.WELCOME_CHANNEL, POST + ("attach_files",)),  # the card is an image
+    Need("tournaments", config.TOURNAMENTS_CHANNEL, POST),
+    Need("tournaments", config.MOD_LOG_CHANNEL, POST),
+    Need("achievements", config.GENERAL_CHANNEL, POST),
+    Need("creators", config.CREATORS_CHANNEL, POST),
+    Need("creators", config.MOD_LOG_CHANNEL, POST),
+    Need("levels", config.BOT_COMMANDS_CHANNEL, POST),
+    Need("levels", config.MOD_LOG_CHANNEL, POST),
+    Need("recap", config.ANNOUNCEMENTS_CHANNEL, POST),  # weekly recap, milestones
+    Need("recap", config.MOD_LOG_CHANNEL, POST),
+    Need("recap", config.SUGGESTIONS_FORUM, VIEW, "forum"),
+    Need("selfroles", config.ROLES_CHANNEL, POST + ("read_message_history",)),
+    Need("partners", config.PARTNERS_CHANNEL, POST),
+    Need("partners", config.MOD_LOG_CHANNEL, POST),
+    Need("quests", config.GENERAL_CHANNEL, POST),
+    Need("challenges", config.GAMES_CHANNEL, POST),
+    Need("wordgame", config.GAMES_CHANNEL, POST),
+    Need("matchmaking", config.GAMES_CHANNEL, POST),
+    Need("matchmaking", config.VOICE_CATEGORY, VIEW + ("manage_channels",), "category"),
+    *_game_channels("news"),
+    Need("staffapps", config.MOD_LOG_CHANNEL, POST),
+    Need("vibes", config.GENERAL_CHANNEL, POST + ("read_message_history",)),
+    Need("vibes", config.ANNOUNCEMENTS_CHANNEL, POST),  # member of the month
+    Need("growth", config.BOT_COMMANDS_CHANNEL, POST),  # bump reminders
+    Need("stats", config.GENERAL_CHANNEL, POST),  # weekly MVP
+]
+
+ROLE_HOLDERS = ("clips", "engagement", "growth", "levels", "selfroles", "shop", "tournaments")
+EVENT_MAKERS = ("engagement", "events", "tournaments")
+CREATE_EVENTS_HINT = "Server Settings -> Roles -> Front Desk -> turn on Create Events"
+GUILD_NEEDS: list[GuildNeed] = [
+    GuildNeed("manage_roles", ROLE_HOLDERS),
+    GuildNeed("manage_channels", ("matchmaking", "tempvoice", "utility")),
+    GuildNeed("manage_events", EVENT_MAKERS),
+    # Discord split this from Manage Events: without it creating an event is a 403.
+    GuildNeed("create_events", EVENT_MAKERS, CREATE_EVENTS_HINT),
+    GuildNeed("moderate_members", ("moderation",)),
+    GuildNeed("manage_messages", ("moderation",)),
+    GuildNeed("manage_guild", ("growth",)),  # reading invites
+    GuildNeed("move_members", ("tempvoice",)),
+]
+
+# Roles the bot hands out: each must exist and sit below the bot's top role. Moderator is
+# left out on purpose: it sits above Front Desk and staffapps says "give it by hand".
+ROLE_NEEDS: list[tuple[str, str]] = [
+    *((name, "levels") for _, name in config.LEVEL_ROLES),
+    *((name, "selfroles") for name in (*config.PLATFORM_ROLES, *config.REGION_ROLES, *config.PLAYTIME_ROLES,
+                                       config.GAMENIGHT_ROLE, config.LFG_ROLE, config.BUMPER_ROLE,
+                                       *(g.role for g in config.GAMES))),
+    (config.BUMPER_ROLE, "growth"),
+    (config.RECRUITER_ROLE, "growth"),
+    (config.CLIP_ROLE, "clips"),
+    (config.HYPE_ROLE, "shop"),
+    (config.SEASON_ROLE, "shop"),
+    (config.BIRTHDAY_ROLE, "engagement"),
+    (config.COUNTING_ROLE, "engagement"),
+    (config.TOURNEY_ROLE, "tournaments"),
+]
+
+PERMISSION_NAMES = sorted({p for n in CHANNEL_NEEDS for p in n.perms} | {n.perm for n in GUILD_NEEDS})
+
+
+def perm_label(perm: str) -> str:
+    return perm.replace("_", " ").title()
+
+
+def _who(cogs) -> str:
+    return ", ".join(sorted(set(cogs)))
+
+
+def channel_problems(channel_perms, needs=None, loaded=None) -> list[Problem]:
+    """`channel_perms`: channel name -> the permission names the bot has there (None or
+    absent: no such channel). `needs`: the requirements table. `loaded`: cog names that
+    are running (None = all). One problem per missing channel or missing permission,
+    naming the cogs that need it, in table order."""
+    needs = CHANNEL_NEEDS if needs is None else needs
+    wanted: dict[str, dict[str, list[str]]] = {}  # channel -> perm -> cogs
+    users: dict[str, list[str]] = {}
+    for need in needs:
+        if loaded is not None and need.cog not in loaded:
+            continue
+        users.setdefault(need.channel, []).append(need.cog)
+        perms = wanted.setdefault(need.channel, {})
+        for perm in need.perms:
+            perms.setdefault(perm, []).append(need.cog)
+    out: list[Problem] = []
+    for channel, perms in wanted.items():
+        have = channel_perms.get(channel)
+        if have is None:
+            out.append(Problem(channel, f"channel not found (needed by {_who(users[channel])})"))
+            continue
+        for perm, cogs in perms.items():
+            if perm not in have:
+                out.append(Problem(channel, f"missing {perm_label(perm)} ({_who(cogs)})"))
+    return out
+
+
+def guild_problems(guild_perms, needs=None, loaded=None) -> list[Problem]:
+    """Server-wide permissions the bot's roles don't grant."""
+    needs = GUILD_NEEDS if needs is None else needs
+    out = []
+    for need in needs:
+        cogs = [c for c in need.cogs if loaded is None or c in loaded]
+        if cogs and need.perm not in guild_perms:
+            hint = f": {need.hint}" if need.hint else ""
+            out.append(Problem(SERVER, f"missing {perm_label(need.perm)} ({_who(cogs)}){hint}"))
+    return out
+
+
+def role_problems(role_positions, top_position: int, needs=None, loaded=None) -> list[Problem]:
+    """`role_positions`: role name -> position (None or absent: no such role)."""
+    needs = ROLE_NEEDS if needs is None else needs
+    users: dict[str, list[str]] = {}
+    for name, cog in needs:
+        if loaded is None or cog in loaded:
+            users.setdefault(name, []).append(cog)
+    out = []
+    for name, cogs in users.items():
+        position = role_positions.get(name)
+        if position is None:
+            out.append(Problem(ROLES, f"{name}: role not found ({_who(cogs)})"))
+        elif position >= top_position:
+            out.append(Problem(ROLES, f"{name}: has to sit below Front Desk's role ({_who(cogs)})"))
+    return out
+
+
+def problems_digest(problems) -> str:
+    """Stable id of a set of problems, so the same set is only reported once."""
+    if not problems:
+        return OK_DIGEST
+    lines = sorted(f"{p.where}\x1f{p.text}" for p in problems)
+    return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()[:32]
+
+
+def problems_report(problems, limit: int = 3800) -> str:
+    """Mod-log text grouped by channel; "" when there are none."""
+    groups: dict[str, list[str]] = {}
+    for p in problems:
+        groups.setdefault(p.where, []).append(p.text)
+    lines: list[str] = []
+    for where, texts in groups.items():
+        lines.append(f"**{_safe(where)}**")
+        lines += [f"- {_safe(t)}" for t in texts]
+    out: list[str] = []
+    used = 0
+    for i, line in enumerate(lines):
+        last = i == len(lines) - 1
+        tail = f"… and {len(lines) - i} more lines"
+        if used + len(line) + (0 if last else 1 + len(tail)) > limit:
+            out.append(tail)
+            break
+        out.append(line)
+        used += len(line) + 1
+    return "\n".join(out)
+
+
+def permissions_status(count: int) -> str:
+    """The /status line."""
+    if count == 0:
+        return "OK"
+    return f"{count} problem{'' if count == 1 else 's'}, see mod-log"

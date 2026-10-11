@@ -58,6 +58,33 @@ def should_card(is_bot: bool, already_done: bool) -> bool:
     return not is_bot and not already_done
 
 
+RETRY_PREFIX = "card:retry:"
+RETRY_EVERY = 10 * 60  # seconds between attempts
+RETRY_FOR = 24 * 60 * 60  # then give up
+RETRY, GIVE_UP, DROP = "retry", "give_up", "drop"
+
+
+def retry_key(user_id: int) -> str:
+    """meta key for a card that failed to post; the value is the time of the first failure."""
+    return f"{RETRY_PREFIX}{user_id}"
+
+
+def retry_user(key: str) -> int | None:
+    """The user id in a retry key, or None if it isn't one."""
+    tail = key[len(RETRY_PREFIX):] if key.startswith(RETRY_PREFIX) else ""
+    return int(tail) if tail.isascii() and tail.isdigit() else None
+
+
+def retry_action(first_failed: int, now: int, in_server: bool, already_done: bool) -> str:
+    """What to do with a failed card: DROP the record (they left, or the card got posted
+    some other way), GIVE_UP after RETRY_FOR, else RETRY."""
+    if not in_server or already_done:
+        return DROP
+    if now - first_failed >= RETRY_FOR:
+        return GIVE_UP
+    return RETRY
+
+
 def member_label(count: int | None) -> str | None:
     if not count or count < 1:
         return None
