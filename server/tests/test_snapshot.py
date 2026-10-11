@@ -383,3 +383,13 @@ def test_layout_names_reads_roles_and_channels():
     roles, channels = lib.layout_names(layout)
     assert roles == ["Keeper", "Squad"]
     assert channels == ["01 · front desk", "📌・rules"]
+
+
+def test_automod_allow_list_never_carries_an_invite_link():
+    trig = NS(type=Kind.text, keyword_filter=[], regex_patterns=[], presets=[],
+              allow_list=["discord.gg/ourcode", "example"], mention_limit=None, mention_raid_protection=None)
+    rule = NS(name="Front Desk: invite links", enabled=True, event_type=Kind.text, trigger=trig, actions=[],
+              exempt_roles=[], exempt_channels=[])
+    out = lib.automod_list([rule])
+    assert out[0]["trigger"]["allow_list"] == ["<invite link>", "example"]
+    assert lib.find_leaks(out, secrets=[]) == []
