@@ -190,6 +190,33 @@ class PublicMode:
     def is_private(ch, ow) -> bool:
         return all(ch.overwrites_for(target) == want for target, want in ow.items())
 
+    # ------------------------------------------------------------ bot can post
+    BOT_POST = ("send_messages", "embed_links", "attach_files")
+
+    async def bot_posting(self):
+        """Read-only channels made before Front Desk existed deny everyone but Keepers, the
+        bot included: welcome cards, recaps and milestones then fail. Add (never remove) a
+        member overwrite that lets the bot post there."""
+        print("\nBot can post in read-only channels")
+        me = self.guild.me
+        for cat_spec in layout.CATEGORIES:
+            for spec in cat_spec["channels"]:
+                if not spec.get("read_only"):
+                    continue
+                ch = find(self.guild.text_channels, spec)
+                if ch is None:
+                    continue
+                perms = ch.permissions_for(me)
+                missing = [p for p in self.BOT_POST if not getattr(perms, p)]
+                if not missing:
+                    print(f"  ok      #{spec['name']}")
+                    continue
+                ow = ch.overwrites_for(me)
+                ow.update(**{p: True for p in self.BOT_POST})
+                await self.do("allow", f"#{spec['name']}: Front Desk may " + ", ".join(
+                    p.replace("_", " ") for p in missing),
+                    lambda ch=ch, ow=ow: ch.set_permissions(me, overwrite=ow, reason="Front Desk posts here"))
+
     async def private(self):
         print("\nPrivate spaces")
         for cat_spec in layout.CATEGORIES:
@@ -434,6 +461,7 @@ class PublicMode:
             return False
         await self.roles()
         await self.new_channels()
+        await self.bot_posting()
         await self.private()
         await self.description()
         await self.posts()

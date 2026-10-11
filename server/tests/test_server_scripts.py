@@ -463,3 +463,36 @@ def test_public_mode_run_includes_automod_gaps(monkeypatch):
         monkeypatch.setattr(pm, name, step)
     assert asyncio.run(pm.run()) is True
     assert ran == list(steps)
+
+
+def _read_only_channel(guild, name, allowed):
+    sets = []
+
+    async def set_permissions(target, overwrite=None, reason=None):
+        sets.append((target, overwrite))
+    ch = NS(id=900 + len(guild.text_channels), name=name, category_id=None, overwrites={},
+            permissions_for=lambda me: discord.Permissions(**{p: True for p in allowed}),
+            overwrites_for=lambda target: discord.PermissionOverwrite(add_reactions=True),
+            set_permissions=set_permissions)
+    guild.text_channels.append(ch)
+    return ch, sets
+
+
+def test_bot_posting_adds_overwrite_only_where_the_bot_cannot_post():
+    guild = FakeGuild()
+    _, blocked = _read_only_channel(guild, "📣・announcements", ["view_channel"])
+    _, fine = _read_only_channel(guild, "🏆・tournaments", ["send_messages", "embed_links", "attach_files"])
+    _, not_read_only = _read_only_channel(guild, "💬・general", ["view_channel"])
+    asyncio.run(public_mode.PublicMode(guild, apply=True).bot_posting())
+    [(target, ow)] = blocked
+    assert target is guild.me
+    assert ow.send_messages is True and ow.embed_links is True and ow.attach_files is True
+    assert ow.add_reactions is True  # what was already there is kept
+    assert fine == [] and not_read_only == []
+
+
+def test_bot_posting_dry_run_changes_nothing():
+    guild = FakeGuild()
+    _, sets = _read_only_channel(guild, "👋・welcome", ["view_channel"])
+    asyncio.run(public_mode.PublicMode(guild, apply=False).bot_posting())
+    assert sets == []
