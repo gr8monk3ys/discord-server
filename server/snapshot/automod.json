@@ -23,6 +23,43 @@
   {
     "actions": [
       {
+        "custom_message": "Invite links to other servers aren't allowed. Partners apply with /partner apply.",
+        "type": "block_message"
+      },
+      {
+        "channel": "📋・mod-log",
+        "type": "send_alert_message"
+      }
+    ],
+    "enabled": true,
+    "event_type": "message_send",
+    "exempt_channels": [
+      "00 · staff"
+    ],
+    "exempt_roles": [
+      "Keeper",
+      "Moderator"
+    ],
+    "name": "Front Desk: invite links",
+    "trigger": {
+      "allow_list": [
+        "<invite link>"
+      ],
+      "keyword_filter": [],
+      "mention_limit": 0,
+      "mention_raid_protection": false,
+      "presets": [],
+      "regex_patterns": [
+        "(?i)discord(?:app)?\\.com/invite/[a-z0-9-]+",
+        "(?i)discord\\.gg/[a-z0-9-]+",
+        "(?i)dsc\\.gg/[a-z0-9-]+"
+      ],
+      "type": "keyword"
+    }
+  },
+  {
+    "actions": [
+      {
         "custom_message": "Blocked by AutoMod. Ask a Keeper if that was a mistake.",
         "type": "block_message"
       },

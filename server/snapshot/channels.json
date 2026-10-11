@@ -119,6 +119,14 @@
           "name": "📌・rules",
           "nsfw": false,
           "overwrites": {
+            "member:Front Desk": {
+              "allow": [
+                "attach_files",
+                "embed_links",
+                "send_messages"
+              ],
+              "deny": []
+            },
             "role:@everyone": {
               "allow": [
                 "add_reactions"
@@ -145,6 +153,14 @@
           "name": "📣・announcements",
           "nsfw": false,
           "overwrites": {
+            "member:Front Desk": {
+              "allow": [
+                "attach_files",
+                "embed_links",
+                "send_messages"
+              ],
+              "deny": []
+            },
             "role:@everyone": {
               "allow": [
                 "add_reactions"
@@ -171,6 +187,14 @@
           "name": "👋・welcome",
           "nsfw": false,
           "overwrites": {
+            "member:Front Desk": {
+              "allow": [
+                "attach_files",
+                "embed_links",
+                "send_messages"
+              ],
+              "deny": []
+            },
             "role:@everyone": {
               "allow": [
                 "add_reactions"
@@ -208,17 +232,17 @@
             },
             {
               "emoji": "✅",
-              "moderated": false,
+              "moderated": true,
               "name": "Accepted"
             },
             {
               "emoji": "❌",
-              "moderated": false,
+              "moderated": true,
               "name": "Denied"
             },
             {
               "emoji": "🎉",
-              "moderated": false,
+              "moderated": true,
               "name": "Done"
             }
           ],
@@ -231,8 +255,12 @@
           "overwrites": {
             "member:Front Desk": {
               "allow": [
+                "attach_files",
+                "create_private_threads",
                 "embed_links",
-                "send_messages"
+                "manage_threads",
+                "send_messages",
+                "send_messages_in_threads"
               ],
               "deny": []
             },
@@ -293,7 +321,7 @@
         },
         {
           "bitrate": 64000,
-          "name": "👥 Members: 13",
+          "name": "👥 Members: 14",
           "nsfw": false,
           "overwrites": {
             "member:Front Desk": {
@@ -320,7 +348,7 @@
         },
         {
           "bitrate": 64000,
-          "name": "🟢 Online: 5",
+          "name": "🟢 Online: 3",
           "nsfw": false,
           "overwrites": {
             "member:Front Desk": {

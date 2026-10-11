@@ -243,7 +243,8 @@ def automod_list(rules, channel_name=lambda _id: None) -> list:
             "keyword_filter": sorted(t.keyword_filter or []),
             "regex_patterns": sorted(t.regex_patterns or []),
             "presets": perm_names(t.presets) if t.presets is not None else [],
-            "allow_list": sorted(t.allow_list or []),
+            # Invite links (our own, allowed by the invite-link rule) never go in a snapshot.
+            "allow_list": sorted({INVITE.sub("<invite link>", a) for a in (t.allow_list or [])}),
             "mention_limit": t.mention_limit,
             "mention_raid_protection": t.mention_raid_protection,
         }
