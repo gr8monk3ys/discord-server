@@ -192,6 +192,8 @@ class PublicMode:
 
     # ------------------------------------------------------------ bot can post
     BOT_POST = ("send_messages", "embed_links", "attach_files")
+    # Extra permissions a feature needs in one read-only channel (tickets are private threads).
+    BOT_POST_EXTRA = {"🆘・help": ("create_private_threads", "send_messages_in_threads", "manage_threads")}
 
     async def bot_posting(self):
         """Read-only channels made before Front Desk existed deny everyone but Keepers, the
@@ -207,12 +209,14 @@ class PublicMode:
                 if ch is None:
                     continue
                 perms = ch.permissions_for(me)
-                missing = [p for p in self.BOT_POST if not getattr(perms, p)]
+                want = (*self.BOT_POST, *next(
+                    (extra for name, extra in self.BOT_POST_EXTRA.items() if slug(name) == slug(spec["name"])), ()))
+                missing = [p for p in want if not getattr(perms, p)]
                 if not missing:
                     print(f"  ok      #{spec['name']}")
                     continue
                 ow = ch.overwrites_for(me)
-                ow.update(**{p: True for p in self.BOT_POST})
+                ow.update(**{p: True for p in want})
                 await self.do("allow", f"#{spec['name']}: Front Desk may " + ", ".join(
                     p.replace("_", " ") for p in missing),
                     lambda ch=ch, ow=ow: ch.set_permissions(me, overwrite=ow, reason="Front Desk posts here"))
