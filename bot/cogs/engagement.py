@@ -54,6 +54,7 @@ ROLE_KEY = "bday_role:"  # meta: bday_role:<user> -> unix time the Birthday role
 LAST_KEY = "bday_last:"  # meta: bday_last:<user> -> last year celebrated (one party a year)
 CHECK, CROSS = "✅", "❌"
 LIVE_EVENTS = (discord.EventStatus.scheduled, discord.EventStatus.active)
+EVENT_RETRY = 30 * 60  # after a 403 creating the game night event, wait this long before trying again
 
 
 def now() -> int:
@@ -71,6 +72,8 @@ class Engagement(commands.Cog):
         self.questions = questions if questions is not None else self._load(E.load_questions, "questions")
         self.pairs = pairs if pairs is not None else self._load(E.load_pairs, "poll pairs")
         self.warned: set[str] = set()  # one log line per stuck role removal, not one a minute
+        self.event_retry_at = 0  # no game night event before this time (set by a 403)
+        self.event_warned: str | None = None  # the period whose missing-permission warning is out
 
     @staticmethod
     def _load(loader, what: str) -> list:
@@ -453,6 +456,8 @@ class Engagement(commands.Cog):
                        + (f"{g.role} got the most play time on the server this week, so that's the pick. "
                           if g else "Bring whatever you're playing. ")
                        + "Tap Interested for a reminder, and hop in Squad voice.")
+        if now() < self.event_retry_at:
+            return False  # Discord said no a moment ago: don't ask every minute
         try:
             event = await guild.create_scheduled_event(
                 name=f"{g.role} game night" if g else "Game night",
@@ -463,8 +468,16 @@ class Engagement(commands.Cog):
                 privacy_level=discord.PrivacyLevel.guild_only,
                 reason="Weekly auto game night",
             )
+        except discord.Forbidden:
+            self.event_retry_at = now() + EVENT_RETRY
+            if self.event_warned != period.key:  # once per week, not once per try
+                self.event_warned = period.key
+                log.warning("auto game night %s: Front Desk is missing the Create Events permission "
+                            "(Server Settings -> Roles -> Front Desk); retrying every %d min",
+                            period.key, EVENT_RETRY // 60)
+            return False
         except discord.HTTPException:
-            log.warning("auto game night %s: Discord wouldn't create the event (Manage Events?); retrying",
+            log.warning("auto game night %s: Discord wouldn't create the event; retrying",
                         period.key, exc_info=True)
             return False
         await self.db.execute(

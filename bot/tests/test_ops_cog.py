@@ -523,6 +523,181 @@ def test_status_without_errors_or_backups(monkeypatch, tmp_path):
     with_env(go, monkeypatch, tmp_path)
 
 
+# ---------------------------------------------------------------- permission self-check
+class PermChan:
+    """A channel whose permissions_for(bot) is whatever the test sets."""
+
+    def __init__(self, name, perms=None):
+        self.id = 300
+        self.name = name
+        self.perms = discord.Permissions.all() if perms is None else perms
+        self.sent = []
+        self.fail = None
+
+    def permissions_for(self, member):
+        return self.perms
+
+    async def send(self, content=None, **kwargs):
+        if self.fail is not None:
+            raise self.fail
+        self.sent.append(dict(content=content, **kwargs))
+
+
+def perm_guild(env, loaded=("ops", "cards", "recap", "levels", "events")):
+    """Give the fake guild everything the loaded cogs need, so each test breaks one thing."""
+    g = env.guild
+    env.bot.extensions = {f"cogs.{n}": None for n in loaded}
+    g.mod_log = PermChan(config.MOD_LOG_CHANNEL)
+    names = dict.fromkeys(n.channel for n in O.CHANNEL_NEEDS if n.kind == "text")
+    g.text_channels = [g.mod_log] + [PermChan(n) for n in names if n != config.MOD_LOG_CHANNEL]
+    g.forums = [PermChan(n) for n in (config.LFG_FORUM, config.SUGGESTIONS_FORUM)]
+    g.voice_channels = [PermChan(n) for n in (config.SQUAD_VOICE, config.LOBBY_VOICE, config.NEW_SQUAD_VOICE)]
+    g.categories = [PermChan(config.VOICE_CATEGORY)]
+    g.roles = g.roles + [Named(name, 1) for name in dict(O.ROLE_NEEDS)]
+    bot_role = Named("Front Desk", 2)
+    g.me = SimpleNamespace(id=7, guild_permissions=discord.Permissions.all(), top_role=bot_role)
+    return g
+
+
+def chan(guild, name):
+    return config.match_by_name(guild.text_channels, name)
+
+
+def without(**flags):
+    p = discord.Permissions.all()
+    p.update(**{k: False for k in flags})
+    return p
+
+
+def test_permission_check_all_ok_posts_nothing(monkeypatch, tmp_path):
+    async def go(env):
+        perm_guild(env)
+        assert await env.cog.check_permissions() == []
+        assert env.guild.mod_log.sent == [] and await env.meta("ops:perms") is None
+    with_env(go, monkeypatch, tmp_path)
+
+
+def test_permission_check_reports_once_then_all_clear_once(monkeypatch, tmp_path):
+    async def go(env):
+        g = perm_guild(env)
+        chan(g, config.WELCOME_CHANNEL).perms = without(send_messages=True, attach_files=True)
+        chan(g, config.ANNOUNCEMENTS_CHANNEL).perms = without(send_messages=True)
+        problems = await env.cog.check_permissions()
+        assert len(problems) == 3
+        (post,) = g.mod_log.sent
+        text = post["embed"].description
+        assert post["embed"].title == "Front Desk is missing permissions" and no_pings(post)
+        assert "missing Send Messages (cards)" in text and "missing Attach Files (cards)" in text
+        assert "missing Send Messages (recap)" in text
+        # grouped: one heading per channel
+        assert text.count("**") == 4
+        await env.cog.check_permissions()
+        await env.restart()
+        await env.cog.check_permissions()
+        assert len(g.mod_log.sent) == 1  # same set: never nags, even after a restart
+
+        chan(g, config.ANNOUNCEMENTS_CHANNEL).perms = discord.Permissions.all()
+        await env.cog.check_permissions()
+        assert len(g.mod_log.sent) == 2  # the set changed
+        assert "recap" not in g.mod_log.sent[1]["embed"].description
+
+        chan(g, config.WELCOME_CHANNEL).perms = discord.Permissions.all()
+        assert await env.cog.check_permissions() == []
+        await env.cog.check_permissions()
+        assert len(g.mod_log.sent) == 3
+        assert g.mod_log.sent[2]["embed"].description == "All permissions OK again."
+        assert await env.meta("ops:perms") == O.OK_DIGEST
+    with_env(go, monkeypatch, tmp_path)
+
+
+def test_permission_check_guild_level_roles_and_missing_channel(monkeypatch, tmp_path):
+    async def go(env):
+        g = perm_guild(env)
+        g.me.guild_permissions = without(create_events=True)
+        g.text_channels.remove(chan(g, config.BOT_COMMANDS_CHANNEL))  # levels posts there
+        g.role("Veteran").position = 5  # above the bot
+        g.roles.remove(g.role("Legend"))
+        g.roles.remove(g.role(config.HYPE_ROLE))  # shop isn't loaded: not a problem
+        problems = await env.cog.check_permissions()
+        texts = {(p.where, p.text) for p in problems}
+        assert (config.BOT_COMMANDS_CHANNEL, "channel not found (needed by levels)") in texts
+        assert (O.ROLES, "Veteran: has to sit below Front Desk's role (levels)") in texts
+        assert (O.ROLES, "Legend: role not found (levels)") in texts
+        assert any(w == O.SERVER and "turn on Create Events" in t for w, t in texts)
+        assert len(problems) == 4
+        assert len(g.mod_log.sent) == 1
+    with_env(go, monkeypatch, tmp_path)
+
+
+@pytest.mark.parametrize("how", ["forbidden", "gone"])
+def test_permission_check_warns_when_mod_log_unusable(monkeypatch, tmp_path, caplog, how):
+    async def go(env):
+        g = perm_guild(env)
+        if how == "forbidden":
+            g.mod_log.perms = without(send_messages=True)
+            g.mod_log.fail = discord.Forbidden(SimpleNamespace(status=403, reason="no"), "no")
+        else:
+            g.text_channels.remove(g.mod_log)
+        await env.cog.check_permissions()
+        await env.cog.check_permissions()
+        warnings = [r for r in caplog.records if r.name == "cogs.ops" and r.levelno >= logging.WARNING]
+        assert len(warnings) == 1 and warnings[0].levelno == logging.WARNING  # once, and never an ERROR
+        assert config.MOD_LOG_CHANNEL in warnings[0].getMessage()
+        assert await env.meta("ops:perms") is None  # still owed to the mod log
+        if how == "forbidden":
+            g.mod_log.fail = None
+            await env.cog.check_permissions()
+            assert len(g.mod_log.sent) == 1
+    with_env(go, monkeypatch, tmp_path)
+
+
+def test_permission_check_runs_after_ready_and_daily(monkeypatch, tmp_path):
+    async def go(env):
+        g = perm_guild(env)
+        chan(g, config.WELCOME_CHANNEL).perms = without(send_messages=True)
+        slept = []
+
+        async def fake_sleep(seconds):
+            slept.append(seconds)
+        monkeypatch.setattr(cogmod.asyncio, "sleep", fake_sleep)
+        await env.cog.startup_permission_check()
+        assert slept == [60] and len(g.mod_log.sent) == 1
+
+        await env.cog.run_permission_job()  # first sighting: marked, not run
+        assert await env.jobs() == {"permcheck:2026-10-04"}
+        chan(g, config.WELCOME_CHANNEL).perms = without(attach_files=True)
+        env.t = local(2026, 10, 5, 9, 2)
+        await env.cog.tick.coro(env.cog)
+        assert "permcheck:2026-10-05" in await env.jobs() and len(g.mod_log.sent) == 2
+        await env.cog.tick.coro(env.cog)
+        assert len(g.mod_log.sent) == 2
+    with_env(go, monkeypatch, tmp_path)
+
+
+def test_permission_check_waits_for_the_guild(monkeypatch, tmp_path):
+    async def go(env):
+        await env.cog.run_permission_job()
+        env.t = local(2026, 10, 5, 9, 2)
+        await env.cog.run_permission_job()  # FakeGuild has no `me` yet
+        assert "permcheck:2026-10-05" not in await env.jobs() and env.posts() == []
+    with_env(go, monkeypatch, tmp_path)
+
+
+def test_status_shows_permissions_line(monkeypatch, tmp_path):
+    async def go(env):
+        async def field():
+            inter = FakeInteraction(FakeMember(OWNER, env.guild))
+            await Ops.status.callback(env.cog, inter)
+            return {f.name: f.value for f in inter.calls[0]["embed"].fields}["Permissions"]
+        assert await field() == "not checked yet"
+        g = perm_guild(env)
+        assert await field() == "OK"
+        chan(g, config.WELCOME_CHANNEL).perms = without(send_messages=True, attach_files=True)
+        assert await field() == "2 problems, see mod-log"
+        assert g.mod_log.sent == []  # /status only reads
+    with_env(go, monkeypatch, tmp_path)
+
+
 def test_ops_job_names_do_not_collide_with_stats():
     assert {cogmod.BACKUP_JOB.name, cogmod.DRIFT_JOB.name}.isdisjoint({"mvp"})
     assert O.backup_name(datetime(2026, 1, 2).date()).startswith("front_desk-")

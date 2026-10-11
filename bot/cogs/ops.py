@@ -9,7 +9,10 @@
 - Weekly config drift check, Sundays 03:00: the live roles and channels, built with
   server/snapshot_lib.py the way snapshot_server.py builds them, compared with the
   JSON in server/snapshot/. Read only: nothing is written into the repo.
-- /status for staff: uptime, latency, database size, last backup, modules, errors.
+- Permission self-check, about a minute after ready and then daily at 09:00: every
+  channel, permission and role the loaded cogs need (logic/ops.py's tables). One mod-log
+  embed when the set of problems changes, one "OK again" when they clear, never a nag.
+- /status for staff: uptime, latency, database size, last backup, permissions, modules, errors.
 """
 
 import asyncio
@@ -44,6 +47,10 @@ ALERT_META = "ops:alert:"  # + logger name -> unix time of the last alert
 ONLINE_META = "ops:online_note"
 BACKUP_META = "ops:last_backup"
 BACKUP_FAIL_META = "ops:backup_fail_note"  # local date of the last failure note
+PERMS_JOB = O.Daily("permcheck", hour=9, minute=0)  # daily 09:00 local
+PERMS_STARTUP_DELAY = 60  # seconds after ready, once the role and channel caches have settled
+PERMS_META = "ops:perms"  # digest of the last reported set of problems
+POOLS = {"text": "text_channels", "forum": "forums", "voice": "voice_channels", "category": "categories"}
 
 
 def now() -> int:
@@ -134,6 +141,7 @@ class Ops(commands.Cog):
         self.loop: asyncio.AbstractEventLoop | None = None
         self.pending_online: int | None = None  # seconds down, waiting to be posted
         self.tasks: set[asyncio.Task] = set()
+        self.perms_warned: str | None = None  # digest already logged while the mod log was unusable
 
     async def cog_load(self) -> None:
         self.loop = asyncio.get_running_loop()
@@ -250,7 +258,7 @@ class Ops(commands.Cog):
     # ------------------------------------------------------------ scheduled jobs
     @tasks.loop(minutes=5)
     async def tick(self) -> None:
-        for step in (self.post_online_note, self.run_backup_job, self.run_drift_job):
+        for step in (self.post_online_note, self.run_backup_job, self.run_drift_job, self.run_permission_job):
             try:
                 await step()
             except Exception:
@@ -259,6 +267,9 @@ class Ops(commands.Cog):
     @tick.before_loop
     async def before_tick(self) -> None:
         await self.bot.wait_until_ready()
+        task = asyncio.ensure_future(self.startup_permission_check())
+        self.tasks.add(task)
+        task.add_done_callback(self.tasks.discard)
 
     async def job_state(self, name: str) -> tuple[int | None, set[str], int]:
         seen_key = f"first_seen:{name}"
@@ -382,6 +393,98 @@ class Ops(commands.Cog):
                                     footer=style.label("drift", week)))
         log.info("drift check %s: roles %s, channels %s", key, bool(roles), bool(channels))
 
+    # ------------------------------------------------------------ permission self-check
+    def loaded_cogs(self) -> set[str]:
+        return {name.removeprefix("cogs.") for name in getattr(self.bot, "extensions", {})}
+
+    def permission_problems(self, guild) -> list[O.Problem]:
+        """What the loaded cogs need and the bot doesn't have. Reads the cache only."""
+        me = guild.me
+        loaded = self.loaded_cogs()
+
+        def granted(perms) -> set[str]:
+            # By name: iterating Permissions skips aliases such as view_channel.
+            return {name for name in O.PERMISSION_NAMES if getattr(perms, name)}
+
+        channels: dict[str, set[str] | None] = {}
+        for need in O.CHANNEL_NEEDS:
+            if need.channel in channels or need.cog not in loaded:
+                continue
+            channel = config.match_by_name(getattr(guild, POOLS[need.kind], []), need.channel)
+            channels[need.channel] = (None if channel is None
+                                      else granted(channel.permissions_for(me)))
+        positions = {}
+        for name, _ in O.ROLE_NEEDS:
+            role = config.match_by_name(guild.roles, name)
+            positions[name] = role.position if role is not None else None
+        return (O.guild_problems(granted(me.guild_permissions), loaded=loaded)
+                + O.channel_problems(channels, loaded=loaded)
+                + O.role_problems(positions, me.top_role.position, loaded=loaded))
+
+    async def check_permissions(self) -> list[O.Problem] | None:
+        """Run the check and report a change to the mod log. None if the guild isn't cached."""
+        guild = self.guild()
+        if guild is None or getattr(guild, "me", None) is None:
+            log.info("ops: permission check skipped, guild not available yet")
+            return None
+        problems = self.permission_problems(guild)
+        digest = O.problems_digest(problems)
+        last = await self.meta(PERMS_META)
+        if digest == (last or O.OK_DIGEST):
+            return problems  # nothing new: never nag
+        if problems:
+            embed = style.embed(
+                title="Front Desk is missing permissions",
+                description=("These will fail until they're fixed. I'll say so here once they are.\n\n"
+                             + O.problems_report(problems)),
+                footer=style.label("permissions", f"{len(problems)} to fix"), color=style.MUTED)
+        else:
+            embed = style.embed(description="All permissions OK again.", footer=style.label("permissions"))
+        try:
+            posted = await self.post(embed)
+        except discord.HTTPException as e:
+            posted = False
+            log.info("ops: couldn't post the permission report (%s)", type(e).__name__)
+        if posted:
+            await self.set_meta(PERMS_META, digest)
+            self.perms_warned = None
+        elif self.perms_warned != digest:
+            # Not stored, so the mod log still gets it once it works. WARNING, not ERROR:
+            # an ERROR would feed the error alert, which posts to the same channel.
+            self.perms_warned = digest
+            if problems:
+                log.warning("permission check: %d problem(s) and the mod log is unusable: %s", len(problems),
+                            "; ".join(f"{p.where}: {p.text}" for p in problems))
+            else:
+                log.warning("permission check: all OK again, but the mod log is unusable")
+        return problems
+
+    async def startup_permission_check(self) -> None:
+        try:
+            await asyncio.sleep(PERMS_STARTUP_DELAY)
+            await self.check_permissions()
+        except Exception:
+            log.exception("ops: startup permission check failed")
+
+    async def run_permission_job(self) -> None:
+        first_seen, done, t = await self.job_state(PERMS_JOB.name)
+        todo = O.plan_daily(PERMS_JOB, t, self.tz, done, first_seen)
+        await self.mark_done(p.key for p in todo.mark_done)
+        if todo.run is None:
+            return
+        if await self.check_permissions() is not None:
+            await self.mark_done([todo.run.key])
+
+    def permissions_text(self) -> str:
+        guild = self.guild()
+        if guild is None or getattr(guild, "me", None) is None:
+            return "not checked yet"
+        try:
+            return O.permissions_status(len(self.permission_problems(guild)))
+        except Exception:
+            log.warning("ops: permission check for /status failed", exc_info=True)
+            return "check failed, see bot.log"
+
     # ------------------------------------------------------------ /status
     @staticmethod
     def is_staff(user) -> bool:
@@ -439,6 +542,7 @@ class Ops(commands.Cog):
         embed.add_field(name="Latency", value=latency_text)
         embed.add_field(name="Database", value=O.fmt_bytes(self.db_size()))
         embed.add_field(name="Last backup", value=await self.last_backup_text(), inline=False)
+        embed.add_field(name="Permissions", value=self.permissions_text(), inline=False)
         embed.add_field(name=f"Modules ({len(modules)})", value=", ".join(modules) or "none", inline=False)
         embed.add_field(name="Errors", value=errors[:1024], inline=False)
         await interaction.response.send_message(embed=embed, ephemeral=True)

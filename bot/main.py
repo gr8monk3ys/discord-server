@@ -67,6 +67,7 @@ PERMISSIONS = discord.Permissions(
     send_messages=True,
     send_messages_in_threads=True,
     create_public_threads=True,
+    create_private_threads=True,  # tickets
     manage_threads=True,
     embed_links=True,
     attach_files=True,
@@ -79,7 +80,9 @@ PERMISSIONS = discord.Permissions(
     manage_channels=True,
     create_instant_invite=True,
     move_members=True,
+    connect=True,  # voice-channel events need View Channel + Connect there
     manage_events=True,
+    create_events=True,  # split from Manage Events: creating an event needs this one
     # Moderation autopilot: timeouts and spam cleanup.
     moderate_members=True,
     manage_messages=True,

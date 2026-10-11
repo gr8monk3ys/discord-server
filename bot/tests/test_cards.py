@@ -154,3 +154,21 @@ def test_fonts_load_or_fall_back():
     font = cards.load_font(40, bold=True)
     assert font is not None
     assert cards.can_draw(font, "A")
+
+
+# ---------------------------------------------------------------- retry rules
+def test_retry_key_round_trip():
+    assert cards.retry_key(42) == "card:retry:42"
+    assert cards.retry_user("card:retry:42") == 42
+    assert cards.retry_user("card:42") is None and cards.retry_user("card:retry:x") is None
+    assert cards.card_key(42) != cards.retry_key(42)
+
+
+def test_retry_action():
+    t0 = 1_000_000
+    assert cards.RETRY_EVERY == 600 and cards.RETRY_FOR == 86400
+    assert cards.retry_action(t0, t0 + 600, True, False) == cards.RETRY
+    assert cards.retry_action(t0, t0 + 86399, True, False) == cards.RETRY
+    assert cards.retry_action(t0, t0 + 86400, True, False) == cards.GIVE_UP
+    assert cards.retry_action(t0, t0 + 600, False, False) == cards.DROP  # left the server
+    assert cards.retry_action(t0, t0 + 600, True, True) == cards.DROP  # already has a card

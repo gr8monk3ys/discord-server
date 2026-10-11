@@ -3,6 +3,7 @@ the bot, guild, channels, roles, scheduled events and interactions. No network: 
 GamerPower fetch is injected. Time is controlled by patching cogs.events.now."""
 
 import asyncio
+import logging
 from datetime import date, datetime, timezone
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
@@ -331,12 +332,19 @@ def test_gamenight_bad_when(monkeypatch, when, word):
     with_env(go, monkeypatch)
 
 
-def test_gamenight_without_manage_events(monkeypatch):
+def test_gamenight_without_create_events(monkeypatch, caplog):
     async def go(env):
         env.guild.forbidden = True
         i = await env.gamenight()
-        assert any("Manage Events" in t for t in i.texts())
+        assert any("Create Events" in t for t in i.texts())
         assert await env.rows("SELECT * FROM gamenights") == []
+        for _ in range(5):
+            await env.gamenight()
+        env.t += 31 * MIN
+        await env.gamenight()
+        warnings = [r for r in caplog.records if r.name == "cogs.events" and r.levelno == logging.WARNING]
+        assert len(warnings) == 2  # one per half hour, not one per try
+        assert all("Create Events" in r.getMessage() for r in warnings)
     with_env(go, monkeypatch)
 
 
@@ -614,8 +622,56 @@ def test_free_games_all_seen_marks_done_posts_nothing(monkeypatch):
     with_env(go, monkeypatch, feed=FakeFeed([item(1)]))
 
 
+def test_free_games_uses_the_filter_endpoint(monkeypatch):
+    # /api/giveaways answers 404 for a platform list; /api/filter takes one.
+    assert cogmod.FREE_GAMES_URL == ("https://www.gamerpower.com/api/filter"
+                                     "?platform=epic-games-store.steam&type=game")
+    assert cogmod.E.safe_url(cogmod.FREE_GAMES_URL) is not None
+    feed = FakeFeed([item(1)])
+
+    async def go(env):
+        await seen_first(env)
+        env.t = THU + MIN
+        await env.cog.run_weekly()
+        assert feed.urls == [cogmod.FREE_GAMES_URL]
+    with_env(go, monkeypatch, feed=feed)
+
+
+@pytest.mark.parametrize("body", [{"status": 0, "status_message": "No active giveaways available at the moment"},
+                                  {"weird": 1}, "html page", None])
+def test_free_games_non_list_body_means_none_this_week(monkeypatch, caplog, body):
+    async def go(env):
+        await seen_first(env)
+        env.t = THU + MIN
+        await env.cog.run_weekly()
+        assert KEY in await env.jobs() and env.guild.gaming.sent == []
+        assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+    with_env(go, monkeypatch, feed=FakeFeed(body))
+
+
+def test_free_games_next_week_runs_after_a_week_was_given_up(monkeypatch):
+    feed = FakeFeed(TimeoutError("404"))
+
+    async def go(env):
+        await seen_first(env)
+        env.t = THU + MIN
+        await env.cog.run_weekly()
+        env.t = THU + 24 * HOUR + MIN
+        await env.cog.run_weekly()
+        assert KEY in await env.jobs() and env.guild.gaming.sent == []  # gave up on that week
+        feed.results = [[item(9)]]
+        env.t = THU + 6 * 24 * HOUR
+        await env.cog.run_weekly()
+        assert env.guild.gaming.sent == []  # not due again yet
+        env.t = THU + 7 * 24 * HOUR + MIN
+        await env.cog.run_weekly()
+        assert len(env.guild.gaming.sent) == 1
+        assert len(await env.jobs()) == 3  # first sighting, the week given up, this week
+    with_env(go, monkeypatch, feed=feed)
+
+
 @pytest.mark.parametrize("failure", [
-    TimeoutError("slow"), ValueError("bad json"), {"weird": 1}, "html page",
+    TimeoutError("slow"), ValueError("bad json"),
 ])
 def test_free_games_api_failure_retries_then_succeeds(monkeypatch, failure):
     feed = FakeFeed(failure, [item(7)])

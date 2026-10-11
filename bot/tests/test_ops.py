@@ -262,3 +262,135 @@ def test_fmt_bytes(n, text):
 @pytest.mark.parametrize("s,text", [(5, "5s"), (65, "1m"), (3 * HOUR + 120, "3h 2m"), (2 * DAY + HOUR, "2d 1h")])
 def test_fmt_uptime(s, text):
     assert ops.fmt_uptime(s) == text
+
+
+# --- permission self-check ------------------------------------------------------
+Need, Problem = ops.Need, ops.Problem
+TABLE = [
+    Need("cards", "welcome", ops.POST + ("attach_files",)),
+    Need("recap", "news", ops.POST),
+    Need("vibes", "news", ops.POST + ("read_message_history",)),
+    Need("lfg", "lfg", ops.POST + ("manage_threads",), "forum"),
+]
+FULL = {"view_channel", "send_messages", "embed_links", "attach_files", "read_message_history", "manage_threads"}
+
+
+def test_channel_problems_none_when_everything_is_granted():
+    perms = {"welcome": FULL, "news": FULL, "lfg": FULL}
+    assert ops.channel_problems(perms, TABLE) == []
+
+
+def test_channel_problems_names_the_permission_and_the_cogs():
+    perms = {"welcome": FULL - {"send_messages", "attach_files"}, "news": FULL - {"send_messages"}, "lfg": FULL}
+    assert ops.channel_problems(perms, TABLE) == [
+        Problem("welcome", "missing Send Messages (cards)"),
+        Problem("welcome", "missing Attach Files (cards)"),
+        Problem("news", "missing Send Messages (recap, vibes)"),
+    ]
+
+
+def test_channel_problems_missing_channel_and_unloaded_cogs():
+    perms = {"welcome": None, "lfg": FULL}
+    assert ops.channel_problems(perms, TABLE) == [
+        Problem("welcome", "channel not found (needed by cards)"),
+        Problem("news", "channel not found (needed by recap, vibes)"),
+    ]
+    # Only what a loaded cog needs counts.
+    assert ops.channel_problems(perms, TABLE, loaded={"lfg"}) == []
+    assert ops.channel_problems({"news": FULL - {"read_message_history"}}, TABLE, loaded={"recap"}) == []
+    assert ops.channel_problems({"news": FULL - {"read_message_history"}}, TABLE, loaded={"recap", "vibes"}) == [
+        Problem("news", "missing Read Message History (vibes)")]
+
+
+def test_guild_problems_and_the_create_events_hint():
+    everything = {n.perm for n in ops.GUILD_NEEDS}
+    assert ops.guild_problems(everything) == []
+    assert {n.perm for n in ops.GUILD_NEEDS} >= {"manage_roles", "manage_channels", "manage_events",
+                                                 "create_events", "moderate_members"}
+    (p,) = ops.guild_problems(everything - {"create_events"})
+    assert p.where == ops.SERVER and p.text.startswith("missing Create Events (engagement, events, tournaments)")
+    assert "Server Settings -> Roles -> Front Desk -> turn on Create Events" in p.text
+    assert ops.guild_problems(everything - {"create_events"}, loaded={"moderation", "lfg"}) == []
+    assert ops.guild_problems(set(), loaded={"moderation"}) == [
+        Problem(ops.SERVER, "missing Moderate Members (moderation)"),
+        Problem(ops.SERVER, "missing Manage Messages (moderation)")]
+
+
+def test_role_problems_missing_and_not_below_the_bot():
+    needs = [("Regular", "levels"), ("PC", "selfroles"), ("Bumper", "selfroles"), ("Bumper", "growth")]
+    assert ops.role_problems({"Regular": 3, "PC": 2, "Bumper": 1}, 10, needs) == []
+    assert ops.role_problems({"Regular": 10, "PC": None}, 10, needs) == [
+        Problem(ops.ROLES, "Regular: has to sit below Front Desk's role (levels)"),
+        Problem(ops.ROLES, "PC: role not found (selfroles)"),
+        Problem(ops.ROLES, "Bumper: role not found (growth, selfroles)"),
+    ]
+    assert ops.role_problems({}, 10, needs, loaded={"lfg"}) == []
+
+
+def test_requirements_tables_cover_config():
+    import config
+    by_channel = {}
+    for n in ops.CHANNEL_NEEDS:
+        by_channel.setdefault(n.channel, set()).update(n.perms)
+        assert n.kind in ("text", "forum", "voice", "category")
+        assert "view_channel" in n.perms
+    # every channel a cog posts to
+    for name in (config.GENERAL_CHANNEL, config.MOD_LOG_CHANNEL, config.MOD_CHANNEL, config.BOT_COMMANDS_CHANNEL,
+                 config.HALL_OF_FAME_CHANNEL, config.CLIPS_CHANNEL, config.GAMING_CHANNEL,
+                 config.ANNOUNCEMENTS_CHANNEL, config.COUNTING_CHANNEL, config.HELP_CHANNEL,
+                 config.WELCOME_CHANNEL, config.TOURNAMENTS_CHANNEL, config.CREATORS_CHANNEL,
+                 config.ROLES_CHANNEL, config.PARTNERS_CHANNEL, config.GAMES_CHANNEL, config.LFG_FORUM,
+                 *(g.channel_name for g in config.GAMES)):
+        assert {"send_messages", "embed_links"} <= by_channel[name], name
+    assert "attach_files" in by_channel[config.WELCOME_CHANNEL]  # welcome cards are images
+    assert "manage_messages" in by_channel[config.GENERAL_CHANNEL]  # the Spotlight pin
+    assert "create_public_threads" in by_channel[config.GENERAL_CHANNEL]  # QOTD thread
+    assert "create_private_threads" in by_channel[config.HELP_CHANNEL]  # tickets
+    assert "manage_threads" in by_channel[config.LFG_FORUM]
+    assert "manage_threads" in by_channel[config.SUGGESTIONS_FORUM]
+    assert "manage_channels" in by_channel[config.VOICE_CATEGORY]
+    # the announcements gap that started this: recap, milestones, member of the month
+    assert {n.cog for n in ops.CHANNEL_NEEDS if n.channel == config.ANNOUNCEMENTS_CHANNEL} >= {"recap", "vibes"}
+    roles = {name for name, _ in ops.ROLE_NEEDS}
+    assert roles >= {name for _, name in config.LEVEL_ROLES}
+    assert roles >= set(config.PLATFORM_ROLES) | set(config.REGION_ROLES) | set(config.PLAYTIME_ROLES)
+    assert roles >= {config.HYPE_ROLE, config.SEASON_ROLE, config.BIRTHDAY_ROLE, config.COUNTING_ROLE,
+                     config.CLIP_ROLE, config.TOURNEY_ROLE, config.RECRUITER_ROLE, config.BUMPER_ROLE,
+                     config.GAMENIGHT_ROLE, config.LFG_ROLE}
+    assert config.MOD_ROLE not in roles and config.KEEPER_ROLE not in roles  # above the bot by design
+
+
+def test_requirements_only_name_real_cogs_and_permissions():
+    import discord
+    import main
+    cogs = {ext.removeprefix("cogs.") for ext, _ in main.MODULES}
+    used = ({n.cog for n in ops.CHANNEL_NEEDS} | {c for n in ops.GUILD_NEEDS for c in n.cogs}
+            | {cog for _, cog in ops.ROLE_NEEDS})
+    assert used <= cogs
+    perms = {p for n in ops.CHANNEL_NEEDS for p in n.perms} | {n.perm for n in ops.GUILD_NEEDS}
+    assert perms <= set(discord.Permissions.VALID_FLAGS)
+    # The invite link asks for everything the self-check expects.
+    assert all(getattr(main.PERMISSIONS, p) for p in perms)
+
+
+def test_problems_digest_is_stable_and_order_free():
+    a, b = Problem("x", "missing Send Messages (cards)"), Problem("y", "channel not found (needed by lfg)")
+    assert ops.problems_digest([]) == ops.OK_DIGEST
+    assert ops.problems_digest([a, b]) == ops.problems_digest([b, a]) != ops.OK_DIGEST
+    assert ops.problems_digest([a]) != ops.problems_digest([a, b])
+
+
+def test_problems_report_groups_by_channel_and_truncates():
+    text = ops.problems_report([Problem("a_b", "missing Send Messages (cards)"), Problem(ops.SERVER, "missing X (y)"),
+                                Problem("a_b", "missing Embed Links (cards)")])
+    assert text == ("**a\\_b**\n- missing Send Messages (cards)\n- missing Embed Links (cards)\n"
+                    "**Server**\n- missing X (y)")
+    assert ops.problems_report([]) == ""
+    many = [Problem(f"ch{i}", "missing Send Messages (cards)") for i in range(200)]
+    short = ops.problems_report(many, limit=500)
+    assert len(short) <= 500 and "more lines" in short.splitlines()[-1]
+
+
+@pytest.mark.parametrize("n,text", [(0, "OK"), (1, "1 problem, see mod-log"), (4, "4 problems, see mod-log")])
+def test_permissions_status(n, text):
+    assert ops.permissions_status(n) == text

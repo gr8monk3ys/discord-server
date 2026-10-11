@@ -135,6 +135,7 @@ def flagged_key(match_id: int) -> str:
 
 
 EVENT_HOURS = 4  # how long the scheduled event says it runs
+EVENT_RETRY = 30 * 60  # an auto tournament without its event: try to create it again this often
 EVENT_LOCATION = f"#{config.TOURNAMENTS_CHANNEL}"
 
 
@@ -269,6 +270,8 @@ class Tournaments(commands.Cog):
         self.bot = bot
         self.rng = rng or random.Random()
         self.lock = asyncio.Lock()  # one sync at a time, so a match message is never posted twice
+        self.event_retry: dict[int, int] = {}  # tournament id -> earliest next try at its event
+        self.event_warned: set[int] = set()  # tournaments whose "no event" warning is out
 
     @property
     def db(self):
@@ -794,6 +797,7 @@ class Tournaments(commands.Cog):
     async def tick(self) -> None:
         jobs = (
             ("monthly auto tournament", self.run_auto_create),
+            ("missing events", self.retry_events),
             ("start reminders", self.send_reminders),
             ("auto start", self.auto_start_due),
             ("stale matches", self.sweep_matches),
@@ -876,6 +880,21 @@ class Tournaments(commands.Cog):
         log.info("auto tournament %s: opened #%s (%s)", period.key, tid, game.key if game else "anything")
         return True
 
+    async def retry_events(self) -> None:
+        """Auto tournaments still in signups whose scheduled event couldn't be created (the
+        bot lacked Create Events, or Discord hiccuped): try again, at most every 30 minutes."""
+        guild = self.guild()
+        if guild is None:
+            return
+        t0 = now()
+        rows = await self.db.fetchall(
+            "SELECT t.* FROM tournaments t JOIN meta m ON m.key = 'tourney:' || t.id || ':auto'"
+            " WHERE t.status = ? AND m.value = '' AND t.starts_at > ?", (SIGNUP, t0))
+        for t in rows:
+            if t0 < self.event_retry.setdefault(t["id"], t0 + EVENT_RETRY):
+                continue
+            await self.create_event(guild, t, None)
+
     async def create_event(self, guild, t, channel) -> None:
         when = datetime.fromtimestamp(t["starts_at"], timezone.utc)
         description = (f"The monthly community tournament: single elimination, up to {t['size']} players. "
@@ -893,10 +912,21 @@ class Tournaments(commands.Cog):
                 privacy_level=discord.PrivacyLevel.guild_only,
                 reason="Monthly auto tournament",
             )
-        except discord.HTTPException:
-            # The signups are up either way; the event is a nice-to-have (needs Manage Events).
-            log.warning("auto tournament #%s: Discord wouldn't create the event", t["id"], exc_info=True)
+        except discord.HTTPException as exc:
+            # The signups are up either way; the event is a nice-to-have. retry_events tries
+            # again later; one warning per tournament, not one per try.
+            self.event_retry[t["id"]] = now() + EVENT_RETRY
+            if t["id"] not in self.event_warned:
+                self.event_warned.add(t["id"])
+                if isinstance(exc, discord.Forbidden):
+                    log.warning("auto tournament #%s: Front Desk is missing the Create Events permission "
+                                "(Server Settings -> Roles -> Front Desk); retrying every %d min",
+                                t["id"], EVENT_RETRY // 60)
+                else:
+                    log.warning("auto tournament #%s: Discord wouldn't create the event; retrying every %d min",
+                                t["id"], EVENT_RETRY // 60, exc_info=True)
             return
+        self.event_retry.pop(t["id"], None)
         await self.set_meta(auto_key(t["id"]), str(event.id))
 
     async def top_game(self, start: int, end: int):
