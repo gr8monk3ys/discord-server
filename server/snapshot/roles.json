@@ -67,11 +67,17 @@
     "name": "Front Desk",
     "permissions": [
       "add_reactions",
+      "administrator",
       "attach_files",
+      "bypass_slowmode",
+      "create_events",
       "create_expressions",
       "create_instant_invite",
       "create_public_threads",
+      "deafen_members",
       "embed_links",
+      "external_emojis",
+      "external_stickers",
       "manage_channels",
       "manage_events",
       "manage_expressions",
@@ -79,13 +85,22 @@
       "manage_messages",
       "manage_roles",
       "manage_threads",
+      "manage_webhooks",
+      "mention_everyone",
       "moderate_members",
       "move_members",
+      "mute_members",
+      "pin_messages",
       "read_message_history",
       "read_messages",
       "send_messages",
       "send_messages_in_threads",
-      "send_polls"
+      "send_polls",
+      "use_application_commands",
+      "use_embedded_activities",
+      "use_external_apps",
+      "view_audit_log",
+      "view_guild_insights"
     ]
   },
   {
@@ -237,26 +252,6 @@
     "mentionable": true,
     "name": "Roblox",
     "permissions": []
-  },
-  {
-    "color": null,
-    "hoist": false,
-    "managed": true,
-    "mentionable": false,
-    "name": "Lurkr",
-    "permissions": [
-      "add_reactions",
-      "attach_files",
-      "embed_links",
-      "external_emojis",
-      "manage_expressions",
-      "manage_messages",
-      "manage_roles",
-      "read_message_history",
-      "read_messages",
-      "send_messages",
-      "send_messages_in_threads"
-    ]
   },
   {
     "color": null,
@@ -478,6 +473,79 @@
     "managed": false,
     "mentionable": false,
     "name": "Weekend Warrior",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": true,
+    "mentionable": false,
+    "name": "Discadia",
+    "permissions": [
+      "create_expressions",
+      "create_instant_invite",
+      "manage_guild",
+      "manage_roles",
+      "manage_webhooks",
+      "send_messages"
+    ]
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": true,
+    "mentionable": false,
+    "name": "Top.gg",
+    "permissions": [
+      "create_instant_invite"
+    ]
+  },
+  {
+    "color": null,
+    "hoist": true,
+    "managed": false,
+    "mentionable": false,
+    "name": "Event Champ",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": true,
+    "name": "Welcome Crew",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": true,
+    "managed": false,
+    "mentionable": false,
+    "name": "Supporter",
+    "permissions": []
+  },
+  {
+    "color": "#7fa36b",
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
+    "name": "House Fern",
+    "permissions": []
+  },
+  {
+    "color": "#c48a4a",
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
+    "name": "House Kestrel",
+    "permissions": []
+  },
+  {
+    "color": "#6f93a8",
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
+    "name": "House Otter",
     "permissions": []
   },
   {

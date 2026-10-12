@@ -2,7 +2,7 @@
   "afk_channel": "💤 AFK",
   "afk_timeout": 900,
   "default_notifications": "only_mentions",
-  "description": "Chill 18+ gaming community. No tryhards, no toxicity: squad up for Valorant, CoD, Fortnite, Minecraft and more.",
+  "description": null,
   "explicit_content_filter": "all_members",
   "features": [
     "AUTO_MODERATION",

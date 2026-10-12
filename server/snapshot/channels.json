@@ -90,6 +90,43 @@
           "synced": false,
           "topic": null,
           "type": "text"
+        },
+        {
+          "name": "🔒・appeals",
+          "nsfw": false,
+          "overwrites": {
+            "member:Front Desk": {
+              "allow": [
+                "connect",
+                "embed_links",
+                "read_messages",
+                "send_messages"
+              ],
+              "deny": []
+            },
+            "role:@everyone": {
+              "allow": [],
+              "deny": [
+                "read_messages"
+              ]
+            },
+            "role:Keeper": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            },
+            "role:Moderator": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            }
+          },
+          "slowmode": 0,
+          "synced": false,
+          "topic": "Ban appeals from the website. Front Desk posts a card for each one.",
+          "type": "text"
         }
       ],
       "name": "00 · staff",
@@ -218,18 +255,16 @@
           "type": "text"
         },
         {
+          "default_reaction": "::",
+          "layout": "not_set",
           "name": "💡・suggestions",
           "nsfw": false,
           "overwrites": {},
           "require_tag": false,
           "slowmode": 0,
+          "sort_order": null,
           "synced": true,
           "tags": [
-            {
-              "emoji": "💡",
-              "moderated": false,
-              "name": "Idea"
-            },
             {
               "emoji": "✅",
               "moderated": true,
@@ -244,8 +279,14 @@
               "emoji": "🎉",
               "moderated": true,
               "name": "Done"
+            },
+            {
+              "emoji": "💡",
+              "moderated": false,
+              "name": "Idea"
             }
           ],
+          "thread_slowmode": 0,
           "topic": "One idea per post. Vote with 👍 / 👎. Mods tag it when it's decided.",
           "type": "forum"
         },
@@ -321,7 +362,7 @@
         },
         {
           "bitrate": 64000,
-          "name": "👥 Members: 14",
+          "name": "👥 Members: 15",
           "nsfw": false,
           "overwrites": {
             "member:Front Desk": {
@@ -348,7 +389,7 @@
         },
         {
           "bitrate": 64000,
-          "name": "🟢 Online: 3",
+          "name": "🟢 Online: 4",
           "nsfw": false,
           "overwrites": {
             "member:Front Desk": {
@@ -457,6 +498,49 @@
           "synced": true,
           "topic": "Daily word game, weekly challenges, /slots, /trivia and friends.",
           "type": "text"
+        },
+        {
+          "name": "💜・supporters",
+          "nsfw": false,
+          "overwrites": {
+            "member:Front Desk": {
+              "allow": [
+                "connect",
+                "embed_links",
+                "read_messages",
+                "send_messages"
+              ],
+              "deny": []
+            },
+            "role:@everyone": {
+              "allow": [],
+              "deny": [
+                "read_messages"
+              ]
+            },
+            "role:Keeper": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            },
+            "role:Moderator": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            },
+            "role:Supporter": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            }
+          },
+          "slowmode": 0,
+          "synced": false,
+          "topic": "A quiet corner for supporters. Thank you for keeping the lights on.",
+          "type": "text"
         }
       ],
       "name": "02 · the lobby",
@@ -475,32 +559,20 @@
           "type": "text"
         },
         {
+          "default_reaction": null,
+          "layout": "list_view",
           "name": "🎮・lfg",
           "nsfw": false,
           "overwrites": {},
           "require_tag": true,
           "slowmode": 0,
+          "sort_order": null,
           "synced": true,
           "tags": [
             {
-              "emoji": "🪖",
+              "emoji": "🔺",
               "moderated": false,
-              "name": "Wardogs"
-            },
-            {
-              "emoji": "⛏️",
-              "moderated": false,
-              "name": "Minecraft"
-            },
-            {
-              "emoji": "🪂",
-              "moderated": false,
-              "name": "Fortnite"
-            },
-            {
-              "emoji": "🎯",
-              "moderated": false,
-              "name": "Valorant"
+              "name": "Apex Legends"
             },
             {
               "emoji": "💥",
@@ -508,9 +580,9 @@
               "name": "Call of Duty"
             },
             {
-              "emoji": "🧙",
+              "emoji": "🛋️",
               "moderated": false,
-              "name": "League of Legends"
+              "name": "Casual"
             },
             {
               "emoji": "💣",
@@ -518,9 +590,9 @@
               "name": "Counter-Strike 2"
             },
             {
-              "emoji": "🔺",
+              "emoji": "🪂",
               "moderated": false,
-              "name": "Apex Legends"
+              "name": "Fortnite"
             },
             {
               "emoji": "🚗",
@@ -528,9 +600,14 @@
               "name": "GTA Online"
             },
             {
-              "emoji": "🧱",
+              "emoji": "🧙",
               "moderated": false,
-              "name": "Roblox"
+              "name": "League of Legends"
+            },
+            {
+              "emoji": "⛏️",
+              "moderated": false,
+              "name": "Minecraft"
             },
             {
               "emoji": "🏆",
@@ -538,11 +615,22 @@
               "name": "Ranked"
             },
             {
-              "emoji": "🛋️",
+              "emoji": "🧱",
               "moderated": false,
-              "name": "Casual"
+              "name": "Roblox"
+            },
+            {
+              "emoji": "🎯",
+              "moderated": false,
+              "name": "Valorant"
+            },
+            {
+              "emoji": "🪖",
+              "moderated": false,
+              "name": "Wardogs"
             }
           ],
+          "thread_slowmode": 0,
           "topic": "One post per session. Title it with the game and a time, like \"Wardogs, 9pm\".\nTag the game (and Ranked or Casual). Ping @LFG if you need people right now.\nClose or delete the post once the squad is full.",
           "type": "forum"
         },
@@ -563,6 +651,92 @@
           "synced": true,
           "topic": "Minecraft talk, squads, and strats. Ping @Minecraft.",
           "type": "text"
+        },
+        {
+          "default_reaction": "👍",
+          "layout": "list_view",
+          "name": "📚・guides",
+          "nsfw": false,
+          "overwrites": {},
+          "require_tag": false,
+          "slowmode": 600,
+          "sort_order": "latest_activity",
+          "synced": true,
+          "tags": [
+            {
+              "emoji": "🧠",
+              "moderated": false,
+              "name": "Advanced"
+            },
+            {
+              "emoji": "🔺",
+              "moderated": false,
+              "name": "Apex Legends"
+            },
+            {
+              "emoji": "🌱",
+              "moderated": false,
+              "name": "Beginner"
+            },
+            {
+              "emoji": "💥",
+              "moderated": false,
+              "name": "Call of Duty"
+            },
+            {
+              "emoji": "💣",
+              "moderated": false,
+              "name": "Counter-Strike 2"
+            },
+            {
+              "emoji": "🪂",
+              "moderated": false,
+              "name": "Fortnite"
+            },
+            {
+              "emoji": "🚗",
+              "moderated": false,
+              "name": "GTA Online"
+            },
+            {
+              "emoji": "🧙",
+              "moderated": false,
+              "name": "League of Legends"
+            },
+            {
+              "emoji": "⛏️",
+              "moderated": false,
+              "name": "Minecraft"
+            },
+            {
+              "emoji": "❓",
+              "moderated": false,
+              "name": "Question"
+            },
+            {
+              "emoji": "🧱",
+              "moderated": false,
+              "name": "Roblox"
+            },
+            {
+              "emoji": "⚙️",
+              "moderated": false,
+              "name": "Settings"
+            },
+            {
+              "emoji": "🎯",
+              "moderated": false,
+              "name": "Valorant"
+            },
+            {
+              "emoji": "🪖",
+              "moderated": false,
+              "name": "Wardogs"
+            }
+          ],
+          "thread_slowmode": 5,
+          "topic": "Tips, builds, settings and how-tos that are worth finding again next month.\nOne topic per post. Put the game and the point in the title, like \"Valorant: crosshair settings that work\".\nTag the game. Write it so someone new can follow it: steps, numbers, a screenshot if it helps.\nYour own words, please: no pasted articles, no link-only posts.\nA real guide that stays up for a day earns a few coins (a couple of posts a week at most).",
+          "type": "forum"
         },
         {
           "name": "🪂・fortnite",
@@ -668,6 +842,15 @@
           "synced": false,
           "topic": "Sign up, see brackets, report results. Join with the buttons.",
           "type": "text"
+        },
+        {
+          "name": "⛏️・realms",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 2,
+          "synced": true,
+          "topic": "The Realms, our Minecraft server. Status is pinned; chat here reaches the game, and linked players' chat comes back. /realms link gets you on the whitelist.",
+          "type": "text"
         }
       ],
       "name": "03 · games",
@@ -676,6 +859,52 @@
     },
     {
       "channels": [
+        {
+          "default_reaction": "🔥",
+          "layout": "gallery_view",
+          "name": "🖥・setups",
+          "nsfw": false,
+          "overwrites": {},
+          "require_tag": false,
+          "slowmode": 600,
+          "sort_order": "creation_date",
+          "synced": true,
+          "tags": [
+            {
+              "emoji": "🖥️",
+              "moderated": false,
+              "name": "Battlestation"
+            },
+            {
+              "emoji": "🎮",
+              "moderated": false,
+              "name": "Console"
+            },
+            {
+              "emoji": "🪑",
+              "moderated": false,
+              "name": "Desk"
+            },
+            {
+              "emoji": "🏰",
+              "moderated": false,
+              "name": "In-game Base"
+            },
+            {
+              "emoji": "🔧",
+              "moderated": false,
+              "name": "PC Build"
+            },
+            {
+              "emoji": "🚧",
+              "moderated": false,
+              "name": "Work in Progress"
+            }
+          ],
+          "thread_slowmode": 5,
+          "topic": "Battlestations, PC builds, console corners, desks and in-game bases. Lead with a picture.\nOne setup per post. Say what we're looking at: parts, the game, how long the base took.\nTag the type. Your own photos and screenshots only, and nothing that shows an address or a face you'd rather keep private.\nA setup with a picture that stays up for a day earns a few coins (a couple of posts a week at most).",
+          "type": "forum"
+        },
         {
           "name": "🎨・art",
           "nsfw": false,
@@ -803,6 +1032,16 @@
           "synced": true,
           "type": "voice",
           "user_limit": 0
+        },
+        {
+          "bitrate": 64000,
+          "name": "🎙・stage",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "type": "stage_voice",
+          "user_limit": 10000
         },
         {
           "bitrate": 64000,
