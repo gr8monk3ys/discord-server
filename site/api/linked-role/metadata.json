@@ -1,0 +1,41 @@
+{
+  "platform_name": "Front Desk",
+  "verification_url": "https://discord.lscaturchio.xyz/api/linked-role/start",
+  "records": [
+    {
+      "key": "steam",
+      "type": 7,
+      "name": "Steam",
+      "description": "Has a verified Steam connection on their Discord account",
+      "service": "steam"
+    },
+    {
+      "key": "xbox",
+      "type": 7,
+      "name": "Xbox",
+      "description": "Has a verified Xbox connection on their Discord account",
+      "service": "xbox"
+    },
+    {
+      "key": "playstation",
+      "type": 7,
+      "name": "PlayStation",
+      "description": "Has a verified PlayStation Network connection on their Discord account",
+      "service": "playstation"
+    },
+    {
+      "key": "epicgames",
+      "type": 7,
+      "name": "Epic Games",
+      "description": "Has a verified Epic Games connection on their Discord account",
+      "service": "epicgames"
+    },
+    {
+      "key": "platforms",
+      "type": 2,
+      "name": "Verified platforms",
+      "description": "How many of Steam, Xbox, PlayStation and Epic Games are verified connections",
+      "count": true
+    }
+  ]
+}

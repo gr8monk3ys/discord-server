@@ -62,7 +62,7 @@
       ]
     },
     {
-      "source": "/(appeal|api/.*)",
+      "source": "/(appeal|linked-role|api/.*)",
       "headers": [
         {
           "key": "X-Robots-Tag",
