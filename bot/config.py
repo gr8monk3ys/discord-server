@@ -116,3 +116,12 @@ def load_settings() -> Settings:
         guild_id=int(os.environ["GUILD_ID"]),
         tz=ZoneInfo(os.environ.get("TZ", "America/Los_Angeles")),
     )
+
+
+# Live site data (cogs/sitedata.py): aggregates for the landing page, written here every 30
+# minutes and pushed by server/publish_site_data.py. SITE_DATA=off stops the bot writing it.
+SITE_DATA_FILE = DATA_DIR / "site" / "stats.json"
+
+
+def site_data_enabled() -> bool:
+    return os.environ.get("SITE_DATA", "on").strip().lower() not in {"off", "0", "false", "no"}
