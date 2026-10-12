@@ -418,6 +418,58 @@ MIGRATIONS = [
         review_message_id INTEGER
     )""",
     ],
+    [
+        # Wave 7: seasonal events (drops in chat and once-only claims per event).
+        """CREATE TABLE event_drops (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event TEXT NOT NULL,
+        channel_id INTEGER NOT NULL,
+        message_id INTEGER,
+        kind TEXT NOT NULL DEFAULT 'drop',
+        value INTEGER NOT NULL DEFAULT 0,
+        claimed_by INTEGER,
+        created_at INTEGER NOT NULL,
+        claimed_at INTEGER
+    )""",
+        "CREATE INDEX event_drops_event ON event_drops (event, claimed_by)",
+        """CREATE TABLE event_claims (
+        event TEXT NOT NULL,
+        user_id INTEGER NOT NULL,
+        key TEXT NOT NULL,
+        at INTEGER NOT NULL,
+        PRIMARY KEY (event, user_id, key)
+    )""",
+        # Linked game accounts (Steam etc.), verified like creator links.
+        """CREATE TABLE game_accounts (
+        user_id INTEGER NOT NULL,
+        platform TEXT NOT NULL,
+        account_id TEXT NOT NULL,
+        display TEXT NOT NULL,
+        verified INTEGER NOT NULL DEFAULT 0,
+        data TEXT NOT NULL DEFAULT '{}',
+        linked_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, platform)
+    )""",
+        """CREATE TABLE game_account_pending (
+        user_id INTEGER NOT NULL,
+        platform TEXT NOT NULL,
+        account_id TEXT NOT NULL,
+        display TEXT NOT NULL,
+        code TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, platform)
+    )""",
+        # /catchup usage per member per day (requests and tokens), for the cost caps.
+        """CREATE TABLE catchup_usage (
+        day TEXT NOT NULL,
+        user_id INTEGER NOT NULL,
+        requests INTEGER NOT NULL DEFAULT 0,
+        input_tokens INTEGER NOT NULL DEFAULT 0,
+        output_tokens INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (day, user_id)
+    )""",
+    ],
 ]
 
 

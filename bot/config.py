@@ -63,6 +63,7 @@ REGION_ROLES = ["NA", "EU", "LATAM", "Asia", "OCE"]
 PLAYTIME_ROLES = ["Early Bird", "Night Owl", "Weekend Warrior"]
 HEARTBEAT_FILE = DATA_DIR / "heartbeat"  # written every minute; server/watchdog.py reads it
 # Wave 3
+EVENT_ROLE = "Event Champ"  # winner of the current seasonal event
 GAMES_CHANNEL = "🎲・games"  # daily word game results, challenge board
 SQUAD_VOICE = "🎮 Squad"
 LOBBY_VOICE = "🔊 Lobby"

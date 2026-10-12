@@ -37,7 +37,7 @@ from setup_server import Makeover, find, private_overwrites
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-BOT_ROLES = ("Season Champ", "Hype", "Birthday", "Tournament Champ", "Counting Champ", "Clip of the Week", "Recruiter", "Bumper",
+BOT_ROLES = ("Season Champ", "Hype", "Birthday", "Tournament Champ", "Event Champ", "Counting Champ", "Clip of the Week", "Recruiter", "Bumper",
              "Game Night", "Mythic", "Legend", "Elite", "Veteran", "Regular",
              "PC", "PlayStation", "Xbox", "Switch", "Mobile", "NA", "EU", "LATAM", "Asia", "OCE",
              "Early Bird", "Night Owl", "Weekend Warrior")  # roles Front Desk hands out
