@@ -1,5 +1,9 @@
-discord.py>=2.4
-python-dotenv>=1.0
-aiosqlite>=0.20
-tzdata
-pytest>=8
+# Runtime dependencies of Front Desk (everything bot/ imports that is not in the standard library).
+# Pinned to the versions the live bot runs; "~=" allows patch releases only.
+# Tests and lint tools are in ../requirements-dev.txt.
+discord.py~=2.7.1
+aiohttp~=3.14.3       # imported directly by the cogs that fetch feeds and APIs
+aiosqlite~=0.22.1
+pillow~=12.3.0        # welcome cards and rank cards
+python-dotenv~=1.2.3
+tzdata>=2026.4        # time zone data for zoneinfo (Windows and slim containers ship none)

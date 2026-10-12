@@ -1,0 +1,14 @@
+{
+  "include": ["bot", "server"],
+  "exclude": ["**/__pycache__", "**/.venv", "bot/data", "server/snapshot"],
+  "venvPath": "server",
+  "venv": ".venv",
+  "pythonVersion": "3.11",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "warning",
+  "reportMissingModuleSource": "warning",
+  "executionEnvironments": [
+    { "root": "bot", "extraPaths": ["bot", "server"] },
+    { "root": "server", "extraPaths": ["server", "bot"] }
+  ]
+}

@@ -14,7 +14,7 @@ import asyncio
 import functools
 import logging
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import discord
 from discord import app_commands

@@ -1,5 +1,9 @@
 # Front Desk bot: design
 
+> **Note (2026-10-11):** this is the original design and build history, kept for context.
+> Parts of it are out of date (the bot now has levels, moderation, a shop and 37 modules).
+> For how the system works today, read [docs/ARCHITECTURE.md](../../ARCHITECTURE.md).
+
 Date: 2026-10-01
 Status: modules 1–12 built and live (2026-10-04). Revised after spec review round 1.
 

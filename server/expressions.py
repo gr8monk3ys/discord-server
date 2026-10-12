@@ -75,7 +75,7 @@ def mp3_duration(data: bytes) -> float:
     rates = {3: [44100, 48000, 32000], 2: [22050, 24000, 16000], 0: [11025, 12000, 8000]}
     seconds = 0.0
     while i + 4 <= len(data):
-        b1, b2, b3 = data[i + 1], data[i + 2], data[i + 3]
+        b1, b2 = data[i + 1], data[i + 2]
         if data[i] != 0xFF or (b1 & 0xE0) != 0xE0:
             i += 1
             continue

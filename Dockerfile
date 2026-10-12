@@ -17,9 +17,8 @@ RUN apt-get update \
 
 WORKDIR /app
 
-# Pillow is imported by the card and rank-card code but is not listed in requirements.txt.
 COPY bot/requirements.txt bot/requirements.txt
-RUN pip install -r bot/requirements.txt "pillow>=10"
+RUN pip install -r bot/requirements.txt
 
 COPY bot/ bot/
 COPY server/ server/

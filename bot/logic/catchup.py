@@ -1,6 +1,7 @@
-"""/catchup rules: which messages go into the prompt and how, the request sent to the
-Anthropic Messages API, reading its answer, and cleaning what the model wrote before a
-member sees it.
+"""/catchup rules: which messages go into the prompt and how, which provider writes the
+summary (the Anthropic Messages API, or a local Ollama server so nothing leaves the
+owner's machine), the request sent to it, reading its answer, and cleaning what the model
+wrote before a member sees it.
 
 The chat log is untrusted. Each message is flattened to one line (mentions become display
 names, links and attachments become bare markers, angle brackets are swapped out so
@@ -13,9 +14,11 @@ Pure: no Discord I/O, no network."""
 
 from __future__ import annotations
 
+import ipaddress
 import re
 from dataclasses import dataclass
 from datetime import datetime, tzinfo
+from urllib.parse import urlsplit
 
 from logic import quests, textfilter
 
@@ -23,6 +26,21 @@ API_URL = "https://api.anthropic.com/v1/messages"
 API_VERSION = "2023-06-01"
 MODEL = "claude-haiku-4-5-20251001"
 MAX_TOKENS = 600
+
+# Providers. CATCHUP_PROVIDER picks one; empty means automatic (see pick_provider).
+ANTHROPIC, OLLAMA = "anthropic", "ollama"
+ENV_PROVIDER, ENV_KEY = "CATCHUP_PROVIDER", "ANTHROPIC_API_KEY"
+ENV_OLLAMA_URL, ENV_OLLAMA_MODEL = "OLLAMA_URL", "OLLAMA_MODEL"
+OLLAMA_DEFAULT_URL = "http://127.0.0.1:11434"
+OLLAMA_DEFAULT_MODEL = "llama3.2:3b"
+OLLAMA_CHAT_PATH, OLLAMA_TAGS_PATH = "/api/chat", "/api/tags"
+OLLAMA_TIMEOUT = 90  # seconds; the first call loads the model into memory
+OLLAMA_PROBE_TIMEOUT = 5  # seconds for "is the server up and is the model there"
+OLLAMA_PROBE_TTL = 60  # seconds a probe result is reused
+OLLAMA_KEEP_ALIVE = "2m"  # then the model leaves RAM again
+OLLAMA_OPTIONS = {"temperature": 0.2, "num_predict": 500, "num_ctx": 8192}
+OLLAMA_TAGS_BYTES = 1024 * 1024
+UNAVAILABLE_LOG_EVERY = 3600  # seconds between "Ollama isn't available" warnings
 
 DEFAULT_HOURS = 12
 MIN_HOURS, MAX_HOURS = 1, 48
@@ -82,6 +100,111 @@ def quota_block(user_requests: int, server_requests: int) -> str | None:
     if server_requests >= SERVER_DAILY:
         return "server"
     return None
+
+
+# ---------------------------------------------------------------- which provider
+# Where chat logs may be sent for the local provider: this machine or a private network,
+# given as an IP address (or "localhost"). Other host names are refused because they can
+# resolve to anything, so a typo can never send a chat log to a host on the internet.
+LOCAL_NETWORKS = tuple(ipaddress.ip_network(n) for n in (
+    "127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "::1/128", "fc00::/7"))
+MODEL_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/:-]{0,127}")
+
+
+def local_host(host: str | None) -> bool:
+    """True for "localhost" and for loopback or private-network IP addresses."""
+    host = (host or "").strip().lower()
+    if host == "localhost" or host.endswith(".localhost"):
+        return True
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped is not None:
+        address = address.ipv4_mapped
+    return any(address.version == net.version and address in net for net in LOCAL_NETWORKS)
+
+
+def ollama_base(raw: str | None) -> tuple[str | None, str | None]:
+    """(base URL without a trailing slash, None) for an acceptable OLLAMA_URL, else
+    (None, why it was refused). Empty means the default. The reason never repeats the
+    value (it could hold credentials)."""
+    raw = (raw or "").strip() or OLLAMA_DEFAULT_URL
+    if any(c.isspace() or c == chr(92) or ord(c) < 32 for c in raw):
+        return None, "it contains whitespace or a backslash"
+    try:
+        parts = urlsplit(raw)
+        host, port = parts.hostname, parts.port
+    except ValueError:
+        return None, "it is not a valid URL"
+    if parts.scheme not in ("http", "https"):
+        return None, "it must start with http:// or https://"
+    if parts.username is not None or parts.password is not None:
+        return None, "it must not contain a user name or password"
+    if parts.path not in ("", "/") or parts.query or parts.fragment:
+        return None, "it must be just scheme://host:port, with no path or query"
+    if not local_host(host):
+        return None, "the host is not localhost or a loopback/private-network IP address"
+    shown = f"[{host}]" if ":" in host else host
+    return f"{parts.scheme}://{shown}{f':{port}' if port is not None else ''}", None
+
+
+@dataclass(frozen=True)
+class Setup:
+    """What the environment asks for. `provider` is ANTHROPIC, OLLAMA or "" (summaries
+    off); for OLLAMA the cog still has to find the server up before it is used."""
+    provider: str
+    api_key: str
+    ollama_url: str | None
+    ollama_model: str
+    problems: tuple[str, ...] = ()
+    why_off: str = ""
+
+    @property
+    def model(self) -> str:
+        return {ANTHROPIC: MODEL, OLLAMA: self.ollama_model}.get(self.provider, "")
+
+
+def pick_provider(setting: str, has_key: bool, ollama_usable: bool) -> str:
+    """The fallback order. Explicit "anthropic"/"ollama": that one or nothing. Empty
+    (automatic): Anthropic if there is a key, else Ollama, else nothing. Anything else is
+    a typo and turns summaries off rather than guessing where chat logs should go."""
+    if setting == ANTHROPIC:
+        return ANTHROPIC if has_key else ""
+    if setting == OLLAMA:
+        return OLLAMA if ollama_usable else ""
+    if setting == "":
+        return ANTHROPIC if has_key else OLLAMA if ollama_usable else ""
+    return ""
+
+
+def read_setup(environ) -> Setup:
+    """Provider settings from the environment (a mapping). Never raises."""
+    setting = (environ.get(ENV_PROVIDER) or "").strip().lower()
+    known = setting in ("", ANTHROPIC, OLLAMA)
+    key = (environ.get(ENV_KEY) or "").strip()
+    problems: list[str] = []
+    if not known:
+        problems.append(f'{ENV_PROVIDER} must be "{OLLAMA}", "{ANTHROPIC}" or empty; summaries are off')
+    url, refused = ollama_base(environ.get(ENV_OLLAMA_URL))
+    if refused:
+        problems.append(f"{ENV_OLLAMA_URL} refused: {refused}")
+    model = (environ.get(ENV_OLLAMA_MODEL) or "").strip() or OLLAMA_DEFAULT_MODEL
+    if not MODEL_NAME.fullmatch(model):
+        problems.append(f"{ENV_OLLAMA_MODEL} is not a model name; using {OLLAMA_DEFAULT_MODEL}")
+        model = OLLAMA_DEFAULT_MODEL
+    provider = pick_provider(setting, bool(key), url is not None)
+    why_off = ""
+    if not provider:
+        if not known:
+            why_off = f"`{ENV_PROVIDER}` isn't a known provider"
+        elif setting == ANTHROPIC:
+            why_off = f"no `{ENV_KEY}`"
+        elif setting == OLLAMA:
+            why_off = f"`{ENV_OLLAMA_URL}` was refused"
+        else:
+            why_off = f"no `{ENV_KEY}`, and `{ENV_OLLAMA_URL}` was refused"
+    return Setup(provider, key, url, model, tuple(problems), why_off)
 
 
 # ---------------------------------------------------------------- flattening messages
@@ -200,6 +323,63 @@ def parse_response(data) -> Answer | None:
     texts = [b["text"] for b in content
              if isinstance(b, dict) and b.get("type") == "text" and isinstance(b.get("text"), str)]
     return Answer("\n".join(texts).strip(), tokens_in, tokens_out)
+
+
+# ---------------------------------------------------------------- the local provider
+def ollama_request_body(log: str, channel_name: str, hours: int, model: str) -> dict:
+    """The same system prompt and <chat_log> framing as the Anthropic request."""
+    return {
+        "model": model,
+        "messages": [{"role": "system", "content": SYSTEM_PROMPT},
+                     {"role": "user", "content": user_prompt(log, channel_name, hours)}],
+        "stream": False,
+        "keep_alive": OLLAMA_KEEP_ALIVE,
+        "options": dict(OLLAMA_OPTIONS),
+    }
+
+
+def ollama_headers() -> dict:
+    return {"content-type": "application/json"}
+
+
+THINKING = re.compile(r"<think(?:ing)?>.*?(?:</think(?:ing)?>|\Z)", re.IGNORECASE | re.DOTALL)
+
+
+def parse_ollama_response(data) -> Answer | None:
+    """The model's text and token counts from an Ollama /api/chat response, or None when
+    the body isn't one (or is an error). Reasoning some models write inline is dropped."""
+    if not isinstance(data, dict) or "error" in data:
+        return None
+    message = data.get("message")
+    if not isinstance(message, dict) or not isinstance(message.get("content"), str):
+        return None
+    text = THINKING.sub("", message["content"]).strip()
+    return Answer(text, _count(data.get("prompt_eval_count")), _count(data.get("eval_count")))
+
+
+def ollama_has_model(data, model: str) -> bool | None:
+    """Whether an /api/tags response lists `model` (a name without a tag means :latest);
+    None when the body isn't a tags response."""
+    if not isinstance(data, dict) or not isinstance(data.get("models"), list):
+        return None
+    wanted = {model} if ":" in model.rsplit("/", 1)[-1] else {model, f"{model}:latest"}
+    for entry in data["models"]:
+        if isinstance(entry, dict) and any(isinstance(entry.get(k), str) and entry[k] in wanted
+                                           for k in ("name", "model")):
+            return True
+    return False
+
+
+FOOTER = {
+    ANTHROPIC: "Written by AI (Anthropic's Claude) from the channel's recent messages.",
+    OLLAMA: "Written by AI from the channel's recent messages. Summarised on the server's own machine.",
+}
+FOOTER_END = " It can miss things or get them wrong."
+
+
+def footer(provider: str) -> str:
+    """The small print under a summary: says it is AI and which provider wrote it."""
+    return FOOTER.get(provider, "Written by AI from the channel's recent messages.") + FOOTER_END
 
 
 # ---------------------------------------------------------------- cleaning the answer

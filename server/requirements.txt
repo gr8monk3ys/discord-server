@@ -1,2 +1,4 @@
-discord.py>=2.4
-python-dotenv>=1.0
+# Runtime dependencies of the setup scripts: a subset of ../bot/requirements.txt, same pins.
+discord.py~=2.7.1
+pillow~=12.3.0        # expressions.py checks emoji files before uploading
+python-dotenv~=1.2.3

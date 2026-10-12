@@ -180,7 +180,7 @@ day-to-day attention. Design and history:
 | Seasonal events | Halloween (Oct 20 to Nov 1) and Winter Fest (Dec 15 to Jan 2) from `bot/assets/events.json`, every year: 6-10 drops a day in 💬・general while chat is active (Grab button, 25-75 coins + 1 point, gone after 10 min, max 12 a day each), a daily quest (+3 points, 100 coins), `/event` with your points and the top 10; at the end the top 3 win 2000/1000/500 coins, first place gets the Event Champ role and 10+ points earns the event badge; accounts under 30 days old earn nothing |
 | Game accounts | `/link steam` + `/link verify` (members prove ownership with a code in their Steam profile summary), `/unlink`, `/accounts`; staff `/link approve/remove`; persona, Steam link and hours in the server's games show on `/profile`, refreshed daily. No API key |
 | Vote hub | `/vote` (private): Disboard with your bump count and when the next bump is ready, discord.me, top.gg ("coming soon" until listed) and the share link discord.lscaturchio.xyz/join; Sundays 17:00 the week's top 3 Disboard bumpers are thanked in 🎲・games and paid 300/200/100 coins (accounts 30+ days old) |
-| Catch-up | `/catchup [channel] [hours]`: a private AI summary (5-8 bullets plus a "good moment to jump in") of a public channel's last 1-48 hours (default 12); needs `ANTHROPIC_API_KEY` in `server/.env`, otherwise it says summaries aren't set up; accounts 30+ days old, 3 a day per member and 60 a day server-wide; bots and members with tracking off are left out; staff `/catchup-usage` shows today's requests and tokens |
+| Catch-up | `/catchup [channel] [hours]`: a private AI summary (5-8 bullets plus a "good moment to jump in") of a public channel's last 1-48 hours (default 12). Two providers: a local Ollama model on the bot's own machine (`OLLAMA_MODEL`, default `llama3.2:3b`; nothing leaves the machine, one summary at a time) or the Anthropic API (`ANTHROPIC_API_KEY`); `CATCHUP_PROVIDER` picks one, otherwise the key wins and Ollama is the fallback, and with neither it says summaries aren't set up. Accounts 30+ days old, 3 a day per member and 60 a day server-wide; bots and members with tracking off are left out; staff `/catchup-usage` shows the provider, requests and tokens |
 
 Short join link: <https://discord.lscaturchio.xyz/join>. Moving the bot off this PC: `docs/HOSTING.md`
 (Docker image, `docker-compose.yml`, `server/migrate_host.py`).
@@ -215,7 +215,7 @@ All times are Pacific. Every scheduled job catches up once after downtime and ne
 | A role won't be given out | The role must sit **below Front Desk** in Server Settings → Roles. Only the owner can move roles above the bot |
 | Run by hand (debugging) | `python server\watchdog.py --pause 60` first (or it restarts the task), stop the task, then `bot\run_bot.bat`; `--resume` afterwards |
 | Watchdog status | `python server\watchdog.py --check` |
-| Tests | `cd bot`, then `..\server\.venv\Scripts\python -m pytest -q` (about 2,600 tests) |
+| Tests | `cd bot`, then `..\server\.venv\Scripts\python -m pytest -q` (about 2,950 tests) |
 
 Required in the Developer Portal: the **Server Members**, **Message Content** and **Presence**
 intents. Required on the Front Desk role: the permissions printed by `main.py --invite`

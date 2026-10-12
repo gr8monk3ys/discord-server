@@ -1,0 +1,22 @@
+# Lint only, and only rules that catch real bugs. No formatter, no style rules:
+#   ruff check .
+target-version = "py311"
+line-length = 120
+extend-exclude = [".venv", "bot/data", "server/snapshot", "site"]
+
+[lint]
+select = [
+    "E9",    # syntax and I/O errors
+    "F63",   # comparisons that are always true or false (`is` with a literal, assert on a tuple)
+    "F7",    # break/continue/return/yield in the wrong place
+    "F82",   # undefined names
+    "F401",  # unused imports
+    "F811",  # a name redefined before it was used
+    "F841",  # a local variable assigned and never used
+    "B006",  # mutable default argument
+]
+# B008 (a call in a default argument) stays off: discord.py's app_commands and
+# dataclasses.field use that pattern on purpose.
+
+[lint.per-file-ignores]
+"__init__.py" = ["F401"]  # re-exports

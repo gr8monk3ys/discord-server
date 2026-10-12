@@ -5,7 +5,7 @@ import asyncio
 import logging
 import random
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
