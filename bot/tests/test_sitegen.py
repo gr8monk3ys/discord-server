@@ -306,6 +306,27 @@ def test_footer_is_the_site_map_and_links_back():
     assert legal.count('<p class="label">') == 2 and "Not affiliated with Discord" in legal
 
 
+def test_footers_do_not_promise_a_site_without_cookies():
+    """The Linked Roles sign-in (/api/linked-role/*) sets one short-lived cookie, so no page may
+    say the site has none; the page that starts that sign-in says so itself."""
+    pages = sorted(SITE.rglob("*.html"))
+    assert len(pages) >= 5
+    for path in pages:
+        page = path.read_text(encoding="utf-8")
+        legal = re.search(r'<div class="foot-legal">.*?</div>', page, re.S).group(0)
+        if path.parent.name == "linked-role":
+            assert "One sign-in cookie" in legal, path
+        else:
+            assert '<p class="label">No tracking · No analytics</p>' in legal and "cookie" not in legal.lower(), path
+    cookie = (SITE / "api" / "linked-role" / "_lib.js").read_text(encoding="utf-8")
+    assert "Set-Cookie" in (SITE / "api" / "linked-role" / "start.js").read_text(encoding="utf-8")
+    assert "HttpOnly; Secure; SameSite=Lax" in cookie and "STATE_TTL" in cookie
+    # nothing else on the site sets one
+    for path in SITE.rglob("*.js"):
+        if path.relative_to(SITE).parts[:2] != ("api", "linked-role"):
+            assert "cookie" not in path.read_text(encoding="utf-8").lower(), path
+
+
 def test_fonts_are_the_main_sites_cuts():
     """next/font on lscaturchio.xyz ships Fraunces without the opsz axis; asking for it here
     (as this page once did) draws visibly thinner display type than the main site."""
@@ -523,6 +544,20 @@ def test_pages_workflow_rewrites_404_for_the_mirror():
     wf = (SITE.parent / ".github" / "workflows" / "pages.yml").read_text(encoding="utf-8")
     assert "site/404.html" in wf and "GITHUB_REPOSITORY" in wf
     assert "path: site" in wf
+
+
+def test_ci_runs_the_site_function_tests():
+    wf = (SITE.parent / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    step = re.search(r"- name: Site function tests\n\s+working-directory: site/api\n\s+run: node --test\n", wf)
+    assert step, "CI runs node --test from site/api"
+    assert re.search(r"uses: actions/setup-node@v\d+\n\s+with:\n\s+node-version: \"\d+\"", wf)
+    assert wf.index("actions/setup-node") < step.start()
+    # the folder really holds tests that runner finds by itself, and they need no install
+    tests = [p for p in (SITE / "api").rglob("*") if re.search(r"\.test\.(js|mjs|cjs)$", p.name)]
+    assert len(tests) >= 2 and not (SITE / "package.json").exists()
+    for path in tests:
+        imports = re.findall(r"""(?:from\s+|require\()\s*["']([^"']+)["']""", path.read_text(encoding="utf-8"))
+        assert imports and all(i.startswith(("node:", "./", "../")) for i in imports), path
 
 
 # ------------------------------------------------------------ /appeal (ban appeals)
