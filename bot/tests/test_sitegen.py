@@ -185,15 +185,15 @@ def test_site_feature_cards_cover_the_current_server():
     cards = re.findall(r"<li\b", features)
     assert 9 <= len(cards) <= 12
     for want in ("Levels", "rank card", "tournament", "Weekly challenges", "Daily Word",
-                 "Starter quest", "Creator spotlight", "Self roles", "Partners"):
+                 "Starter quest", "Creator spotlight", "Houses", "Guides and setups"):
         assert want.lower() in features.lower(), want
 
 
 def test_site_has_this_week_strip_and_updated_faq():
     page = _page()
     week = re.search(r'<section id="week".*?</section>', page, re.S)
-    assert week, "This week on the server strip"
-    assert "This week on the server" in week.group(0)
+    assert week, "the weekly schedule strip"
+    assert "<h2>A normal week</h2>" in week.group(0)
     faq = re.search(r'<section id="faq".*?</section>', page, re.S).group(0).lower()
     for want in ("level", "roles", "partner"):
         assert want in faq, want
@@ -250,7 +250,10 @@ def test_house_type_and_motion_rules():
     assert "letter-spacing: 0.16em" in css  # the wall label
     assert ":focus-visible { outline: 2px solid var(--pen); outline-offset: 2px; }" in css
     reduce = re.search(r"@media \(prefers-reduced-motion: reduce\)\s*\{(.*?)\n\}", css, re.S)
-    assert reduce and "transition-duration: 0.01ms" in reduce.group(1)
+    # reduced motion stops what moves (slides, turns, presses) and keeps the colour fades;
+    # no blanket 0.01ms kill, which also removes the feedback that moves nothing
+    assert reduce and "transition: none" in reduce.group(1) and "transform: none" in reduce.group(1)
+    assert "0.01ms" not in css
     # smooth scrolling only for readers who did not ask for less motion
     assert "@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }" in css
     assert css.count("scroll-behavior: smooth") == 1
@@ -303,7 +306,9 @@ def test_footer_is_the_site_map_and_links_back():
     assert re.search(r'<a class="ink" href="https://lscaturchio\.xyz" rel="author">', footer)
     assert footer.count('class="ink"') == len(re.findall(r"<li>", footer))  # every link gets the pen
     legal = re.search(r'<div class="foot-legal">.*?</div>', footer, re.S).group(0)
-    assert legal.count('<p class="label">') == 2 and "Not affiliated with Discord" in legal
+    # fine print is sentence case, not a wall label: a whole line in tracked capitals is hard to read
+    assert legal.count('<p class="fine">') == 2 and "Not affiliated with Discord" in legal
+    assert 'class="label"' not in legal
 
 
 def test_footers_do_not_promise_a_site_without_cookies():
@@ -315,9 +320,9 @@ def test_footers_do_not_promise_a_site_without_cookies():
         page = path.read_text(encoding="utf-8")
         legal = re.search(r'<div class="foot-legal">.*?</div>', page, re.S).group(0)
         if path.parent.name == "linked-role":
-            assert "One sign-in cookie" in legal, path
+            assert "sets one cookie" in legal, path
         else:
-            assert '<p class="label">No tracking · No analytics</p>' in legal and "cookie" not in legal.lower(), path
+            assert "<p class=\"fine\">This page doesn't track you.</p>" in legal and "cookie" not in legal.lower(), path
     cookie = (SITE / "api" / "linked-role" / "_lib.js").read_text(encoding="utf-8")
     assert "Set-Cookie" in (SITE / "api" / "linked-role" / "start.js").read_text(encoding="utf-8")
     assert "HttpOnly; Secure; SameSite=Lax" in cookie and "STATE_TTL" in cookie
@@ -345,18 +350,17 @@ def test_fonts_are_the_main_sites_cuts():
     assert "@import" not in css and "url(http" not in css  # nothing remote from the stylesheet
 
 
-def test_sections_are_numbered_ledgers():
-    """Every section is the main site's ledger: a wall-label kicker and title in the rail."""
+def test_sections_are_ledgers_led_by_their_heading():
+    """Every section is a ledger whose rail opens with the heading itself: no kicker line above
+    it and no section numbers (the order of the page carries no information)."""
     page = _page()
-    kickers = []
     for sid in ("features", "week", "games", "rules", "faq"):
         section = re.search(rf'<section id="{sid}">.*?</section>', page, re.S).group(0)
-        head = re.search(r'<div class="ledger-head">\s*<p class="label">(\d\d) — ([^<]+)</p>\s*<h2>[^<]+</h2>',
-                         section)
-        assert head, sid
+        assert re.search(r'<div class="ledger-head">\s*<h2>[^<]+</h2>', section), sid
         assert '<div class="ledger-body">' in section, sid
-        kickers.append(head.group(1))
-    assert kickers == ["01", "02", "03", "04", "05"]
+    assert not re.search(r'<p class="label">\s*\d\d\b', page)
+    main = re.search(r"<main.*?</main>", page, re.S).group(0)
+    assert not re.search(r'<p class="label">[^<]*</p>\s*<h[12]', main)  # nothing sits on top of a heading
     assert page.count("<h1") == 1
     assert "btn-big" not in page and "btn-small" not in page  # the old button sizes are gone
 

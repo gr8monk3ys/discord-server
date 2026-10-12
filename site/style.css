@@ -148,14 +148,13 @@ code {
 }
 .skip:focus { transform: translateY(0); }
 
-/* Reduced motion, actually collapsed (0.01ms so transitionend still fires). */
+/* Reduced motion: nothing slides, turns or travels. Colour and border changes
+   still fade, because they say "this is the thing you are pointing at" without
+   moving anything. */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
+  html { scroll-behavior: auto; }
+  .skip, .ink::after, .sections a::after, summary::after, .theme-toggle svg { transition: none; }
+  .btn:active, .theme-toggle:active, .btn-quiet:active { transform: none; }
 }
 
 /* -------------------------------------------------------------------- type */
@@ -186,6 +185,10 @@ h1 em { font-style: normal; color: var(--pen); }
 h2, .group-head h3 { font-size: clamp(1.55rem, 2.4vw, 2.25rem); font-weight: 650; line-height: 1.18; letter-spacing: -0.026em; }
 /* Card title. */
 h4, .card-title { font-family: var(--display); font-size: 1.25rem; font-weight: 620; line-height: 1.2; letter-spacing: -0.02em; }
+/* Fine print: the legal line and captions. Mono like the wall label, but set
+   in sentence case so a whole line of it stays readable. */
+.fine { font: 400 0.75rem/1.6 var(--mono); letter-spacing: 0.01em; color: var(--ink-muted); }
+
 /* A heading that is really metadata takes the wall-label voice. */
 h3.label { font-family: var(--mono); font-size: 0.72rem; font-weight: 500; letter-spacing: 0.16em; line-height: 1.1; }
 
@@ -337,7 +340,7 @@ h3.label { font-family: var(--mono); font-size: 0.72rem; font-weight: 500; lette
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
-  transition: all var(--default) var(--ease-ui);
+  transition: filter var(--default) var(--ease-ui), transform 100ms ease;
 }
 .btn:hover { color: var(--pen-text); filter: brightness(1.05); }
 .btn:active { transform: translateY(1px); }
@@ -360,6 +363,12 @@ h3.label { font-family: var(--mono); font-size: 0.72rem; font-weight: 500; lette
   cursor: pointer;
 }
 .btn-quiet:hover { color: var(--pen); }
+/* On a touch screen the small controls grow to a full 44px target. */
+@media (hover: none) and (pointer: coarse) {
+  .btn-quiet, .theme-toggle { min-width: 44px; height: 44px; }
+  .btn { min-height: 44px; }
+  .now a { padding-block: 14px; }
+}
 
 .btn.is-disabled, .btn[aria-disabled="true"], .btn-quiet.is-disabled, .btn-quiet[aria-disabled="true"] {
   background: var(--tint);
@@ -372,8 +381,8 @@ h3.label { font-family: var(--mono); font-size: 0.72rem; font-weight: 500; lette
 }
 
 /* -------------------------------------------------------------------- hero */
-/* The masthead: wall-label kicker, the Display line with the pen on the
-   promise, a muted thesis, and a square plate with a placard at the right. */
+/* The masthead: the Display line with the pen on the promise, a muted thesis,
+   and a square plate with its caption at the right. */
 .hero { width: 100%; padding: 0 16px; }
 @media (min-width: 640px) { .hero { padding: 0 24px; } }
 @media (min-width: 1024px) { .hero { padding: 0 32px; } }
@@ -402,14 +411,12 @@ h3.label { font-family: var(--mono); font-size: 0.72rem; font-weight: 500; lette
 .plate-frame .icon { width: 100%; height: 100%; object-fit: cover; }
 .sticker { position: absolute; width: 26%; }
 .s1 { top: -9%; right: -9%; transform: rotate(10deg); }
-.s2 { bottom: 14%; left: -11%; transform: rotate(-12deg); }
+.s2 { bottom: 14%; left: -8%; transform: rotate(-12deg); }
 .s3 { bottom: -9%; right: 12%; transform: rotate(6deg); }
 .plate figcaption { margin-top: 12px; }
-.plate figcaption span { display: block; }
-.plate figcaption span + span { margin-top: 2px; }
 
 /* ---------------------------------------------------------------- sections */
-/* The ledger: a sticky wall-label rail on the left (280-360px), the entries on
+/* The ledger: a sticky heading rail on the left (280-360px), the entries on
    the right. The rule that opens each one ends where the content ends. */
 main > section[id] { scroll-margin-top: var(--header-h); }
 .ledger { display: grid; align-items: start; gap: 48px; padding: 96px 0; border-top: 1px solid var(--hairline); }
@@ -419,26 +426,22 @@ main > section[id] { scroll-margin-top: var(--header-h); }
   .ledger-head { position: sticky; top: 7rem; }
 }
 .ledger-head, .ledger-body { min-width: 0; }
-.ledger-head .label { margin-bottom: 12px; }
 .blurb { margin-top: 12px; font-size: 0.875rem; line-height: 1.625; color: var(--ink-muted); }
 
 /* ---------------------------------------------------------------- features */
 .group + .group { margin-top: 40px; }
 .group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--hairline); }
 .group-head .label { flex: none; }
-.rows { margin-top: 16px; }
-.rows li { display: grid; grid-template-columns: 40px minmax(0, 1fr); column-gap: 16px; align-items: start; }
-.rows li + li { margin-top: 16px; }
-.rows img, .rows .emoji { grid-row: span 2; width: 40px; height: 40px; }
-.rows .emoji { display: block; font-size: 30px; line-height: 40px; text-align: center; }
-.rows p, .days p { margin-top: 4px; max-width: 32rem; font-size: 0.875rem; line-height: 1.25rem; color: var(--ink-muted); }
+/* Entries: a title and two lines under it, two to a row once there is room. */
+.rows { display: grid; gap: 24px 40px; margin-top: 20px; }
+@media (min-width: 640px) { .rows { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.rows p, .days p { margin-top: 6px; max-width: 32rem; font-size: 0.9375rem; line-height: 1.6; color: var(--ink-muted); }
 
 /* -------------------------------------------------------------- this week */
 /* Numbered-ledger rows: the day is the wall label, the event is the title. */
 .days { border-top: 1px solid var(--hairline); }
 .days li { display: grid; align-items: baseline; gap: 4px 24px; padding: 24px 0; border-bottom: 1px solid var(--hairline); }
 @media (min-width: 640px) { .days li { grid-template-columns: 7rem minmax(0, 1fr); } }
-.days p { line-height: 1.625; }
 
 /* ------------------------------------------------------------------- games */
 /* The house chip: fully round, paper card, hairline, 0.75rem semibold. */
@@ -467,8 +470,8 @@ main > section[id] { scroll-margin-top: var(--header-h); }
 
 /* --------------------------------------------------------------------- faq */
 /* The accordion: a hairline under each item, a chevron that turns over. */
-.faq { border-top: 1px solid var(--hairline); }
 details { border-bottom: 1px solid var(--hairline); }
+.faq details:first-child { border-top: 1px solid var(--hairline); }
 summary {
   display: flex;
   align-items: center;
@@ -493,16 +496,15 @@ summary::after {
   transition: transform var(--default) var(--ease-ui);
 }
 details[open] summary::after { transform: translateY(3px) rotate(225deg); }
-details p { padding-bottom: 16px; font-size: 0.875rem; color: var(--ink-muted); }
+details p { max-width: 36rem; padding-bottom: 16px; font-size: 0.9375rem; line-height: 1.6; color: var(--ink-muted); }
 
 /* ------------------------------------------------------------------- final */
-.final-row { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 24px 48px; padding: 40px 0; border-top: 1px solid var(--hairline); }
+.final-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 24px 48px; padding: 40px 0; border-top: 1px solid var(--hairline); }
 @media (min-width: 768px) { .final-row { padding: 64px 0; } }
-.final-row .label { margin-bottom: 12px; }
 
 /* ------------------------------------------------------------------ footer */
-/* The site map: colophon at the left, wall-label columns of links at the
-   right, a hairline before the legal line. */
+/* The site map: colophon at the left, columns of links at the right, a
+   hairline before the legal line. */
 footer { border-top: 1px solid color-mix(in srgb, var(--hairline) 60%, transparent); background: var(--page); }
 .foot { padding-top: 48px; padding-bottom: 48px; }
 .foot-grid { display: grid; gap: 48px; }
@@ -538,7 +540,8 @@ footer { border-top: 1px solid color-mix(in srgb, var(--hairline) 60%, transpare
   text-align: center;
 }
 @media (min-width: 768px) { .foot-legal { flex-direction: row; } }
-.foot-legal:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+/* On the small pages the legal line is the whole footer: the footer's own rule is enough. */
+.foot-legal:first-child { margin-top: 0; border-top-color: transparent; padding-top: 0; }
 
 /* -------------------------------------------------------------------- 404 */
 .lost { display: flex; align-items: center; min-height: 72vh; padding: 64px 0; }

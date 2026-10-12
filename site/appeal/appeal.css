@@ -32,8 +32,8 @@ textarea.field-input { resize: vertical; min-height: 120px; }
 .field-code { font-family: var(--mono); letter-spacing: 0.08em; text-transform: uppercase; }
 .field-input:hover { border-color: var(--ink-muted); }
 .field-input[aria-invalid="true"] { border-color: var(--ink); border-width: 2px; padding: 11px 13px; }
-/* Errors are said in words and marked with a rule, not carried by colour alone. */
-.field-error { padding-left: 10px; border-left: 2px solid var(--ink); font-size: 0.875rem; font-weight: 600; line-height: 1.5; color: var(--ink); }
+/* Errors are said in words, in bold, under a field whose border thickens: never by colour alone. */
+.field-error { font-size: 0.875rem; font-weight: 600; line-height: 1.5; color: var(--ink); }
 
 .appeal-alert { padding: 14px 16px; border: 1px solid var(--ink); border-radius: 10px; background: var(--tint); font-size: 0.9375rem; font-weight: 600; line-height: 1.5; color: var(--ink); }
 .appeal-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
