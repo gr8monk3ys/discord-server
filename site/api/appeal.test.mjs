@@ -254,6 +254,56 @@ test("a payload too big for one embed is refused, not truncated", async () => {
   assert.ok(buildPayload(USER, CODE, ["a".repeat(600), "b".repeat(600), "c".repeat(300)]).length < PAYLOAD_MAX);
 });
 
+test("a malformed request is refused the same way with a right code and with a wrong one", async () => {
+  // Nothing about the refusal may depend on the code: otherwise each of these would be a
+  // way to test a code (or a user ID) without ever sending a real appeal.
+  const WRONG = "AAAAAAAAAAAAAAAA";
+  const malformed = [
+    { what: "*".repeat(600), why: "_".repeat(600) }, // fits the field limits, too long once escaped
+    { what: "x".repeat(601) },
+    { what: "" },
+    { why: "see https://example.com" },
+    { else: 5 },
+    { extra: "field" },
+  ];
+  for (const change of malformed) {
+    const answers = [];
+    for (const code of [GOOD.code, WRONG]) {
+      for (const failing of [false, true]) { // nor on whether Discord would have taken it
+        const ctx = setup(failing ? { reply: { ok: false, status: 500 } } : {});
+        const res = await post(ctx, { ...GOOD, ...change, code });
+        assert.equal(res.statusCode, 400, JSON.stringify(change));
+        assert.equal(ctx.calls.length, 0);
+        assert.deepEqual(ctx.logs, []);
+        answers.push(JSON.stringify([res.statusCode, res.headers, res.text]));
+      }
+    }
+    assert.equal(new Set(answers).size, 1, JSON.stringify(change));
+  }
+  // the same holds for a body that is too large or not JSON at all
+  for (const options of [{ raw: "{not json" }, { raw: JSON.stringify({ ...GOOD, what: "x".repeat(BODY_MAX) }) }]) {
+    const right = await post(setup(), GOOD, options);
+    const wrong = await post(setup(), { ...GOOD, code: WRONG }, options.raw.startsWith("{not")
+      ? options : { raw: JSON.stringify({ ...GOOD, code: WRONG, what: "x".repeat(BODY_MAX) }) });
+    assert.deepEqual([right.statusCode, right.text], [wrong.statusCode, wrong.text]);
+    assert.ok(right.statusCode === 400 || right.statusCode === 413);
+  }
+});
+
+test("a well-formed appeal with a wrong code is 'received' even while Discord is failing", async () => {
+  // The 502 below takes the real code to trigger, so it tells its sender nothing they did
+  // not already hold; without the code the answer never changes.
+  for (const options of [{ reply: { ok: false, status: 500 } }, { fail: new Error("down") }, {}]) {
+    const ctx = setup(options);
+    const res = await post(ctx, { ...GOOD, code: "AAAAAAAAAAAAAAAA" });
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.json, { ok: true, message: "Received." });
+    assert.equal(ctx.calls.length, 0);
+    const other = await post(setup(options), { ...GOOD, user_id: "123456789012345679" });
+    assert.equal(other.text, res.text);
+  }
+});
+
 test("a failed delivery is a 502 and the log never holds the secret, code, answers or URL", async () => {
   const body = { ...GOOD, what: "a very identifiable answer", why: "another identifiable answer" };
   const failures = [setup({ reply: { ok: false, status: 429 } }), setup({ reply: { ok: false, status: 404 } }),

@@ -668,6 +668,55 @@ def test_standing_never_declines_what_is_waiting_and_stops_the_questions(monkeyp
     with_env(go, monkeypatch, tmp_path)
 
 
+def test_switching_back_to_ask_reopens_what_the_standing_yes_approved(monkeypatch, tmp_path):
+    async def go(env):
+        await env.start()
+        await env.command("consent", A, choice(L.ALWAYS), None)
+        auto = await env.clip(A)  # approved by the standing yes on Sunday
+        pressed = await env.approved(A)  # a yes A gave with the button: that one stands
+        other = await env.clip(B)
+        await env.command("consent", B, choice(L.ALWAYS), None)
+        posted = 900_000_000_000_000_001
+        await env.put_row(posted, A, L.PUBLISHED, video_id="vid00000009", credit=L.NAME, answered_by=A,
+                          answered_at=T0, answered_via=L.VIA_STANDING)
+        await env.tick(ASK_AT)
+        assert await env.status(auto) == await env.status(other) == L.APPROVED and env.member(A).dms == []
+        env.t = ASK_AT + 60
+        inter = await env.command("consent", A, choice(L.ASK), None)
+        assert "1 clip(s) your standing yes had already approved won't be posted unless you say yes" in inter.text
+        row = await env.row(auto)
+        assert (row["status"], row["credit"], row["credit_name"]) == (L.ASKED, None, None)
+        assert (row["answered_by"], row["answered_at"], row["answered_via"]) == (None, None, None)
+        assert (row["asked_at"], row["asked_via"]) == (ASK_AT + 60, "dm") and not L.may_upload(row)
+        (dm,) = env.member(A).dms  # the question is really asked, with its buttons
+        assert "shortlist" in dm["content"] and dm["view"] is not None
+        # untouched: their own button answer, what is already posted, and anybody else's clips
+        assert await env.status(pressed) == L.APPROVED and (await env.row(pressed))["answered_via"] == L.VIA_BUTTON
+        assert await env.status(posted) == L.PUBLISHED and await env.status(other) == L.APPROVED
+        # the reopened clip is posted only after a real yes
+        assert "Thanks!" in await env.press(A, "anon", auto)
+        row = await env.row(auto)
+        assert (row["status"], row["answered_via"], row["answered_at"]) == (L.APPROVED, L.VIA_BUTTON, ASK_AT + 60)
+        # saying "ask" again changes nothing more and sends nothing more
+        inter = await env.command("consent", A, choice(L.ASK), None)
+        assert "standing yes" not in inter.text and len(env.member(A).dms) == 1
+    with_env(go, monkeypatch, tmp_path)
+
+
+def test_a_reopened_clip_that_cannot_be_looked_at_stays_unanswered(monkeypatch, tmp_path):
+    async def go(env):
+        await env.start()
+        await env.command("consent", A, choice(L.ALWAYS), None)
+        auto = await env.clip(A)
+        await env.tick(ASK_AT)
+        del env.guild.clips.messages[auto]  # deleted in the meantime
+        await env.command("consent", A, choice(L.ASK), None)
+        row = await env.row(auto)
+        assert row["status"] == L.ASKED and row["asked_via"] == "unsent" and env.member(A).dms == []
+        assert not L.may_upload(row)
+    with_env(go, monkeypatch, tmp_path)
+
+
 def test_standing_always_needs_tracking_on_and_tracking_off_resets_it(monkeypatch, tmp_path):
     async def go(env):
         await env.start()
@@ -1266,7 +1315,7 @@ def test_remove_takes_a_posted_clip_down_and_tells_staff(monkeypatch, tmp_path):
         assert await env.status(a1) == L.PUBLISHED and env.http.of("delete") == []
 
         inter = await env.command("remove", A, str(a1))
-        assert inter.deferred and inter.text == "Done. The video is deleted from YouTube."
+        assert inter.deferred and inter.text.startswith("Done. The video is deleted from YouTube.")
         (delete,) = env.http.of("delete")
         assert delete.params == {"id": "vid00000001"} and delete.headers["Authorization"] == "Bearer tok1"
         assert await env.status(a1) == L.REMOVED
@@ -1274,6 +1323,71 @@ def test_remove_takes_a_posted_clip_down_and_tells_staff(monkeypatch, tmp_path):
         (alert,) = env.guild.mod_log.sent
         assert f"by <@{A}> has to come down (requested by <@{A}>). I deleted the video from YouTube." in alert["content"]
         assert alert["allowed_mentions"].to_dict() == discord.AllowedMentions.none().to_dict()
+    with_env(go, monkeypatch, tmp_path)
+
+
+async def clip_ledger(env, uid):
+    rows = await env.db.fetchall("SELECT delta, reason, ref FROM ledger WHERE user_id = ? ORDER BY id", (uid,))
+    return [(r["delta"], r["reason"], r["ref"]) for r in rows]
+
+
+def test_an_author_who_takes_a_fresh_clip_down_gives_the_coins_back_once(monkeypatch, tmp_path):
+    """Post, collect, remove must not be a coin tap."""
+    async def go(env):
+        await env.start()
+        a1 = await env.approved(A)
+        await env.tick(PUB_AT)
+        assert await economy.balance(env.db, A) == L.COINS
+        env.guild.mod_log.sent.clear()
+        env.http.script("delete", Response(403, {}, google_error("insufficientPermissions")))
+        env.t = PUB_AT + 29 * DAY
+        inter = await env.command("remove", A, str(a1))  # the delete fails: the request still counts
+        assert await env.status(a1) == L.REMOVAL
+        assert f"The {L.COINS} coins it earned came back out of your balance" in inter.text
+        assert await economy.balance(env.db, A) == 0
+        assert await clip_ledger(env, A) == [(L.COINS, L.REASON, f"clipcast:{a1}"),
+                                             (-L.COINS, L.REASON, f"clipcast:{a1}:refund")]
+        assert L.refund_ref(a1) == f"clipcast:{a1}:refund"
+        # asking again (the retry that deletes it) takes nothing more, even with coins to take
+        await economy.apply(env.db, A, 500, "daily", env.t)
+        inter = await env.command("remove", A, str(a1))
+        assert await env.status(a1) == L.REMOVED and "coins" not in inter.text
+        assert await economy.balance(env.db, A) == 500
+    with_env(go, monkeypatch, tmp_path)
+
+
+def test_no_reversal_when_the_coins_are_spent_after_thirty_days_or_for_a_staff_takedown(monkeypatch, tmp_path):
+    async def go(env):
+        await env.start()
+        spent, old, by_staff, unpaid = [await env.approved(uid) for uid in (A, B, C, D)]
+        await env.db.execute("UPDATE clipcast SET backers = 0 WHERE message_id = ?", (unpaid,))  # posts, pays nothing
+        await env.tick(PUB_AT)
+        assert [await economy.balance(env.db, u) for u in (A, B, C, D)] == [L.COINS, L.COINS, L.COINS, 0]
+        env.guild.mod_log.sent.clear()
+
+        # spent in the meantime: economy.py never pushes a wallet below zero, so nothing is taken
+        await economy.apply(env.db, A, -(L.COINS - 10), "shop", PUB_AT + 60)
+        env.t = PUB_AT + DAY
+        inter = await env.command("remove", A, str(spent))
+        assert "your balance is lower than that, so nothing was taken" in inter.text
+        assert await economy.balance(env.db, A) == 10
+        assert "so nothing was taken back" in env.guild.mod_log.sent[-1]["content"]
+        assert env.guild.mod_log.sent[-1]["allowed_mentions"].to_dict() == discord.AllowedMentions.none().to_dict()
+        assert L.refund_ref(spent) not in [ref for _, _, ref in await clip_ledger(env, A)]
+
+        # staff taking it down is not the author's choice
+        inter = await env.command("remove", MOD, str(by_staff), roles=[config.MOD_ROLE])
+        assert "coins" not in inter.text and await economy.balance(env.db, C) == L.COINS
+
+        # a clip that never paid has nothing to reverse
+        inter = await env.command("remove", D, str(unpaid))
+        assert "coins" not in inter.text and await clip_ledger(env, D) == []
+
+        # thirty days on, the clip has had its run
+        env.t = PUB_AT + L.REFUND_DAYS * DAY
+        inter = await env.command("remove", B, str(old))
+        assert "coins" not in inter.text and await economy.balance(env.db, B) == L.COINS
+        assert L.refund_due(PUB_AT, PUB_AT + L.REFUND_DAYS * DAY - 1) and not L.refund_due(None, PUB_AT)
     with_env(go, monkeypatch, tmp_path)
 
 

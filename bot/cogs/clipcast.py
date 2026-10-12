@@ -989,8 +989,40 @@ class Clipcast(commands.Cog):
                     f"credited {how}, without asking first. A clip you're being asked about right now still needs "
                     "its button. `/clipcast consent ask` or `never` changes this any time.")
         else:
+            # "Ask me" also covers what the old standing yes already approved and has not been
+            # posted yet: those go back to being a question instead of going up unasked.
+            again = await self.db.fetchall(
+                "SELECT message_id, channel_id FROM clipcast WHERE user_id = ? AND status = ? AND answered_via = ?",
+                (uid, L.APPROVED, L.VIA_STANDING))
+            reopened = []
+            for row in again:
+                if await self.db.execute(
+                        "UPDATE clipcast SET status = ?, credit = NULL, credit_name = NULL, answered_by = NULL,"
+                        " answered_at = NULL, answered_via = NULL, asked_at = ?, asked_via = NULL, updated_at = ?"
+                        " WHERE message_id = ? AND status = ? AND answered_via = ?",
+                        (L.ASKED, t, t, row["message_id"], L.APPROVED, L.VIA_STANDING)):
+                    reopened.append(row)
             text = "Done. I'll ask you each time one of your clips makes the shortlist."
+            if reopened:
+                text += (f" {len(reopened)} clip(s) your standing yes had already approved won't be posted "
+                         "unless you say yes to the question I'm sending you now.")
         await interaction.response.send_message(text, ephemeral=True)
+        if pref == L.ASK:
+            for row in reopened:
+                try:
+                    await self.ask_again(interaction.user, row["message_id"], row["channel_id"])
+                except Exception:
+                    log.exception("clipcast: re-asking about clip %s failed", row["message_id"])
+
+    async def ask_again(self, member, message_id: int, channel_id: int) -> None:
+        """Send the consent question for a clip that went back to "asked"."""
+        guild = self.guild()
+        seen = await self.inspect(guild, channel_id, message_id) if guild is not None else UNKNOWN
+        via = "unsent"  # the clip can't be looked at right now: it simply stays unanswered
+        if isinstance(seen, Seen):
+            via = await self.send_ask(guild, member, seen, message_id, L.credit_name(member.display_name))
+        await self.db.execute("UPDATE clipcast SET asked_via = ? WHERE message_id = ? AND status = ?",
+                              (via, message_id, L.ASKED))
 
     @clipcast.command(name="remove", description="Take one of your clips off the server's YouTube (or off the list)")
     @app_commands.describe(clip="The clip's message link (pick from the list, or paste a link)")
@@ -1020,9 +1052,38 @@ class Clipcast(commands.Cog):
             return
         await interaction.response.defer(ephemeral=True, thinking=True)
         status = await self.take_down(interaction.guild, row, f"requested by <@{user.id}>")
-        await interaction.followup.send(
-            "Done. The video is deleted from YouTube." if status == L.REMOVED else
-            "Got it. I couldn't delete it myself, so the owner has been told to take it down by hand.", ephemeral=True)
+        text = ("Done. The video is deleted from YouTube." if status == L.REMOVED else
+                "Got it. I couldn't delete it myself, so the owner has been told to take it down by hand.")
+        if user.id == row["user_id"]:  # the author's own choice (a staff takedown costs the author nothing)
+            text += await self.reverse_payout(interaction.guild, row)
+        await interaction.followup.send(text, ephemeral=True)
+
+    async def reverse_payout(self, guild, row) -> str:
+        """Take back the coins a clip earned when its author removes it within L.REFUND_DAYS of
+        posting. Through economy.py with its own ref, so it happens once; a wallet is never
+        pushed below zero, so an author who has spent the coins keeps them and the mod log
+        says so. Returns what to add to the author's reply ("" when nothing was owed)."""
+        mid, uid, t = row["message_id"], row["user_id"], now()
+        if not L.refund_due(row["published_at"], t):
+            return ""
+        try:
+            async with self.db.transaction() as tx:
+                if not await tx.fetchone("SELECT 1 FROM ledger WHERE ref = ? AND delta > 0", (L.coin_ref(mid),)):
+                    return ""  # this clip never paid
+                result = await economy.apply_tx(tx, uid, -L.COINS, L.REASON, t, ref=L.refund_ref(mid))
+        except Exception:
+            log.exception("clipcast: reversing the payout for clip %s failed", mid)
+            return ""
+        if result.status is economy.Status.DUPLICATE:
+            return ""
+        if not result.ok:
+            await self.mod_log(guild, f"🧹 Clipcast: <@{uid}> took {self.jump_row(guild, row)} down within "
+                                      f"{L.REFUND_DAYS} days of posting, but has fewer than the {L.COINS} coins it "
+                                      "paid, so nothing was taken back.")
+            return (f" The {L.COINS} coins it earned would have come back out, but your balance is lower than "
+                    "that, so nothing was taken.")
+        log.info("clipcast: took back %d coins from %s for clip %s", L.COINS, uid, mid)
+        return f" The {L.COINS} coins it earned came back out of your balance (it was up for under {L.REFUND_DAYS} days)."
 
     @remove.autocomplete("clip")
     async def remove_autocomplete(self, interaction: discord.Interaction, current: str):

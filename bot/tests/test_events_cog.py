@@ -113,6 +113,10 @@ class FakeGuild:
         self.forbidden = False
         self.create_error = None  # any other exception create_scheduled_event should raise
         self.fetches = 0
+        self.members: dict[int, FakeUser] = {}  # whoever ran a command, as the member cache has them
+
+    def get_member(self, uid):
+        return self.members.get(uid)
 
     async def create_scheduled_event(self, **kw):
         if self.forbidden:
@@ -218,6 +222,7 @@ class Env:
         user = FakeUser(uid)
         # Staff are exempt from the /gamenight spam limits; most tests aren't about those.
         user.roles = [SimpleNamespace(name=config.KEEPER_ROLE)] if staff else []
+        self.guild.members[uid] = user
         return FakeInteraction(user, self.guild)
 
     async def gamenight(self, game="valorant", when="9pm", size=None, note=None, uid=HOST, staff=True):
@@ -1058,7 +1063,48 @@ def test_watchparty_discord_error_replies_and_gives_the_cooldown_back(monkeypatc
     with_env(go, monkeypatch)
 
 
-def test_watchparty_reminder_pings_interested_and_the_game_night_role(monkeypatch):
+def test_a_members_watchparty_reminder_pings_interested_people_but_not_the_role(monkeypatch):
+    """The title is the host's own words and any member can make one: it must not be a way to
+    ping everyone with the Game Night role."""
+    async def go(env):
+        add_stage(env)
+        gn = FakeRole(710, config.GAMENIGHT_ROLE)
+        env.guild.roles.append(gn)
+
+        async def reminder(**who):
+            await watchparty(env, title="free nitro at my place", **who)
+            ev = list(env.guild.events.values())[-1]
+            ev.interested = [FakeUser(A)]
+            env.guild.gaming.sent.clear()
+            env.t = ts(2026, 10, 7, 21) - 10 * MIN
+            await env.cog.run_reminders()
+            [post] = env.guild.gaming.sent
+            return post
+        post = await reminder(uid=USER_A, staff=False)
+        assert gn.mention not in post["content"] and "Watch party: free nitro at my place" in post["content"]
+        assert not post["allowed_mentions"].roles and post["allowed_mentions"].everyone is False
+        assert [u.id for u in post["allowed_mentions"].users] == [A]  # Interested people still hear about it
+        # a host who has left by then is nobody's staff either
+        env.t = T0
+        await env.db.execute("DELETE FROM hosted_events")
+        env.cog.last_created.clear()
+        env.cog.reminded.clear()
+        env.guild.events.clear()
+        late = FakeEvent(9001, env.guild, name="Watch party: gone", start_time=datetime.fromtimestamp(
+            ts(2026, 10, 7, 21), timezone.utc), channel=env.guild.lobby)
+        env.guild.events[late.id] = late
+        env.guild.cached.add(late.id)
+        await env.db.execute("INSERT INTO hosted_events (event_id, host_id, kind, starts_at) VALUES (9001, 4242,"
+                             " 'watchparty', ?)", (ts(2026, 10, 7, 21),))
+        env.guild.gaming.sent.clear()
+        env.t = ts(2026, 10, 7, 21) - 10 * MIN
+        await env.cog.run_reminders()
+        [post] = env.guild.gaming.sent
+        assert gn.mention not in post["content"] and not post["allowed_mentions"].roles
+    with_env(go, monkeypatch)
+
+
+def test_a_staff_watchparty_reminder_pings_interested_and_the_game_night_role(monkeypatch):
     async def go(env):
         add_stage(env)
         gn = FakeRole(710, config.GAMENIGHT_ROLE)

@@ -11,7 +11,10 @@
 // - Off (503) unless APPEAL_SECRET and APPEAL_WEBHOOK_URL are both set and sane.
 // - POST with a JSON body only, from this site's own origin, at most 8 KB.
 // - A wrong code gets the same 200 as a right one, so the endpoint can't be used to
-//   test user IDs or codes.
+//   test user IDs or codes. Every refusal for a malformed request is decided before the
+//   code is compared, so those are the same for both too. The one answer only a right
+//   code can get is 502 when Discord did not take the appeal (see the handler for why
+//   that gives nothing away).
 // - Never logs the secret, the code, the answers or the webhook URL.
 
 "use strict";
@@ -202,11 +205,21 @@ function createHandler({ config, fetchImpl, log }) {
     const input = validate(read.body);
     if (input.fields) return send(res, 400, "invalid", { fields: input.fields });
 
+    // Every check on the request's shape and size comes before the code is looked at, the
+    // escaped length included: a malformed request gets the same refusal with a right code
+    // as with a wrong one.
+    const payload = buildPayload(input.userId, input.code, input.answers);
+    if (payload.length > PAYLOAD_MAX) return send(res, 400, "invalid", { fields: { form: "too_long" } });
+
     // Same answer whether or not the code is right: no way to probe IDs or codes.
     if (!codeMatches(config.secret, input.userId, input.code)) return send(res, 200);
 
-    const payload = buildPayload(input.userId, input.code, input.answers);
-    if (payload.length > PAYLOAD_MAX) return send(res, 400, "invalid", { fields: { form: "too_long" } });
+    // From here on the sender holds the real code. A failed delivery says so (502) instead of
+    // "Received": a banned member must not believe an appeal arrived that was lost. It tells
+    // nobody anything new. The only fact it gives away is "this code is this ID's code", which
+    // takes the real code to trigger; the code is 80 bits of an HMAC, so it cannot be searched
+    // for, and whoever holds it was sent it by the bot and knows it is right. It says nothing
+    // about whether the ID is banned: the code depends on the ID alone.
     try {
       const reply = await (fetchImpl || fetch)(config.webhookUrl, {
         method: "POST",

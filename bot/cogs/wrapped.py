@@ -433,6 +433,17 @@ class Wrapped(commands.Cog):
             return False
         return not any(config.match_by_name([parent], name) is not None for name in QUIET_CHANNELS)
 
+    @staticmethod
+    def may_post(channel, member) -> bool:
+        """Whether the member could post here themselves. The bot posts the card for them, so
+        without this the button would speak in channels (or locked threads) they can only read."""
+        try:
+            perms = channel.permissions_for(member)
+        except Exception:
+            return False
+        in_thread = getattr(channel, "parent", None) is not None
+        return bool(perms.send_messages_in_threads if in_thread else perms.send_messages)
+
     async def handle_share(self, interaction: discord.Interaction, year: int, user_id: int) -> None:
         user = interaction.user
         if user.id != user_id:
@@ -453,6 +464,11 @@ class Wrapped(commands.Cog):
             await interaction.response.send_message(
                 "Cards can't be shared in this channel. Run `/wrapped` in a chat channel and share it there.",
                 ephemeral=True)
+            return
+        if not self.may_post(channel, user):
+            await interaction.response.send_message(
+                "You can't post in this channel, so your card can't be shared here. Run `/wrapped` in a "
+                "channel you can chat in.", ephemeral=True)
             return
         # Claim the cooldown in one transaction, so a double click can't post twice.
         key = W.share_key(year, user_id)

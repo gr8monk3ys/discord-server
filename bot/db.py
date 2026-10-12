@@ -628,6 +628,12 @@ MIGRATIONS = [
         source TEXT NOT NULL
     )""",
     ],
+    [
+        # The Realms: 1 once the server said "Added <name>" to this bot's own whitelist add (or
+        # staff adopted the name). Only such a name is ever sent `whitelist remove`, and only
+        # such a name may answer "already whitelisted" to an add.
+        "ALTER TABLE realms_links ADD COLUMN managed INTEGER NOT NULL DEFAULT 0",
+    ],
 ]
 
 

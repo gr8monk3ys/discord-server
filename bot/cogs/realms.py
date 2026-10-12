@@ -7,14 +7,19 @@ command says the bridge is not set up.
 - Status panel (REALMS_ADDRESS): one message in the realms channel, edited in place when
   what it shows changes. The server is asked with the Server List Ping protocol every two
   minutes; while it does not answer the polls back off and the panel is edited once.
-- Whitelist (RCON): `/realms link <name>` for established accounts runs `whitelist add`,
-  `/realms unlink` (or leaving, or a ban) runs `whitelist remove`. One name per member,
-  one member per name. A change the server could not take yet waits in `realms_links`
-  (state add / remove) and is sent after the next poll that reaches the server.
+- Whitelist (RCON): `/realms link <name>` for established accounts that have been in the
+  server two weeks runs `whitelist add`, `/realms unlink` (or leaving, or a ban) runs
+  `whitelist remove`. One name per member, one member per name. A change the server could
+  not take yet waits in `realms_links` (state add / remove) and is sent after the next poll
+  that reaches the server. The bot only ever removes a name it added itself (`managed`): an
+  add answered "already whitelisted" means somebody else put the name there, so the link is
+  refused, and a link the server never confirmed is forgotten without a `whitelist remove`.
+  Staff link such a name for a member with `/realms adopt`.
 - Chat, both ways, in the realms channel. Discord to Minecraft is a `tellraw` over RCON,
   rate limited, never for bots. Minecraft to Discord tails the server log read-only
   (REALMS_LOG_PATH) in a worker thread and posts at most one batched message every few
-  seconds, with no pings.
+  seconds, with no pings; chat from a name linked to a member who is timed out or gone is
+  dropped.
 - Playtime: a linked member seen in two player-list polls in a row, with at least one other
   player on in both (company, like voice coins: nobody is paid to idle alone), is credited
   the time between them; every full half hour pays a few coins up to a daily cap (refs keyed
@@ -55,6 +60,11 @@ MESSAGES = {
     "bad_name": "That isn't a Minecraft Java name: 3 to 16 letters, digits or underscores, nothing else.",
     "young": (f"Your Discord account must be {quests.MIN_ACCOUNT_DAYS}+ days old to join "
               "The Realms through Discord. Ask a Keeper to add you."),
+    "new_here": (f"Linking opens once you've been in the server for {R.LINK_MEMBER_DAYS} days. "
+                 "Until then, ask a Keeper to add you."),
+    "claimed": ("`{name}` is already on The Realms whitelist, and I didn't put it there, so I can't link it. "
+                "If it's yours, ask a mod to link it for you."),
+    "unlink_unconfirmed": "Unlinked. `{name}` was still waiting to be added, so the whitelist is unchanged.",
     "cooldown": "Give it a moment, then try again.",
     "have_one": "You already linked `{name}`. Run `/realms unlink` first if you want to change it.",
     "taken": "Someone here already linked that Minecraft name. If it's yours, ask a mod.",
@@ -521,7 +531,9 @@ class Realms(commands.Cog):
 
     # ------------------------------------------------------------ whitelist
     async def sync_one(self, key: str) -> str:
-        """Send one waiting whitelist change. Returns ok / removed / unknown / pending / gone."""
+        """Send one waiting whitelist change. Returns ok / removed / unknown / claimed /
+        pending / gone. "claimed": the name was on the whitelist before this bot ever added
+        it (by hand, or for somebody else), so the link is refused and the row deleted."""
         async with self.sync_lock:
             row = await self.db.fetchone("SELECT * FROM realms_links WHERE name_key = ?", (key,))
             if row is None:
@@ -529,6 +541,10 @@ class Realms(commands.Cog):
             if row["state"] == "ok":
                 return "ok"
             action = "add" if row["state"] == "add" else "remove"
+            if action == "remove" and not row["managed"]:
+                # Never sent for a name this bot did not put there itself.
+                await self.db.execute("DELETE FROM realms_links WHERE name_key = ? AND state = 'remove'", (key,))
+                return "gone"
             try:
                 reply = await self.rcon_call(R.whitelist_command(action, row["name"]))
             except (RconError, ValueError):
@@ -540,12 +556,21 @@ class Realms(commands.Cog):
                                       " WHERE name_key = ? AND state = ?", (t, key, row["state"]))
                 log.warning("realms: the server gave an unexpected answer to a whitelist %s", action)
                 return "pending"
-            if action == "add" and result == "ok":
-                await self.db.execute("UPDATE realms_links SET state = 'ok', attempts = 0, updated_at = ?"
+            # "already whitelisted" is fine only for a name this bot added before (it was being
+            # removed and got claimed again before the server took the removal).
+            if action == "add" and (result == "ok" or (result == "already" and row["managed"])):
+                await self.db.execute("UPDATE realms_links SET state = 'ok', managed = 1, attempts = 0, updated_at = ?"
                                       " WHERE name_key = ? AND state = 'add'", (t, key))
                 return "ok"
-            # an add for a name Minecraft does not know, or a finished removal: the row goes
+            # an add for a name Minecraft does not know or that somebody else whitelisted, or a
+            # finished removal: the row goes
             await self.db.execute("DELETE FROM realms_links WHERE name_key = ? AND state = ?", (key, row["state"]))
+            if action == "add" and result == "already":
+                await self.mod_log(
+                    f"⛏️ <@{row['user_id']}> tried to link `{row['name']}`, which was already on The Realms "
+                    "whitelist (added by hand, or somebody else's). Not linked, and the whitelist is unchanged. "
+                    "If the name is theirs, `/realms adopt` links it.")
+                return "claimed"
             return "unknown" if action == "add" else "removed"
 
     async def sync_whitelist(self) -> None:
@@ -562,11 +587,16 @@ class Realms(commands.Cog):
         self.waiting = left
 
     async def mark_remove(self, user_id: int) -> dict | None:
-        """Turn the member's link into a waiting removal; None when they have none."""
+        """Turn the member's link into a waiting removal; None when they have none. A link
+        the server never confirmed is just forgotten ("unconfirmed" in the result): as far as
+        the bot knows that name is not on the whitelist, or not by its doing."""
         async with self.db.transaction() as tx:
             row = await tx.fetchone("SELECT * FROM realms_links WHERE user_id = ? AND state != 'remove'", (user_id,))
             if row is None:
                 return None
+            if not row["managed"]:
+                await tx.execute("DELETE FROM realms_links WHERE name_key = ?", (row["name_key"],))
+                return {**dict(row), "unconfirmed": True}
             await tx.execute("UPDATE realms_links SET state = 'remove', attempts = 0, updated_at = ?"
                              " WHERE name_key = ?", (now(), row["name_key"]))
         self.waiting += 1
@@ -574,6 +604,8 @@ class Realms(commands.Cog):
 
     async def remove_now(self, row: dict) -> bool:
         """Try the removal at once; False when it has to wait for the server."""
+        if row.get("unconfirmed"):
+            return True  # nothing was ever added: nothing to send
         if not self.setup.rcon_on:
             return False
         done = await self.sync_one(row["name_key"]) in ("removed", "gone")
@@ -588,9 +620,12 @@ class Realms(commands.Cog):
         if row is None:
             return False
         done = await self.remove_now(row)
-        await self.mod_log(f"⛏️ <@{user_id}> {why}: `{row['name']}` "
-                           + ("is off The Realms whitelist" if done else
-                              "comes off The Realms whitelist when the server answers"))
+        if row.get("unconfirmed"):
+            what = "was still waiting to be added, so the whitelist is unchanged"
+        else:
+            what = ("is off The Realms whitelist" if done else
+                    "comes off The Realms whitelist when the server answers")
+        await self.mod_log(f"⛏️ <@{user_id}> {why}: `{row['name']}` {what}")
         return True
 
     async def sweep_departed(self) -> int:
@@ -630,6 +665,9 @@ class Realms(commands.Cog):
         t = now()
         if not R.established(member.id, t):
             return MESSAGES["young"]
+        joined = getattr(member, "joined_at", None)
+        if not R.member_long_enough(int(joined.timestamp()) if joined is not None else None, t):
+            return MESSAGES["new_here"]
         last = self.last_link.get(member.id)
         if last is not None and t - last < R.LINK_COOLDOWN:
             return MESSAGES["cooldown"]
@@ -655,9 +693,48 @@ class Realms(commands.Cog):
         result = await self.sync_one(key)
         if result == "unknown":
             return MESSAGES["unknown"]
+        if result == "claimed":  # sync_one deleted the row and told the mod log
+            return MESSAGES["claimed"].format(name=name)
         await self.mod_log(f"⛏️ <@{member.id}> linked the Minecraft name `{name}`"
                            + ("" if result == "ok" else " (waiting for the server)"))
         return MESSAGES["linked" if result == "ok" else "pending"].format(name=name)
+
+    async def adopt_member(self, mod, member, name: str) -> str:
+        """/realms adopt: staff vouch that a name already on the whitelist (put there by hand)
+        is this member's. The link is recorded as the bot's own, so unlinking, leaving or a
+        ban takes the name off like any other. Returns the reply."""
+        if not self.setup.rcon_on:
+            return MESSAGES["no_whitelist" if self.setup.any_on else "off"]
+        if not R.valid_name(name):
+            return MESSAGES["bad_name"]
+        if getattr(member, "bot", False):
+            return "Bots don't play on The Realms."
+        key, t = R.name_key(name), now()
+        mine = await self.db.fetchone("SELECT name, name_key FROM realms_links WHERE user_id = ? AND state != 'remove'",
+                                      (member.id,))
+        if mine is not None and mine["name_key"] != key:
+            return f"{member.mention} already has `{mine['name']}` linked. `/realms remove` it first."
+        row = await self.db.fetchone("SELECT user_id, state FROM realms_links WHERE name_key = ?", (key,))
+        if row is not None and row["state"] != "remove" and row["user_id"] != member.id:
+            return f"`{name}` is linked to <@{row['user_id']}>. `/realms remove` that link first."
+        try:
+            # Makes sure the name is on the whitelist; "already whitelisted" is the expected answer.
+            result = R.whitelist_result("add", await self.rcon_call(R.whitelist_command("add", name)))
+        except RconError:
+            return "I can't reach the Minecraft server right now, so nothing was linked. Try again in a minute."
+        if result == "unknown":
+            return MESSAGES["unknown"]
+        if result not in ("ok", "already"):
+            return MESSAGES["failed"]
+        await self.db.execute(
+            "INSERT INTO realms_links (name_key, name, user_id, state, attempts, linked_at, updated_at, managed)"
+            " VALUES (?, ?, ?, 'ok', 0, ?, ?, 1) ON CONFLICT (name_key) DO UPDATE SET name = excluded.name,"
+            " user_id = excluded.user_id, state = 'ok', attempts = 0, linked_at = excluded.linked_at,"
+            " updated_at = excluded.updated_at, managed = 1", (key, name, member.id, t, t))
+        log.info("realms: %s adopted a whitelisted name for %s", mod.id, member.id)
+        await self.mod_log(f"⛏️ <@{mod.id}> linked the Minecraft name `{name}` to <@{member.id}> (`/realms adopt`: "
+                           "it was on the whitelist already, and is now managed like any other link)")
+        return f"Linked `{name}` to {member.mention}. It comes off the whitelist if they unlink, leave or are banned."
 
     # ------------------------------------------------------------ commands
     @realms.command(name="link", description="Get on The Realms whitelist with your Minecraft name")
@@ -680,7 +757,8 @@ class Realms(commands.Cog):
                 text = MESSAGES["none"]
             else:
                 done = await self.remove_now(row)
-                text = MESSAGES["unlinked" if done else "unlink_pending"].format(name=row["name"])
+                which = "unlink_unconfirmed" if row.get("unconfirmed") else "unlinked" if done else "unlink_pending"
+                text = MESSAGES[which].format(name=row["name"])
                 await self.mod_log(f"⛏️ <@{interaction.user.id}> unlinked the Minecraft name `{row['name']}`")
         except Exception:
             log.exception("realms: unlink failed")
@@ -696,6 +774,21 @@ class Realms(commands.Cog):
         await interaction.response.defer(ephemeral=True, thinking=True)
         had = await self.drop_member(member.id, f"was unlinked by <@{interaction.user.id}>")
         text = f"Removed {member.mention}'s Minecraft link." if had else f"{member.mention} has no Minecraft link."
+        await interaction.followup.send(text, ephemeral=True, allowed_mentions=NO_PINGS)
+
+    @realms.command(name="adopt", description="Link a name that is already on the whitelist to a member (mods)")
+    @app_commands.describe(member="Whose Minecraft name it is", minecraft_name="The name as it is on the whitelist")
+    async def adopt(self, interaction: discord.Interaction, member: discord.Member,
+                    minecraft_name: app_commands.Range[str, 1, 32]) -> None:
+        if not is_staff(interaction.user):
+            await interaction.response.send_message("Only mods can link a name for someone else.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            text = await self.adopt_member(interaction.user, member, minecraft_name)
+        except Exception:
+            log.exception("realms: adopt failed")
+            text = MESSAGES["failed"]
         await interaction.followup.send(text, ephemeral=True, allowed_mentions=NO_PINGS)
 
     async def played(self, user_id: int, since_day: str) -> int:
@@ -813,6 +906,22 @@ class Realms(commands.Cog):
             self.once("relay", logging.ERROR, "realms: relaying a message to Minecraft failed")
 
     # ------------------------------------------------------------ Minecraft -> Discord
+    async def silenced(self, name: str) -> bool:
+        """True when a Minecraft name is linked to a member who may not talk here right now:
+        timed out, or gone from the server (a ban or a leave whose whitelist removal is still
+        on its way). The game must not be a way around a timeout. A player nobody linked is
+        just a player: their chat is relayed."""
+        row = await self.db.fetchone("SELECT user_id FROM realms_links WHERE name_key = ? AND state = 'ok'",
+                                     (R.name_key(name),))
+        guild = self.guild()
+        if row is None or guild is None:
+            return False
+        member = guild.get_member(row["user_id"])
+        if member is None:
+            return bool(getattr(guild, "chunked", False))  # a cold member cache proves nothing
+        timed_out = getattr(member, "is_timed_out", None)
+        return bool(timed_out()) if callable(timed_out) else False
+
     async def relay_once(self) -> None:
         """Read what the server logged since the last pass and post one batched message."""
         result = await asyncio.to_thread(self.reader, self.setup.log_path, self.tail)
@@ -831,6 +940,8 @@ class Realms(commands.Cog):
                     continue
                 if event.kind in (R.JOIN, R.LEAVE):
                     self.next_poll_at = min(self.next_poll_at, now() + R.TICK)  # freshen the panel soon
+                if event.kind == R.CHAT and await self.silenced(event.name):
+                    continue
                 text = R.discord_line(event)
                 if text:
                     self.batcher.add(text)

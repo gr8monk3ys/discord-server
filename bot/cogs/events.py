@@ -443,7 +443,8 @@ class Events(commands.Cog):
     async def announce_watchparty(self, guild, event, place, host, url: str | None) -> bool:
         """Announced where "Anything" game nights are: 🕹️・gaming. Nobody is pinged here (a game
         night's announcement only pings its game role, and a watch party has none); the
-        reminder pings the opt-in Game Night role like every other event."""
+        reminder pings the people who tapped Interested, and the opt-in Game Night role only
+        when the host is staff."""
         channel = self.text_channel_for(guild, None)
         if channel is None:
             log.warning("no %s channel for the watch party announcement", config.GAMING_CHANNEL)
@@ -647,9 +648,13 @@ class Events(commands.Cog):
             text += " " + " ".join(f"<@{u.id}>" for u in shown)
             if len(users) > len(shown):
                 text += f" and {len(users) - len(shown)} more"
-        # Opt-in Game Night role (self-assign panel): pinged for every game night and watch party
-        # that starts. Not for the Town Hall: that isn't what people opted in to.
-        gamenight_role = None if townhall else config.match_by_name(guild.roles, config.GAMENIGHT_ROLE)
+        # Opt-in Game Night role (self-assign panel): pinged for every game night that starts.
+        # Not for the Town Hall: that isn't what people opted in to. And for a watch party only
+        # when staff host it: its title is the host's own words, and any member can make one,
+        # so a member's watch party reminds the people who tapped Interested and nobody else.
+        host = guild.get_member(row["host_id"]) if row["kind"] == E.WATCHPARTY else None
+        quiet = townhall or (row["kind"] == E.WATCHPARTY and (host is None or not is_staff(host)))
+        gamenight_role = None if quiet else config.match_by_name(guild.roles, config.GAMENIGHT_ROLE)
         if gamenight_role is not None:
             text = f"{gamenight_role.mention} {text}"
         await channel.send(text, allowed_mentions=ping_only(

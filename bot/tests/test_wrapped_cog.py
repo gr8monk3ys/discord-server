@@ -72,6 +72,12 @@ class FakeText:
         self.category = category
         self.sent = []
         self.fail = None
+        self.parent = None  # set to the parent channel to make this a thread
+        self.muted = set()  # member ids who can read here but not post
+
+    def permissions_for(self, member):
+        can = member.id not in self.muted
+        return discord.Permissions(view_channel=True, send_messages=can, send_messages_in_threads=can)
 
     async def send(self, content=None, **kwargs):
         if self.fail is not None:
@@ -550,6 +556,57 @@ def test_share_cooldown(monkeypatch):
         assert len(env.guild.general.sent) == 2
         await env.share(U2)  # per member
         assert len(env.guild.general.sent) == 3
+    with_env(body, monkeypatch)
+
+
+def test_share_cooldown_outlives_a_privacy_round_trip(monkeypatch):
+    from cogs.stats import opt_out
+
+    async def body(env):
+        async def round_trip():
+            await opt_out(env.db, U1, env.t)  # /privacy tracking:off ...
+            await env.db.execute("DELETE FROM privacy_optout WHERE user_id = ?", (U1,))  # ... and on again
+        await env.share(U1)
+        shared_at = env.t
+        env.t += HOUR
+        await round_trip()
+        assert await env.meta(W.share_key(2026, U1)) == str(shared_at)  # kept while the cooldown runs
+        i = await env.share(U1)
+        assert "again in about 5 hours" in i.said and len(env.guild.general.sent) == 1
+        env.t = shared_at + W.SHARE_COOLDOWN
+        await round_trip()
+        assert await env.meta(W.share_key(2026, U1)) is None  # the cooldown is over: nothing left to keep
+        await env.share(U1)
+        assert len(env.guild.general.sent) == 2
+        rows = await env.db.fetchall("SELECT key FROM achievements WHERE user_id = ?", (U1,))
+        assert [r["key"] for r in rows] == ["wrapped_2026"]  # and the badge is still granted once
+    with_env(body, monkeypatch)
+
+
+def test_share_needs_the_member_to_be_able_to_post_there(monkeypatch):
+    async def body(env):
+        general = env.guild.general
+        general.muted = {U1}  # can read general, can't write in it (a timeout-style overwrite)
+        i = await env.share(U1)
+        assert "can't post in this channel" in i.said and general.sent == []
+        assert await env.meta(W.share_key(2026, U1)) is None  # no cooldown burned
+        await env.share(U2)  # someone who can post is not affected
+        assert len(general.sent) == 1
+        # in a thread the thread permission is what counts
+        thread = FakeText("a thread")
+        thread.parent = general
+        thread.permissions_for = lambda m: discord.Permissions(send_messages=True, send_messages_in_threads=False)
+        assert "can't post in this channel" in (await env.share(U3, channel=thread)).said and thread.sent == []
+        thread.permissions_for = lambda m: discord.Permissions(send_messages=False, send_messages_in_threads=True)
+        assert "Shared." in (await env.share(U3, channel=thread)).said and len(thread.sent) == 1
+        # a channel that can't say what the member may do is refused, not trusted
+        odd = FakeText("odd")
+        del FakeText.permissions_for
+        try:
+            assert "can't post in this channel" in (await env.share(U4, channel=odd)).said and odd.sent == []
+        finally:
+            FakeText.permissions_for = permissions_for
+    permissions_for = FakeText.permissions_for
     with_env(body, monkeypatch)
 
 

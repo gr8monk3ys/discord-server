@@ -257,7 +257,9 @@ def test_whitelist_command_only_takes_valid_names():
 
 def test_whitelist_result():
     assert R.whitelist_result("add", "Added Steve to the whitelist") == "ok"
-    assert R.whitelist_result("add", "Player is already whitelisted") == "ok"
+    # not "ok": the name was there before this add, so somebody else put it on the whitelist
+    assert R.whitelist_result("add", "Player is already whitelisted") == "already"
+    assert R.whitelist_result("remove", "Player is already whitelisted") == "error"
     assert R.whitelist_result("add", "That player does not exist") == "unknown"
     assert R.whitelist_result("add", "") == "error"
     assert R.whitelist_result("add", "Removed Steve from the whitelist") == "error"
@@ -265,6 +267,15 @@ def test_whitelist_result():
     assert R.whitelist_result("remove", "Player is not whitelisted") == "ok"
     assert R.whitelist_result("remove", "That player does not exist") == "unknown"
     assert R.whitelist_result("remove", "Unknown or incomplete command") == "error"
+
+
+def test_linking_needs_two_weeks_in_the_server():
+    day = 86400
+    assert R.LINK_MEMBER_DAYS == 14
+    assert not R.member_long_enough(1000, 1000 + 14 * day - 1)
+    assert R.member_long_enough(1000, 1000 + 14 * day)
+    assert not R.member_long_enough(None, 10 ** 10)  # join time unknown: not taken on trust
+    assert not R.member_long_enough(2000, 1000)  # a clock that makes no sense
 
 
 def test_parse_list():

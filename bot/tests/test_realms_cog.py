@@ -150,12 +150,18 @@ class Role:
 
 
 class FakeMember:
-    def __init__(self, uid, guild, roles=(), bot=False, name=None):
+    def __init__(self, uid, guild, roles=(), bot=False, name=None, joined_days=200):
         self.id, self.guild, self.bot = uid, guild, bot
         self.mention = f"<@{uid}>"
         self.display_name = name or f"member{uid % 100}"
         self.roles = [Role(r) for r in roles]
         self.guild_permissions = SimpleNamespace(administrator=False)
+        # in the server since `joined_days` before the tests' clock starts (None: Discord didn't say)
+        self.joined_at = None if joined_days is None else datetime.fromtimestamp(T0 - joined_days * 86400, TZ)
+        self.timed_out = False
+
+    def is_timed_out(self):
+        return self.timed_out
 
 
 class FakeGuild:
@@ -279,6 +285,11 @@ class Env:
     async def unlink(self, uid):
         inter = FakeInteraction(self.member(uid), self.guild)
         await Realms.unlink.callback(self.cog, inter)
+        return inter.reply()
+
+    async def adopt(self, mod_uid, uid, name, roles=(config.MOD_ROLE,)):
+        inter = FakeInteraction(self.member(mod_uid, roles=roles), self.guild)
+        await Realms.adopt.callback(self.cog, inter, self.member(uid), name)
         return inter.reply()
 
     async def remove(self, mod_uid, uid, roles=(config.MOD_ROLE,)):
@@ -569,6 +580,120 @@ def test_link_needs_an_established_account(monkeypatch):
     with_env(go, monkeypatch)
 
 
+def test_link_needs_two_weeks_in_the_server(monkeypatch):
+    async def go(env):
+        assert R.LINK_MEMBER_DAYS == 14
+        env.member(U1, joined_days=13)  # an old account that only just joined
+        reply = await env.link(U1, "Steve")
+        assert reply["content"] == MESSAGES["new_here"] and "14 days" in reply["content"]
+        env.member(U2, joined_days=None)  # Discord didn't say when: not taken on trust
+        assert (await env.link(U2, "Alex"))["content"] == MESSAGES["new_here"]
+        assert env.rcon.commands == [] and await env.links() == [] and env.mod_lines() == []
+        env.t = T0 + 2 * 86400  # now two weeks in
+        assert (await env.link(U1, "Steve"))["content"] == MESSAGES["linked"].format(name="Steve")
+    with_env(go, monkeypatch)
+
+
+def test_a_name_somebody_else_whitelisted_cannot_be_linked_or_removed(monkeypatch):
+    """Name squatting: a name put on the whitelist by hand is not the bot's to give or take."""
+    async def go(env):
+        env.rcon.whitelist = {"ownerfriend"}
+        reply = await env.link(U1, "OwnerFriend")
+        assert reply["content"] == MESSAGES["claimed"].format(name="OwnerFriend") and "ask a mod" in reply["content"]
+        assert await env.links() == [] and env.rcon.whitelist == {"ownerfriend"}
+        (line,) = env.mod_lines()  # one line, and it is not "linked"
+        assert f"<@{U1}> tried to link `OwnerFriend`" in line and "Not linked" in line and "/realms adopt" in line
+        # nothing the member can do now sends a remove for it
+        assert (await env.unlink(U1))["content"] == MESSAGES["none"]
+        await env.cog.on_member_ban(env.guild, SimpleNamespace(id=U1))
+        await env.cog.on_member_remove(env.member(U1))
+        await env.poll()
+        assert env.rcon.sent("whitelist remove") == [] and env.rcon.whitelist == {"ownerfriend"}
+        assert len(env.mod_lines()) == 1
+    with_env(go, monkeypatch)
+
+
+def test_a_squat_queued_while_the_server_is_down_never_becomes_a_removal(monkeypatch):
+    async def go(env):
+        env.rcon.whitelist = {"ownerfriend"}
+        env.rcon.down = True
+        assert (await env.link(U1, "OwnerFriend"))["content"] == MESSAGES["pending"].format(name="OwnerFriend")
+        # unlinking (or leaving, or a ban) an unconfirmed link forgets it: no `whitelist remove` is queued
+        reply = await env.unlink(U1)
+        assert reply["content"] == MESSAGES["unlink_unconfirmed"].format(name="OwnerFriend")
+        assert await env.links() == []
+        assert (await env.link(U2, "OwnerFriend"))["content"] == MESSAGES["pending"].format(name="OwnerFriend")
+        await env.cog.on_member_ban(env.guild, SimpleNamespace(id=U2))
+        assert await env.links() == [] and "so the whitelist is unchanged" in env.mod_lines()[-1]
+        assert (await env.link(U3, "OwnerFriend"))["content"] == MESSAGES["pending"].format(name="OwnerFriend")
+        env.rcon.down = False
+        await env.poll()  # the server answers "already whitelisted": refused, with one mod-log line
+        assert await env.links() == [] and env.cog.waiting == 0
+        assert f"<@{U3}> tried to link `OwnerFriend`" in env.mod_lines()[-1]
+        await env.poll()
+        assert env.rcon.sent("whitelist remove") == [] and env.rcon.whitelist == {"ownerfriend"}
+        assert sum("tried to link" in line for line in env.mod_lines()) == 1
+    with_env(go, monkeypatch)
+
+
+def test_only_names_the_bot_added_are_marked_managed(monkeypatch):
+    async def go(env):
+        async def managed():
+            return {r["name"]: r["managed"] for r in await env.db.fetchall("SELECT name, managed FROM realms_links")}
+        env.rcon.down = True
+        await env.link(U1, "Steve")
+        assert await managed() == {"Steve": 0}
+        env.rcon.down = False
+        await env.poll()
+        assert await managed() == {"Steve": 1}  # the server said "Added Steve"
+        # a hand-made 'remove' row for a name the bot never added is dropped without a command
+        await env.db.execute("INSERT INTO realms_links (name_key, name, user_id, state, attempts, linked_at,"
+                             " updated_at) VALUES ('ghost', 'Ghost', ?, 'remove', 0, ?, ?)", (U3, T0, T0))
+        env.rcon.whitelist.add("ghost")
+        await env.poll()
+        assert await managed() == {"Steve": 1} and env.rcon.sent("whitelist remove") == []
+    with_env(go, monkeypatch)
+
+
+def test_staff_adopt_a_hand_whitelisted_name_for_a_member(monkeypatch):
+    async def go(env):
+        env.rcon.whitelist = {"ownerfriend"}
+        env.member(U1, joined_days=1)  # staff vouch: the two-week wait is not theirs to serve
+        reply = await env.adopt(U2, U1, "OwnerFriend", roles=())
+        assert "Only mods" in reply["content"] and await env.links() == [] and env.rcon.commands == []
+        reply = await env.adopt(MOD, U1, "OwnerFriend")
+        assert reply["content"].startswith(f"Linked `OwnerFriend` to <@{U1}>") and reply["ephemeral"] is True
+        assert reply["allowed_mentions"].users is False
+        assert await env.links() == [("OwnerFriend", U1, "ok")]
+        assert env.mod_lines() == [
+            f"⛏️ <@{MOD}> linked the Minecraft name `OwnerFriend` to <@{U1}> (`/realms adopt`: it was on the "
+            "whitelist already, and is now managed like any other link)"]
+        # from here on it is the bot's: leaving takes it off
+        await env.cog.on_member_remove(env.member(U1))
+        assert env.rcon.whitelist == set() and env.rcon.sent("whitelist remove") == ["whitelist remove OwnerFriend"]
+    with_env(go, monkeypatch)
+
+
+def test_adopt_refuses_bad_names_taken_names_and_an_unreachable_server(monkeypatch):
+    async def go(env):
+        await env.link(U1, "Steve")
+        assert (await env.adopt(MOD, U2, "x; op me"))["content"] == MESSAGES["bad_name"]
+        assert "is linked to" in (await env.adopt(MOD, U2, "steve"))["content"]
+        assert "already has `Steve` linked" in (await env.adopt(MOD, U1, "Alex"))["content"]
+        env.rcon.unknown = {"Nobody_Here"}
+        assert (await env.adopt(MOD, U2, "Nobody_Here"))["content"] == MESSAGES["unknown"]
+        env.rcon.down = True
+        assert "can't reach the Minecraft server" in (await env.adopt(MOD, U2, "Alex"))["content"]
+        env.rcon.down, env.rcon.garble = False, True
+        assert (await env.adopt(MOD, U2, "Alex"))["content"] == MESSAGES["failed"]
+        assert await env.links() == [("Steve", U1, "ok")] and len(env.mod_lines()) == 1
+        bot_member = env.member(999_000, bot=True)
+        inter = FakeInteraction(env.member(MOD, roles=(config.MOD_ROLE,)), env.guild)
+        await Realms.adopt.callback(env.cog, inter, bot_member, "Alex")
+        assert "Bots" in inter.reply()["content"]
+    with_env(go, monkeypatch)
+
+
 def test_one_name_per_member_and_one_member_per_name(monkeypatch):
     async def go(env):
         await env.link(U1, "Steve")
@@ -855,6 +980,43 @@ def test_minecraft_chat_reaches_discord_as_one_batched_message(monkeypatch):
     with_env(go, monkeypatch)
 
 
+def test_minecraft_chat_from_a_timed_out_or_departed_member_is_dropped(monkeypatch):
+    """The game is not a way around a timeout: Discord moderation applies to linked names."""
+    async def go(env):
+        async def chat(*names):
+            before = len(env.posts)
+            await env.log(*(P + f"<{name}> hi from {name}" for name in names))
+            return env.posts[-1].kwargs["content"] if len(env.posts) > before else ""
+        await env.link(U1, "Steve")
+        await env.link(U2, "Alex")
+        assert (await chat("Steve", "Alex", "Stranger")).count("hi from") == 3
+        env.member(U1).timed_out = True
+        text = await chat("Steve", "steve", "Alex", "Stranger")  # the server's spelling may differ in case
+        assert "Steve" not in text and "steve" not in text and "hi from Alex" in text
+        assert "hi from Stranger" in text  # nobody linked that name: just a player
+        # their join, death and leave lines carry no words of theirs and still show
+        await env.log(P + "Steve was slain by Zombie", P + "Steve left the game")
+        assert "💀 **Steve** was slain by Zombie" in env.posts[-1].kwargs["content"]
+        env.member(U1).timed_out = False
+        assert "hi from Steve" in await chat("Steve")
+        # gone from the server, the whitelist removal still waiting for the Minecraft server
+        env.rcon.down = True
+        await env.cog.on_member_ban(env.guild, SimpleNamespace(id=U2))
+        del env.guild.members[U2]
+        assert await env.links() == [("Alex", U2, "remove"), ("Steve", U1, "ok")]
+        await env.db.execute("UPDATE realms_links SET state = 'ok' WHERE user_id = ?", (U2,))  # even if still 'ok'
+        assert await chat("Alex") == ""
+        env.guild.chunked = False  # a cold member cache proves nothing: don't silence everyone
+        assert "hi from Alex" in await chat("Alex")
+        # a link the server has not confirmed proves nothing about whose name it is
+        env.guild.chunked = True
+        env.member(U3).timed_out = True
+        await env.link(U3, "Herobrine")
+        assert await env.links() == [("Alex", U2, "ok"), ("Herobrine", U3, "add"), ("Steve", U1, "ok")]
+        assert "hi from Herobrine" in await chat("Herobrine")
+    with_env(go, monkeypatch)
+
+
 def test_minecraft_text_is_hostile_input(monkeypatch):
     async def go(env):
         await env.log(P + f"<Steve> {SECTION}4@everyone free nitro **now** <@&123456789012345678> ||x|| `y`",
@@ -1069,6 +1231,33 @@ def test_opted_out_members_are_not_tracked_or_paid(monkeypatch):
         assert f"<@{U2}>" in top and f"<@{U1}>" not in top
         assert "isn't counted" in (await env.status(U1))["embed"].description
         assert await env.links() == [("Alex", U2, "ok"), ("Steve", U1, "ok")]  # the link itself is not tracking
+    with_env(go, monkeypatch)
+
+
+def test_paid_half_hours_are_not_paid_again_after_a_privacy_round_trip(monkeypatch):
+    from cogs.stats import opt_out
+
+    async def go(env):
+        async def round_trip():
+            await opt_out(env.db, U1, env.t)  # /privacy tracking:off ...
+            await env.db.execute("DELETE FROM privacy_optout WHERE user_id = ?", (U1,))  # ... and on again
+        await env.link(U1, "Steve")
+        await play(env, 94, "Steve", PAL)
+        assert await env.seconds(U1) == 92 * 60 and await env.balance(U1) == 3 * R.SLOT_COINS
+        await round_trip()
+        assert await env.seconds(U1) is None  # the playtime is deleted...
+        await play(env, 94, "Steve", PAL)  # ...and the same three half hours, played again, pay nothing
+        assert await env.balance(U1) == 3 * R.SLOT_COINS
+        await play(env, 30, "Steve", PAL)
+        assert await env.balance(U1) == 4 * R.SLOT_COINS  # only a half hour never paid before does
+        # the daily cap holds across any number of round trips
+        for _ in range(3):
+            await round_trip()
+            await play(env, 60, "Steve", PAL)
+        await play(env, 5 * 60, "Steve", PAL)
+        assert await env.balance(U1) == R.SLOT_COINS * R.DAILY_SLOTS
+        rows = await env.db.fetchall("SELECT ref FROM ledger WHERE user_id = ? ORDER BY id", (U1,))
+        assert [r["ref"] for r in rows] == [f"realms:{U1}:{DAY}:{slot}" for slot in range(R.DAILY_SLOTS)]
     with_env(go, monkeypatch)
 
 

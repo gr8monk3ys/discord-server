@@ -257,6 +257,20 @@ def coin_ref(message_id: int) -> str:
     return f"clipcast:{message_id}"
 
 
+REFUND_DAYS = 30  # an author who takes their clip down this soon after it went up gives the coins back
+
+
+def refund_ref(message_id: int) -> str:
+    """Ledger ref of the reversal: one per clip, so it can never be taken twice."""
+    return f"{coin_ref(message_id)}:refund"
+
+
+def refund_due(published_at: int | None, now: int) -> bool:
+    """Posting pays COINS; post-then-remove must not be a way to keep them. After REFUND_DAYS
+    the clip has had its run and a takedown costs nothing."""
+    return published_at is not None and now - published_at < REFUND_DAYS * 24 * 60 * 60
+
+
 def pays(user_id: int, at: int, tracking: bool, backers: int) -> bool:
     """Coins only for established, tracked authors whose clip at least one other established
     member reacted to, so nobody farms the slot alone or with fresh alts."""

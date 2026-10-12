@@ -373,13 +373,23 @@ def whitelist_command(action: str, name: str) -> str:
 
 
 def whitelist_result(action: str, reply: str) -> str:
-    """What the server's answer means: "ok" (now in the wanted state, or already was),
-    "unknown" (no such Minecraft account) or "error" (anything else; try again later)."""
+    """What the server's answer means: "ok" (this command put it in the wanted state, or a
+    removal found it already gone), "already" (an add for a name that was on the whitelist
+    before: somebody else put it there), "unknown" (no such Minecraft account) or "error"
+    (anything else; try again later)."""
     text = clean_plain(reply, 300).lower()
     if "does not exist" in text:
         return "unknown"
-    wanted = ("added", "already whitelisted") if action == "add" else ("removed", "not whitelisted")
+    if action == "add" and "already whitelisted" in text:
+        return "already"
+    wanted = ("added",) if action == "add" else ("removed", "not whitelisted")
     return "ok" if any(w in text for w in wanted) else "error"
+
+
+def member_long_enough(joined_at: int | None, now: int) -> bool:
+    """Linking is for members who have been in the server LINK_MEMBER_DAYS (on top of the
+    account-age gate): a fresh join can't put a name on the whitelist. Unknown join time: no."""
+    return joined_at is not None and now - joined_at >= LINK_MEMBER_DAYS * 24 * 60 * 60
 
 
 def parse_list(reply: str) -> list[str] | None:
@@ -617,6 +627,7 @@ SYNC_BATCH = 10  # whitelist changes sent per poll
 MAX_ATTEMPTS = 5  # refused whitelist changes are retried this often at poll speed...
 SLOW_RETRY = 60 * 60  # ...then once an hour
 LINK_COOLDOWN = 30  # seconds between one member's /realms link attempts
+LINK_MEMBER_DAYS = 14  # days in this server before /realms link works (staff can /realms adopt sooner)
 
 
 def poll_delay(failures: int) -> int:
