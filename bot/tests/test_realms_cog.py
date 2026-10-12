@@ -954,6 +954,9 @@ def test_a_join_in_the_log_brings_the_next_poll_forward(monkeypatch):
 
 
 # ---------------------------------------------------------------- playtime and coins
+PAL = "Pal"  # someone else on the server (not linked): time only counts in company
+
+
 async def play(env, minutes, *names):
     env.players(*names)
     for _ in range(minutes * 60 // R.POLL_EVERY):
@@ -963,18 +966,18 @@ async def play(env, minutes, *names):
 def test_playtime_counts_between_polls_and_pays_per_half_hour(monkeypatch):
     async def go(env):
         await env.link(U1, "Steve")
-        env.players("Steve")
+        env.players("Steve", PAL)
         await env.poll()
         assert await env.seconds(U1) is None  # seen once: nothing is known yet
         await env.poll()
         assert await env.seconds(U1) == 120
-        await play(env, 26, "Steve")
+        await play(env, 26, "Steve", PAL)
         assert await env.seconds(U1) == 28 * 60 and await env.balance(U1) == 0
         await env.poll()
         assert await env.seconds(U1) == 30 * 60 and await env.balance(U1) == R.SLOT_COINS
         rows = await env.db.fetchall("SELECT reason, ref, delta FROM ledger WHERE user_id = ?", (U1,))
         assert [(r["reason"], r["ref"], r["delta"]) for r in rows] == [("realms", f"realms:{U1}:{DAY}:0", 5)]
-        await play(env, 30, "Steve")
+        await play(env, 30, "Steve", PAL)
         assert await env.balance(U1) == 2 * R.SLOT_COINS
     with_env(go, monkeypatch)
 
@@ -982,11 +985,34 @@ def test_playtime_counts_between_polls_and_pays_per_half_hour(monkeypatch):
 def test_playtime_has_a_hard_daily_cap(monkeypatch):
     async def go(env):
         await env.link(U1, "Steve")
-        await play(env, 7 * 60, "Steve")  # 08:00 to 15:00, all the same local day
+        await play(env, 7 * 60, "Steve", PAL)  # 08:00 to 15:00, all the same local day
         assert await env.seconds(U1) > 6 * 3600
         assert await env.balance(U1) == R.SLOT_COINS * R.DAILY_SLOTS == 40
         rows = await env.db.fetchall("SELECT ref FROM ledger WHERE user_id = ? ORDER BY id", (U1,))
         assert [r["ref"] for r in rows] == [f"realms:{U1}:{DAY}:{slot}" for slot in range(R.DAILY_SLOTS)]
+    with_env(go, monkeypatch)
+
+
+def test_time_alone_on_the_server_counts_for_nothing(monkeypatch):
+    async def go(env):
+        assert R.MIN_PLAYERS == 2  # company, like voice coins
+        await env.link(U1, "Steve")
+        await play(env, 3 * 60, "Steve")  # three hours with nobody else on
+        assert await env.seconds(U1) is None and await env.balance(U1) == 0
+        env.players("Steve", PAL)
+        await env.poll()  # company arrived at some point since the last poll: that stretch isn't counted
+        assert await env.seconds(U1) is None
+        await env.poll()
+        assert await env.seconds(U1) == 120  # both seen in two polls in a row
+        env.players("Steve", "Other")
+        await env.poll()  # a different second player: nobody else was there for the whole stretch
+        assert await env.seconds(U1) == 120
+        env.players("Steve")
+        await env.poll()  # the company left
+        await env.poll()
+        assert await env.seconds(U1) == 120 and await env.balance(U1) == 0
+        rows = await env.db.fetchall("SELECT 1 FROM ledger WHERE reason = ?", (R.REASON,))
+        assert rows == []
     with_env(go, monkeypatch)
 
 
@@ -1008,7 +1034,7 @@ def test_playtime_comes_from_the_servers_list_only(monkeypatch):
 def test_a_gap_or_a_failed_poll_is_never_credited(monkeypatch):
     async def go(env):
         await env.link(U1, "Steve")
-        await play(env, 4, "Steve")
+        await play(env, 4, "Steve", PAL)
         assert await env.seconds(U1) == 120
         await env.poll(R.MAX_GAP + 1)  # the bot was away for a while
         assert await env.seconds(U1) == 120
@@ -1016,14 +1042,14 @@ def test_a_gap_or_a_failed_poll_is_never_credited(monkeypatch):
         assert await env.seconds(U1) == 240
         env.ping = cogmod.PingError("TimeoutError")
         await env.poll()
-        env.players("Steve")
+        env.players("Steve", PAL)
         await env.poll(30)  # back, but the chain was broken
         assert await env.seconds(U1) == 240
         await env.poll()
         assert await env.seconds(U1) == 360
-        env.players()
+        env.players(PAL)
         await env.poll()
-        env.players("Steve")
+        env.players("Steve", PAL)
         await env.poll()  # left and came back between polls: only seen-twice time counts
         assert await env.seconds(U1) == 360
     with_env(go, monkeypatch)
@@ -1066,7 +1092,7 @@ def test_pending_links_earn_nothing_until_the_server_confirmed_them(monkeypatch)
     async def go(env):
         env.rcon.garble = True
         await env.link(U1, "Steve")
-        await play(env, 40, "Steve")
+        await play(env, 40, "Steve", PAL)
         assert await env.links() == [("Steve", U1, "add")] and await env.seconds(U1) is None
     with_env(go, monkeypatch)
 
@@ -1076,7 +1102,7 @@ def test_playtime_works_from_the_ping_sample_without_rcon(monkeypatch):
         await env.db.execute("INSERT INTO realms_links (name_key, name, user_id, state, attempts, linked_at,"
                              " updated_at) VALUES ('steve', 'Steve', ?, 'ok', 0, ?, ?)", (U1, T0, T0))
         env.member(U1)
-        await play(env, 34, "Steve")
+        await play(env, 34, "Steve", PAL)
         assert await env.seconds(U1) == 32 * 60 and await env.balance(U1) == R.SLOT_COINS
         assert env.rcon.commands == []
     with_env(go, monkeypatch, environ={R.ENV_ADDRESS: "127.0.0.1"})
@@ -1085,7 +1111,7 @@ def test_playtime_works_from_the_ping_sample_without_rcon(monkeypatch):
 def test_rcon_only_setup_polls_through_rcon(monkeypatch):
     async def go(env):
         await env.link(U1, "Steve")
-        await play(env, 34, "Steve")
+        await play(env, 34, "Steve", PAL)
         assert env.pings == 0 and env.posts == []  # no address: no ping, no panel
         assert await env.seconds(U1) == 32 * 60 and await env.balance(U1) == R.SLOT_COINS
         assert env.cog.health_text() == "ok (whitelist, chat to Minecraft)"
@@ -1126,7 +1152,7 @@ def test_status_shows_the_server_the_members_link_and_playtime(monkeypatch):
         await play(env, 64, "Steve", "Alex")
         text = (await env.status(U1))["embed"].description
         assert "🟢 **Online** · 2 / 20 players" in text and "Alex, Steve" in text and "**You**: `Steve`" in text
-        assert "Played today 1h 02m, this week 1h 02m. Coins today: 10 of 40 (5 per half hour)." in text
+        assert "Played today 1h 02m, this week 1h 02m. Coins today: 10 of 40 (5 per half hour). Time counts while someone else is on too." in text
         staff = (await env.status(MOD, roles=(config.MOD_ROLE,)))["embed"].description
         assert f"**{cogmod.HEALTH_NAME}**: ok (status, whitelist, chat to Minecraft, chat from Minecraft)" in staff
         assert PASSWORD not in staff

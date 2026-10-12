@@ -15,9 +15,10 @@ command says the bridge is not set up.
   rate limited, never for bots. Minecraft to Discord tails the server log read-only
   (REALMS_LOG_PATH) in a worker thread and posts at most one batched message every few
   seconds, with no pings.
-- Playtime: a linked member seen in two player-list polls in a row is credited the time
-  between them; every full half hour pays a few coins up to a daily cap (refs keyed on
-  member, day and slot). `/realms top` ranks the week; tracking opt-out is respected.
+- Playtime: a linked member seen in two player-list polls in a row, with at least one other
+  player on in both (company, like voice coins: nobody is paid to idle alone), is credited
+  the time between them; every full half hour pays a few coins up to a daily cap (refs keyed
+  on member, day and slot). `/realms top` ranks the week; tracking opt-out is respected.
 
 This file owns the sockets and the file handle. Nothing here ever starts, stops or
 configures the Minecraft server, and the RCON password is never logged or shown: errors
@@ -489,10 +490,10 @@ class Realms(commands.Cog):
         self.last_names, self.last_names_at = current, t
         await self.forget_opted_out()
         seconds = R.credit_seconds(previous_at, t)
-        if previous is None or not seconds or len(current) < R.MIN_PLAYERS:
+        if previous is None or not seconds:
             return 0
         present = current & previous
-        if not present:
+        if len(present) < R.MIN_PLAYERS:  # alone (or the company only just arrived): nothing counts
             return 0
         guild = self.guild()
         day = R.day_key(t, self.tz)
@@ -730,7 +731,7 @@ class Realms(commands.Cog):
                 lines.append(f"Played today {R.fmt_duration(await self.played(uid, today))}, this week "
                              f"{R.fmt_duration(await self.played(uid, R.week_start(t, self.tz).isoformat()))}. "
                              f"Coins today: {earned['n']} of {R.SLOT_COINS * R.DAILY_SLOTS} "
-                             f"({R.SLOT_COINS} per half hour).")
+                             f"({R.SLOT_COINS} per half hour). Time counts while someone else is on too.")
             else:
                 lines.append("Playtime isn't counted for you (`/privacy`).")
         if is_staff(interaction.user):

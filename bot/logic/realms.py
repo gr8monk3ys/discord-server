@@ -634,7 +634,7 @@ SLOT_SECONDS = 30 * 60
 SLOT_COINS = 5  # per full 30 minutes online
 DAILY_SLOTS = 8  # hard cap: 40 coins (4 hours) a local day
 MAX_GAP = 5 * 60  # two polls further apart than this prove nothing about the time between
-MIN_PLAYERS = 1  # players that must be online for time to count (raise to 2 to require company)
+MIN_PLAYERS = 2  # players that must be on in both polls for the time to count: company, like voice coins
 TOP_SIZE = 10
 
 
