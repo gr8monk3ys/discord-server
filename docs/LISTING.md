@@ -92,8 +92,8 @@ trust the form if it says otherwise.
 ### discord.me
 
 - Sign in with Discord → **Create server page**.
-- Fields: page URL slug (`chill-18-gamers`, already taken and live at
-  <https://discord.me/chill-18-gamers>; it is only the URL, not the tagline), short description, long description, category
+- Fields: page URL slug (`chill-gamers-hq`, live at
+  <https://discord.me/chill-gamers-hq>; `chill-gamers` was taken), short description, long description, category
   Gaming, language English, **tags/keywords: up to 5**, invite link, banner (`banner.png`).
 - Limits: the description field takes **1,025 characters** at most, and the banner is shown at
   **945×290**. `banner.png` is 960×540, so export a 945×290 crop before uploading.
