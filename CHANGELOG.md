@@ -13,6 +13,10 @@ All notable changes to this project are recorded here. The format follows
 - `docs/ARCHITECTURE.md`, `SECURITY.md`, `CONTRIBUTING.md`, issue and pull request templates.
 - `ruff.toml`, `pyrightconfig.json`, `requirements-dev.txt`.
 
+### Security
+
+- `/catchup` with the local model budgets the chat log in tokens, so a log of emoji or non-Latin text can no longer overflow the context window and push the system prompt out of it.
+
 ### Changed
 
 - Requirements are complete and pinned (Pillow and aiohttp were missing); the Docker image installs from them.

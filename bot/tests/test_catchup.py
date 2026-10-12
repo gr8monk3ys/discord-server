@@ -377,3 +377,29 @@ def test_footer_names_the_provider():
     assert "Anthropic" in C.footer(C.ANTHROPIC) and "own machine" not in C.footer(C.ANTHROPIC)
     for provider in (C.OLLAMA, C.ANTHROPIC, ""):
         assert C.footer(provider).startswith("Written by AI") and C.footer(provider).endswith("get them wrong.")
+
+
+def test_token_estimate_is_high_for_non_ascii():
+    assert C.estimate_tokens("a" * 100) == 50
+    assert C.estimate_tokens("🎃" * 100) == 200
+    assert C.estimate_tokens("日本語") == 6
+
+
+def test_fit_log_token_budget_keeps_the_newest_lines():
+    lines = [f"[10:0{i}] someone: " + "🎃" * 50 for i in range(8)]
+    log, kept = C.fit_log(lines, token_budget=3 * (C.estimate_tokens(lines[0]) + 1))
+    assert kept == 3 and log.split("\n") == lines[-3:]
+    assert C.fit_log(lines)[1] == 8  # the character limit alone would keep them all
+
+
+def test_local_request_always_fits_the_context_window():
+    """12,000 characters of emoji fit the character cap but would overflow the local
+    model's window and push the system prompt (the injection guard) out of it."""
+    lines = [f"[10:00] someone: " + "🎃" * 380 for _ in range(40)]
+    assert len(C.fit_log(lines)[0]) > 11_000  # the old, character-only budget
+    log, kept = C.fit_log(lines, token_budget=C.ollama_log_budget())
+    assert kept >= 1
+    body = C.ollama_request_body(log, "general", 12, "llama3.2:3b")
+    total = sum(C.estimate_tokens(m["content"]) for m in body["messages"])
+    assert total + C.OLLAMA_OPTIONS["num_predict"] <= C.OLLAMA_OPTIONS["num_ctx"]
+    assert body["messages"][0]["content"] == C.SYSTEM_PROMPT
