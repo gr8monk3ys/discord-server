@@ -55,6 +55,7 @@ ROLES = [
     {"name": "Season Champ", "hoist": True},  # top 3 of last month's season (Front Desk)
     {"name": "Birthday", "hoist": True},  # 24 h on your birthday (Front Desk)
     {"name": "Tournament Champ"},  # won the latest tournament (Front Desk)
+    {"name": "Event Champ", "hoist": True},  # winner of the latest seasonal event (Front Desk)
     {"name": "Counting Champ"},  # top counter of the best counting run (Front Desk)
     {"name": "Hype", "hoist": True},  # bought in the shop, lasts 24 h (Front Desk)
     {"name": "Clip of the Week"},  # given by Front Desk to the weekly clip winner

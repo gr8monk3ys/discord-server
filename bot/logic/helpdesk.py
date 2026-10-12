@@ -47,7 +47,8 @@ MODULE_CATEGORY = {
     "community": "community", "growth": "community", "engagement": "community", "selfroles": "community",
     "partners": "community", "quests": "community", "challenges": "community", "vibes": "community",
     "recap": "community", "cards": "community", "starboard": "community", "staffapps": "community",
-    "news": "games",
+    "news": "games", "seasonal": "community", "votehub": "community", "catchup": "utility",
+    "gamelink": "stats",
     "creators": "creators", "clips": "creators",
     "utility": "utility", "moderation": "utility", "ops": "utility", "helpdesk": "utility", "heartbeat": "utility",
 }

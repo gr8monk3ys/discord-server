@@ -1,0 +1,58 @@
+{
+  "events": [
+    {
+      "key": "halloween",
+      "name": "Halloween",
+      "emoji": "🎃",
+      "start": "10-20",
+      "end": "11-01",
+      "color": "#E8741A",
+      "intro": "The lights are low and something keeps rolling pumpkins into chat.",
+      "drop": {
+        "emoji": "🎃",
+        "name": "pumpkin",
+        "lines": [
+          "A pumpkin rolled into chat.",
+          "Something left a pumpkin on the doorstep.",
+          "A pumpkin fell off the back of a hay cart.",
+          "This pumpkin is glowing. Probably fine.",
+          "A suspiciously heavy pumpkin just appeared.",
+          "Someone carved a face into this one. It's looking at you.",
+          "A pumpkin drifted in on the fog.",
+          "The front desk bell rang by itself. There's a pumpkin on the counter."
+        ]
+      },
+      "badge": {
+        "emoji": "🎃",
+        "name": "Pumpkin Hunter"
+      }
+    },
+    {
+      "key": "winter",
+      "name": "Winter Fest",
+      "emoji": "❄️",
+      "start": "12-15",
+      "end": "01-02",
+      "color": "#5DADE2",
+      "intro": "It's snowing in the lobby and nobody is fixing the roof.",
+      "drop": {
+        "emoji": "❄️",
+        "name": "snowflake",
+        "lines": [
+          "A snowflake drifted into chat.",
+          "The window's open again. A snowflake blew in.",
+          "A perfect snowflake landed on the keyboard.",
+          "Someone shook the snow globe.",
+          "A snowflake is melting on the front desk. Quick.",
+          "This one fell off a passing sleigh.",
+          "The heating is off and it's snowing indoors.",
+          "A snowflake the size of a coin just floated by."
+        ]
+      },
+      "badge": {
+        "emoji": "❄️",
+        "name": "Snow Chaser"
+      }
+    }
+  ]
+}

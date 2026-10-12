@@ -68,7 +68,8 @@ def test_site_games_match_layout():
 def test_site_invite_code_lives_only_in_config_js():
     cfg = (SITE / "config.js").read_text(encoding="utf-8")
     assert re.search(r'INVITE_CODE\s*[:=]\s*"[^"]+"', cfg)
-    for name in ("index.html", "404.html", "app.js", "theme.js", "style.css", "vercel.json"):
+    for name in ("index.html", "404.html", "join/index.html", "app.js", "join.js", "theme.js",
+                 "style.css", "vercel.json"):
         text = (SITE / name).read_text(encoding="utf-8")
         assert "discord.gg/" not in text.replace("discord.gg/${", "")
 
@@ -421,7 +422,7 @@ def test_pages_obey_the_csp():
     assert fetched
     for url in fetched:
         assert sitegen.csp_allows(csp["connect-src"], url), url
-    for name in ("index.html", "404.html"):
+    for name in ("index.html", "404.html", "join/index.html"):
         page = (SITE / name).read_text(encoding="utf-8")
         assert "<style" not in page and " style=" not in page, name
         assert not re.search(r"\son[a-z]+=", page), f"inline handler in {name}"
@@ -435,6 +436,74 @@ def test_pages_obey_the_csp():
             assert sitegen.csp_allows(csp["style-src"], href), href
         for src in re.findall(r'<img [^>]*src="([^"]+)"', page):
             assert sitegen.csp_allows(csp["img-src"], src), src
+
+
+# ------------------------------------------------------------ /join short link
+
+def _join():
+    return (SITE / "join" / "index.html").read_text(encoding="utf-8")
+
+
+def test_join_page_exists_and_is_not_indexed():
+    page = _join()
+    assert sitegen.meta_tags(page)["robots"].startswith("noindex")
+    assert f'<link rel="canonical" href="{CANONICAL}">' in page
+    assert "<title>" in page and page.count("<h1") == 1
+    assert _headers_for(_vercel(), "/join")["X-Robots-Tag"].startswith("noindex")
+    assert "X-Robots-Tag" not in _headers_for(_vercel(), "/")
+
+
+def test_join_page_has_no_hardcoded_invite():
+    cfg = (SITE / "config.js").read_text(encoding="utf-8")
+    code = re.search(r'INVITE_CODE\s*:\s*"([^"]*)"', cfg).group(1)
+    for text in (_join(), (SITE / "join.js").read_text(encoding="utf-8")):
+        assert "discord.gg/" not in text.replace("discord.gg/${", "")
+        assert "discord.com/invite" not in text
+        assert code == "REPLACE_ME" or code not in text
+        assert "http-equiv" not in text.lower()  # no meta refresh: it would need the code
+
+
+def test_join_page_loads_config_then_join_js_from_the_site_root():
+    page = _join()
+    scripts = re.findall(r'<script src="([^"]+)"', page)
+    assert scripts == ["../theme.js", "../config.js", "../join.js"]
+    # parent-relative: the site root from /join and /join/, the project folder on the mirror
+    for ref in re.findall(r'(?:src|href)="([^"#]+)"', page):
+        assert ref.startswith(("../", "https://")), ref
+        if ref.startswith("../") and ref != "../":
+            assert (SITE / ref[3:]).is_file(), ref
+    assert "app.js" not in page  # no counts fetch on the way through
+
+
+def test_join_page_has_a_fallback_and_a_noscript_note():
+    page = _join()
+    assert re.search(r'<a class="btn btn-lg" data-join href="\.\./">', page)  # home until join.js wires it
+    noscript = re.search(r"<noscript>(.*?)</noscript>", page, re.S)
+    assert noscript and "JavaScript" in noscript.group(1) and 'href="../"' in noscript.group(1)
+    assert "<script" not in noscript.group(1) and "<meta" not in noscript.group(1)
+    assert "data-theme-toggle" in page and '<meta name="color-scheme" content="light dark">' in page
+
+
+def test_join_js_validates_like_app_js_and_replaces_location():
+    js = (SITE / "join.js").read_text(encoding="utf-8")
+    app = (SITE / "app.js").read_text(encoding="utf-8")
+    check = re.search(r"var valid = .*;", app).group(0)
+    assert check in js and "REPLACE_ME" in check
+    assert "location.replace(inviteUrl)" in js
+    assert "`https://discord.gg/${code}`" in js
+    assert "if (inviteUrl) window.location.replace" in js  # never redirects on a bad code
+    for bad in ("location.href", "location.assign", "innerHTML", "eval(", "fetch(", "document.write",
+                "location.search", "location.hash"):  # nothing from the URL steers the redirect
+        assert bad not in js, bad
+
+
+def test_vercel_serves_join_with_and_without_the_slash():
+    cfg = _vercel()
+    assert cfg["cleanUrls"] is True and cfg["trailingSlash"] is False  # /join/ redirects to /join
+    assert not cfg.get("redirects") and not cfg.get("rewrites")  # the invite is not in vercel.json
+    h = _headers_for(cfg, "/join")
+    assert "Content-Security-Policy" in h and "max-age=0" in h["Cache-Control"]
+    assert "max-age=0" in _headers_for(cfg, "/join.js")["Cache-Control"]
 
 
 def test_parse_csp_and_csp_allows():

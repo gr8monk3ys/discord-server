@@ -35,6 +35,15 @@
       ]
     },
     {
+      "source": "/join",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, follow"
+        }
+      ]
+    },
+    {
       "source": "/img/(.*)",
       "headers": [
         {

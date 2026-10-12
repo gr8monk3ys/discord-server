@@ -1,0 +1,21 @@
+# Allowlist: the image needs only bot/ and server/ (layout.py, names.py, snapshot/).
+*
+!bot/
+!server/
+
+# Never in the image: secrets, the live database, logs, the lock file.
+**/.env
+**/.env.*
+bot/data/*
+!bot/data/qotd.txt
+!bot/data/polls.txt
+
+# Not needed at run time.
+**/__pycache__
+**/.pytest_cache
+**/*.pyc
+server/.venv
+server/tests
+bot/tests
+bot/run_bot.bat
+server/*.ps1

@@ -3,6 +3,7 @@ Pure: no Discord, no database. The cog gathers a `Facts` per member from the
 existing tables (squads, voice, messages, clips, wallets...) and grants whatever
 `new_badges` returns, once each."""
 
+import re
 from collections.abc import Callable, Collection, Iterable
 from dataclasses import dataclass
 from datetime import date, datetime, time
@@ -100,9 +101,32 @@ def is_early(joined_at: datetime | None, tz) -> bool:
     return joined_at is not None and joined_at.timestamp() < early_cutoff(tz)
 
 
+EVENT_KEY = re.compile(r"^event_([a-z0-9_]+?)_(\d{4})$")
+
+
+def event_badges(held: Iterable[str]) -> list[Badge]:
+    """Seasonal event badges (cogs/seasonal.py grants keys like event_halloween_2026). They come
+    from bot/assets/events.json, so a new year or event needs no catalogue entry, and they
+    don't count toward the N/TOTAL progress."""
+    found = []
+    for key in sorted(held):
+        m = EVENT_KEY.match(key)
+        if not m:
+            continue
+        from logic import seasonal  # late: seasonal is optional and reads a file
+        try:
+            event = next((e for e in seasonal.load_events() if e.key == m.group(1)), None)
+        except Exception:
+            event = None
+        if event is not None:
+            found.append(Badge(key, event.badge_emoji, f"{event.badge_name} {m.group(2)}",
+                               f"Earned in {event.name} {m.group(2)} (/event)", lambda f: False))
+    return found
+
+
 def held_badges(held: Iterable[str]) -> list[Badge]:
     held = set(held)
-    return [b for b in BADGES if b.key in held]
+    return [b for b in BADGES if b.key in held] + event_badges(held)
 
 
 def grid(held: Iterable[str], per_row: int = PER_ROW) -> str:
@@ -113,7 +137,8 @@ def grid(held: Iterable[str], per_row: int = PER_ROW) -> str:
 
 
 def progress(held: Iterable[str]) -> str:
-    return f"{len(held_badges(held))}/{TOTAL}"
+    held = set(held)
+    return f"{sum(1 for b in BADGES if b.key in held)}/{TOTAL}"
 
 
 def congrats(mention: str, badges: list[Badge]) -> str:

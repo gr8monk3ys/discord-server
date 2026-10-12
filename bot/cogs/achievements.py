@@ -383,6 +383,11 @@ class Achievements(commands.Cog):
             embed.add_field(name="Top game", value=await self.top_game(uid) or "none yet")
         else:
             embed.add_field(name="Stats", value="Turned off with `/privacy`.", inline=False)
+        get_cog = getattr(self.bot, "get_cog", None)
+        gamelink = get_cog("GameLink") if get_cog else None
+        account_lines = await gamelink.profile_lines(uid) if gamelink is not None else []
+        if account_lines:
+            embed.add_field(name="Game accounts", value="\n".join(account_lines)[:1024], inline=False)
         embed.add_field(name=f"Badges · {A.progress(held)}", value=A.grid(held), inline=False)
         return embed
 
