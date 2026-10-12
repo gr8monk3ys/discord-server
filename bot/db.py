@@ -470,6 +470,43 @@ MIGRATIONS = [
         PRIMARY KEY (day, user_id)
     )""",
     ],
+    [
+        # Clipcast: member clips shortlisted for the server's YouTube channel. One row per clip
+        # (its message id) with the author's answer, who gave it and when; `status` is the state
+        # machine in logic/clipcast.py. No clip text or media is stored.
+        """CREATE TABLE clipcast (
+        message_id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        channel_id INTEGER NOT NULL,
+        posted_at INTEGER NOT NULL,
+        reactions INTEGER NOT NULL DEFAULT 0,
+        backers INTEGER NOT NULL DEFAULT 0,
+        week TEXT NOT NULL,
+        status TEXT NOT NULL,
+        credit TEXT,
+        credit_name TEXT,
+        answered_by INTEGER,
+        answered_at INTEGER,
+        answered_via TEXT,
+        asked_at INTEGER,
+        asked_via TEXT,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        upload_started_at INTEGER,
+        video_id TEXT,
+        published_at INTEGER,
+        notice_message_id INTEGER,
+        note TEXT,
+        updated_at INTEGER NOT NULL
+    )""",
+        "CREATE INDEX clipcast_status ON clipcast (status, user_id)",
+        # Standing answer from /clipcast consent (always | ask | never).
+        """CREATE TABLE clipcast_prefs (
+        user_id INTEGER PRIMARY KEY,
+        pref TEXT NOT NULL,
+        credit TEXT,
+        set_at INTEGER NOT NULL
+    )""",
+    ],
 ]
 
 

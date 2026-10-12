@@ -116,3 +116,14 @@ def load_settings() -> Settings:
         guild_id=int(os.environ["GUILD_ID"]),
         tz=ZoneInfo(os.environ.get("TZ", "America/Los_Angeles")),
     )
+
+
+# Clipcast (cogs/clipcast.py): optional YouTube upload settings. All three credentials unset
+# means the feature posts nothing itself and lists the week's approved clips for staff.
+CLIPCAST_ENV = ("YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "YOUTUBE_REFRESH_TOKEN", "YOUTUBE_PRIVACY")
+
+
+def clipcast_env(environ=None) -> dict[str, str]:
+    """The clipcast settings from the environment (or a mapping, in tests); missing ones are ''."""
+    environ = os.environ if environ is None else environ
+    return {key: str(environ.get(key) or "").strip() for key in CLIPCAST_ENV}

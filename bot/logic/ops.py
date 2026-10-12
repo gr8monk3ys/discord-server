@@ -379,6 +379,8 @@ CHANNEL_NEEDS: list[Need] = [
     Need("vibes", config.ANNOUNCEMENTS_CHANNEL, POST),  # member of the month
     Need("growth", config.BOT_COMMANDS_CHANNEL, POST),  # bump reminders
     Need("stats", config.GENERAL_CHANNEL, POST),  # weekly MVP
+    Need("clipcast", config.CLIPS_CHANNEL, POST + ("read_message_history",)),  # consent fallback, "as seen on"
+    Need("clipcast", config.MOD_LOG_CHANNEL, POST),  # picks, upload notes, takedown alerts
 ]
 
 ROLE_HOLDERS = ("clips", "engagement", "growth", "levels", "selfroles", "shop", "tournaments")
