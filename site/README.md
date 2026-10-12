@@ -44,8 +44,36 @@ local preview. The bot's `/vote` hands out this link (`bot/logic/votehub.py` `SH
 
 `app.js` reads `approximate_member_count` and `approximate_presence_count` from Discord's public
 `https://discord.com/api/v10/invites/CODE?with_counts=true`, which sends CORS headers for any
-origin (checked 2026-10-07). If the request fails or the invite expires, the counts stay hidden.
+origin (checked 2026-10-07). If the request fails or the invite expires, the counts fall back to
+the member count in the live data below, and stay hidden when that is missing too.
 No guild ID is needed or embedded.
+
+## Live section
+
+The page shows what is happening on the server: upcoming events in the visitor's time zone, house
+standings as a bar strip (when the houses module exists), the most played games of the week, a
+line of weekly totals, and a "next up" line in the masthead. The data is one small JSON file of
+server-wide aggregates, with no member names, avatars or IDs:
+
+1. The bot (`bot/cogs/sitedata.py`, rules in `bot/logic/sitedata.py`) writes
+   `bot/data/site/stats.json` every 30 minutes, or on `/sitedata refresh` (staff). Anything that
+   describes fewer than 3 members is left out, numbers are rounded, game names come from
+   `layout.py` only and event titles that are not the bot's own template go through the text filter.
+2. `server/publish_site_data.py --apply` (run it from a scheduled task every 30 minutes) checks the
+   file again against `server/site_schema.py` and pushes it as the single file `stats.json` on the
+   orphan branch `site-data`, only when the content changed or the published copy is a day old.
+   Without `--apply` it is a dry run.
+3. `app.js` fetches `STATS_URL` from `config.js`
+   (`https://raw.githubusercontent.com/gr8monk3ys/discord-server/site-data/stats.json`) with a
+   6 second timeout, checks every field again and renders with `textContent` only.
+
+The section and the masthead line carry the `hidden` attribute in the HTML. If the fetch fails,
+the file is older than 48 hours, or JavaScript is off, they stay hidden and the page is the static
+page. The section opens between "This week" and "Games" without moving what the visitor is
+looking at: below the fold it just appears, above the viewport the scroll position is corrected,
+and while that spot is on screen it waits. Set `STATS_URL` to `""` to turn it off.
+To try it locally, serve `site/` and point `STATS_URL` at a fixture file next to the page
+(do not commit that change; `bot/tests/test_sitedata_site.py` checks the real URL).
 
 ## Games list
 
@@ -85,11 +113,13 @@ Then Settings > Domains > add `discord.lscaturchio.xyz`, and at the DNS host add
 Vercel shows (normally `CNAME discord -> cname.vercel-dns.com`).
 
 `vercel.json` sets clean URLs, the security headers (a Content-Security-Policy that allows only
-this origin, Google Fonts and `https://discord.com` for the counts; `nosniff`;
+this origin, Google Fonts, `https://discord.com` for the counts and
+`https://raw.githubusercontent.com` for the live data; `nosniff`;
 `strict-origin-when-cross-origin`; a deny-all Permissions-Policy; no framing) and caching: 30 days
 for `img/`, revalidate on every request for HTML, CSS and JS (the Vercel CDN still serves them
 from cache until the next deploy). The CSP means no inline scripts, styles or event handlers;
-the JSON-LD block is a data block and is not affected. `test_sitegen.py` checks the pages
+the JSON-LD block is a data block and is not affected. The house bars set their width through
+the CSSOM (`element.style.width`), which `style-src 'self'` allows. `test_sitegen.py` checks the pages
 against the policy. `.vercelignore` keeps this README out of the deploy.
 
 `404.html` is served for any missing path, so it links its assets root-absolute (`/style.css`).

@@ -155,3 +155,10 @@ def realms_environ(environ=None) -> dict[str, str]:
     was loaded by load_settings(). logic/realms.py validates them; all empty means the bridge is off."""
     environ = os.environ if environ is None else environ
     return {name: environ.get(name) or "" for name in REALMS_ENV}
+# Live site data (cogs/sitedata.py): aggregates for the landing page, written here every 30
+# minutes and pushed by server/publish_site_data.py. SITE_DATA=off stops the bot writing it.
+SITE_DATA_FILE = DATA_DIR / "site" / "stats.json"
+
+
+def site_data_enabled() -> bool:
+    return os.environ.get("SITE_DATA", "on").strip().lower() not in {"off", "0", "false", "no"}

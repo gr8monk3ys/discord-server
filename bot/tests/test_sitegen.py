@@ -396,7 +396,8 @@ def test_vercel_security_headers():
     csp = sitegen.parse_csp(h["Content-Security-Policy"])
     assert csp["default-src"] == ["'self'"]
     assert csp["script-src"] == ["'self'"]
-    assert csp["connect-src"] == ["https://discord.com"]
+    # counts from Discord, live aggregates from this repo's site-data branch; nothing else
+    assert csp["connect-src"] == ["https://discord.com", "https://raw.githubusercontent.com"]
     assert "https://fonts.googleapis.com" in csp["style-src"]
     assert "https://fonts.gstatic.com" in csp["font-src"]
     assert csp["frame-ancestors"] == ["'none'"] and csp["object-src"] == ["'none'"]

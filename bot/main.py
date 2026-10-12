@@ -71,6 +71,7 @@ MODULES = [
     ("cogs.clipcast", {"members", "message_content"}),  # consented weekly clips to YouTube Shorts, /clipcast
     ("cogs.realms", {"members", "message_content"}),  # Minecraft bridge: status panel, whitelist, chat relay, playtime
     ("cogs.wrapped", {"members"}),  # /wrapped year-in-review cards (Dec 1 - Jan 15), /wrapped-preview (staff)
+    ("cogs.sitedata", {"members", "presences"}),  # landing page live data: aggregates file every 30 min, /sitedata refresh
 ]
 
 PERMISSIONS = discord.Permissions(

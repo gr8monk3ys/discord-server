@@ -56,6 +56,7 @@ MODULE_CATEGORY = {
     "houses": "community",
     "clipcast": "creators",
     "wrapped": "stats",
+    "sitedata": "utility",
 }
 
 # Staff commands say so in their description: "Staff: ...", "... (mods only)", "... (staff only)",
