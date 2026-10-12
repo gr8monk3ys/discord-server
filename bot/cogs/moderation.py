@@ -1,13 +1,15 @@
 """Module 10: Moderation autopilot.
 
-Staff commands /warn, /timeout, /untimeout, /cases and /purge, each stored as a case
-and logged to the mod log. Warnings escalate on their own (3 in 30 days: 1 h timeout,
+Staff commands /warn, /timeout, /untimeout, /ban, /cases and /purge, each stored as a case
+and logged to the mod log. /ban DMs the member the reason first and, when ban appeals are set
+up (APPEAL_SECRET), their appeal code and the appeal page; a ban made in Discord's own menu
+gets the same DM attempt afterwards, which usually fails, so the mod log says so. Warnings escalate on their own (3 in 30 days: 1 h timeout,
 5: 24 h). Anti-spam times out message floods, repeats and mass mentions and deletes the
 burst. Anti-raid raises the verification level and pauses invites for 30 minutes when
 many accounts join at once, then puts everything back, even across a restart.
 
-Needs Moderate Members (timeouts), Manage Messages (deleting) and Manage Server (raid
-lockdown). Anti-raid needs the Server Members intent and duplicate detection needs
+Needs Moderate Members (timeouts), Ban Members (/ban), Manage Messages (deleting) and
+Manage Server (raid lockdown). Anti-raid needs the Server Members intent and duplicate detection needs
 Message Content; without them the rest keeps working."""
 
 import asyncio
@@ -23,6 +25,7 @@ from discord.ext import commands, tasks
 
 import config
 import style
+from logic import appeals as A
 from logic import moderation as M
 from logic.moderation import SpamMessage
 
@@ -31,8 +34,11 @@ log = logging.getLogger(__name__)
 NO_PINGS = discord.AllowedMentions.none()
 RAID_KEY = "moderation:raid"
 STAFF_ONLY = "Only Moderators and Keepers can use this."
+NEED_BAN = "You need the **Ban Members** permission for that."
+BAN_ECHO = 120  # seconds: a ban event this soon after /ban is that /ban, not a second ban
 PERMISSION_NAMES = {
     "moderate_members": "Moderate Members",
+    "ban_members": "Ban Members",
     "manage_messages": "Manage Messages",
     "manage_guild": "Manage Server",
     "read_message_history": "Read Message History",
@@ -105,6 +111,26 @@ class Moderation(commands.Cog):
         if guild is None:
             return False
         return M.is_staff(guild.owner_id == member.id, member.guild_permissions.administrator, member.roles)
+
+    @staticmethod
+    def may_ban(member) -> bool:
+        """Who may /ban; cogs/appeals.py uses the same rule for Accept and Deny."""
+        guild = getattr(member, "guild", None)
+        if guild is None:
+            return False
+        perms = getattr(member, "guild_permissions", None)
+        holds = (guild.owner_id == member.id or bool(getattr(perms, "administrator", False))
+                 or bool(getattr(perms, "ban_members", False)))
+        return M.can_ban(Moderation.is_staff(member), holds)
+
+    @staticmethod
+    def appeal_notice(user_id: int, banned_at: int) -> str | None:
+        """The appeal part of a ban DM, or None when appeals are off (then nothing is said)."""
+        s = config.appeal_settings()
+        if s is None:
+            return None
+        return A.ban_notice(page_url=s.page_url, user_id=user_id, code=A.appeal_code(s.secret, user_id),
+                            banned_at=banned_at, cooling=s.cooling, reappeal=s.reappeal)
 
     @staticmethod
     def has(guild, perm: str, channel=None) -> bool:
@@ -330,6 +356,80 @@ class Moderation(commands.Cog):
         await self.post_log(interaction.guild, f"**Case #{case_id}** {M.KIND_LABELS['purge']}\n"
                                                f"**By** {mod.mention}\n**Deleted** {reason}", style.MUTED)
         await self.done(interaction, f"Deleted {n} message{'s' if n != 1 else ''}.")
+
+    # ------------------------------------------------------------ bans
+    @app_commands.command(name="ban", description="Ban a member or a user ID (mods only)")
+    @app_commands.default_permissions(ban_members=True)  # hidden from members' picker
+    @app_commands.describe(user="Who to ban: a member, or the ID of someone who already left",
+                           reason="Why (they get this in a DM)",
+                           delete_days="Also delete their messages from the last 0 to 7 days")
+    @app_commands.guild_only()
+    async def ban(self, interaction: discord.Interaction, user: discord.User,
+                  reason: app_commands.Range[str, 1, M.REASON_MAX],
+                  delete_days: app_commands.Range[int, 0, 7] = 0) -> None:
+        member = user if getattr(user, "top_role", None) is not None else None  # None: not in the server
+        if not await self.gate(interaction, member, "ban_members"):
+            return
+        if not self.may_ban(interaction.user):
+            await interaction.response.send_message(NEED_BAN, ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        guild, mod, reason, t = interaction.guild, interaction.user, reason.strip(), now()
+        # The DM goes first: once they're banned (and share no server with me) it can't be delivered.
+        notice = self.appeal_notice(user.id, t)
+        dm_ok = await self.dm(user, M.ban_dm_text(guild.name, reason, notice))
+        await self.db.execute(
+            "INSERT OR REPLACE INTO appeal_bans (user_id, banned_at, source) VALUES (?, ?, 'command')", (user.id, t))
+        try:
+            await guild.ban(user, reason=f"{mod.name}: {reason}"[:512], delete_message_seconds=delete_days * M.DAY)
+        except discord.HTTPException as e:
+            await self.db.execute("DELETE FROM appeal_bans WHERE user_id = ?", (user.id,))
+            if not isinstance(e, discord.Forbidden):
+                log.warning("ban of %s failed", user.id, exc_info=True)
+            if dm_ok:
+                await self.dm(user, f"Correction: the ban from **{guild.name}** did not go through. You aren't banned.")
+            await self.done(interaction, "Discord didn't let me ban them (role order or permissions).")
+            return
+        case_id = await self.add_case(user.id, mod.id, "ban", reason)
+        if notice is None:
+            extra = "" if dm_ok else "DM failed"
+        elif dm_ok:
+            extra = "Appeal code sent by DM"
+        else:
+            extra = "DM failed, so they have no appeal code (`/appeals code` shows it if you want to pass it on)"
+        await self.log_case(guild, case_id, "ban", user, mod, reason, None, extra)
+        await self.done(interaction, f"Case #{case_id}: banned {user.mention}." + (f" {extra}." if extra else ""))
+
+    @commands.Cog.listener()
+    @never_raise
+    async def on_member_ban(self, guild: discord.Guild, user) -> None:
+        """Bans made in Discord's own menu: remember when (the appeal cooling-off period) and
+        try the appeal DM anyway. It usually fails, so say what staff can do about it."""
+        if not self.ours(guild):
+            return
+        t = now()
+        row = await self.db.fetchone("SELECT banned_at, source FROM appeal_bans WHERE user_id = ?", (user.id,))
+        if row is not None and row["source"] == "command" and t - row["banned_at"] < BAN_ECHO:
+            return  # our own /ban: the DM went out before it
+        await self.db.execute(
+            "INSERT OR REPLACE INTO appeal_bans (user_id, banned_at, source) VALUES (?, ?, 'manual')", (user.id, t))
+        notice = self.appeal_notice(user.id, t)
+        if notice is None or getattr(user, "bot", False):
+            return
+        if await self.dm(user, M.ban_dm_text(guild.name, None, notice)):
+            await self.post_log(guild, f"📨 {who(user)} was banned outside `/ban`; I sent their appeal code by DM.",
+                                style.MUTED)
+        else:
+            await self.post_log(guild, f"📭 {who(user)} was banned outside `/ban` and I couldn't DM them (Discord "
+                                       "stops DMs once someone is banned), so they have no appeal code. If they "
+                                       "should be able to appeal, `/appeals code` shows it and you can pass it on. "
+                                       "`/ban` sends it before the ban.", style.MUTED)
+
+    @commands.Cog.listener()
+    @never_raise
+    async def on_member_unban(self, guild: discord.Guild, user) -> None:
+        if self.ours(guild):
+            await self.db.execute("DELETE FROM appeal_bans WHERE user_id = ?", (user.id,))
 
     # ------------------------------------------------------------ anti-spam
     @commands.Cog.listener()

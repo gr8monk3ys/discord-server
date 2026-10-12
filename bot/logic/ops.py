@@ -395,6 +395,10 @@ CHANNEL_NEEDS: list[Need] = [
     # status panel (edited in place) and the chat relay; reactions say "not relayed"
     Need("realms", config.REALMS_CHANNEL, POST + ("read_message_history", "add_reactions")),
     Need("realms", config.MOD_LOG_CHANNEL, POST),  # whitelist changes
+    # appeals: delete the raw webhook message, read missed ones after downtime, open a discussion thread
+    Need("appeals", config.APPEALS_CHANNEL, POST + ("manage_messages", "read_message_history",
+                                                    "create_public_threads", "send_messages_in_threads")),
+    Need("appeals", config.MOD_LOG_CHANNEL, POST),
 ]
 
 ROLE_HOLDERS = ("clips", "engagement", "growth", "levels", "selfroles", "shop", "tournaments", "crew", "supporter")
@@ -410,6 +414,8 @@ GUILD_NEEDS: list[GuildNeed] = [
     GuildNeed("manage_messages", ("moderation",)),
     GuildNeed("manage_guild", ("growth",)),  # reading invites
     GuildNeed("move_members", ("tempvoice",)),
+    GuildNeed("ban_members", ("appeals", "moderation"),  # /ban, checking a ban, unbanning on Accept
+              "Server Settings -> Roles -> Front Desk -> turn on Ban Members"),
 ]
 
 # Roles the bot hands out: each must exist and sit below the bot's top role. Moderator is

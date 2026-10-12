@@ -72,6 +72,7 @@ MODULES = [
     ("cogs.realms", {"members", "message_content"}),  # Minecraft bridge: status panel, whitelist, chat relay, playtime
     ("cogs.wrapped", {"members"}),  # /wrapped year-in-review cards (Dec 1 - Jan 15), /wrapped-preview (staff)
     ("cogs.sitedata", {"members", "presences"}),  # landing page live data: aggregates file every 30 min, /sitedata refresh
+    ("cogs.appeals", {"message_content"}),  # ban appeals from the website: review cards, /appeals list|code
 ]
 
 PERMISSIONS = discord.Permissions(
@@ -101,6 +102,7 @@ PERMISSIONS = discord.Permissions(
     # Stage events (watch parties, Town Hall): Discord asks for Manage Channels, Move Members
     # and Mute Members in the stage channel. The first two are above.
     mute_members=True,
+    ban_members=True,  # /ban, and unbanning when a ban appeal is accepted
 )
 
 def build_intents(privileged: bool = True) -> discord.Intents:

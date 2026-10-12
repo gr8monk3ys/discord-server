@@ -216,6 +216,10 @@ CATEGORIES = [
             {"name": "🔒・admin", "was": ["admin"]},
             # Front Desk logs joins, leaves, bans, AutoMod hits and /report here.
             {"name": "📋・mod-log", "private_to": ["Keeper", "Moderator"]},
+            # Ban appeals from the website arrive here through a webhook; Front Desk turns each
+            # into a review card (bot/cogs/appeals.py).
+            {"name": "🔒・appeals", "private_to": ["Keeper", "Moderator"],
+             "topic": "Ban appeals from the website. Front Desk posts a card for each one."},
         ],
     },
     {

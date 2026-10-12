@@ -396,8 +396,9 @@ def test_vercel_security_headers():
     csp = sitegen.parse_csp(h["Content-Security-Policy"])
     assert csp["default-src"] == ["'self'"]
     assert csp["script-src"] == ["'self'"]
-    # counts from Discord, live aggregates from this repo's site-data branch; nothing else
-    assert csp["connect-src"] == ["https://discord.com", "https://raw.githubusercontent.com"]
+    # counts from Discord, live aggregates from this repo's site-data branch, the appeal form on this origin
+    assert csp["connect-src"] == ["'self'", "https://discord.com", "https://raw.githubusercontent.com"]  # 'self': the appeal form posts to /api/appeal
+    assert csp["form-action"] == ["'none'"]  # forms only ever submit through fetch
     assert "https://fonts.googleapis.com" in csp["style-src"]
     assert "https://fonts.gstatic.com" in csp["font-src"]
     assert csp["frame-ancestors"] == ["'none'"] and csp["object-src"] == ["'none'"]
@@ -522,3 +523,80 @@ def test_pages_workflow_rewrites_404_for_the_mirror():
     wf = (SITE.parent / ".github" / "workflows" / "pages.yml").read_text(encoding="utf-8")
     assert "site/404.html" in wf and "GITHUB_REPOSITORY" in wf
     assert "path: site" in wf
+
+
+# ------------------------------------------------------------ /appeal (ban appeals)
+
+def _appeal():
+    return (SITE / "appeal" / "index.html").read_text(encoding="utf-8")
+
+
+def test_appeal_page_is_not_indexed_and_obeys_the_csp():
+    page = _appeal()
+    assert sitegen.meta_tags(page)["robots"] == "noindex, nofollow"
+    assert _headers_for(_vercel(), "/appeal")["X-Robots-Tag"].startswith("noindex")
+    assert _headers_for(_vercel(), "/api/appeal")["X-Robots-Tag"].startswith("noindex")
+    assert "<title>" in page and page.count("<h1") == 1
+    csp = sitegen.parse_csp(_headers_for(_vercel(), "/appeal")["Content-Security-Policy"])
+    assert "<style" not in page and " style=" not in page
+    assert not re.search(r"\son[a-z]+=", page), "inline handler"
+    scripts = re.findall(r"<script\b([^>]*)>(.*?)</script>", page, re.S)
+    assert [re.search(r'src="([^"]+)"', a).group(1) for a, _ in scripts] == ["../theme.js", "../appeal/appeal.js"]
+    assert all(not body.strip() for _, body in scripts)
+    for href in re.findall(r'<link rel="stylesheet" href="([^"]+)"', page):
+        assert sitegen.csp_allows(csp["style-src"], href), href
+    # every local reference resolves the same from /appeal and /appeal/, and the file exists
+    for ref in re.findall(r'(?:src|href)="([^"#]+)"', page):
+        assert ref.startswith(("../", "https://")), ref
+        if ref.startswith("../") and ref not in ("../", "../join"):
+            assert (SITE / ref[3:]).is_file(), ref
+    assert '<link rel="stylesheet" href="../style.css">' in page  # the shared look, not a copy of it
+
+
+def test_appeal_form_is_labelled_and_never_submits_natively():
+    page = _appeal()
+    form = re.search(r"<form\b([^>]*)>(.*?)</form>", page, re.S)
+    assert form and "action=" not in form.group(1) and "novalidate" in form.group(1)
+    names = re.findall(r'<(?:input|textarea)\b[^>]*\bname="([^"]+)"', form.group(2))
+    assert names == ["user_id", "code", "what", "why", "else"]
+    for name in names:
+        assert f'<label class="field-label" for="{name}">' in form.group(2), name
+        assert f'id="{name}-error"' in form.group(2) and f"{name}-hint {name}-error" in form.group(2), name
+    assert 'role="alert"' in page and 'id="appeal-done"' in page and "<noscript>" in page
+    js = (SITE / "appeal" / "appeal.js").read_text(encoding="utf-8")
+    assert "event.preventDefault()" in js and '"../api/appeal"' in js
+    for bad in ("innerHTML", "eval(", "document.write", "localStorage", "document.cookie", "location.search",
+                "console.", "https://"):
+        assert bad not in js, bad  # same origin only, nothing stored, nothing logged
+
+
+def test_appeal_limits_agree_between_page_function_and_bot():
+    from logic import appeals
+
+    page = _appeal()
+    js = (SITE / "appeal" / "appeal.js").read_text(encoding="utf-8")
+    fn = (SITE / "api" / "appeal.js").read_text(encoding="utf-8")
+    for q in appeals.QUESTIONS:
+        assert re.search(rf'id="{q.key}" name="{q.key}"[^>]*maxlength="{q.max_length}"', page), q.key
+        assert ("required" in re.search(rf'<textarea[^>]*id="{q.key}"[^>]*>', page).group(0)) == q.required
+        assert re.search(rf'name: "{q.key}", required: {str(q.required).lower()}, max: {q.max_length}', js), q.key
+        assert f'["{q.key}", {q.max_length}, {str(q.required).lower()}]' in fn, q.key
+        assert q.label in page
+    assert f"const CODE_LEN = {appeals.CODE_LEN};" in fn
+    assert f"const SECRET_MIN = {config.APPEAL_SECRET_MIN};" in fn
+    assert f'const SITE_ORIGIN = "{config.SITE_URL}";' in fn
+    assert int(re.search(r"const PAYLOAD_MAX = (\d+);", fn).group(1)) <= appeals.PAYLOAD_MAX
+
+
+def test_appeal_function_has_no_dependencies_and_logs_no_secrets():
+    fn = (SITE / "api" / "appeal.js").read_text(encoding="utf-8")
+    assert re.findall(r'require\("([^"]+)"\)', fn) == ["node:crypto"] and "import " not in fn
+    assert "module.exports = createHandler" in fn  # CommonJS: the site has no package.json
+    assert "timingSafeEqual" in fn and "allowed_mentions: { parse: [] }" in fn
+    logged = re.findall(r"say\((.*)\);", fn)
+    assert len(logged) == 2 and "console.log" not in fn
+    for line in logged:
+        assert not re.search(r"secret|code|answers|webhookUrl|payload|body|message", line), line
+    ignore = (SITE / ".vercelignore").read_text(encoding="utf-8").split()
+    assert "api/*.test.mjs" in ignore  # every other file in api/ becomes a public function
+    assert sorted(p.name for p in (SITE / "api").glob("appeal*")) == ["appeal.js", "appeal.test.mjs"]
