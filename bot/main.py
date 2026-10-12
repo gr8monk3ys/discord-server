@@ -65,6 +65,8 @@ MODULES = [
     ("cogs.catchup", {"message_content"}),  # /catchup AI summary of a public channel, /catchup-usage
     ("cogs.vibes", {"members"}),  # chat revival, join anniversaries, booster thanks + stipend, member of the month
     ("cogs.houses", {"members"}),  # three houses: /house, weekly House Cup, season trophy, /house-admin
+    ("cogs.crew", {"members", "presences"}),  # Welcome Crew: /crew, crew ping for newcomers, greeting rewards, /crew-stats
+    ("cogs.supporter", {"members"}),  # Supporter tier: /support, thank-you, stipend, /supporter grant|revoke
 ]
 
 PERMISSIONS = discord.Permissions(

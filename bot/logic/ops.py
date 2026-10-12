@@ -379,9 +379,13 @@ CHANNEL_NEEDS: list[Need] = [
     Need("vibes", config.ANNOUNCEMENTS_CHANNEL, POST),  # member of the month
     Need("growth", config.BOT_COMMANDS_CHANNEL, POST),  # bump reminders
     Need("stats", config.GENERAL_CHANNEL, POST),  # weekly MVP
+    Need("crew", config.GENERAL_CHANNEL, POST),  # the crew ping
+    Need("crew", config.MOD_LOG_CHANNEL, POST),
+    Need("supporter", config.GENERAL_CHANNEL, POST),  # the thank-you
+    Need("supporter", config.MOD_LOG_CHANNEL, POST),
 ]
 
-ROLE_HOLDERS = ("clips", "engagement", "growth", "levels", "selfroles", "shop", "tournaments")
+ROLE_HOLDERS = ("clips", "engagement", "growth", "levels", "selfroles", "shop", "tournaments", "crew", "supporter")
 EVENT_MAKERS = ("engagement", "events", "tournaments")
 CREATE_EVENTS_HINT = "Server Settings -> Roles -> Front Desk -> turn on Create Events"
 GUILD_NEEDS: list[GuildNeed] = [
@@ -411,6 +415,9 @@ ROLE_NEEDS: list[tuple[str, str]] = [
     (config.BIRTHDAY_ROLE, "engagement"),
     (config.COUNTING_ROLE, "engagement"),
     (config.TOURNEY_ROLE, "tournaments"),
+    # Supporter is left out on purpose: the bot only reacts to it, and a Server Subscriptions
+    # role is managed by Discord and may sit anywhere.
+    (config.CREW_ROLE, "crew"),
 ]
 
 PERMISSION_NAMES = sorted({p for n in CHANNEL_NEEDS for p in n.perms} | {n.perm for n in GUILD_NEEDS})

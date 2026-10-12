@@ -69,6 +69,10 @@ ROLES = [
     *({"name": n} for n in ("NA", "EU", "LATAM", "Asia", "OCE")),
     *({"name": n} for n in ("Early Bird", "Night Owl", "Weekend Warrior")),
     *({"name": role, "mentionable": True} for _, _, role in GAMES),
+    {"name": "Welcome Crew", "mentionable": True},  # opt-in via /crew: pinged when someone new arrives
+    # Cosmetic thank-you tier: no colour and no permissions, so it can't pass for staff. Given by
+    # Ko-fi's Discord bot or Server Subscriptions (or /supporter grant).
+    {"name": "Supporter", "hoist": True},
 ]
 
 # ---------------------------------------------------------------- channels
@@ -102,6 +106,8 @@ CATEGORIES = [
             {"name": "⭐・hall-of-fame", "topic": "3 ⭐ on any message and it lands here.", "read_only": True},
             {"name": "🔢・counting", "topic": "Count up together. Same person can't go twice; a wrong number resets."},
             {"name": "🎲・games", "topic": "Daily word game, weekly challenges, /slots, /trivia and friends."},
+            {"name": "💜・supporters", "topic": "A quiet corner for supporters. Thank you for keeping the lights on.",
+             "private_to": ["Supporter", "Keeper", "Moderator"]},
         ],
     },
     {

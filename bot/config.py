@@ -71,6 +71,10 @@ MODES = ("Ranked", "Casual")
 # Houses: (key, name, emoji, colour) and the role each house carries, from layout.py
 HOUSES = layout.HOUSES
 HOUSE_ROLES = layout.HOUSE_ROLES
+# Wave 9: Welcome Crew and Supporter tier
+CREW_ROLE = "Welcome Crew"  # opt-in with a bar (/crew): pinged when someone new arrives
+SUPPORTER_ROLE = "Supporter"  # given by Ko-fi's Discord bot or Server Subscriptions; cosmetic perks
+SUPPORTERS_CHANNEL = "💜・supporters"  # private lounge for the Supporter role
 
 
 @dataclass(frozen=True)
@@ -119,3 +123,14 @@ def load_settings() -> Settings:
         guild_id=int(os.environ["GUILD_ID"]),
         tz=ZoneInfo(os.environ.get("TZ", "America/Los_Angeles")),
     )
+
+
+def crew_env() -> tuple[str, str]:
+    """Optional Welcome Crew settings, raw (logic/crew.py validates them and has the defaults):
+    CREW_PING_MINUTES (gap between crew pings) and CREW_QUIET_HOURS (local hours, like "22-9")."""
+    return os.environ.get("CREW_PING_MINUTES", ""), os.environ.get("CREW_QUIET_HOURS", "")
+
+
+def support_url_env() -> str:
+    """SUPPORT_URL, raw (logic/supporter.py validates it). Unset: /support says it isn't open."""
+    return os.environ.get("SUPPORT_URL", "")

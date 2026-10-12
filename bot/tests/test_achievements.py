@@ -17,9 +17,9 @@ def keys(badges):
 
 
 def test_twenty_one_badges_with_unique_keys_and_emoji():
-    assert len(A.BADGES) == 21 == A.TOTAL
-    assert len({b.key for b in A.BADGES}) == 21
-    assert len({b.emoji for b in A.BADGES}) == 21
+    assert len(A.BADGES) == 22 == A.TOTAL
+    assert len({b.key for b in A.BADGES}) == 22
+    assert len({b.emoji for b in A.BADGES}) == 22
     for b in A.BADGES:
         assert b.name and b.description and b.emoji
         assert A.BY_KEY[b.key] is b
@@ -64,8 +64,8 @@ def test_every_badge_is_reachable():
                          messages=1000, clips=1, clip_week_wins=1, hall_of_fame=1, mvp_wins=1, daily_streak=30,
                          balance=10_000, tournaments_entered=1, tournament_wins=1, birthday_set=True,
                          recruiter=True, early_member=True)
-    # "starter" is granted by the starter quest, never by the sweep.
-    assert A.earned(everything) == set(A.BY_KEY) - {"starter"}
+    # "starter" is granted by the starter quest and "welcoming" by the crew cog, never by the sweep.
+    assert A.earned(everything) == set(A.BY_KEY) - {"starter", "welcoming"}
 
 
 def test_opted_out_never_earns_tracking_badges():
@@ -104,8 +104,8 @@ def test_grid_rows_of_five_in_catalogue_order():
 
 
 def test_progress():
-    assert A.progress({"first_squad", "chatty"}) == "2/21"
-    assert A.progress({"first_squad", "gone"}) == "1/21"
+    assert A.progress({"first_squad", "chatty"}) == "2/22"
+    assert A.progress({"first_squad", "gone"}) == "1/22"
 
 
 def test_congrats_one_and_many():
