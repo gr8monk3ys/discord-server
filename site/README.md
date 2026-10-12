@@ -8,14 +8,18 @@ Pages (`.github/workflows/pages.yml`) keeps a mirror at
 
 ## Look
 
-It is styled as part of lscaturchio.xyz and follows that repo's `DESIGN.md` ("The Field
-Notebook"): warm paper with a faint grain, one pen (Forest Ink `#184e35`, `#42a979` at night),
-sand hairlines instead of boxes, Fraunces for headings, Instrument Sans for reading and IBM Plex
-Mono for the small uppercase wall labels. Light ("paper") and dark ("night") themes are CSS
+It is styled as a page of lscaturchio.xyz and takes its values from that repo (`DESIGN.md`, "The
+Field Notebook", plus `src/app/globals.css` and the home page components): warm paper with a
+faint grain, one pen (Forest Ink `#184e35`, `#42a979` at night), sand hairlines instead of boxes,
+Fraunces for headings, Instrument Sans for reading and IBM Plex Mono for the small uppercase wall
+labels. The structure is the main site's too: the same header (cursive wordmark at the left, which
+links back to lscaturchio.xyz; nav pill; theme toggle), a masthead with a square plate, numbered
+ledger sections with a sticky wall-label rail, and the site-map footer. `img/cursive.svg` is a copy
+of that repo's `public/cursive.svg`. The fonts are the same cuts next/font serves there (Fraunces
+without the optical-size axis); here they still come from Google Fonts. Light ("paper") and dark ("night") themes are CSS
 tokens in `style.css`: the page follows `prefers-color-scheme` until the toggle in the header is
 used, and `theme.js` remembers that choice in `localStorage` (guarded, so private windows just
-don't remember). Everything collapses under `prefers-reduced-motion`. The header links back to
-lscaturchio.xyz ("by Lorenzo").
+don't remember). Everything collapses under `prefers-reduced-motion`.
 
 ## Set the invite (once)
 

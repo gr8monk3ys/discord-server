@@ -178,8 +178,8 @@ day-to-day attention. Design and history:
 | Staff applications | `/apply staff` (30+ days in the server, 90+ day account, clean record), `/apply status`; review card in 📋・mod-log with Approve/Deny (Keepers) and Interview; the Moderator role is then given by hand, since it sits above Front Desk |
 | Text filter | slurs (with evasion spellings) and other servers' invite links are refused in member text the bot reposts: `/lfg` and `/gamenight` notes, shoutouts and Spotlight, tournament names, partner applications |
 
-Landing page: <https://gr8monk3ys.github.io/discord-server/> (`site/`, deployed by
-`.github/workflows/pages.yml`). Listing-site copy and banners: `docs/LISTING.md`, `assets/listing/`.
+Landing page: <https://discord.lscaturchio.xyz/> (`site/`, served by Vercel from `main`; GitHub Pages keeps a
+mirror via `.github/workflows/pages.yml`, see `site/README.md`). Listing-site copy and banners: `docs/LISTING.md`, `assets/listing/`.
 
 All times are Pacific. Every scheduled job catches up once after downtime and never runs twice.
 

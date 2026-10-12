@@ -8,7 +8,7 @@ Reddit templates live in [growth/listing.md](growth/listing.md); this file is th
 | **Name** | Lorenzo's Server |
 | **Tagline** | Chill 18+ gamers. No tryhards, no toxicity. |
 | **Invite** (permanent) | <https://discord.gg/C25hy9Ca9W> |
-| **Landing page** | <https://gr8monk3ys.github.io/discord-server/> |
+| **Landing page** | <https://discord.lscaturchio.xyz/> (GitHub Pages keeps a mirror at <https://gr8monk3ys.github.io/discord-server/>; always paste the subdomain) |
 | **Banner** (960×540) | `assets/listing/banner.png` |
 | **Hero** (1920×1080) | `assets/listing/hero.png` |
 | **Icon** | `assets/server-icon.png` |
@@ -44,7 +44,7 @@ Games: Valorant, Call of Duty, Fortnite, Minecraft, Apex Legends, Counter-Strike
 
 Rules are short: 18+ only, be decent, no cheats, no spam, no NSFW. A quick captcha keeps bots out, then you pick your games and land in general. Say hi.
 
-More: https://gr8monk3ys.github.io/discord-server/
+More: https://discord.lscaturchio.xyz/
 ```
 
 ## Tags
@@ -85,7 +85,7 @@ trust the form if it says otherwise.
   member counts.
 - Fields: short description (the 101-character one), long description (markdown OK), **tags:
   up to 5** from top.gg's own list (Gaming, Community, Social, plus game tags if offered),
-  invite link <https://discord.gg/C25hy9Ca9W>, website <https://gr8monk3ys.github.io/discord-server/>,
+  invite link <https://discord.gg/C25hy9Ca9W>, website <https://discord.lscaturchio.xyz/>,
   banner (`banner.png`).
 - Ranking is vote-based: ask members to vote every 12 hours.
 
@@ -94,6 +94,8 @@ trust the form if it says otherwise.
 - Sign in with Discord → **Create server page**.
 - Fields: page URL slug (`chill-18-gamers`), short description, long description, category
   Gaming, language English, **tags/keywords: up to 5**, invite link, banner (`banner.png`).
+- Limits: the description field takes **1,025 characters** at most, and the banner is shown at
+  **945×290**. `banner.png` is 960×540, so export a 945×290 crop before uploading.
 - Bump from the website every 6 hours.
 
 ### Discadia (discadia.com)
