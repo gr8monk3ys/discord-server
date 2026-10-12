@@ -38,6 +38,26 @@ def layout_channels():
         yield from cat_spec["channels"]
 
 
+FORUM_LAYOUTS = {"list": discord.ForumLayoutType.list_view, "gallery": discord.ForumLayoutType.gallery_view}
+FORUM_SORTS = {"latest_activity": discord.ForumOrderType.latest_activity,
+               "creation_date": discord.ForumOrderType.creation_date}
+
+
+def forum_options(spec) -> dict:
+    """create_forum keyword arguments for a forum spec's optional settings (see layout.py).
+    Only what the spec sets is passed, apart from the layout, which defaults to a list."""
+    out = {"default_layout": FORUM_LAYOUTS[spec.get("layout", "list")]}
+    if "sort" in spec:
+        out["default_sort_order"] = FORUM_SORTS[spec["sort"]]
+    if spec.get("reaction"):
+        out["default_reaction_emoji"] = spec["reaction"]
+    if spec.get("post_slowmode"):
+        out["slowmode_delay"] = spec["post_slowmode"]  # on a forum: time between new posts
+    if spec.get("slowmode"):
+        out["default_thread_slowmode_delay"] = spec["slowmode"]
+    return out
+
+
 def private_overwrites(guild, role_names, known=None):
     """Hidden from @everyone, visible to the bot and the named roles ("private_to").
 
@@ -198,8 +218,7 @@ class Makeover:
 
             async def create():
                 forum = await self.guild.create_forum(
-                    name, category=cat, topic=topic, available_tags=tags,
-                    default_layout=discord.ForumLayoutType.list_view,
+                    name, category=cat, topic=topic, available_tags=tags, **forum_options(spec),
                 )
                 return await forum.edit(require_tag=True) or forum
 
@@ -226,9 +245,20 @@ class Makeover:
             return ch
         return await self.do("update", f"{label}: {', '.join(changed)}", lambda: ch.edit(**kwargs)) or ch
 
+    async def make_stage(self, spec, cat):
+        """Stage channels are only created, never restyled: there is nothing in the spec to restyle."""
+        ch = find(getattr(self.guild, "stage_channels", []), spec)
+        if ch is not None:
+            print(f"  ok      {spec['name']} (stage)")
+            return ch
+        return await self.do("create", f"{spec['name']} (stage)",
+                             lambda: self.guild.create_stage_channel(spec["name"], category=cat))
+
     async def make_channel(self, spec, cat, private_to=None):
         if spec.get("type") == "forum":
             return await self.make_forum(spec, cat)
+        if spec.get("type") == "stage":
+            return await self.make_stage(spec, cat)
         name = spec["name"]
         voice = spec.get("type") == "voice"
         pool = self.guild.voice_channels if voice else self.guild.text_channels

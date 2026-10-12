@@ -13,6 +13,7 @@ from names import slug
 SNOWFLAKE = re.compile(r"(?<!\d)\d{17,20}(?!\d)")
 INVITE = re.compile(r"discord(?:\.gg|(?:app)?\.com/invite)/\S+", re.IGNORECASE)
 VOICE_TYPES = {"voice", "stage_voice"}
+FORUM_TYPES = {"forum", "media"}
 
 
 # ------------------------------------------------------------ small pieces
@@ -133,12 +134,19 @@ def channel_dict(ch, member_names=None) -> dict:
     else:
         out["topic"] = getattr(ch, "topic", None)
     out["slowmode"] = getattr(ch, "slowmode_delay", 0) or 0
-    if kind == "forum":
+    if kind in FORUM_TYPES:
+        # On a forum, "slowmode" above is the wait between new posts; this one is inside a post.
+        out["thread_slowmode"] = getattr(ch, "default_thread_slowmode_delay", 0) or 0
+        out["layout"] = enum_name(getattr(ch, "default_layout", None))
+        out["sort_order"] = enum_name(getattr(ch, "default_sort_order", None))
+        out["default_reaction"] = emoji_str(getattr(ch, "default_reaction_emoji", None))
         out["require_tag"] = bool(getattr(getattr(ch, "flags", None), "require_tag", False))
-        out["tags"] = [
-            {"name": t.name, "emoji": emoji_str(t.emoji), "moderated": bool(t.moderated)}
-            for t in ch.available_tags
-        ]
+        # By name, not ID or the order they were added in: re-creating a tag is not a diff.
+        out["tags"] = sorted(
+            ({"name": t.name, "emoji": emoji_str(t.emoji), "moderated": bool(t.moderated)}
+             for t in ch.available_tags),
+            key=lambda t: (t["name"].casefold(), t["name"]),
+        )
     return out
 
 

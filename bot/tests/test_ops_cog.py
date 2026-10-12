@@ -550,7 +550,9 @@ def perm_guild(env, loaded=("ops", "cards", "recap", "levels", "events")):
     g.mod_log = PermChan(config.MOD_LOG_CHANNEL)
     names = dict.fromkeys(n.channel for n in O.CHANNEL_NEEDS if n.kind == "text")
     g.text_channels = [g.mod_log] + [PermChan(n) for n in names if n != config.MOD_LOG_CHANNEL]
-    g.forums = [PermChan(n) for n in (config.LFG_FORUM, config.SUGGESTIONS_FORUM)]
+    g.forums = [PermChan(n) for n in (config.LFG_FORUM, config.SUGGESTIONS_FORUM,
+                                      config.GUIDES_FORUM, config.SETUPS_FORUM)]
+    g.stage_channels = [PermChan(config.STAGE_CHANNEL)]
     g.voice_channels = [PermChan(n) for n in (config.SQUAD_VOICE, config.LOBBY_VOICE, config.NEW_SQUAD_VOICE)]
     g.categories = [PermChan(config.VOICE_CATEGORY)]
     g.roles = g.roles + [Named(name, 1) for name in dict(O.ROLE_NEEDS)]

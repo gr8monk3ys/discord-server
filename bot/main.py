@@ -64,6 +64,7 @@ MODULES = [
     ("cogs.votehub", set()),  # /vote hub, weekly Supporter thanks for Disboard bumpers
     ("cogs.catchup", {"message_content"}),  # /catchup AI summary of a public channel, /catchup-usage
     ("cogs.vibes", {"members"}),  # chat revival, join anniversaries, booster thanks + stipend, member of the month
+    ("cogs.forums", {"message_content"}),  # guides + setups forums: reaction, one-time post reward, recap line
 ]
 
 PERMISSIONS = discord.Permissions(
@@ -90,6 +91,9 @@ PERMISSIONS = discord.Permissions(
     # Moderation autopilot: timeouts and spam cleanup.
     moderate_members=True,
     manage_messages=True,
+    # Stage events (watch parties, Town Hall): Discord asks for Manage Channels, Move Members
+    # and Mute Members in the stage channel. The first two are above.
+    mute_members=True,
 )
 
 def build_intents(privileged: bool = True) -> discord.Intents:

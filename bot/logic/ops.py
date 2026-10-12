@@ -305,7 +305,7 @@ class Need:
     cog: str  # extension name without "cogs."
     channel: str  # as in config.py
     perms: tuple[str, ...]
-    kind: str = "text"  # text | forum | voice | category
+    kind: str = "text"  # text | forum | voice | category | stage
 
 
 @dataclass(frozen=True)
@@ -379,6 +379,13 @@ CHANNEL_NEEDS: list[Need] = [
     Need("vibes", config.ANNOUNCEMENTS_CHANNEL, POST),  # member of the month
     Need("growth", config.BOT_COMMANDS_CHANNEL, POST),  # bump reminders
     Need("stats", config.GENERAL_CHANNEL, POST),  # weekly MVP
+    # the bot reacts to new posts and reads the starter message to judge the reward
+    Need("forums", config.GUIDES_FORUM, VIEW + ("add_reactions", "read_message_history"), "forum"),
+    Need("forums", config.SETUPS_FORUM, VIEW + ("add_reactions", "read_message_history"), "forum"),
+    # Stage events (Town Hall, watch parties): Discord wants these three in the stage channel.
+    # Without the channel or one of them the Town Hall is skipped and watch parties use the Lobby.
+    Need("events", config.STAGE_CHANNEL, VIEW + ("connect", "manage_channels", "mute_members", "move_members"),
+         "stage"),
 ]
 
 ROLE_HOLDERS = ("clips", "engagement", "growth", "levels", "selfroles", "shop", "tournaments")

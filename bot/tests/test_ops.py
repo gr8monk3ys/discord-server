@@ -332,7 +332,7 @@ def test_requirements_tables_cover_config():
     by_channel = {}
     for n in ops.CHANNEL_NEEDS:
         by_channel.setdefault(n.channel, set()).update(n.perms)
-        assert n.kind in ("text", "forum", "voice", "category")
+        assert n.kind in ("text", "forum", "voice", "category", "stage")
         assert "view_channel" in n.perms
     # every channel a cog posts to
     for name in (config.GENERAL_CHANNEL, config.MOD_LOG_CHANNEL, config.MOD_CHANNEL, config.BOT_COMMANDS_CHANNEL,

@@ -75,6 +75,10 @@ ROLES = [
 # Categories are numbered like a catalogue; Discord uppercases them, which
 # gives you the site's wall-label look for free.
 # "read_only": everyone can read and react, only Keepers (and the bot) post.
+# Forums ("type": "forum") may also set "layout" (list | gallery), "sort" (latest_activity |
+# creation_date), "reaction" (the default reaction emoji), "post_slowmode" (seconds between
+# new posts per member) and "slowmode" (seconds between messages inside a post).
+# "type": "stage" is a Stage channel (needs Community).
 CATEGORIES = [
     {
         "name": "01 · front desk",
@@ -128,6 +132,26 @@ CATEGORIES = [
                 {"name": f"{emoji}・{channel}", "topic": f"{role} talk, squads, and strats. Ping @{role}."}
                 for emoji, channel, role in GAMES
             ),
+            {
+                # A forum stays readable when things are quiet: a guide from last month is
+                # still the first thing you see, where a chat channel would just look dead.
+                "name": "📚・guides",
+                "type": "forum",
+                "topic": "\n".join(
+                    [
+                        "Tips, builds, settings and how-tos that are worth finding again next month.",
+                        "One topic per post. Put the game and the point in the title, like "
+                        "\"Valorant: crosshair settings that work\".",
+                        "Tag the game. Write it so someone new can follow it: steps, numbers, a screenshot if it helps.",
+                        "Your own words, please: no pasted articles, no link-only posts.",
+                        "A real guide that stays up for a day earns a few coins (a couple of posts a week at most).",
+                    ]
+                ),
+                "tags": [*((role, emoji) for emoji, _, role in GAMES),
+                         ("Beginner", "🌱"), ("Advanced", "🧠"), ("Settings", "⚙️"), ("Question", "❓")],
+                "layout": "list", "sort": "latest_activity", "reaction": "👍",
+                "post_slowmode": 600, "slowmode": 5,
+            },
         ],
     },
     {
@@ -140,6 +164,25 @@ CATEGORIES = [
             {"name": "🤖・bot-commands", "topic": "Music (/play), bump reminders, and other bot spam."},
             {"name": "📺・creators", "topic": "Members' streams and uploads. Link yours with /creator.", "read_only": True},
             {"name": "🤝・partners", "topic": "Servers we partner with. Apply with /partner apply.", "read_only": True},
+            {
+                # Image-first: the gallery layout shows each post's first picture.
+                "name": "🖥・setups",
+                "type": "forum",
+                "topic": "\n".join(
+                    [
+                        "Battlestations, PC builds, console corners, desks and in-game bases. Lead with a picture.",
+                        "One setup per post. Say what we're looking at: parts, the game, how long the base took.",
+                        "Tag the type. Your own photos and screenshots only, and nothing that shows an address "
+                        "or a face you'd rather keep private.",
+                        "A setup with a picture that stays up for a day earns a few coins "
+                        "(a couple of posts a week at most).",
+                    ]
+                ),
+                "tags": [("Battlestation", "🖥️"), ("PC Build", "🔧"), ("Console", "🎮"), ("Desk", "🪑"),
+                         ("In-game Base", "🏰"), ("Work in Progress", "🚧")],
+                "layout": "gallery", "sort": "creation_date", "reaction": "🔥",
+                "post_slowmode": 600, "slowmode": 5,
+            },
         ],
     },
     {
@@ -150,6 +193,8 @@ CATEGORIES = [
             {"name": "➕ New Squad", "type": "voice"},  # join to get your own channel
             {"name": "🎮 Squad", "type": "voice", "user_limit": 5, "was": ["🎮 Squad I", "General 2"]},
             {"name": "💤 AFK", "type": "voice", "afk": True},
+            # Watch parties and the monthly Town Hall (Front Desk schedules both as Stage events).
+            {"name": "🎙・stage", "type": "stage"},
         ],
     },
     {
@@ -238,6 +283,7 @@ ONBOARDING_DEFAULT_CHANNELS = [
     "🆘・help", "💡・suggestions", "🤣・memes", "📸・clips", "⭐・hall-of-fame", "🔢・counting", "🎲・games", "🕹️・gaming", "🎮・lfg", "🎨・art", "💻・code",
     "👗・fashion", "♟️・chess", "🤖・bot-commands", "📺・creators", "🏆・tournaments", "🎭・roles", "🤝・partners",
     "🔊 Lobby", "➕ New Squad", "🎮 Squad", "💤 AFK",
+    "📚・guides", "🖥・setups", "🎙・stage",
 ]
 # Anything public that's neither a default channel nor an Onboarding option is
 # hidden from members who went through Onboarding, so keep this list complete.

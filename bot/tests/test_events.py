@@ -221,3 +221,75 @@ def test_free_games_lines_escape_and_limit():
     assert "$19.99" in lines[0] and "PC, Steam" in lines[0] and "2026-10-15" in lines[0]
     evil = E.giveaway_lines(E.select_giveaways([item(50, title="[evil](javascript:x) **bold**")], set()))[0]
     assert "](javascript" not in evil and "**bold**" not in evil
+
+
+# ---------------------------------------------------------------- watch parties
+@pytest.mark.parametrize("url", [
+    "https://www.youtube.com/watch?v=abc123", "https://example.org/stream", " https://twitch.tv/someone ",
+])
+def test_watch_link_accepts_plain_https(url):
+    assert E.watch_link(url) == url.strip()
+
+
+@pytest.mark.parametrize("url", [
+    "http://example.org/stream",  # not https
+    "javascript:alert(1)", "ftp://example.org/x", "example.org/stream", "https://", "https:///path",
+    "https://user:pw@example.org/", "https://localhost/x",  # credentials, no real host
+    "https://example.org/a b", "https://example.org/<x>", "https://example.org/a)b", "https://example.org/[x]",
+    "https://example.org/" + "a" * 400, "", None, 42,
+])
+def test_watch_link_refuses_everything_else(url):
+    assert E.watch_link(url) is None
+
+
+def test_show_link_only_lets_known_hosts_embed():
+    assert E.show_link("https://www.youtube.com/watch?v=abc") == "https://www.youtube.com/watch?v=abc"
+    assert E.show_link("https://youtu.be/abc") == "https://youtu.be/abc"
+    assert E.show_link("https://m.twitch.tv/someone") == "https://m.twitch.tv/someone"
+    assert E.show_link("https://example.org/stream") == "<https://example.org/stream>"
+    # Lookalikes are not the real host.
+    assert E.show_link("https://youtube.com.example.org/x") == "<https://youtube.com.example.org/x>"
+    assert E.show_link("https://notyoutube.com/x") == "<https://notyoutube.com/x>"
+
+
+def test_watchparty_name_and_description():
+    assert E.watchparty_name("Dune   Part Two") == "Watch party: Dune Part Two"
+    assert len(E.watchparty_name("x" * 200)) == 100
+    assert E.watchparty_description("sam", None) == "Hosted by sam."
+    assert E.watchparty_description("sam", "https://example.org/s") == "Hosted by sam. Watching: https://example.org/s"
+
+
+# ---------------------------------------------------------------- Town Hall
+def test_parse_townhall_time():
+    from datetime import time
+    assert E.parse_townhall_time(None) == E.TOWNHALL_DEFAULT == time(12, 0)
+    assert E.parse_townhall_time("  ") == time(12, 0)
+    assert E.parse_townhall_time("19:30") == time(19, 30) and E.parse_townhall_time("7 PM") == time(19, 0)
+    for off in ("off", "OFF", "none", "0"):
+        assert E.parse_townhall_time(off) is None
+    assert E.parse_townhall_time("noonish") is None and E.parse_townhall_time("25:00") is None
+
+
+def test_townhall_start_is_the_first_saturday_a_week_after_the_job():
+    def at(y, m, d, h=12, mi=0):
+        return int(local(y, m, d, h, mi).timestamp())
+
+    # Saturdays in October 2026: 3, 10, 17, 24, 31. November's first Saturday is the 7th.
+    assert E.townhall_start(at(2026, 10, 31), TZ) == local(2026, 11, 7, 12)
+    for day in (3, 10, 17, 24):
+        assert E.townhall_start(at(2026, 10, day), TZ) is None
+    assert E.townhall_start(at(2026, 9, 26, 19, 30), TZ) == local(2026, 10, 3, 19, 30)
+    # Across the fall-back night (Nov 1) the wall-clock time is kept: 12:00 PDT -> 12:00 PST.
+    start = E.townhall_start(at(2026, 10, 31), TZ)
+    assert start.hour == 12 and int(start.timestamp()) - at(2026, 10, 31) == 7 * 86400 + 3600
+    # Exactly one Town Hall per month, on a Saturday in the first seven days.
+    seen = {}
+    day = local(2026, 1, 3, 12)
+    for _ in range(104):
+        s = E.townhall_start(int(datetime(day.year, day.month, day.day, 12, tzinfo=TZ).timestamp()), TZ)
+        if s is not None:
+            assert s.weekday() == 5 and s.day <= 7
+            seen[(s.year, s.month)] = seen.get((s.year, s.month), 0) + 1
+        day = day + timedelta(days=7)
+    assert len(seen) == 24 and set(seen.values()) == {1}
+    assert E.townhall_start(at(2026, 10, 30), TZ) is None  # the job only ever runs on Saturdays

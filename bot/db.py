@@ -470,6 +470,31 @@ MIGRATIONS = [
         PRIMARY KEY (day, user_id)
     )""",
     ],
+    [
+        # Forums: guide and setup posts by tracking-allowed members, waiting for their one-time
+        # reward. state: pending | paid | skipped (didn't qualify) | deleted.
+        """CREATE TABLE forum_posts (
+        thread_id INTEGER PRIMARY KEY,
+        kind TEXT NOT NULL,
+        author_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        state TEXT NOT NULL DEFAULT 'pending',
+        settled_at INTEGER
+    )""",
+        "CREATE INDEX forum_posts_state ON forum_posts (state, created_at)",
+        "CREATE INDEX forum_posts_author ON forum_posts (author_id, settled_at)",
+        # Watch parties and the Town Hall: scheduled events that share the game-night reminder
+        # loop and host limits, kept out of `gamenights` so game-night stats don't count them.
+        # kind: watchparty | townhall.
+        """CREATE TABLE hosted_events (
+        event_id INTEGER PRIMARY KEY,
+        host_id INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        starts_at INTEGER NOT NULL,
+        reminded INTEGER NOT NULL DEFAULT 0
+    )""",
+    ],
 ]
 
 

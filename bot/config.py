@@ -68,6 +68,10 @@ GAMES_CHANNEL = "🎲・games"  # daily word game results, challenge board
 SQUAD_VOICE = "🎮 Squad"
 LOBBY_VOICE = "🔊 Lobby"
 MODES = ("Ranked", "Casual")
+# Forums and Stage events
+GUIDES_FORUM = "📚・guides"
+SETUPS_FORUM = "🖥・setups"
+STAGE_CHANNEL = "🎙・stage"  # watch parties, the monthly Town Hall
 
 
 @dataclass(frozen=True)
