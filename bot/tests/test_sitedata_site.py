@@ -34,7 +34,8 @@ def test_csp_allows_the_stats_fetch_and_nothing_new_besides():
                  if h["key"] == "Content-Security-Policy")
     csp = sitegen.parse_csp(value)
     assert sitegen.csp_allows(csp["connect-src"], RAW)
-    assert csp["connect-src"] == ["https://discord.com", "https://raw.githubusercontent.com"]
+    # 'self': the appeal form posts to /api/appeal
+    assert csp["connect-src"] == ["'self'", "https://discord.com", "https://raw.githubusercontent.com"]
     assert csp["script-src"] == ["'self'"] and csp["style-src"] == ["'self'", "https://fonts.googleapis.com"]
 
 

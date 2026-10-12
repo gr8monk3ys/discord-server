@@ -472,27 +472,30 @@ def test_levels_gained_uses_the_january_snapshots(monkeypatch):
     with_env(body, monkeypatch)
 
 
-def test_house_is_read_only_when_a_houses_table_exists(monkeypatch):
+def test_house_is_the_current_house_by_its_display_name(monkeypatch):
     async def body(env):
-        assert await env.cog.house_of(U1) is None  # no such table in this schema
-        await env.db.execute("CREATE TABLE house_members (user_id INTEGER PRIMARY KEY, house TEXT NOT NULL)")
-        assert await env.cog.house_of(U1) is None  # table, but not sorted yet
-        await env.db.execute("INSERT INTO house_members VALUES (?, 'ember_fall')", (U1,))
-        assert await env.cog.house_of(U1) == "Ember Fall"
+        place = "INSERT INTO house_members (user_id, house, joined_at, left_at) VALUES (?, ?, ?, ?)"
+        await env.db.execute(place, (U1, "fern", MAY, None))
+        assert await env.cog.house_of(U1) is None  # the houses module isn't loaded
+        env.bot.cogs["Houses"] = object()
+        assert await env.cog.house_of(U1) == "Fern"  # the name, not the stored key
+        assert await env.cog.house_of(U2) is None  # never sorted
         summary, _ = await env.cog.member_summary(env.guild, env.member(U1), 2026)
-        assert summary.house == "Ember Fall"
+        assert summary.house == "Fern"
+        await env.db.execute(place, (U2, "otter", MAY, MAY + DAY))
+        assert await env.cog.house_of(U2) is None  # left their house: a former member
+        await env.db.execute(place, (U3, "ember_fall", MAY, None))
+        assert await env.cog.house_of(U3) is None  # not one of the houses
     with_env(body, monkeypatch)
 
 
-def test_house_by_id_and_unknown_shapes(monkeypatch):
+def test_house_is_left_out_when_the_table_cannot_be_read(monkeypatch):
     async def body(env):
-        await env.db.execute("CREATE TABLE houses (id INTEGER PRIMARY KEY, name TEXT)")
-        await env.db.execute("INSERT INTO houses VALUES (3, 'Emberfall')")
-        assert await env.cog.house_of(U1) is None  # houses has no user_id column: not a membership table
-        await env.db.execute("CREATE TABLE house_members (user_id INTEGER PRIMARY KEY, house_id INTEGER)")
-        await env.db.execute("INSERT INTO house_members VALUES (?, 3), (?, 8)", (U1, U2))
-        assert await env.cog.house_of(U1) == "Emberfall"
-        assert await env.cog.house_of(U2) is None  # points at a house that isn't there
+        env.bot.cogs["Houses"] = object()
+        await env.db.execute("DROP TABLE house_members")
+        assert await env.cog.house_of(U1) is None
+        summary, _ = await env.cog.member_summary(env.guild, env.member(U1), 2026)
+        assert summary.house is None
     with_env(body, monkeypatch)
 
 

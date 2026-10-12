@@ -12,10 +12,15 @@ is public and so is the repo, so this module is where the privacy rules live:
 - Rounding: messages to the nearest 10, voice and game time to whole hours.
 - Game names come from layout.py only. A presence name that is not one of the server's games
   is ignored, so nobody's obscure game shows up.
-- Event titles: game nights and "<Game> game night" are re-templated here from the game name.
-  Any other title (a tournament name, an event somebody made by hand) is member-authored text:
-  it must pass logic/textfilter.py with links refused and the schema's own text check, and the
-  whole event is dropped when it does not. Events in a channel @everyone cannot see are dropped.
+- Event titles: only the ones the bot templates itself, rebuilt here and never copied: "Game
+  night" / "<Game> game night", "Town Hall", "Watch party" (what is being watched is the host's
+  own words, so it is left off) and "<Game> tournament" / "Tournament" for an open or running
+  tournament (its name is free text too). An event with any other title was made by hand and
+  is dropped. Events in a channel @everyone cannot see are dropped.
+- Houses: the three house names from layout.py and each house's points per member, rounded to
+  a whole point. Published only when every house has at least `MIN_GROUP` members who scored
+  this week; otherwise the whole table is left out, so no number is ever one or two members'
+  activity (and a missing house cannot be worked out from the others).
 """
 
 from __future__ import annotations
@@ -26,7 +31,7 @@ from dataclasses import dataclass, field
 
 import config
 import site_schema as schema  # server/site_schema.py; config puts server/ on sys.path
-from logic import textfilter
+from logic import events, textfilter
 from names import slug
 
 MIN_GROUP = 3  # an aggregate about fewer people than this is not published
@@ -37,6 +42,10 @@ MESSAGE_STEP = 10
 HOUR = 3600
 MIN_PREFIX = 5  # a presence name may extend a game key at least this long ("minecraftlauncher")
 GAMENIGHT = "Game night"
+TOWNHALL = events.TOWNHALL_NAME
+WATCHPARTY = "Watch party"
+WATCHPARTY_PREFIX = events.watchparty_name("").strip()  # "Watch party:", as the events module spells it
+TOURNAMENT = "Tournament"
 _SPACE = re.compile(r"\s+")
 
 
@@ -125,7 +134,8 @@ class EventIn:
 
 
 def classify_event(title: str, tournaments: dict[str, str | None], games=None) -> dict | None:
-    """{"title", "kind"[, "game"]} for a scheduled event's title, or None to drop it.
+    """{"title", "kind"[, "game"]} for a scheduled event's title, or None to drop it. The
+    title that comes back is always one of the bot's own templates, never the text it was given.
     tournaments: lower-cased name -> game text, for tournaments that are open or running."""
     games = config.GAMES if games is None else games
     plain = _SPACE.sub(" ", title or "").strip()
@@ -135,14 +145,16 @@ def classify_event(title: str, tournaments: dict[str, str | None], games=None) -
     for g in games:  # the bot's own template: rebuilt from the game name, not copied
         if folded == f"{g.role} game night".casefold():
             return {"title": f"{g.role} game night", "kind": "gamenight", "game": g.role}
-    safe = clean_title(plain)
-    if safe is None:
-        return None
-    out = {"title": safe, "kind": "tournament" if folded in tournaments else "event"}
-    game = match_game(tournaments.get(folded), games) if folded in tournaments else None
-    if game is not None:
-        out["game"] = game.role
-    return out
+    if folded == TOWNHALL.casefold():
+        return {"title": TOWNHALL, "kind": "event"}
+    if folded.startswith(WATCHPARTY_PREFIX.casefold()):  # "Watch party: <the host's words>"
+        return {"title": WATCHPARTY, "kind": "event"}
+    if folded in tournaments:  # the name is whatever its organiser typed: say which game instead
+        game = match_game(tournaments[folded], games)
+        if game is None:
+            return {"title": TOURNAMENT, "kind": "tournament"}
+        return {"title": f"{game.role} tournament", "kind": "tournament", "game": game.role}
+    return None
 
 
 # ---------------------------------------------------------------- the document
@@ -166,7 +178,7 @@ class Inputs:
     match_people: int = 0
     queued: int = 0
     seasonal: tuple | None = None  # (name, emoji, end)
-    houses: list | None = None  # [(name, points)]; None: no houses module
+    houses: list | None = None  # [(name, points per member, members who scored)], best first; None: no houses
     starred: int = 0
     starred_people: int = 0
     clips: int = 0
@@ -196,15 +208,20 @@ def _games(inp: Inputs, games) -> list[dict]:
 
 def _houses(inp: Inputs) -> list[dict]:
     rows = []
-    for name, points in inp.houses or []:
+    for name, points, people in inp.houses or []:
         text = clean_title(name) if isinstance(name, str) else None
         if (text is None or len(text) > schema.MAX_NAME or isinstance(points, bool)
                 or not isinstance(points, int) or not 0 <= points <= schema.MAX_COUNT):
             return []  # one odd row: publish no standings rather than a partial table
+        # The small-group rule, for the whole table: a score built on one or two members'
+        # week is theirs, not the house's, and leaving just that house out would say as much.
+        if isinstance(people, bool) or not isinstance(people, int) or people < MIN_GROUP:
+            return []
         rows.append((text, points))
     if not 2 <= len(rows) <= schema.MAX_HOUSES:
         return []
-    return [{"name": n, "points": p} for n, p in sorted(rows, key=lambda r: (-r[1], r[0]))]
+    # Stable: houses level after rounding keep the order the houses module ranked them in.
+    return [{"name": n, "points": p} for n, p in sorted(rows, key=lambda r: -r[1])]
 
 
 def build(inp: Inputs, games=None) -> dict:

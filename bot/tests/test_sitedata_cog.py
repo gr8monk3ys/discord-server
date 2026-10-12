@@ -13,7 +13,9 @@ import config
 import db as dbmod
 import site_schema as schema
 from cogs import sitedata as cogmod
+from cogs.houses import Houses
 from cogs.sitedata import SiteData
+from logic import houses as H
 from logic import sitedata as SD
 
 T = 1_800_000_000
@@ -82,8 +84,9 @@ def with_cog(fn, monkeypatch, tmp_path, guild=None, events=(), enabled=True):
         db = dbmod.Database(":memory:")
         await db.connect()
         await db.migrate()
+        loaded = {}  # cog name -> cog, for the modules a test switches on
         bot = SimpleNamespace(db=db, settings=SimpleNamespace(guild_id=1, tz=TZ),
-                              get_guild=lambda _id: guild)
+                              get_guild=lambda _id: guild, cogs=loaded, get_cog=loaded.get)
         cog = SiteData(bot, path=tmp_path / "site" / "stats.json", events=events, enabled=enabled)
         monkeypatch.setattr(cogmod, "now", lambda: T)
         try:
@@ -140,7 +143,11 @@ def busy_guild():
                member(5), member(50, bot=True)]
     events = [event("Valorant game night", T + DAY, channel=Channel()),
               event("October Cup", T + 3 * DAY),
+              event("Watch party: Member Name 3 picks the film", T + 4 * DAY, channel=Channel()),
+              event("Town Hall", T + 5 * DAY, channel=Channel()),
               event("Mods only planning", T + 2 * DAY, channel=Channel(public=False)),
+              event("Town Hall", T + 5 * DAY, channel=Channel(public=False)),
+              event("Member Name 2's birthday", T + 2 * DAY),  # harmless, but not the bot's words
               event(f"party for <@{uid(4)}>", T + 2 * DAY),
               event("Game night", T - DAY, status=discord.EventStatus.completed)]
     return Guild(members, events)
@@ -159,7 +166,10 @@ def test_refresh_writes_aggregates_only(monkeypatch, tmp_path):
         assert doc["games"] == [{"name": "Valorant", "hours": 12}]
         assert doc["events"] == [
             {"title": "Valorant game night", "kind": "gamenight", "game": "Valorant", "start": schema.iso(T + DAY)},
-            {"title": "October Cup", "kind": "tournament", "game": "Valorant", "start": schema.iso(T + 3 * DAY)}]
+            {"title": "Valorant tournament", "kind": "tournament", "game": "Valorant", "start": schema.iso(T + 3 * DAY)},
+            {"title": "Watch party", "kind": "event", "start": schema.iso(T + 4 * DAY)},
+            {"title": "Town Hall", "kind": "event", "start": schema.iso(T + 5 * DAY)}]
+        assert "October" not in text and "film" not in text and "birthday" not in text
         assert doc["tournaments"] == {"open": 1, "running": 0, "finished": 1}
         assert doc["matchmaking"] == {"matches_week": 2}
         assert doc["hall"] == {"starred": 4, "badges": 4}  # clips: only two people
@@ -188,20 +198,69 @@ def test_online_needs_the_member_cache(monkeypatch, tmp_path):
     with_cog(go, monkeypatch, tmp_path)
 
 
-def test_houses_are_read_only_when_the_table_fits(monkeypatch, tmp_path):
+HOUSE_ROSTER = {"fern": (1, 2, 3), "kestrel": (4, 5, 6), "otter": (7, 8, 9, 10)}
+
+
+async def seed_houses(db, chat_days):
+    """Three houses; `chat_days` is member -> days chatted this week (3 house points a day)."""
+    for house, people in HOUSE_ROSTER.items():
+        for n in people:
+            await db.execute("INSERT INTO house_members (user_id, house, joined_at) VALUES (?, ?, ?)",
+                             (uid(n), house, T - 30 * DAY))
+    monday = H.week_of(T, TZ).start
+    for n, days in chat_days.items():
+        for i in range(days):
+            await db.execute("INSERT INTO message_counts (user_id, day, count) VALUES (?, ?, ?)",
+                             (uid(n), day(monday + i * DAY + HOUR), H.ACTIVE_DAY_MESSAGES))
+
+
+def house_guild():
+    return Guild([member(n) for people in HOUSE_ROSTER.values() for n in people] + [member(50, bot=True)])
+
+
+def test_houses_are_this_week_s_live_standings(monkeypatch, tmp_path):
     async def go(db, cog):
-        assert await cog.houses() is None  # the houses module is not merged
-        await db.execute("CREATE TABLE houses (id INTEGER PRIMARY KEY, title TEXT)")
-        assert await cog.houses() is None  # a table, but not the shape we expect
-        await db.execute("DROP TABLE houses")
-        await db.execute("CREATE TABLE houses (name TEXT PRIMARY KEY, points INTEGER NOT NULL, role_id INTEGER)")
-        for name, points in (("Ember", 120), ("Tide", 340), ("Moss", 90)):
-            await db.execute("INSERT INTO houses (name, points, role_id) VALUES (?, ?, ?)", (name, points, uid(1)))
+        await seed_houses(db, {1: 1, 2: 1, 3: 1, 4: 3, 5: 2, 6: 3, 7: 4, 8: 4, 9: 4})
+        assert await cog.houses(T) is None  # the houses module is not loaded
+        assert "houses" not in await cog.refresh()
+        cog.bot.cogs["Houses"] = Houses(cog.bot)
+        # what /house standings shows, best first, with how many members scored
+        shown = await H.standings(db, H.week_of(T, TZ), T, **cog.bot.cogs["Houses"].scoring_context(cog.guild()))
+        assert [(s.house, H.fmt_score(s.score), s.contributors) for s in shown] == [
+            ("otter", "9.0", 3), ("kestrel", "8.0", 3), ("fern", "3.0", 3)]
+        assert await cog.houses(T) == [("Otter", 9, 3), ("Kestrel", 8, 3), ("Fern", 3, 3)]
         doc = await cog.refresh()
-        assert doc["houses"] == [{"name": "Tide", "points": 340}, {"name": "Ember", "points": 120},
-                                 {"name": "Moss", "points": 90}]
-        assert not re.search(r"\d{15,20}", cog.path.read_text(encoding="utf-8"))
-    with_cog(go, monkeypatch, tmp_path)
+        assert doc["houses"] == [{"name": "Otter", "points": 9}, {"name": "Kestrel", "points": 8},
+                                 {"name": "Fern", "points": 3}]
+        text = cog.path.read_text(encoding="utf-8")
+        assert schema.check_text(text) == (doc, []) and not re.search(r"\d{15,20}", text)
+    with_cog(go, monkeypatch, tmp_path, guild=house_guild())
+
+
+def test_houses_are_left_out_when_a_house_has_fewer_than_three_scorers(monkeypatch, tmp_path):
+    async def go(db, cog):
+        await seed_houses(db, {1: 1, 2: 1, 3: 1, 4: 3, 5: 2, 7: 4, 8: 4, 9: 4})  # kestrel: two members scored
+        cog.bot.cogs["Houses"] = Houses(cog.bot)
+        assert [people for _, _, people in await cog.houses(T)] == [3, 2, 3]
+        assert "houses" not in await cog.refresh()
+        assert "houses" not in json.loads(cog.path.read_text(encoding="utf-8"))
+        # the third scorer opts out with /privacy: they stop counting, and so does the table
+        await db.execute("INSERT INTO message_counts (user_id, day, count) VALUES (?, ?, ?)",
+                         (uid(6), day(T), H.ACTIVE_DAY_MESSAGES))
+        assert "houses" in await cog.refresh()
+        await db.execute("INSERT INTO privacy_optout (user_id, at) VALUES (?, ?)", (uid(6), T))
+        assert "houses" not in await cog.refresh()
+    with_cog(go, monkeypatch, tmp_path, guild=house_guild())
+
+
+def test_broken_house_tables_only_lose_the_houses(monkeypatch, tmp_path):
+    async def go(db, cog):
+        await seed_busy_week(db)
+        cog.bot.cogs["Houses"] = Houses(cog.bot)
+        await db.execute("DROP TABLE house_members")
+        doc = await cog.refresh()
+        assert "houses" not in doc and doc["week"]["messages"] == 1150
+    with_cog(go, monkeypatch, tmp_path, guild=busy_guild())
 
 
 def test_seasonal_event_from_events_json(monkeypatch, tmp_path):
@@ -228,7 +287,8 @@ def test_a_broken_source_only_loses_its_own_section(monkeypatch, tmp_path):
         doc = await cog.refresh()
         assert "matchmaking" not in doc
         assert doc["week"]["messages"] == 1150
-        assert doc["events"][1] == {"title": "October Cup", "kind": "event", "start": schema.iso(T + 3 * DAY)}
+        # without the tournaments table nothing says "October Cup" is the bot's: it is dropped
+        assert [e["title"] for e in doc["events"]] == ["Valorant game night", "Watch party", "Town Hall"]
     with_cog(go, monkeypatch, tmp_path, guild=busy_guild())
 
 

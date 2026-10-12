@@ -28,6 +28,7 @@ from discord.ext import commands, tasks
 
 import config
 from logic import community as community_rules
+from logic import houses as H
 from logic import matchmaking as M
 from logic import seasonal as S
 from logic import sitedata as SD
@@ -189,15 +190,15 @@ class SiteData(commands.Cog):
         queued = await self.db.fetchone(f"SELECT COUNT(*) AS n FROM mm_queue WHERE user_id {OPTED_IN}")
         return len(rows), len(people), int(queued["n"]) if queued else 0
 
-    async def houses(self) -> list | None:
-        """House standings, if the houses module is merged: a `houses` table with `name` and
-        `points` columns. Anything else (no table, other columns) means no standings."""
-        if await self.db.fetchone("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'houses'") is None:
+    async def houses(self, t: int) -> list | None:
+        """This week's live House Cup standings as /house standings shows them, best first:
+        (house name, points per member rounded to a whole point, members who scored). None
+        when the houses module is off. logic/sitedata.py decides whether they are published."""
+        cog = self.bot.get_cog("Houses")
+        if cog is None:
             return None
-        columns = {r["name"] for r in await self.db.fetchall("PRAGMA table_info(houses)")}
-        if not {"name", "points"} <= columns:
-            return None
-        return [(r["name"], r["points"]) for r in await self.db.fetchall("SELECT name, points FROM houses")]
+        rows = await H.standings(self.db, H.week_of(t, self.tz), t, **cog.scoring_context(self.guild()))
+        return [(H.BY_KEY[s.house].name, SD.round_to(s.score, H.SCALE) // H.SCALE, s.contributors) for s in rows]
 
     async def gather(self, t: int) -> SD.Inputs:
         guild = self.guild()
@@ -208,7 +209,7 @@ class SiteData(commands.Cog):
         games = await self.section("games", lambda: self.played(lo, t), [])
         counts, active = await self.section("tournaments", self.tournaments, ({}, {}))
         matches, match_people, queued = await self.section("matchmaking", lambda: self.matchmaking(lo), (0, 0, 0))
-        houses = await self.section("houses", self.houses, None)
+        houses = await self.section("houses", lambda: self.houses(t), None)
         starred, starred_people = await self.section("hall of fame", lambda: self.one(
             "SELECT COUNT(*) AS n, COUNT(DISTINCT author_id) AS people FROM starboard"
             f" WHERE board_message_id IS NOT NULL AND author_id {OPTED_IN}"), (0, 0))

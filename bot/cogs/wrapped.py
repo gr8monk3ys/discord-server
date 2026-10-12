@@ -36,6 +36,7 @@ from discord.ext import commands, tasks
 import config
 from errors import reply_error
 from logic import community as community_rules
+from logic import houses as H
 from logic import matchmaking as M
 from logic import starboard
 from logic import stats as S
@@ -53,9 +54,6 @@ ANNOUNCED_KEY = "wrapped:announced:"  # meta: + year -> when the December 1 post
 QUIET_CHANNELS = (config.COUNTING_CHANNEL, config.RULES_CHANNEL, config.ANNOUNCEMENTS_CHANNEL,
                   config.HALL_OF_FAME_CHANNEL, config.CREATORS_CHANNEL, config.WELCOME_CHANNEL,
                   config.TOURNAMENTS_CHANNEL, config.ROLES_CHANNEL, config.PARTNERS_CHANNEL)
-# Where another module might keep a member's house: (table, columns that could hold it).
-HOUSE_TABLES = ("house_members", "house_assignments", "houses")
-HOUSE_COLUMNS = ("house", "house_name", "house_key", "name", "house_id")
 
 
 def now() -> int:
@@ -191,27 +189,17 @@ class Wrapped(commands.Cog):
             return {}
 
     async def house_of(self, user_id: int) -> str | None:
-        """The member's house, if a houses module has put its table in this database. Its
-        schema isn't ours, so this looks for a user_id column next to a house column and
-        gives up quietly on anything unexpected."""
+        """The display name of the house the member is in now (logic/houses.py: a row with
+        left_at set is a former member), or None. None too when the houses module is off or
+        its table can't be read: a card never fails over this."""
+        if self.bot.get_cog("Houses") is None:
+            return None
         try:
-            for table in HOUSE_TABLES:
-                cols = {r["name"] for r in await self.db.fetchall(f"PRAGMA table_info({table})")}
-                col = next((c for c in HOUSE_COLUMNS if c in cols), None)
-                if "user_id" not in cols or col is None:
-                    continue
-                row = await self.db.fetchone(f"SELECT {col} AS house FROM {table} WHERE user_id = ?", (user_id,))
-                value = row["house"] if row else None
-                if isinstance(value, int):  # an id: the name lives in houses(id, name)
-                    named = await self.db.fetchone("SELECT name FROM houses WHERE id = ?", (value,))
-                    value = named["name"] if named else None
-                if not isinstance(value, str) or not value.strip():
-                    return None
-                value = value.strip()[:40]
-                return value.replace("_", " ").title() if value.islower() else value
+            key = await H.house_of(self.db, user_id)
         except Exception:
             log.debug("wrapped: no readable house for %s", user_id, exc_info=True)
-        return None
+            return None
+        return H.BY_KEY[key].name if key is not None else None
 
     async def member_rows(self, member, year: int) -> W.MemberRows:
         uid = member.id

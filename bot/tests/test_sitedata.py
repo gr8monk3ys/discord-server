@@ -20,13 +20,14 @@ def full_inputs(**over) -> SD.Inputs:
         now=T, member_count=15, online=6,
         messages=1243, message_people=9, voice_seconds=34 * HOUR + 200, voice_people=5,
         events=[SD.EventIn("Valorant game night", T + 2 * DAY), SD.EventIn("October Cup", T + 5 * DAY),
-                SD.EventIn("Movie night", T + 3 * DAY)],
+                SD.EventIn("Watch party: Movie night", T + 3 * DAY), SD.EventIn("Town Hall", T + 6 * DAY),
+                SD.EventIn("Movie night", T + 4 * DAY)],  # made by hand: never published
         active_tournaments={"october cup": "Valorant"},
         games=[("Valorant", 12 * HOUR, 4), ("Minecraft", 30 * HOUR, 3), ("Roblox", 50 * HOUR, 2)],
         tournaments={"signup": 1, "done": 3, "cancelled": 2},
         matches=4, match_people=6, queued=3,
         seasonal=("Spooky Season", "🎃", T + 10 * DAY),
-        houses=[("Ember", 120), ("Tide", 340), ("Moss", 120)],
+        houses=[("Tide", 34, 5), ("Moss", 12, 3), ("Ember", 12, 4)],
         starred=12, starred_people=5, clips=30, clip_people=4, badges=87, badge_people=11,
     )
     base.update(over)
@@ -74,10 +75,31 @@ def test_bot_templated_game_nights_are_rebuilt_from_the_game_name():
     assert SD.classify_event("Game night", {}) == {"title": "Game night", "kind": "gamenight"}
 
 
-def test_tournament_titles_are_matched_and_filtered():
+def test_a_tournament_is_named_by_its_game_never_by_its_own_name():
     assert SD.classify_event("October Cup", {"october cup": "Valorant"}) == {
-        "title": "October Cup", "kind": "tournament", "game": "Valorant"}
-    assert SD.classify_event("October Cup", {"october cup": None}) == {"title": "October Cup", "kind": "tournament"}
+        "title": "Valorant tournament", "kind": "tournament", "game": "Valorant"}
+    assert SD.classify_event("October Cup", {"october cup": None}) == {"title": "Tournament", "kind": "tournament"}
+    assert SD.classify_event("October Cup", {"october cup": "Some Hobby Game"}) == {
+        "title": "Tournament", "kind": "tournament"}
+    assert SD.classify_event("October Cup", {}) is None  # not a tournament the bot knows: a hand-made event
+
+
+def test_watch_parties_and_the_town_hall_get_the_bot_s_own_words():
+    from logic import events as E
+
+    assert SD.classify_event(E.watchparty_name("Alex's  secret movie"), {}) == {"title": "Watch party", "kind": "event"}
+    assert SD.classify_event(" WATCH PARTY: anything at all", {}) == {"title": "Watch party", "kind": "event"}
+    assert SD.classify_event(E.watchparty_name("x" * 200), {}) == {"title": "Watch party", "kind": "event"}
+    assert SD.classify_event(E.TOWNHALL_NAME, {}) == {"title": "Town Hall", "kind": "event"}
+    assert SD.classify_event("town  hall", {}) == {"title": "Town Hall", "kind": "event"}
+    assert SD.classify_event("Town Hall with Alex", {}) is None
+    assert SD.classify_event("Watch party", {}) is None  # not the template: someone typed it
+
+
+@pytest.mark.parametrize("title", ["Movie night", "Alex's birthday", "Game night at mine", "Valorant", "Karaoke"])
+def test_a_hand_made_title_is_never_published_however_harmless(title):
+    assert SD.classify_event(title, {}) is None
+    assert SD.clean_title(title) == title  # it would pass the text checks; it is still not ours
 
 
 @pytest.mark.parametrize("title", [
@@ -120,16 +142,19 @@ def test_build_full_document():
     assert doc["v"] == 1 and doc["generated_at"] == schema.iso(T)
     assert doc["members"] == {"total": 15, "online": 6}
     assert doc["week"] == {"messages": 1240, "voice_hours": 34}
-    assert [e["title"] for e in doc["events"]] == ["Valorant game night", "Movie night", "October Cup"]
+    assert [e["title"] for e in doc["events"]] == ["Valorant game night", "Watch party", "Valorant tournament",
+                                                   "Town Hall"]
     assert doc["events"][0] == {"title": "Valorant game night", "kind": "gamenight", "game": "Valorant",
                                 "start": schema.iso(T + 2 * DAY)}
-    assert doc["events"][1]["kind"] == "event" and doc["events"][2]["kind"] == "tournament"
+    assert doc["events"][1] == {"title": "Watch party", "kind": "event", "start": schema.iso(T + 3 * DAY)}
+    assert doc["events"][2]["kind"] == "tournament" and doc["events"][3]["kind"] == "event"
+    assert "Movie" not in SD.render(doc) and "October" not in SD.render(doc)
     assert doc["games"] == [{"name": "Minecraft", "hours": 30}, {"name": "Valorant", "hours": 12}]  # Roblox: 2 players
     assert doc["tournaments"] == {"open": 1, "running": 0, "finished": 3}
     assert doc["matchmaking"] == {"matches_week": 4, "queued": 3}
     assert doc["seasonal"] == {"name": "Spooky Season", "emoji": "🎃", "ends": schema.iso(T + 10 * DAY)}
-    assert doc["houses"] == [{"name": "Tide", "points": 340}, {"name": "Ember", "points": 120},
-                             {"name": "Moss", "points": 120}]
+    assert doc["houses"] == [{"name": "Tide", "points": 34}, {"name": "Moss", "points": 12},
+                             {"name": "Ember", "points": 12}]  # level houses keep the order they came in
     assert doc["hall"] == {"starred": 12, "clips": 30, "badges": 87}
     assert schema.validate(doc) == []
     assert SD.summary(doc) == ("members, week, events, games, tournaments, matchmaking, seasonal, houses, hall")
@@ -175,11 +200,23 @@ def test_events_window_privacy_and_cap():
 
 def test_houses_are_all_or_nothing():
     assert "houses" not in SD.build(full_inputs(houses=None))
-    assert "houses" not in SD.build(full_inputs(houses=[("Ember", 5)]))  # one house is not a standing
-    assert "houses" not in SD.build(full_inputs(houses=[("Ember", 5), (f"<@{SNOWFLAKE}>", 9)]))
-    assert "houses" not in SD.build(full_inputs(houses=[("Ember", 5), ("Tide", SNOWFLAKE)]))
-    assert "houses" not in SD.build(full_inputs(houses=[("Ember", 5), ("Tide", "9")]))
-    assert "houses" not in SD.build(full_inputs(houses=[("Ember", 5), (None, 9)]))
+    assert "houses" not in SD.build(full_inputs(houses=[("Ember", 5, 3)]))  # one house is not a standing
+    assert "houses" not in SD.build(full_inputs(houses=[("Ember", 5, 3), (f"<@{SNOWFLAKE}>", 9, 3)]))
+    assert "houses" not in SD.build(full_inputs(houses=[("Ember", 5, 3), ("Tide", SNOWFLAKE, 3)]))
+    assert "houses" not in SD.build(full_inputs(houses=[("Ember", 5, 3), ("Tide", "9", 3)]))
+    assert "houses" not in SD.build(full_inputs(houses=[("Ember", 5, 3), (None, 9, 3)]))
+    assert "houses" in SD.build(full_inputs(houses=[("Ember", 5, 3), ("Tide", 9, 3)]))
+
+
+@pytest.mark.parametrize("people", [0, 1, 2, None, True, "3"])
+def test_houses_need_a_group_behind_every_score(people):
+    """One house scored by fewer than MIN_GROUP members takes the whole table with it: its
+    number would be one or two members' week, and a gap would say the same."""
+    rows = [("Fern", 34, 5), ("Kestrel", 12, people), ("Otter", 9, 4)]
+    for order in (rows, rows[::-1], [rows[1], rows[0], rows[2]]):
+        assert "houses" not in SD.build(full_inputs(houses=order))
+    assert "houses" not in SD.build(full_inputs(houses=[("Fern", 0, 0), ("Kestrel", 0, 0), ("Otter", 0, 0)]))
+    assert len(SD.build(full_inputs(houses=[("Fern", 34, 5), ("Kestrel", 12, 3), ("Otter", 9, 4)]))["houses"]) == 3
 
 
 def test_seasonal_event_that_is_over_is_left_out():
@@ -208,7 +245,7 @@ def test_no_value_looks_like_a_snowflake_or_a_mention():
                 SD.EventIn("@here game night", T + DAY), SD.EventIn("Valorant game night", T + DAY)],
         active_tournaments={f"<@{SNOWFLAKE}> birthday": "Valorant"},
         games=[("Valorant", 12 * HOUR, 4), (f"{SNOWFLAKE}", 99 * HOUR, 9), ("Not A Layout Game", 99 * HOUR, 9)],
-        houses=[(f"{SNOWFLAKE}", 1), ("Tide", 2)],
+        houses=[(f"{SNOWFLAKE}", 1, 9), ("Tide", 2, 9)],
     )
     for inputs in (full_inputs(), hostile):
         doc = SD.build(inputs)
@@ -222,7 +259,8 @@ def test_no_value_looks_like_a_snowflake_or_a_mention():
             else:
                 assert isinstance(value, str)
                 assert not re.search(r"\d{15,20}", value) and "@" not in value and "<" not in value
-    assert [e["title"] for e in SD.build(hostile)["events"]] == ["Valorant game night"]
+    # the tournament with the hostile name is still a tournament: it shows under the bot's words
+    assert [e["title"] for e in SD.build(hostile)["events"]] == ["Valorant tournament", "Valorant game night"]
     assert SD.build(hostile)["games"] == [{"name": "Valorant", "hours": 12}]
 
 
