@@ -391,7 +391,7 @@ def test_discord_line_formats_each_event():
     assert R.discord_line(R.Event(R.CHAT, "A_b_c", "x")) == "**<A\\_b\\_c>** x"
     assert R.discord_line(R.Event(R.JOIN, "Steve")) == "➕ **Steve** joined The Realms"
     assert R.discord_line(R.Event(R.LEAVE, "Steve")) == "➖ **Steve** left The Realms"
-    assert R.discord_line(R.Event(R.DEATH, "Steve", "was slain by Zombie")) == "💀 **Steve** was slain by Zombie"
+    assert R.discord_line(R.Event(R.DEATH, "Steve", "was slain by Zombie")) == "💀 **Steve** died"
     assert R.discord_line(R.Event(R.ADVANCEMENT, "Steve", "Stone Age", "made the advancement")) == \
         "🏅 **Steve** has made the advancement **Stone Age**"
     assert R.discord_line(R.Event(R.CHAT, "Steve", "")) is None
@@ -411,7 +411,9 @@ def test_discord_line_treats_minecraft_text_as_hostile():
     for text in ("join discord.gg/abcdef now", "free nitro at http://evil.example", "[click](https://evil.example)",
                  "visit evil.com today", "discord (dot) gg / abcdef"):
         assert R.discord_line(R.Event(R.CHAT, "Steve", text)) is None, text
-    assert R.discord_line(R.Event(R.DEATH, "Steve", "was slain by Zombie using [discord.gg/abcdef]")) is None
+    # the cause never leaves the game: it can be another player's renamed weapon or a name-tagged mob
+    assert R.discord_line(R.Event(R.DEATH, "Steve", "was slain by Zombie using [discord.gg/abcdef]")) == "💀 **Steve** died"
+    assert R.discord_line(R.Event(R.DEATH, "Steve", "was slain by Alex using [@everyone free nitro]")) == "💀 **Steve** died"
     assert R.discord_line(R.Event(R.ADVANCEMENT, "Steve", "http://evil.example", "made the advancement")) is None
 
 

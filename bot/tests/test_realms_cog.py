@@ -996,7 +996,7 @@ def test_minecraft_chat_reaches_discord_as_one_batched_message(monkeypatch):
         (post,) = env.posts
         assert post.kwargs["content"].split("\n") == [
             "➕ **Steve** joined The Realms", "**<Steve>** hello discord",
-            "🏅 **Steve** has made the advancement **Stone Age**", "💀 **Steve** was slain by Zombie",
+            "🏅 **Steve** has made the advancement **Stone Age**", "💀 **Steve** died",
             "➖ **Steve** left The Realms"]
         mentions = post.kwargs["allowed_mentions"]
         assert mentions.everyone is False and mentions.users is False and mentions.roles is False
@@ -1049,7 +1049,7 @@ def test_deaths_and_advancements_go_through_the_same_gate_and_joins_do_not(monke
         assert "nitro" not in env.posts[-1].kwargs["content"] and "Prize" not in env.posts[-1].kwargs["content"]
         await env.log(*lines("Steve"))
         text = env.posts[-1].kwargs["content"]
-        assert "💀 **Steve** was slain by Zombie using" in text and "🏅 **Steve** has made the advancement" in text
+        assert "💀 **Steve** died" in text and "free nitro" not in text and "🏅 **Steve** has made the advancement" in text
         env.member(U1).timed_out = True
         await env.log(*lines("Steve"))
         assert env.posts[-1].kwargs["content"] == "➕ **Steve** joined The Realms\n➖ **Steve** left The Realms"

@@ -485,6 +485,11 @@ def discord_line(event: Event) -> str | None:
     empty message, an echo of our own relay, or text the filter refuses (invites, any
     link, blocked words). Everything is escaped; the caller still sends with no pings."""
     name = for_discord(event.name)
+    if event.kind == DEATH:
+        # The cause is somebody else's words as often as not (the killer's renamed weapon, a
+        # name-tagged mob), and the relay gate only vouches for the player who died: say
+        # that they died and nothing more.
+        return f"💀 **{name}** died"
     text = clean_plain(event.text, MC_TEXT_CAP)
     if BRIDGE_TAG.lower() in text.lower():
         return None  # never relay a relay
@@ -500,8 +505,6 @@ def discord_line(event: Event) -> str | None:
         return f"➖ **{name}** left The Realms"
     if event.kind == ADVANCEMENT:
         return f"🏅 **{name}** has {event.verb} **{shown}**" if shown else None
-    if event.kind == DEATH:
-        return f"💀 **{name}** {shown}" if shown else None
     return None
 
 
