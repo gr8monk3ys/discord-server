@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Join Chill Gamers</title>
+  <meta name="description" content="The short link to the Chill Gamers Discord server. You are being sent to the invite.">
+  <meta name="robots" content="noindex, follow">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#184e35" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#111317" media="(prefers-color-scheme: dark)">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <link rel="canonical" href="https://discord.lscaturchio.xyz/">
+  <!-- Parent-relative paths ("../"): they resolve to the site root at /join and /join/ on
+       Vercel and to the project folder on the GitHub Pages mirror. The invite itself is
+       only in config.js; join.js reads it and redirects. -->
+  <link rel="icon" type="image/png" href="../img/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:wght@100..900&family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400..700&display=swap">
+  <link rel="stylesheet" href="../style.css">
+  <script src="../theme.js"></script>
+  <script src="../config.js"></script>
+  <script src="../join.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="top">
+    <div class="wrap top-row">
+      <div class="brand">
+        <a class="brand-home" href="https://lscaturchio.xyz" rel="author">
+          <img class="wordmark" src="../img/cursive.svg" alt="Lorenzo Scaturchio" width="818" height="198">
+          <span class="brand-name">Lorenzo Scaturchio</span>
+        </a>
+      </div>
+      <div class="controls">
+        <button class="theme-toggle" type="button" data-theme-toggle aria-label="Toggle theme" hidden>
+          <svg class="sun" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+          <svg class="moon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
+        </button>
+        <a class="btn-quiet" href="../">Server page</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main" class="lost">
+    <div class="wrap">
+      <div class="narrow">
+        <p class="label">Chill Gamers · Invite</p>
+        <h1>Taking you to the server.</h1>
+        <p class="lede" id="join-note">Discord should open in a moment. If nothing happens, use the button.</p>
+        <p class="lede"><a class="btn btn-lg" data-join href="../">Join the server</a></p>
+        <hr>
+        <nav class="recover" aria-label="Find your way">
+          <a class="label" href="../">← See the server page first</a>
+          <a class="label" href="../#faq">Read the FAQ</a>
+        </nav>
+        <noscript>
+          <p class="lede">JavaScript is off, so this page can't send you on by itself. The Join button on the <a class="ink" href="../">server page</a> needs it too; turn it on for this site and reload.</p>
+        </noscript>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap foot">
+      <div class="foot-legal">
+        <p class="label">Chill Gamers · Not affiliated with Discord</p>
+        <p class="label">No cookies · No trackers</p>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

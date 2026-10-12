@@ -1,6 +1,7 @@
 # Landing page
 
-A static page (`index.html`, `404.html`, `style.css`, `theme.js`, `app.js`, `config.js`, `img/`),
+A static page (`index.html`, `404.html`, `join/index.html`, `style.css`, `theme.js`, `app.js`,
+`join.js`, `config.js`, `img/`),
 no build step, no framework, no trackers, no scripts from anywhere but this folder (Google Fonts
 is the only third party). It lives at **<https://discord.lscaturchio.xyz/>** on Vercel; GitHub
 Pages (`.github/workflows/pages.yml`) keeps a mirror at
@@ -27,6 +28,17 @@ Edit `config.js` and set `INVITE_CODE` to the bare invite code (the part after `
 Use a permanent invite: `server/public_mode.py --apply` creates one and prints it. That is the
 only place the code lives; every Join button reads it. Until it is set the buttons are greyed out
 and the live counts stay hidden.
+
+## Short join link
+
+<https://discord.lscaturchio.xyz/join> sends people straight to the invite: `join/index.html`
+loads `config.js` and `join.js`, which checks the code the same way `app.js` does and calls
+`location.replace("https://discord.gg/CODE")`. The page shows a Join button in case the redirect
+is blocked and a note for readers without JavaScript; it is `noindex` (meta tag and an
+`X-Robots-Tag` header in `vercel.json`) with its canonical on the home page. With `cleanUrls` on
+and `trailingSlash` off, Vercel serves it at `/join` and redirects `/join/` there. Its assets
+are linked parent-relative (`../style.css`), so it also works on the Pages mirror and in the
+local preview. The bot's `/vote` hands out this link (`bot/logic/votehub.py` `SHARE_URL`).
 
 ## Live counts
 

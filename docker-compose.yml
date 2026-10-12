@@ -1,0 +1,36 @@
+# Front Desk on any always-on Linux box (VPS, Raspberry Pi, mini PC). See docs/HOSTING.md.
+#
+#   docker compose up -d --build     build and start (also after `git pull`)
+#   docker compose logs -f --tail 50 follow the log
+#   docker compose ps                STATUS shows "healthy" once the heartbeat is fresh
+#   docker compose down              stop (the data volume is kept)
+#
+# Secrets come from server/.env (same file as on Windows; it is never copied into the image).
+services:
+  bot:
+    build: .
+    image: front-desk-bot
+    container_name: front-desk
+    restart: unless-stopped          # back after a crash, a hang (see run_container.sh) or a reboot
+    init: true
+    env_file: server/.env
+    volumes:
+      - front-desk-data:/app/bot/data   # database, nightly backups, log, lock, heartbeat
+    mem_limit: 512m
+    read_only: true                  # the bot writes only to its data volume
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_signal: SIGINT
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  front-desk-data:

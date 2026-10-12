@@ -124,3 +124,12 @@ def test_season_points_window_and_reasons():
 def test_squad_badge_name_differs_from_the_level_role():
     import config
     assert A.BY_KEY["squad_regular"].name not in {name for _, name in config.LEVEL_ROLES}
+
+
+def test_event_badges_come_from_the_events_file_and_do_not_count_toward_progress():
+    held = {"first_squad", "event_halloween_2026", "event_nosuchevent_2026", "event_halloween_20x6"}
+    names = [b.name for b in A.held_badges(held)]
+    assert names[0] == "Squad Up" and len(names) == 2
+    assert names[1].endswith("2026")
+    assert A.progress(held) == f"1/{A.TOTAL}"
+    assert len(A.grid(held).split()) == 2

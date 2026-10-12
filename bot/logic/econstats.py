@@ -20,7 +20,7 @@ LABELS = {
     "mvp": "Weekly MVP", "clipweek": "Clip of the week", "give": "Gifts (/give)", "coinflip": "Coinflip",
     "slots": "Slots", "blackjack": "Blackjack", "trivia": "Trivia", "predict": "Predictions",
     "shop": "Shop", "season": "Season bonuses", "quest": "Starter quest", "challenge": "Weekly challenges",
-    "word": "Daily Word", "tournament": "Tournaments", "invitecontest": "Invite contest",
+    "word": "Daily Word", "event": "Seasonal events", "support": "Supporter thanks", "tournament": "Tournaments", "invitecontest": "Invite contest",
     "boost": "Booster thanks", "booststipend": "Booster stipend", "motm": "Member of the month",
     "birthday": "Birthdays", "raffle": "Raffle",
 }

@@ -177,6 +177,13 @@ day-to-day attention. Design and history:
 | Game news | official Steam announcements and verified feeds (`bot/assets/news_sources.json`) posted in each game's channel every 30 min, no pings; staff `/news test` |
 | Staff applications | `/apply staff` (30+ days in the server, 90+ day account, clean record), `/apply status`; review card in 📋・mod-log with Approve/Deny (Keepers) and Interview; the Moderator role is then given by hand, since it sits above Front Desk |
 | Text filter | slurs (with evasion spellings) and other servers' invite links are refused in member text the bot reposts: `/lfg` and `/gamenight` notes, shoutouts and Spotlight, tournament names, partner applications |
+| Seasonal events | Halloween (Oct 20 to Nov 1) and Winter Fest (Dec 15 to Jan 2) from `bot/assets/events.json`, every year: 6-10 drops a day in 💬・general while chat is active (Grab button, 25-75 coins + 1 point, gone after 10 min, max 12 a day each), a daily quest (+3 points, 100 coins), `/event` with your points and the top 10; at the end the top 3 win 2000/1000/500 coins, first place gets the Event Champ role and 10+ points earns the event badge; accounts under 30 days old earn nothing |
+| Game accounts | `/link steam` + `/link verify` (members prove ownership with a code in their Steam profile summary), `/unlink`, `/accounts`; staff `/link approve/remove`; persona, Steam link and hours in the server's games show on `/profile`, refreshed daily. No API key |
+| Vote hub | `/vote` (private): Disboard with your bump count and when the next bump is ready, discord.me, top.gg ("coming soon" until listed) and the share link discord.lscaturchio.xyz/join; Sundays 17:00 the week's top 3 Disboard bumpers are thanked in 🎲・games and paid 300/200/100 coins (accounts 30+ days old) |
+| Catch-up | `/catchup [channel] [hours]`: a private AI summary (5-8 bullets plus a "good moment to jump in") of a public channel's last 1-48 hours (default 12); needs `ANTHROPIC_API_KEY` in `server/.env`, otherwise it says summaries aren't set up; accounts 30+ days old, 3 a day per member and 60 a day server-wide; bots and members with tracking off are left out; staff `/catchup-usage` shows today's requests and tokens |
+
+Short join link: <https://discord.lscaturchio.xyz/join>. Moving the bot off this PC: `docs/HOSTING.md`
+(Docker image, `docker-compose.yml`, `server/migrate_host.py`).
 
 Landing page: <https://discord.lscaturchio.xyz/> (`site/`, served by Vercel from `main`; GitHub Pages keeps a
 mirror via `.github/workflows/pages.yml`, see `site/README.md`). Listing-site copy and banners: `docs/LISTING.md`, `assets/listing/`.
