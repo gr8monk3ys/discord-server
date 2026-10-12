@@ -160,7 +160,8 @@ CATEGORIES = [
             },
             # Front Desk's bridge to our Minecraft server: pinned status panel, chat both ways.
             {"name": "⛏️・realms", "topic": "The Realms, our Minecraft server. Status is pinned; chat here reaches "
-                                           "the game and back. /realms link gets you on the whitelist.",
+                                           "the game, and linked players' chat comes back. /realms link gets "
+                                           "you on the whitelist.",
              "slowmode": 2},
         ],
     },
