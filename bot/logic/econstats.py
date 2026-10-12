@@ -23,6 +23,7 @@ LABELS = {
     "word": "Daily Word", "event": "Seasonal events", "support": "Supporter thanks", "tournament": "Tournaments", "invitecontest": "Invite contest",
     "boost": "Booster thanks", "booststipend": "Booster stipend", "motm": "Member of the month",
     "birthday": "Birthdays", "raffle": "Raffle",
+    "crew": "Welcome Crew greetings", "supporterstipend": "Supporter tier stipend",
 }
 
 

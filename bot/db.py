@@ -470,6 +470,32 @@ MIGRATIONS = [
         PRIMARY KEY (day, user_id)
     )""",
     ],
+    [
+        # Wave 9: Welcome Crew. Arrivals waiting for (or covered by) a crew ping, one row per
+        # member (the latest arrival), and one greeting per newcomer ever (first crew member wins).
+        """CREATE TABLE crew_arrivals (
+        user_id INTEGER PRIMARY KEY,
+        at INTEGER NOT NULL,
+        fresh INTEGER NOT NULL DEFAULT 1,
+        pinged_at INTEGER,
+        skipped INTEGER NOT NULL DEFAULT 0
+    )""",
+        """CREATE TABLE crew_greetings (
+        newcomer_id INTEGER PRIMARY KEY,
+        crew_id INTEGER NOT NULL,
+        at INTEGER NOT NULL,
+        coins INTEGER NOT NULL DEFAULT 0
+    )""",
+        "CREATE INDEX crew_greetings_crew ON crew_greetings (crew_id, at)",
+        # Supporter tier: who holds (or held) the Supporter role, and when they were thanked.
+        """CREATE TABLE supporters (
+        user_id INTEGER PRIMARY KEY,
+        since INTEGER NOT NULL,
+        source TEXT NOT NULL DEFAULT 'role',
+        thanked_at INTEGER,
+        ended_at INTEGER
+    )""",
+    ],
 ]
 
 

@@ -31,6 +31,8 @@ Every coin moves through `bot/economy.py` (`apply`, `apply_tx`, `transfer`), so 
 | `booststipend` | `logic/vibes.py` | 500 | per booster per month | yes |
 | `birthday` | `cogs/engagement.py` | 250 | once a year | no |
 | `raffle` (win) | `logic/shop.py` | 80% of the week's pot | one winner a week | buying needs an established account |
+| `crew` (Welcome Crew greeting) | `logic/crew.py` | 40 when a newcomer answers you | once per newcomer ever, 3 paid a day (120) | yes (both accounts; fresh joins only, the newcomer has to reply) |
+| `supporterstipend` | `logic/supporter.py` | 250 | per Supporter per month | yes |
 
 Zero-sum or near zero-sum (they move coins around more than they create or destroy them):
 
