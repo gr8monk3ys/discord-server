@@ -101,7 +101,7 @@ def test_site_join_buttons_are_wired_by_app_js():
 def test_site_assets_referenced_exist():
     for name in ("index.html", "404.html"):
         page = (SITE / name).read_text(encoding="utf-8")
-        refs = re.findall(r'(?:src|href)="/?((?:img/)?[\w.-]+\.(?:png|css|js))"', page)
+        refs = re.findall(r'(?:src|href)="/?((?:img/)?[\w.-]+\.(?:png|svg|css|js))"', page)
         assert refs, name
         for src in set(refs):
             assert (SITE / src).is_file(), f"{name}: {src}"
@@ -196,7 +196,7 @@ def test_site_has_this_week_strip_and_updated_faq():
     faq = re.search(r'<section id="faq".*?</section>', page, re.S).group(0).lower()
     for want in ("level", "roles", "partner"):
         assert want in faq, want
-    assert '<p class="counts" id="counts"' in page  # live counts stay
+    assert '<p class="counts label" id="counts"' in page  # live counts stay, as a wall label
 
 
 def test_canonical_is_one_origin_everywhere():
@@ -269,11 +269,86 @@ def test_theme_toggle_is_wired_and_storage_is_guarded():
         assert '<meta name="color-scheme" content="light dark">' in page, name
 
 
-def test_header_links_back_to_lscaturchio():
+def test_header_mirrors_lscaturchio():
+    """Same bar as the main site: wordmark left (it is the way back), nav pill, controls."""
     for name in ("index.html", "404.html"):
         page = (SITE / name).read_text(encoding="utf-8")
         header = re.search(r'<header class="top">.*?</header>', page, re.S).group(0)
-        assert re.search(r'<a class="byline" href="https://lscaturchio\.xyz"[^>]*>by Lorenzo', header), name
+        brand = re.search(r'<a class="brand-home" href="https://lscaturchio\.xyz"[^>]*>(.*?)</a>', header, re.S)
+        assert brand, name
+        assert re.search(r'<img class="wordmark" src="/?img/cursive\.svg" alt="Lorenzo Scaturchio"', brand.group(1)), name
+        assert '<span class="brand-name">Lorenzo Scaturchio</span>' in brand.group(1), name
+        # the icon names the theme you are in, as on the main site: sun first, moon stacked on it
+        assert header.index('class="sun"') < header.index('class="moon"'), name
+        # One Pen Rule: the header carries no filled button, the masthead keeps the only fill
+        assert 'class="btn ' not in header and 'class="btn"' not in header, name
+    header = re.search(r'<header class="top">.*?</header>', _page(), re.S).group(0)
+    assert header.index('class="brand"') < header.index('<nav class="sections" aria-label="Primary">')         < header.index('class="controls"')
+    assert re.search(r'<a class="btn-quiet" data-join', header)
+
+
+def test_wordmark_is_a_plain_svg():
+    svg = (SITE / "img" / "cursive.svg").read_text(encoding="utf-8")
+    assert svg.lstrip().startswith("<?xml") and "<svg" in svg
+    for bad in ("<script", "href=", "<style", "<foreignObject", "<image"):
+        assert bad not in svg, bad
+
+
+def test_footer_is_the_site_map_and_links_back():
+    footer = re.search(r"<footer>.*?</footer>", _page(), re.S).group(0)
+    assert '<h2 class="card-title">' in footer
+    columns = re.findall(r'<nav aria-label="([^"]+)">\s*<h3 class="label">([^<]+)</h3>', footer)
+    assert len(columns) >= 2 and all(label == heading for label, heading in columns)
+    assert re.search(r'<a class="ink" href="https://lscaturchio\.xyz" rel="author">', footer)
+    assert footer.count('class="ink"') == len(re.findall(r"<li>", footer))  # every link gets the pen
+    legal = re.search(r'<div class="foot-legal">.*?</div>', footer, re.S).group(0)
+    assert legal.count('<p class="label">') == 2 and "Not affiliated with Discord" in legal
+
+
+def test_fonts_are_the_main_sites_cuts():
+    """next/font on lscaturchio.xyz ships Fraunces without the opsz axis; asking for it here
+    (as this page once did) draws visibly thinner display type than the main site."""
+    for name in ("index.html", "404.html"):
+        page = (SITE / name).read_text(encoding="utf-8")
+        hrefs = re.findall(r'<link rel="stylesheet" href="(https://fonts\.googleapis\.com/[^"]+)"', page)
+        assert len(hrefs) == 1, name
+        href = hrefs[0]
+        assert "opsz" not in href, name
+        for want in ("family=Fraunces:wght@100..900", "family=Instrument+Sans:wght@400..700",
+                     "family=IBM+Plex+Mono:wght@400;500;600", "display=swap"):
+            assert want in href, f"{name}: {want}"
+    css = _css()
+    for fallback in ("Fraunces Fallback", "Instrument Sans Fallback", "IBM Plex Mono Fallback"):
+        assert f'@font-face {{ font-family: "{fallback}"; src: local(' in css, fallback
+    assert "@import" not in css and "url(http" not in css  # nothing remote from the stylesheet
+
+
+def test_sections_are_numbered_ledgers():
+    """Every section is the main site's ledger: a wall-label kicker and title in the rail."""
+    page = _page()
+    kickers = []
+    for sid in ("features", "week", "games", "rules", "faq"):
+        section = re.search(rf'<section id="{sid}">.*?</section>', page, re.S).group(0)
+        head = re.search(r'<div class="ledger-head">\s*<p class="label">(\d\d) — ([^<]+)</p>\s*<h2>[^<]+</h2>',
+                         section)
+        assert head, sid
+        assert '<div class="ledger-body">' in section, sid
+        kickers.append(head.group(1))
+    assert kickers == ["01", "02", "03", "04", "05"]
+    assert page.count("<h1") == 1
+    assert "btn-big" not in page and "btn-small" not in page  # the old button sizes are gone
+
+
+def test_house_values_match_the_main_site():
+    css = _css()
+    assert "h1 { font-size: clamp(2.4rem, 5.2vw, 4.9rem); font-weight: 720;" in css
+    assert "font-size: clamp(1.55rem, 2.4vw, 2.25rem); font-weight: 650;" in css
+    assert "--sheet-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);" in css
+    assert css.count("box-shadow:") == 3  # the sheet, the ledge, and the disabled reset
+    assert "grid-template-columns: minmax(280px, 360px) 1fr;" in css  # the ledger rail
+    assert "grid-template-columns: 1.1fr 2fr;" in css  # the footer split
+    assert _rule(css, ".wrap")  # 72rem page width
+    assert "max-width: 72rem" in _rule(css, ".wrap")
 
 
 def test_404_page():
