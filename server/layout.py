@@ -297,11 +297,14 @@ ONBOARDING_DEFAULT_CHANNELS = [
     "🆘・help", "💡・suggestions", "🤣・memes", "📸・clips", "⭐・hall-of-fame", "🔢・counting", "🎲・games", "🕹️・gaming", "🎮・lfg", "🎨・art", "💻・code",
     "👗・fashion", "♟️・chess", "🤖・bot-commands", "📺・creators", "🏆・tournaments", "🎭・roles", "🤝・partners",
     "🔊 Lobby", "➕ New Squad", "🎮 Squad", "💤 AFK",
-    "📚・guides", "🖥・setups", "🎙・stage",
+    "📚・guides", "🖥・setups",
     "⛏️・realms",
 ]
 # Anything public that's neither a default channel nor an Onboarding option is
 # hidden from members who went through Onboarding, so keep this list complete.
+# Two kinds never go in it: private ("private_to") channels, and the Stage channel. Discord
+# may refuse a Stage as a default channel, and one refused channel fails the whole
+# Onboarding edit; a Stage shows itself to everyone while an event is live anyway.
 ONBOARDING_PROMPTS = [
     {
         "title": "What do you play?",

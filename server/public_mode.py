@@ -9,7 +9,8 @@ Administrator. It needs Manage Roles, Manage Channels, Manage Server and
 Create Invite on Front Desk's role.
 
 Steps, all driven by layout.py:
-- create the roles Front Desk hands out (Clip of the Week, Recruiter, Bumper)
+- create the roles Front Desk hands out (Clip of the Week, Recruiter, Bumper, the house roles,
+  Welcome Crew, Supporter, ...); new roles land at the bottom of the list and nothing is moved
 - create any public layout channel that doesn't exist yet (never moves or edits existing ones),
   forums with their tags, layout, sort order, default reaction and slowmode, and the Stage channel
 - create private categories/channels ("private_to") and keep them private
@@ -93,6 +94,9 @@ class PublicMode:
     def __init__(self, guild: discord.Guild, apply: bool):
         self.guild = guild
         self.apply = apply
+        # Roles made in this run: guild.roles only learns about them from the gateway a moment
+        # later, and the private channels made further down need them straight away.
+        self.made_roles: dict[str, discord.Role] = {}
 
     async def do(self, verb, what, action):
         print(f"  {verb:<7} {what}")
@@ -124,9 +128,13 @@ class PublicMode:
             hoist = spec.get("hoist", False)
             role = self.role(name)
             if role is None:
-                await self.do("create", f"@{name}", lambda: self.guild.create_role(
+                # No position: Discord puts a new role at the bottom, below Front Desk, and
+                # nothing is ever moved.
+                made = await self.do("create", f"@{name}", lambda: self.guild.create_role(
                     name=name, colour=discord.Colour(spec.get("color", 0)), hoist=hoist,
                     mentionable=spec.get("mentionable", False), reason="Public server"))
+                if made is not None:
+                    self.made_roles[name] = made
             elif role.hoist != hoist and role < self.guild.me.top_role:
                 await self.do("update", f"@{name}: {'hoist' if hoist else 'unhoist'}",
                               lambda: role.edit(hoist=hoist, reason="Public server"))
@@ -216,7 +224,7 @@ class PublicMode:
 
     # ------------------------------------------------------------ private spaces
     def private_overwrites(self, role_names):
-        return private_overwrites(self.guild, role_names)
+        return private_overwrites(self.guild, role_names, known=self.made_roles)
 
     @staticmethod
     def is_private(ch, ow) -> bool:
