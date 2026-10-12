@@ -70,6 +70,7 @@ MODULES = [
     ("cogs.forums", {"message_content"}),  # guides + setups forums: reaction, one-time post reward, recap line
     ("cogs.clipcast", {"members", "message_content"}),  # consented weekly clips to YouTube Shorts, /clipcast
     ("cogs.realms", {"members", "message_content"}),  # Minecraft bridge: status panel, whitelist, chat relay, playtime
+    ("cogs.wrapped", {"members"}),  # /wrapped year-in-review cards (Dec 1 - Jan 15), /wrapped-preview (staff)
 ]
 
 PERMISSIONS = discord.Permissions(

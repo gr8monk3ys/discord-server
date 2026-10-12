@@ -55,6 +55,7 @@ MODULE_CATEGORY = {
     "utility": "utility", "moderation": "utility", "ops": "utility", "helpdesk": "utility", "heartbeat": "utility",
     "houses": "community",
     "clipcast": "creators",
+    "wrapped": "stats",
 }
 
 # Staff commands say so in their description: "Staff: ...", "... (mods only)", "... (staff only)",
