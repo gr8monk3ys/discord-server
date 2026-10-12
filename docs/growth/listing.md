@@ -1,7 +1,8 @@
 # Growing the server
 
-Positioning: **chill 18+ gamers, no tryhards, no toxicity.** Every listing and post says the
-same three things: adults only, any game, someone to play with tonight.
+Positioning: **chill gamers, no tryhards, no toxicity.** Every listing and post says the
+same three things: laid-back, any game, someone to play with tonight. The server is 18+ by rule;
+the copy implies it ("for adults") and states it once, in the rules line.
 
 Use the permanent invite that `server/public_mode.py --apply` prints. It's one link, so the
 invite tracker can tell listing traffic from friend invites.
@@ -14,11 +15,11 @@ invite tracker can tell listing traffic from friend invites.
 
 **Short description** (shown in search results):
 
-> Chill 18+ gamers. No tryhards, no toxicity. Squad up for Valorant, CoD, Fortnite, Minecraft and more, any night.
+> Chill gamers. No tryhards, no toxicity. Squad up for Valorant, CoD, Fortnite, Minecraft and more.
 
 **Long description:**
 
-> Tired of servers full of kids and sweats? This is a laid-back gaming hangout for adults (18+).
+> Tired of servers full of kids and sweats? This is a laid-back gaming hangout for adults.
 >
 > 🎮 **Find a squad fast.** `/lfg` posts a "need 2 more" card with a Join button, and people get
 > pinged only for the games they picked.
@@ -30,9 +31,9 @@ invite tracker can tell listing traffic from friend invites.
 > Games: Valorant, Call of Duty, Fortnite, Minecraft, Apex, CS2, League, GTA Online, Roblox, Wardogs,
 > plus whatever you're playing.
 >
-> Rules are short: be decent, no cheats, no spam. 18+ only.
+> Rules are short: be decent, no cheats, no spam, no NSFW, 18+ only.
 
-**Tags** (Disboard allows 5): `gaming`, `18+`, `chill`, `lfg`, `valorant`
+**Tags** (Disboard allows 5): `gaming`, `adults`, `chill`, `lfg`, `valorant`
 
 **Language:** English · **Category:** Gaming
 
@@ -58,20 +59,20 @@ megathread), r/FortniteLFG, r/MinecraftBuddies, r/GTAOnlineCrews. Read each sub'
 
 **Template (LFG subs):**
 
-> **[NA West][18+] Chill squad for Valorant / CoD / Fortnite tonight**
+> **[NA West] Chill squad for Valorant / CoD / Fortnite tonight**
 > Adult gamers, any rank, no rage. We run games most nights around 8 to 11 PM PT and have a
 > small Discord with a squad-finder bot so you're never solo-queuing. DM me or grab the invite:
 > <invite>
 
 **Template (r/DiscordAdvertising / r/discordservers):**
 
-> **Chill 18+ Gamers**: laid-back gaming hangout for adults
+> **Chill Gamers**: laid-back gaming hangout for adults
 > No tryhards, no toxicity. LFG bot with Join buttons, voice every night, weekly MVP, music.
 > Valorant, CoD, Fortnite, Minecraft, Apex and more. <invite>
 
 ## Partner swap (with servers your size)
 
-> Hey! I run a chill 18+ gaming server (~N members) with an LFG bot and weekly game nights.
+> Hey! I run a chill gaming server for adults (~N members) with an LFG bot and weekly game nights.
 > Want to swap partner posts? I'll post yours in our #📣・announcements and you post ours.
 > Happy to do a joint game night too.
 
