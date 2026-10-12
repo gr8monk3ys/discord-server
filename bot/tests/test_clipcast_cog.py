@@ -872,16 +872,17 @@ def test_approved_clips_are_uploaded_once_and_celebrated(monkeypatch, tmp_path):
         assert await env.status(c1) == L.DECLINED
         assert env.leftovers() == [] and len(env.http.files_seen) == 2  # temp files are gone
 
-        # the public "as seen on" replies, the coins and the badge
+        # the public "as seen on" replies and the badge; the coins are only promised for later
         notice_b, notice_a = env.guild.clips.sent
         assert notice_a["content"] == (f"📺 As seen on the server's YouTube: https://youtu.be/vid00000002\n"
-                                       f"<@{A}> earned 100 coins and the 📺 **On the Channel** badge for it.")
+                                       f"<@{A}> earned the 📺 **On the Channel** badge for it. "
+                                       "And 100 coins follow once it has stayed up for 7 days.")
         assert notice_a["reference"] == ("ref", a1) and notice_b["reference"] == ("ref", b1)
         assert only_pings(notice_a["allowed_mentions"], A)
         assert ra["notice_message_id"] == notice_a["id"]
-        assert await economy.balance(env.db, A) == 100 and await economy.balance(env.db, B) == 100
-        refs = {r["ref"] for r in await env.db.fetchall("SELECT ref FROM ledger WHERE reason = 'clipcast'")}
-        assert refs == {f"clipcast:{a1}", f"clipcast:{b1}"}
+        assert await economy.balance(env.db, A) == 0 and await economy.balance(env.db, B) == 0
+        assert await env.db.fetchall("SELECT ref FROM ledger WHERE reason = 'clipcast'") == []
+        assert (ra["payout_at"], rb["payout_at"]) == (None, None)
         held = await env.db.fetchall("SELECT user_id FROM achievements WHERE key = 'clipcast' ORDER BY user_id")
         assert [r["user_id"] for r in held] == [A, B]
         assert len(env.guild.mod_log.sent) == 2
@@ -893,7 +894,10 @@ def test_approved_clips_are_uploaded_once_and_celebrated(monkeypatch, tmp_path):
         await env.tick(PUB_AT + 600)
         await env.tick(PUB_AT + WEEK)
         assert len(env.http.calls) == before and len(env.http.downloads) == 2
-        assert await economy.balance(env.db, A) == 100
+        # a week on, still up: now the coins, once each
+        assert await economy.balance(env.db, A) == 100 and await economy.balance(env.db, B) == 100
+        refs = {r["ref"] for r in await env.db.fetchall("SELECT ref FROM ledger WHERE reason = 'clipcast'")}
+        assert refs == {f"clipcast:{a1}", f"clipcast:{b1}"}
         assert all(no_secrets(m["content"]) for m in env.guild.mod_log.sent + env.guild.clips.sent)
     with_env(go, monkeypatch, tmp_path)
 
@@ -961,19 +965,140 @@ def test_a_private_upload_gets_no_public_link(monkeypatch, tmp_path):
         assert env.http.of("init")[0].json["status"]["privacyStatus"] == "private"
         assert env.guild.clips.sent == []
         assert "Members aren't shown the link while it's private" in env.guild.mod_log.sent[0]["content"]
-        assert await economy.balance(env.db, A) == 100
+        assert await economy.balance(env.db, A) == 0
+        await env.tick(PUB_AT + L.PAYOUT_DAYS * DAY)  # a private upload that stays up pays like any other
+        assert await economy.balance(env.db, A) == 100 and env.guild.clips.sent == []
     with_env(go, monkeypatch, tmp_path, environ={**ENV, "YOUTUBE_PRIVACY": "private"})
 
 
-def test_coins_need_a_backer_and_tracking(monkeypatch, tmp_path):
+# ---------------------------------------------------------------- the delayed payout
+async def clip_ledger(env, uid):
+    rows = await env.db.fetchall("SELECT delta, reason, ref FROM ledger WHERE user_id = ? ORDER BY id", (uid,))
+    return [(r["delta"], r["reason"], r["ref"]) for r in rows]
+
+
+PAY_AT = PUB_AT + 7 * DAY
+
+
+def test_a_clip_pays_once_after_it_has_stayed_up_a_week(monkeypatch, tmp_path):
+    async def go(env):
+        assert L.PAYOUT_DAYS == 7
+        await env.start()
+        a1 = await env.approved(A)
+        await env.tick(PUB_AT)
+        assert await env.status(a1) == L.PUBLISHED and await clip_ledger(env, A) == []
+        await env.tick(PAY_AT - 60)  # a minute short of a week
+        assert await clip_ledger(env, A) == [] and (await env.row(a1))["payout_at"] is None
+        await env.tick(PAY_AT)
+        assert await clip_ledger(env, A) == [(L.COINS, L.REASON, f"clipcast:{a1}")]
+        assert (await env.row(a1))["payout_at"] == PAY_AT and await env.status(a1) == L.PUBLISHED
+        for later in (PAY_AT + 300, PAY_AT + DAY, PAY_AT + 5 * WEEK):  # every later tick: nothing more
+            await env.tick(later)
+        assert await env.cog.run_payouts() == 0 and await economy.balance(env.db, A) == L.COINS
+        # taking it down after it paid is the author's right and costs nothing: it had its week
+        inter = await env.command("remove", A, str(a1))
+        assert inter.text == "Done. The video is deleted from YouTube." and await economy.balance(env.db, A) == L.COINS
+        assert not hasattr(L, "refund_ref") and not hasattr(env.cog, "reverse_payout")
+    with_env(go, monkeypatch, tmp_path)
+
+
+def test_a_clip_removed_on_day_six_never_pays(monkeypatch, tmp_path):
+    """Post, collect, remove is not a coin tap: there is nothing to collect until it has stayed."""
+    async def go(env):
+        await env.start()
+        by_author, by_staff, failed_delete = [await env.approved(uid) for uid in (A, B, C)]
+        await env.tick(PUB_AT)
+        env.t = PUB_AT + 6 * DAY
+        assert (await env.command("remove", A, str(by_author))).text == "Done. The video is deleted from YouTube."
+        await env.command("remove", MOD, str(by_staff), roles=[config.MOD_ROLE])
+        env.http.script("delete", Response(403, {}, google_error("insufficientPermissions")))
+        await env.command("remove", C, str(failed_delete))  # asked for, even though the owner must finish it
+        assert [await env.status(m) for m in (by_author, by_staff, failed_delete)] == [L.REMOVED, L.REMOVED, L.REMOVAL]
+        for at in (PAY_AT, PAY_AT + WEEK, PAY_AT + 10 * WEEK):
+            await env.tick(at)
+        for uid in (A, B, C):
+            assert await clip_ledger(env, uid) == [] and await economy.balance(env.db, uid) == 0
+        assert not await env.db.fetchall("SELECT 1 FROM ledger WHERE reason = ?", (L.REASON,))
+    with_env(go, monkeypatch, tmp_path)
+
+
+def test_a_restart_between_publish_and_payout_still_pays_exactly_once(monkeypatch, tmp_path):
     async def go(env):
         await env.start()
         a1 = await env.approved(A)
-        await env.db.execute("UPDATE clipcast SET backers = 0 WHERE message_id = ?", (a1,))
         await env.tick(PUB_AT)
-        assert await env.status(a1) == L.PUBLISHED and await economy.balance(env.db, A) == 0
-        (notice,) = env.guild.clips.sent
-        assert "coins" not in notice["content"] and "badge" in notice["content"]
+        # the bot restarts: a new cog, nothing kept in memory, the same database
+        env.cog = env.bot.cog = Clipcast(env.bot, http=env.http, environ=ENV, tmp_dir=env.tmp)
+        await env.tick(PAY_AT + 3 * DAY)  # and it was down when the week ran out
+        assert await clip_ledger(env, A) == [(L.COINS, L.REASON, f"clipcast:{a1}")]
+        env.cog = env.bot.cog = Clipcast(env.bot, http=env.http, environ=ENV, tmp_dir=env.tmp)
+        await env.tick(PAY_AT + 4 * DAY)
+        # even a payout row lost by hand cannot make it pay again: the ledger ref decides
+        await env.db.execute("UPDATE clipcast SET payout_at = NULL WHERE message_id = ?", (a1,))
+        assert await env.cog.run_payouts() == 0
+        assert await clip_ledger(env, A) == [(L.COINS, L.REASON, f"clipcast:{a1}")]
+        assert len(env.http.of("put")) == 1  # and nothing was uploaded twice along the way
+    with_env(go, monkeypatch, tmp_path)
+
+
+def test_an_empty_wallet_changes_nothing(monkeypatch, tmp_path):
+    """The hole in a clawback: spend or give the coins away first. Nothing is ever taken back
+    now, so what the author's balance is on any day is irrelevant."""
+    async def go(env):
+        await env.start()
+        await economy.apply(env.db, A, 250, "daily", T0)
+        early, kept = await env.approved(A), await env.approved(B)
+        await env.tick(PUB_AT)
+        await economy.transfer(env.db, A, B, 250, "give", PUB_AT + 60)  # A empties their wallet
+        assert await economy.balance(env.db, A) == 0
+        env.t = PUB_AT + DAY
+        await env.command("remove", A, str(early))
+        await env.tick(PAY_AT)
+        assert await economy.balance(env.db, A) == 0  # removed early: never paid, nothing to recover
+        assert (L.COINS, L.REASON, f"clipcast:{kept}") in await clip_ledger(env, B)
+        assert all(delta > 0 for (delta, reason, _) in await clip_ledger(env, B) if reason == L.REASON)
+        assert not await env.db.fetchall("SELECT 1 FROM ledger WHERE ref LIKE '%refund%'")
+    with_env(go, monkeypatch, tmp_path)
+
+
+def test_the_payout_needs_a_backer_and_an_author_still_here_established_and_tracked(monkeypatch, tmp_path):
+    async def go(env):
+        await env.start()
+        no_backer, opted_out, left = [await env.approved(uid) for uid in (A, B, C)]
+        await env.db.execute("UPDATE clipcast SET backers = 0 WHERE message_id = ?", (no_backer,))
+        await env.tick(PUB_AT)
+        notices = {n["reference"][1]: n["content"] for n in env.guild.clips.sent}
+        assert "coins" not in notices[no_backer] and "badge" in notices[no_backer]
+        assert "100 coins follow once it has stayed up for 7 days" in notices[opted_out]
+        # between publish and payout: one opts out, one leaves (the row is edited directly so
+        # the clip itself stays published and only the payout rule is under test)
+        await env.optout(B)
+        del env.guild.members[C]
+        env.t = PAY_AT
+        assert await env.cog.run_payouts() == 0
+        for uid, mid in ((A, no_backer), (B, opted_out), (C, left)):
+            assert await clip_ledger(env, uid) == [], uid
+            assert (await env.row(mid))["payout_at"] == PAY_AT  # settled: not looked at again
+        # coming back, or opting back in, later does not reopen it
+        await env.db.execute("DELETE FROM privacy_optout")
+        env.member(C)
+        env.t = PAY_AT + DAY
+        assert await env.cog.run_payouts() == 0 and await economy.balance(env.db, B) == 0
+    with_env(go, monkeypatch, tmp_path)
+
+
+def test_the_payout_waits_when_discord_cannot_say_whether_the_author_is_here(monkeypatch, tmp_path):
+    async def go(env):
+        await env.start()
+        a1 = await env.approved(A)
+        await env.tick(PUB_AT)
+        member = env.guild.members.pop(A)  # not cached, and the API is having a moment
+        env.guild.fetch_fail = http_error(discord.HTTPException, 503)
+        env.t = PAY_AT
+        assert await env.cog.run_payouts() == 0 and (await env.row(a1))["payout_at"] is None
+        env.guild.members[A] = member
+        env.t = PAY_AT + 300
+        assert await env.cog.run_payouts() == 1 and await economy.balance(env.db, A) == L.COINS
     with_env(go, monkeypatch, tmp_path)
 
 
@@ -1315,7 +1440,7 @@ def test_remove_takes_a_posted_clip_down_and_tells_staff(monkeypatch, tmp_path):
         assert await env.status(a1) == L.PUBLISHED and env.http.of("delete") == []
 
         inter = await env.command("remove", A, str(a1))
-        assert inter.deferred and inter.text.startswith("Done. The video is deleted from YouTube.")
+        assert inter.deferred and inter.text == "Done. The video is deleted from YouTube."
         (delete,) = env.http.of("delete")
         assert delete.params == {"id": "vid00000001"} and delete.headers["Authorization"] == "Bearer tok1"
         assert await env.status(a1) == L.REMOVED
@@ -1323,71 +1448,6 @@ def test_remove_takes_a_posted_clip_down_and_tells_staff(monkeypatch, tmp_path):
         (alert,) = env.guild.mod_log.sent
         assert f"by <@{A}> has to come down (requested by <@{A}>). I deleted the video from YouTube." in alert["content"]
         assert alert["allowed_mentions"].to_dict() == discord.AllowedMentions.none().to_dict()
-    with_env(go, monkeypatch, tmp_path)
-
-
-async def clip_ledger(env, uid):
-    rows = await env.db.fetchall("SELECT delta, reason, ref FROM ledger WHERE user_id = ? ORDER BY id", (uid,))
-    return [(r["delta"], r["reason"], r["ref"]) for r in rows]
-
-
-def test_an_author_who_takes_a_fresh_clip_down_gives_the_coins_back_once(monkeypatch, tmp_path):
-    """Post, collect, remove must not be a coin tap."""
-    async def go(env):
-        await env.start()
-        a1 = await env.approved(A)
-        await env.tick(PUB_AT)
-        assert await economy.balance(env.db, A) == L.COINS
-        env.guild.mod_log.sent.clear()
-        env.http.script("delete", Response(403, {}, google_error("insufficientPermissions")))
-        env.t = PUB_AT + 29 * DAY
-        inter = await env.command("remove", A, str(a1))  # the delete fails: the request still counts
-        assert await env.status(a1) == L.REMOVAL
-        assert f"The {L.COINS} coins it earned came back out of your balance" in inter.text
-        assert await economy.balance(env.db, A) == 0
-        assert await clip_ledger(env, A) == [(L.COINS, L.REASON, f"clipcast:{a1}"),
-                                             (-L.COINS, L.REASON, f"clipcast:{a1}:refund")]
-        assert L.refund_ref(a1) == f"clipcast:{a1}:refund"
-        # asking again (the retry that deletes it) takes nothing more, even with coins to take
-        await economy.apply(env.db, A, 500, "daily", env.t)
-        inter = await env.command("remove", A, str(a1))
-        assert await env.status(a1) == L.REMOVED and "coins" not in inter.text
-        assert await economy.balance(env.db, A) == 500
-    with_env(go, monkeypatch, tmp_path)
-
-
-def test_no_reversal_when_the_coins_are_spent_after_thirty_days_or_for_a_staff_takedown(monkeypatch, tmp_path):
-    async def go(env):
-        await env.start()
-        spent, old, by_staff, unpaid = [await env.approved(uid) for uid in (A, B, C, D)]
-        await env.db.execute("UPDATE clipcast SET backers = 0 WHERE message_id = ?", (unpaid,))  # posts, pays nothing
-        await env.tick(PUB_AT)
-        assert [await economy.balance(env.db, u) for u in (A, B, C, D)] == [L.COINS, L.COINS, L.COINS, 0]
-        env.guild.mod_log.sent.clear()
-
-        # spent in the meantime: economy.py never pushes a wallet below zero, so nothing is taken
-        await economy.apply(env.db, A, -(L.COINS - 10), "shop", PUB_AT + 60)
-        env.t = PUB_AT + DAY
-        inter = await env.command("remove", A, str(spent))
-        assert "your balance is lower than that, so nothing was taken" in inter.text
-        assert await economy.balance(env.db, A) == 10
-        assert "so nothing was taken back" in env.guild.mod_log.sent[-1]["content"]
-        assert env.guild.mod_log.sent[-1]["allowed_mentions"].to_dict() == discord.AllowedMentions.none().to_dict()
-        assert L.refund_ref(spent) not in [ref for _, _, ref in await clip_ledger(env, A)]
-
-        # staff taking it down is not the author's choice
-        inter = await env.command("remove", MOD, str(by_staff), roles=[config.MOD_ROLE])
-        assert "coins" not in inter.text and await economy.balance(env.db, C) == L.COINS
-
-        # a clip that never paid has nothing to reverse
-        inter = await env.command("remove", D, str(unpaid))
-        assert "coins" not in inter.text and await clip_ledger(env, D) == []
-
-        # thirty days on, the clip has had its run
-        env.t = PUB_AT + L.REFUND_DAYS * DAY
-        inter = await env.command("remove", B, str(old))
-        assert "coins" not in inter.text and await economy.balance(env.db, B) == L.COINS
-        assert L.refund_due(PUB_AT, PUB_AT + L.REFUND_DAYS * DAY - 1) and not L.refund_due(None, PUB_AT)
     with_env(go, monkeypatch, tmp_path)
 
 

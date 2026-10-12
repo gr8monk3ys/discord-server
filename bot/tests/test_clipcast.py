@@ -218,6 +218,15 @@ def test_pays_only_established_tracked_authors_with_a_backer():
     assert L.coin_ref(123) == "clipcast:123" and L.COINS == 100 and L.REASON == "clipcast"
 
 
+def test_the_payout_waits_a_week_and_nothing_is_ever_taken_back():
+    day = 86400
+    assert L.PAYOUT_DAYS == 7
+    assert not L.payout_due(T, T) and not L.payout_due(T, T + 7 * day - 1)
+    assert L.payout_due(T, T + 7 * day) and L.payout_due(T, T + 400 * day)
+    assert not L.payout_due(None, T + 400 * day)  # never published: never due
+    assert not hasattr(L, "refund_ref") and not hasattr(L, "refund_due")
+
+
 def test_parse_clip_ref():
     mid = 1234567890123456789
     assert L.parse_clip_ref(str(mid)) == mid

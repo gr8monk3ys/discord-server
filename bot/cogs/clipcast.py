@@ -15,6 +15,9 @@ explicit yes for that clip.
 - Deleting the clip, leaving, a ban or `/privacy tracking:off` withdraws consent for anything
   not posted yet. `/clipcast remove` takes a posted clip down (deleted through the API when
   it can be, and staff are told either way).
+- The author gets the badge when the clip goes up and the coins only once it has stayed up
+  for a week (`run_payouts`, from the same tick): a clip taken down before then never pays,
+  so there is nothing to claw back.
 - A clip is never uploaded twice: the row is claimed before the first byte is sent, and an
   upload whose result can't be established is parked for staff instead of retried.
 
@@ -491,7 +494,8 @@ class Clipcast(commands.Cog):
         await self.bot.wait_until_ready()
 
     async def tick(self) -> None:
-        for name, step in (("sweep", self.sweep), ("ask", self.run_ask), ("post", self.run_publish)):
+        for name, step in (("sweep", self.sweep), ("ask", self.run_ask), ("post", self.run_publish),
+                           ("payout", self.run_payouts)):
             try:
                 await step()
             except Exception:
@@ -895,16 +899,16 @@ class Clipcast(commands.Cog):
         return "posted"
 
     async def celebrate(self, guild, row, seen: Seen, vid: str, t: int) -> None:
-        """Coins, badge, the public "as seen on" reply and a mod-log line. The video id is
-        already stored, so nothing here can cause a second upload."""
+        """Badge, the public "as seen on" reply and a mod-log line. No coins yet: those come
+        from `run_payouts` once the clip has stayed up. The video id is already stored, so
+        nothing here can cause a second upload."""
         uid, mid = row["user_id"], row["message_id"]
         url = L.watch_url(vid)
-        paid = False
+        coins_later = False  # only said when it would pay as things stand today
         try:
-            if L.pays(uid, t, await self.db.tracking_allowed(uid), row["backers"]):
-                paid = (await economy.apply(self.db, uid, L.COINS, L.REASON, t, ref=L.coin_ref(mid))).ok
+            coins_later = L.pays(uid, t, await self.db.tracking_allowed(uid), row["backers"])
         except Exception:
-            log.exception("clipcast: paying %s for clip %s failed", uid, mid)
+            log.exception("clipcast: checking the payout for clip %s failed", mid)
         badge = False
         try:
             if L.BADGE_KEY in A.BY_KEY:
@@ -915,14 +919,14 @@ class Clipcast(commands.Cog):
 
         private = self.setup.privacy == "private"
         if not private:  # a private video's link would only show members an error page
-            extras = []
-            if paid:
-                extras.append(f"{L.COINS} coins")
+            lines = [f"📺 As seen on the server's YouTube: {url}"]
             if badge:
-                extras.append(f"the {A.BY_KEY[L.BADGE_KEY].emoji} **{A.BY_KEY[L.BADGE_KEY].name}** badge")
-            text = f"📺 As seen on the server's YouTube: {url}"
-            if extras:
-                text += f"\n<@{uid}> earned {' and '.join(extras)} for it."
+                lines.append(f"<@{uid}> earned the {A.BY_KEY[L.BADGE_KEY].emoji} **{A.BY_KEY[L.BADGE_KEY].name}** "
+                             "badge for it.")
+            if coins_later:
+                lines.append(("And " if badge else f"<@{uid}> ") + f"{L.COINS} coins follow once it has stayed up "
+                             f"for {L.PAYOUT_DAYS} days.")
+            text = lines[0] + ("\n" + " ".join(lines[1:]) if lines[1:] else "")
             try:
                 notice = await seen.channel.send(text, reference=seen.message.to_reference(fail_if_not_exists=False),
                                                  allowed_mentions=ping_only(users=[discord.Object(uid)]))
@@ -933,6 +937,42 @@ class Clipcast(commands.Cog):
         await self.mod_log(guild, f"📺 Clipcast: uploaded {self.jump_row(guild, row)} as **{self.setup.privacy}**: "
                                   f"{url} ({esc(L.credit_label(row['credit'], row['credit_name']))})."
                                   + (" Members aren't shown the link while it's private." if private else ""))
+
+    # ------------------------------------------------------------ the delayed payout
+    async def run_payouts(self) -> int:
+        """Pay for clips that have stayed published for L.PAYOUT_DAYS. Everything it needs is
+        in the database, so a restart in between changes nothing, and the ledger ref makes a
+        clip pay once whatever happens. Only a row that is still PUBLISHED is looked at: one
+        taken down, withdrawn or deleted in the meantime has left that status and never pays.
+        The author has to still be here, established and allowing tracking, and the clip to
+        have had a backer. Returns how many clips were paid."""
+        guild = self.guild()
+        if guild is None:
+            return 0
+        t = now()
+        rows = await self.db.fetchall(
+            "SELECT * FROM clipcast WHERE status = ? AND payout_at IS NULL ORDER BY published_at, message_id",
+            (L.PUBLISHED,))
+        paid = 0
+        for row in rows:
+            if not L.payout_due(row["published_at"], t):
+                continue
+            mid, uid = row["message_id"], row["user_id"]
+            state = await self.member_state(guild, uid)
+            if state == "unknown":
+                continue  # Discord wouldn't say whether they're still here: ask again next time
+            async with self.db.transaction() as tx:
+                # Settled and paid together, and only if it is still published at this moment.
+                if not (await tx.execute("UPDATE clipcast SET payout_at = ? WHERE message_id = ? AND status = ?"
+                                         " AND payout_at IS NULL", (t, mid, L.PUBLISHED))).rowcount:
+                    continue
+                tracking = await tx.fetchone("SELECT 1 FROM privacy_optout WHERE user_id = ?", (uid,)) is None
+                if state != "here" or not L.pays(uid, t, tracking, row["backers"]):
+                    continue
+                if (await economy.apply_tx(tx, uid, L.COINS, L.REASON, t, ref=L.coin_ref(mid))).ok:
+                    paid += 1
+                    log.info("clipcast: paid %d coins to %s for clip %s", L.COINS, uid, mid)
+        return paid
 
     # ------------------------------------------------------------ takedown
     async def take_down(self, guild, row, why: str) -> str:
@@ -1052,38 +1092,9 @@ class Clipcast(commands.Cog):
             return
         await interaction.response.defer(ephemeral=True, thinking=True)
         status = await self.take_down(interaction.guild, row, f"requested by <@{user.id}>")
-        text = ("Done. The video is deleted from YouTube." if status == L.REMOVED else
-                "Got it. I couldn't delete it myself, so the owner has been told to take it down by hand.")
-        if user.id == row["user_id"]:  # the author's own choice (a staff takedown costs the author nothing)
-            text += await self.reverse_payout(interaction.guild, row)
-        await interaction.followup.send(text, ephemeral=True)
-
-    async def reverse_payout(self, guild, row) -> str:
-        """Take back the coins a clip earned when its author removes it within L.REFUND_DAYS of
-        posting. Through economy.py with its own ref, so it happens once; a wallet is never
-        pushed below zero, so an author who has spent the coins keeps them and the mod log
-        says so. Returns what to add to the author's reply ("" when nothing was owed)."""
-        mid, uid, t = row["message_id"], row["user_id"], now()
-        if not L.refund_due(row["published_at"], t):
-            return ""
-        try:
-            async with self.db.transaction() as tx:
-                if not await tx.fetchone("SELECT 1 FROM ledger WHERE ref = ? AND delta > 0", (L.coin_ref(mid),)):
-                    return ""  # this clip never paid
-                result = await economy.apply_tx(tx, uid, -L.COINS, L.REASON, t, ref=L.refund_ref(mid))
-        except Exception:
-            log.exception("clipcast: reversing the payout for clip %s failed", mid)
-            return ""
-        if result.status is economy.Status.DUPLICATE:
-            return ""
-        if not result.ok:
-            await self.mod_log(guild, f"🧹 Clipcast: <@{uid}> took {self.jump_row(guild, row)} down within "
-                                      f"{L.REFUND_DAYS} days of posting, but has fewer than the {L.COINS} coins it "
-                                      "paid, so nothing was taken back.")
-            return (f" The {L.COINS} coins it earned would have come back out, but your balance is lower than "
-                    "that, so nothing was taken.")
-        log.info("clipcast: took back %d coins from %s for clip %s", L.COINS, uid, mid)
-        return f" The {L.COINS} coins it earned came back out of your balance (it was up for under {L.REFUND_DAYS} days)."
+        await interaction.followup.send(
+            "Done. The video is deleted from YouTube." if status == L.REMOVED else
+            "Got it. I couldn't delete it myself, so the owner has been told to take it down by hand.", ephemeral=True)
 
     @remove.autocomplete("clip")
     async def remove_autocomplete(self, interaction: discord.Interaction, current: str):

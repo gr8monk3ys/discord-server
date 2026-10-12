@@ -634,6 +634,11 @@ MIGRATIONS = [
         # such a name may answer "already whitelisted" to an add.
         "ALTER TABLE realms_links ADD COLUMN managed INTEGER NOT NULL DEFAULT 0",
     ],
+    [
+        # Clipcast: when a published clip's payout was settled (paid, or decided against: the
+        # ledger ref clipcast:<message_id> says which). NULL: still waiting out PAYOUT_DAYS.
+        "ALTER TABLE clipcast ADD COLUMN payout_at INTEGER",
+    ],
 ]
 
 

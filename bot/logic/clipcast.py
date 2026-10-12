@@ -28,7 +28,7 @@ ASK_JOB = Weekly("clipcast-ask", weekday=6, hour=18, minute=30)  # Sundays 18:30
 PUBLISH_JOB = Weekly("clipcast", weekday=1, hour=18, minute=30)  # Tuesdays 18:30 local
 
 TOP_N = 3  # clips asked about, and posted, per week
-COINS = 100  # to the author when their clip is posted
+COINS = 100  # to the author once their clip has stayed posted for PAYOUT_DAYS
 REASON = "clipcast"  # ledger reason
 BADGE_KEY = "clipcast"  # granted on a first post when logic/achievements.py has it
 MAX_ATTEMPTS = 3  # failed uploads of one clip before it's parked for staff
@@ -257,18 +257,14 @@ def coin_ref(message_id: int) -> str:
     return f"clipcast:{message_id}"
 
 
-REFUND_DAYS = 30  # an author who takes their clip down this soon after it went up gives the coins back
+PAYOUT_DAYS = 7  # the clip has to stay posted this long before it pays
 
 
-def refund_ref(message_id: int) -> str:
-    """Ledger ref of the reversal: one per clip, so it can never be taken twice."""
-    return f"{coin_ref(message_id)}:refund"
-
-
-def refund_due(published_at: int | None, now: int) -> bool:
-    """Posting pays COINS; post-then-remove must not be a way to keep them. After REFUND_DAYS
-    the clip has had its run and a takedown costs nothing."""
-    return published_at is not None and now - published_at < REFUND_DAYS * 24 * 60 * 60
+def payout_due(published_at: int | None, now: int) -> bool:
+    """COINS are paid late, not taken back early: a clip that comes down in its first
+    PAYOUT_DAYS never pays, so post-collect-remove earns nothing (and there are no coins out
+    there to be spent or given away before a clawback could reach them)."""
+    return published_at is not None and now - published_at >= PAYOUT_DAYS * 24 * 60 * 60
 
 
 def pays(user_id: int, at: int, tracking: bool, backers: int) -> bool:
