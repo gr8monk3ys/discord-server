@@ -313,7 +313,9 @@ def test_guild_problems_and_the_create_events_hint():
     assert ops.guild_problems(everything - {"create_events"}, loaded={"moderation", "lfg"}) == []
     assert ops.guild_problems(set(), loaded={"moderation"}) == [
         Problem(ops.SERVER, "missing Moderate Members (moderation)"),
-        Problem(ops.SERVER, "missing Manage Messages (moderation)")]
+        Problem(ops.SERVER, "missing Manage Messages (moderation)"),
+        Problem(ops.SERVER, "missing Ban Members (moderation): Server Settings -> Roles -> Front Desk -> "
+                            "turn on Ban Members")]
 
 
 def test_role_problems_missing_and_not_below_the_bot():

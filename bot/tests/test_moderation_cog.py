@@ -12,6 +12,7 @@ import config
 import db as dbmod
 from cogs import moderation as cogmod
 from cogs.moderation import Moderation
+from logic import appeals
 from logic import moderation as M
 
 GUILD_ID = 999
@@ -768,3 +769,207 @@ def test_on_member_join_never_raises(monkeypatch):
         env.guild.edit_fail = RuntimeError("boom")
         await raid(env)  # lockdown raises a non-HTTP error: logged, not raised
     with_env(go, monkeypatch)
+
+
+# ---------------------------------------------------------------- /ban and appeal codes
+APPEAL_SECRET = "test-secret-for-appeal-vectors!!"
+BANNER, LEFT = 24, 400  # a Moderator who holds Ban Members; a user who already left
+
+
+def arm_bans(env, monkeypatch, secret=APPEAL_SECRET):
+    """The fakes above predate /ban: give the guild a ban() and the bot the permission."""
+    guild = env.guild
+    guild.bans, guild.ban_fail = [], None
+
+    async def ban(user, reason=None, delete_message_seconds=0):
+        if guild.ban_fail is not None:
+            raise guild.ban_fail
+        guild.bans.append((user.id, reason, delete_message_seconds))
+    guild.ban = ban
+    guild.me.guild_permissions.ban_members = True
+    for key in ("APPEAL_SECRET", "APPEAL_COOLING_DAYS", "APPEAL_REAPPEAL_DAYS", "SITE_URL"):
+        monkeypatch.delenv(key, raising=False)
+    if secret:
+        monkeypatch.setenv("APPEAL_SECRET", secret)
+    env.member(BANNER, roles=[config.MOD_ROLE], perms={"ban_members": True})
+
+
+def gone_user(uid=LEFT, dm_fail=None):
+    """A user who isn't in the server: no roles, and DMs normally bounce."""
+    user = SimpleNamespace(id=uid, name=f"user{uid}", mention=f"<@{uid}>", bot=False, dms=[])
+
+    async def send(content=None, **kwargs):
+        if dm_fail is not None:
+            raise dm_fail
+        user.dms.append(dict(content=content, **kwargs))
+    user.send = send
+    return user
+
+
+async def ban_rows(env):
+    return [dict(r) for r in await env.db.fetchall("SELECT * FROM appeal_bans ORDER BY user_id")]
+
+
+def test_ban_dms_the_appeal_code_before_banning(monkeypatch):
+    async def go(env):
+        arm_bans(env, monkeypatch)
+        a = env.member(A)
+        order = []
+        real_send, real_ban = a.send, env.guild.ban
+
+        async def send(content=None, **kw):
+            order.append("dm")
+            await real_send(content, **kw)
+
+        async def ban(user, **kw):
+            order.append("ban")
+            await real_ban(user, **kw)
+        a.send, env.guild.ban = send, ban
+        inter = env.inter(BANNER)
+        await Moderation.ban.callback(env.cog, inter, a, "  slurs in general  ", 1)
+        assert order == ["dm", "ban"]
+        assert env.guild.bans == [(A, f"user{BANNER}: slurs in general", DAY)]
+        (dm,) = a.dms
+        text = dm["content"]
+        assert "banned from **Test Server**" in text and "**Reason** slurs in general" in text
+        code = appeals.fmt_code(appeals.appeal_code(APPEAL_SECRET, A))
+        assert f"`{code}`" in text and f"`{A}`" in text and "<https://discord.lscaturchio.xyz/appeal>" in text
+        assert f"<t:{T0 + 7 * DAY}:D>" in text and dm["allowed_mentions"].to_dict() == NONE
+        (case,) = await env.cases()
+        assert (case["kind"], case["user_id"], case["mod_id"], case["reason"]) == ("ban", A, BANNER, "slurs in general")
+        assert await ban_rows(env) == [{"user_id": A, "banned_at": T0, "source": "command"}]
+        assert inter.text() == f"Case #1: banned <@{A}>. Appeal code sent by DM."
+        (line,) = logs(env.guild.mod_log)
+        assert "Ban" in line and "Appeal code sent by DM" in line and code not in line and no_pings(env.guild.mod_log)
+    with_env(go, monkeypatch)
+
+
+def test_ban_without_appeals_says_nothing_about_appealing(monkeypatch):
+    async def go(env):
+        arm_bans(env, monkeypatch, secret=None)
+        a = env.member(A)
+        inter = env.inter(OWNER)
+        await Moderation.ban.callback(env.cog, inter, a, "spam", 0)
+        assert a.dms[0]["content"] == "You were banned from **Test Server**.\n**Reason** spam"
+        assert inter.text() == f"Case #1: banned <@{A}>." and env.guild.bans == [(A, f"user{OWNER}: spam", 0)]
+        assert "ppeal" not in logs(env.guild.mod_log)[0]
+    with_env(go, monkeypatch)
+
+
+def test_ban_dm_failure_never_blocks_the_ban(monkeypatch):
+    async def go(env):
+        arm_bans(env, monkeypatch)
+        env.member(A).dm_fail = http_error(discord.Forbidden, 403)
+        inter = env.inter(BANNER)
+        await Moderation.ban.callback(env.cog, inter, env.member(A), "spam", 0)
+        assert env.guild.bans and len(await env.cases()) == 1
+        assert "DM failed" in inter.text() and "/appeals code" in inter.text()
+        assert "DM failed" in logs(env.guild.mod_log)[0]
+        # A user ID that already left: no role checks, the DM bounces, the ban still lands.
+        user = gone_user(dm_fail=http_error(discord.Forbidden, 403))
+        inter = env.inter(OWNER)
+        await Moderation.ban.callback(env.cog, inter, user, "raid alt", 7)
+        assert env.guild.bans[-1] == (LEFT, f"user{OWNER}: raid alt", 7 * DAY)
+        assert [r["user_id"] for r in await ban_rows(env)] == [A, LEFT]
+    with_env(go, monkeypatch)
+
+
+def test_ban_needs_staff_who_hold_ban_members(monkeypatch):
+    async def go(env):
+        arm_bans(env, monkeypatch)
+        env.member(60, roles=[config.LFG_ROLE], perms={"ban_members": True})  # the permission but not staff
+        for uid, want in ((A, "Only Moderators"), (60, "Only Moderators"), (MOD, "**Ban Members** permission")):
+            inter = env.inter(uid)
+            await Moderation.ban.callback(env.cog, inter, env.member(B), "x", 0)
+            (reply,) = inter.replies()
+            assert want in reply["content"] and reply["ephemeral"], uid
+        assert env.guild.bans == [] and env.member(B).dms == [] and await env.cases() == []
+        assert Moderation.may_ban(env.member(BANNER)) and Moderation.may_ban(env.member(OWNER))
+        assert Moderation.may_ban(env.member(ADMIN)) and Moderation.may_ban(env.member(KEEPER)) is False
+        assert not Moderation.may_ban(env.member(MOD)) and not Moderation.may_ban(SimpleNamespace(id=1))
+    with_env(go, monkeypatch)
+
+
+def test_ban_target_rules_and_missing_bot_permission(monkeypatch):
+    async def go(env):
+        arm_bans(env, monkeypatch)
+        for target, want in ((MOD, "is staff"), (BANNER, "on yourself"), (BOT_ID, "moderate myself")):
+            inter = env.inter(BANNER)
+            await Moderation.ban.callback(env.cog, inter, env.member(target), "x", 0)
+            assert want in inter.text(), target
+        env.guild.me.guild_permissions.ban_members = False
+        inter = env.inter(BANNER)
+        await Moderation.ban.callback(env.cog, inter, env.member(A), "x", 0)
+        assert "I'm missing the **Ban Members** permission" in inter.text()
+        assert env.guild.bans == [] and env.member(A).dms == []  # nobody is told they're banned when they aren't
+    with_env(go, monkeypatch)
+
+
+def test_ban_refused_by_discord_is_undone(monkeypatch):
+    async def go(env):
+        arm_bans(env, monkeypatch)
+        env.guild.ban_fail = http_error(discord.Forbidden, 403)
+        a = env.member(A)
+        inter = env.inter(BANNER)
+        await Moderation.ban.callback(env.cog, inter, a, "x", 0)
+        assert "didn't let me" in inter.text()
+        assert await env.cases() == [] and await ban_rows(env) == []
+        assert len(a.dms) == 2 and "did not go through" in a.dms[1]["content"]
+    with_env(go, monkeypatch)
+
+
+def test_ban_made_in_discord_gets_a_dm_attempt_and_a_staff_note(monkeypatch):
+    async def go(env):
+        arm_bans(env, monkeypatch)
+        user = gone_user(dm_fail=http_error(discord.Forbidden, 403))
+        await env.cog.on_member_ban(env.guild, user)
+        assert await ban_rows(env) == [{"user_id": LEFT, "banned_at": T0, "source": "manual"}]
+        (line,) = logs(env.guild.mod_log)
+        assert "couldn't DM them" in line and "/appeals code" in line and f"`{LEFT}`" in line
+        assert appeals.fmt_code(appeals.appeal_code(APPEAL_SECRET, LEFT)) not in line  # the code stays out of logs
+        # When the DM does get through (they share another server with the bot), it carries the code.
+        reachable = gone_user(401)
+        await env.cog.on_member_ban(env.guild, reachable)
+        text = reachable.dms[0]["content"]
+        assert appeals.fmt_code(appeals.appeal_code(APPEAL_SECRET, 401)) in text and "Reason" not in text
+        assert "sent their appeal code by DM" in logs(env.guild.mod_log)[-1]
+        # Bots and other servers: nothing.
+        await env.cog.on_member_ban(SimpleNamespace(id=5), gone_user(402))
+        bot_user = gone_user(403)
+        bot_user.bot = True
+        await env.cog.on_member_ban(env.guild, bot_user)
+        assert len(logs(env.guild.mod_log)) == 2 and bot_user.dms == []
+    with_env(go, monkeypatch)
+
+
+def test_own_ban_is_not_handled_twice(monkeypatch):
+    async def go(env):
+        arm_bans(env, monkeypatch)
+        a = env.member(A)
+        await Moderation.ban.callback(env.cog, env.inter(BANNER), a, "spam", 0)
+        env.tick(2)
+        await env.cog.on_member_ban(env.guild, a)  # the gateway echo of our own /ban
+        assert len(a.dms) == 1 and len(logs(env.guild.mod_log)) == 1
+        assert (await ban_rows(env))[0]["source"] == "command"
+        # Unbanned and, much later, banned again by hand: that is a new ban with a new date.
+        await env.cog.on_member_unban(env.guild, a)
+        assert await ban_rows(env) == []
+        env.tick(DAY)
+        await env.cog.on_member_ban(env.guild, a)
+        assert await ban_rows(env) == [{"user_id": A, "banned_at": T0 + 2 + DAY, "source": "manual"}]
+    with_env(go, monkeypatch)
+
+
+def test_manual_ban_with_appeals_off_is_silent(monkeypatch):
+    async def go(env):
+        arm_bans(env, monkeypatch, secret=None)
+        user = gone_user()
+        await env.cog.on_member_ban(env.guild, user)
+        assert user.dms == [] and logs(env.guild.mod_log) == []
+        assert len(await ban_rows(env)) == 1  # the date is still kept, for when appeals are turned on
+    with_env(go, monkeypatch)
+
+
+def test_ban_is_hidden_from_members_picker():
+    perms = Moderation.ban.default_permissions
+    assert perms is not None and perms.value == discord.Permissions(ban_members=True).value

@@ -116,3 +116,43 @@ def load_settings() -> Settings:
         guild_id=int(os.environ["GUILD_ID"]),
         tz=ZoneInfo(os.environ.get("TZ", "America/Los_Angeles")),
     )
+
+
+# Ban appeals (logic/appeals.py). Off unless APPEAL_SECRET is set in server/.env.
+APPEALS_CHANNEL = "🔒・appeals"  # staff only; the website's webhook posts here
+SITE_URL = "https://discord.lscaturchio.xyz"
+APPEAL_SECRET_MIN = 16  # characters; site/api/appeal.js applies the same floor
+
+
+@dataclass(frozen=True)
+class AppealSettings:
+    secret: str
+    page_url: str  # the form banned members fill in
+    join_url: str
+    cooling: int  # seconds after a ban before an appeal is read
+    reappeal: int  # seconds after a denial before the next one is read
+
+
+def _env_days(env, key: str, default: int) -> int:
+    try:
+        days = int(str(env.get(key, "")).strip() or default)
+    except ValueError:
+        return default
+    return days if 0 <= days <= 3650 else default
+
+
+def appeal_settings(env=None) -> AppealSettings | None:
+    """None (the whole feature is off) unless APPEAL_SECRET is set and long enough.
+    Optional: APPEAL_COOLING_DAYS (default 7), APPEAL_REAPPEAL_DAYS (default 90) and
+    SITE_URL (default the public site; https only)."""
+    env = os.environ if env is None else env
+    secret = str(env.get("APPEAL_SECRET", "")).strip()
+    if len(secret) < APPEAL_SECRET_MIN:
+        return None
+    site = str(env.get("SITE_URL", "")).strip().rstrip("/")
+    if not site.startswith("https://") or any(c.isspace() or c in "<>" for c in site):
+        site = SITE_URL
+    day = 24 * 60 * 60
+    return AppealSettings(secret=secret, page_url=f"{site}/appeal", join_url=f"{site}/join",
+                          cooling=_env_days(env, "APPEAL_COOLING_DAYS", 7) * day,
+                          reappeal=_env_days(env, "APPEAL_REAPPEAL_DAYS", 90) * day)

@@ -77,6 +77,12 @@ def check_target(*, actor_id: int, target_id: int, bot_id: int, target_is_staff:
     return None
 
 
+def can_ban(is_staff: bool, has_ban_members: bool) -> bool:
+    """Who may /ban, and so who may accept or deny a ban appeal: staff who also hold
+    Discord's own Ban Members permission (the owner and administrators always do)."""
+    return is_staff and has_ban_members
+
+
 def escalation(warns: int) -> int | None:
     """Automatic timeout (seconds) after a warning, given warnings in the last 30 days
     including this one: 3 or 4 -> 1 h, 5 or more -> 24 h."""
@@ -238,6 +244,7 @@ KIND_LABELS = {
     "auto_timeout": "⏳ Automatic timeout",
     "spam": "🚫 Anti-spam timeout",
     "purge": "🧹 Purge",
+    "ban": "🔨 Ban",
 }
 
 
@@ -266,6 +273,18 @@ def dm_text(kind: str, guild_name: str, reason: str, duration: int | None, warns
     return "\n".join([f"You were timed out in **{guild_name}** for {fmt_duration(duration or 0)}.",
                       f"**Reason** {reason}",
                       "You can read but not chat until it ends. Questions? Message a Moderator afterwards."])
+
+
+def ban_dm_text(guild_name: str, reason: str | None, appeal: str | None = None) -> str:
+    """The DM sent just before a ban (afterwards the bot can't reach them). `reason` is None for
+    a ban made in Discord's own menu; `appeal` is logic.appeals.ban_notice(...) or None when
+    appeals are off, in which case nothing about appealing is said."""
+    lines = [f"You were banned from **{guild_name}**."]
+    if reason:
+        lines.append(f"**Reason** {reason}")
+    if appeal:
+        lines.append(appeal)
+    return "\n".join(lines)
 
 
 def case_line(case_id: int, kind: str, target: str, mod: str | None, reason: str, duration: int | None) -> str:

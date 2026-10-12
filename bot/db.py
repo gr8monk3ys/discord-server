@@ -470,6 +470,33 @@ MIGRATIONS = [
         PRIMARY KEY (day, user_id)
     )""",
     ],
+    [
+        # Ban appeals sent through the website. status: open | accepted | denied | expired | closed.
+        # source_message_id is the webhook message it came from, so one message is one appeal.
+        """CREATE TABLE appeals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'open',
+        answers TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        touched_at INTEGER NOT NULL,
+        source_message_id INTEGER UNIQUE,
+        card_message_id INTEGER,
+        thread_id INTEGER,
+        decided_by INTEGER,
+        decided_at INTEGER,
+        decision_reason TEXT
+    )""",
+        "CREATE UNIQUE INDEX idx_appeals_one_open ON appeals (user_id) WHERE status = 'open'",
+        "CREATE INDEX idx_appeals_user ON appeals (user_id)",
+        # When a ban happened (written by cogs/moderation.py), for the appeal cooling-off period.
+        # source: command (/ban) | manual (banned in Discord's own menu).
+        """CREATE TABLE appeal_bans (
+        user_id INTEGER PRIMARY KEY,
+        banned_at INTEGER NOT NULL,
+        source TEXT NOT NULL
+    )""",
+    ],
 ]
 
 

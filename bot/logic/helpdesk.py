@@ -51,6 +51,7 @@ MODULE_CATEGORY = {
     "gamelink": "stats",
     "creators": "creators", "clips": "creators",
     "utility": "utility", "moderation": "utility", "ops": "utility", "helpdesk": "utility", "heartbeat": "utility",
+    "appeals": "utility",
 }
 
 # Staff commands say so in their description: "Staff: ...", "... (mods only)", "... (staff only)",

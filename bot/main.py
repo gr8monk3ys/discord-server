@@ -64,6 +64,7 @@ MODULES = [
     ("cogs.votehub", set()),  # /vote hub, weekly Supporter thanks for Disboard bumpers
     ("cogs.catchup", {"message_content"}),  # /catchup AI summary of a public channel, /catchup-usage
     ("cogs.vibes", {"members"}),  # chat revival, join anniversaries, booster thanks + stipend, member of the month
+    ("cogs.appeals", {"message_content"}),  # ban appeals from the website: review cards, /appeals list|code
 ]
 
 PERMISSIONS = discord.Permissions(
@@ -90,6 +91,7 @@ PERMISSIONS = discord.Permissions(
     # Moderation autopilot: timeouts and spam cleanup.
     moderate_members=True,
     manage_messages=True,
+    ban_members=True,  # /ban, and unbanning when a ban appeal is accepted
 )
 
 def build_intents(privileged: bool = True) -> discord.Intents:
