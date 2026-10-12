@@ -470,6 +470,28 @@ MIGRATIONS = [
         PRIMARY KEY (day, user_id)
     )""",
     ],
+    [
+        # The Realms (Minecraft bridge). One row per Minecraft name: state 'add' (whitelist add not
+        # confirmed by the server yet), 'ok', or 'remove' (unlinked; whitelist remove not confirmed yet).
+        """CREATE TABLE realms_links (
+        name_key TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        user_id INTEGER NOT NULL,
+        state TEXT NOT NULL DEFAULT 'add',
+        attempts INTEGER NOT NULL DEFAULT 0,
+        linked_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+    )""",
+        # one Minecraft name per member (a removal still waiting does not count)
+        "CREATE UNIQUE INDEX realms_links_user ON realms_links (user_id) WHERE state != 'remove'",
+        # Seconds online per member per local day, measured from player-list polls.
+        """CREATE TABLE realms_playtime (
+        user_id INTEGER NOT NULL,
+        day TEXT NOT NULL,
+        seconds INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (user_id, day)
+    )""",
+    ],
 ]
 
 

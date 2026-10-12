@@ -68,6 +68,9 @@ GAMES_CHANNEL = "🎲・games"  # daily word game results, challenge board
 SQUAD_VOICE = "🎮 Squad"
 LOBBY_VOICE = "🔊 Lobby"
 MODES = ("Ranked", "Casual")
+# The Realms (Minecraft bridge): status panel and two-way chat live in this channel.
+REALMS_CHANNEL = "⛏️・realms"
+REALMS_ENV = ("REALMS_ADDRESS", "REALMS_RCON_HOST", "REALMS_RCON_PORT", "REALMS_RCON_PASSWORD", "REALMS_LOG_PATH")
 
 
 @dataclass(frozen=True)
@@ -116,3 +119,10 @@ def load_settings() -> Settings:
         guild_id=int(os.environ["GUILD_ID"]),
         tz=ZoneInfo(os.environ.get("TZ", "America/Los_Angeles")),
     )
+
+
+def realms_environ(environ=None) -> dict[str, str]:
+    """The Minecraft bridge's settings (REALMS_ENV) as they are in the environment; server/.env
+    was loaded by load_settings(). logic/realms.py validates them; all empty means the bridge is off."""
+    environ = os.environ if environ is None else environ
+    return {name: environ.get(name) or "" for name in REALMS_ENV}
