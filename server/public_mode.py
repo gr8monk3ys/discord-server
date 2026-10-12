@@ -41,6 +41,7 @@ BOT_ROLES = ("Season Champ", "Hype", "Birthday", "Tournament Champ", "Event Cham
              "Game Night", "Mythic", "Legend", "Elite", "Veteran", "Regular",
              "PC", "PlayStation", "Xbox", "Switch", "Mobile", "NA", "EU", "LATAM", "Asia", "OCE",
              "Early Bird", "Night Owl", "Weekend Warrior")  # roles Front Desk hands out
+BOT_ROLES += tuple(layout.HOUSE_ROLES.values())  # the three house roles (created at the bottom)
 NEEDED = ("manage_roles", "manage_channels", "manage_guild", "create_instant_invite")
 
 # Onboarding questions added after the existing ones (matched by title; existing prompts are

@@ -304,3 +304,16 @@ MEDIA_ROLES = ["Keeper", "Moderator", "Squad", "Verified"]
 # Every bot member (except Front Desk itself) gets this role, so bots are
 # grouped together in the member list.
 BOT_ROLE = "Bots"
+
+# ---------------------------------------------------------------- houses
+# Three teams, named like specimens pressed into the notebook. Front Desk sorts every member
+# into one and hands out its role; the colours are quiet inks so the One Pen stays the loudest.
+HOUSES = [
+    # (key stored in the database, name, emoji, colour)
+    ("fern", "Fern", "🌿", 0x7FA36B),
+    ("kestrel", "Kestrel", "🪶", 0xC48A4A),
+    ("otter", "Otter", "🦦", 0x6F93A8),
+]
+HOUSE_ROLES = {key: f"House {name}" for key, name, _, _ in HOUSES}
+# Appended, so they are created at the bottom of the stack (below Front Desk).
+ROLES += [{"name": HOUSE_ROLES[key], "color": color} for key, _, _, color in HOUSES]

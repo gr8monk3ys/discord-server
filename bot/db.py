@@ -470,6 +470,27 @@ MIGRATIONS = [
         PRIMARY KEY (day, user_id)
     )""",
     ],
+    [
+        # Houses: one row per member ever placed (left_at set = left, kept for the rejoin
+        # cooldown), and one frozen result per closed week / season (the House Cup).
+        """CREATE TABLE house_members (
+        user_id INTEGER PRIMARY KEY,
+        house TEXT NOT NULL,
+        joined_at INTEGER NOT NULL,
+        left_at INTEGER,
+        source TEXT NOT NULL DEFAULT 'auto'
+    )""",
+        """CREATE TABLE house_results (
+        kind TEXT NOT NULL,
+        period TEXT NOT NULL,
+        season TEXT NOT NULL,
+        winner TEXT,
+        data TEXT NOT NULL,
+        closed_at INTEGER NOT NULL,
+        PRIMARY KEY (kind, period)
+    )""",
+        "CREATE INDEX house_results_season ON house_results (kind, season)",
+    ],
 ]
 
 

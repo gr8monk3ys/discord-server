@@ -64,6 +64,7 @@ MODULES = [
     ("cogs.votehub", set()),  # /vote hub, weekly Supporter thanks for Disboard bumpers
     ("cogs.catchup", {"message_content"}),  # /catchup AI summary of a public channel, /catchup-usage
     ("cogs.vibes", {"members"}),  # chat revival, join anniversaries, booster thanks + stipend, member of the month
+    ("cogs.houses", {"members"}),  # three houses: /house, weekly House Cup, season trophy, /house-admin
 ]
 
 PERMISSIONS = discord.Permissions(

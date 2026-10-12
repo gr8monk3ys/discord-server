@@ -68,6 +68,9 @@ GAMES_CHANNEL = "🎲・games"  # daily word game results, challenge board
 SQUAD_VOICE = "🎮 Squad"
 LOBBY_VOICE = "🔊 Lobby"
 MODES = ("Ranked", "Casual")
+# Houses: (key, name, emoji, colour) and the role each house carries, from layout.py
+HOUSES = layout.HOUSES
+HOUSE_ROLES = layout.HOUSE_ROLES
 
 
 @dataclass(frozen=True)
