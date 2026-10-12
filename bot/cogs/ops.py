@@ -50,7 +50,8 @@ BACKUP_FAIL_META = "ops:backup_fail_note"  # local date of the last failure note
 PERMS_JOB = O.Daily("permcheck", hour=9, minute=0)  # daily 09:00 local
 PERMS_STARTUP_DELAY = 60  # seconds after ready, once the role and channel caches have settled
 PERMS_META = "ops:perms"  # digest of the last reported set of problems
-POOLS = {"text": "text_channels", "forum": "forums", "voice": "voice_channels", "category": "categories"}
+POOLS = {"text": "text_channels", "forum": "forums", "voice": "voice_channels", "category": "categories",
+         "stage": "stage_channels"}
 
 
 def now() -> int:
@@ -485,6 +486,18 @@ class Ops(commands.Cog):
             log.warning("ops: permission check for /status failed", exc_info=True)
             return "check failed, see bot.log"
 
+    def realms_text(self) -> str | None:
+        """The Minecraft bridge's own health line (cogs/realms.py), or None when that module is off."""
+        get_cog = getattr(self.bot, "get_cog", None)
+        realms = get_cog("Realms") if get_cog is not None else None
+        if realms is None:
+            return None
+        try:
+            return realms.health_text()
+        except Exception:
+            log.warning("ops: the realms health line for /status failed", exc_info=True)
+            return "check failed, see bot.log"
+
     # ------------------------------------------------------------ /status
     @staticmethod
     def is_staff(user) -> bool:
@@ -543,6 +556,9 @@ class Ops(commands.Cog):
         embed.add_field(name="Database", value=O.fmt_bytes(self.db_size()))
         embed.add_field(name="Last backup", value=await self.last_backup_text(), inline=False)
         embed.add_field(name="Permissions", value=self.permissions_text(), inline=False)
+        realms = self.realms_text()
+        if realms is not None:
+            embed.add_field(name="Realms bridge", value=realms[:1024], inline=False)
         embed.add_field(name=f"Modules ({len(modules)})", value=", ".join(modules) or "none", inline=False)
         embed.add_field(name="Errors", value=errors[:1024], inline=False)
         await interaction.response.send_message(embed=embed, ephemeral=True)

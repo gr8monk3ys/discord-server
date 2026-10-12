@@ -113,6 +113,10 @@ class FakeGuild:
         self.forbidden = False
         self.create_error = None  # any other exception create_scheduled_event should raise
         self.fetches = 0
+        self.members: dict[int, FakeUser] = {}  # whoever ran a command, as the member cache has them
+
+    def get_member(self, uid):
+        return self.members.get(uid)
 
     async def create_scheduled_event(self, **kw):
         if self.forbidden:
@@ -218,6 +222,7 @@ class Env:
         user = FakeUser(uid)
         # Staff are exempt from the /gamenight spam limits; most tests aren't about those.
         user.roles = [SimpleNamespace(name=config.KEEPER_ROLE)] if staff else []
+        self.guild.members[uid] = user
         return FakeInteraction(user, self.guild)
 
     async def gamenight(self, game="valorant", when="9pm", size=None, note=None, uid=HOST, staff=True):
@@ -836,3 +841,493 @@ def test_gamenight_blocked_note_is_refused_before_anything_is_made(monkeypatch, 
     with_env(go, monkeypatch)
     line = caplog.records[-1].getMessage()
     assert str(HOST) in line and reason in line and note not in line
+
+
+# ---------------------------------------------------------------- /watchparty
+ME = SimpleNamespace(id=BOTUSER)
+
+
+class FakeStage(FakeVoice):
+    def __init__(self, perms=None):
+        super().__init__(102, config.STAGE_CHANNEL)
+        self.perms = discord.Permissions.all() if perms is None else perms
+
+    def permissions_for(self, member):
+        assert member is ME
+        return self.perms
+
+
+def add_stage(env, perms=None):
+    env.guild.me = ME
+    env.guild.stage = FakeStage(perms)
+    env.guild.stage_channels = [env.guild.stage]
+    return env.guild.stage
+
+
+async def watchparty(env, title="Dune Part Two", when="9pm", link=None, uid=HOST, staff=True):
+    i = env.inter(uid, staff)
+    await env.cog.watchparty.callback(env.cog, i, title, when, link)
+    return i
+
+
+def young_account(days=3):
+    from logic import quests as Q
+    return ((T0 - days * 86400) * 1000 - Q.DISCORD_EPOCH_MS) << 22
+
+
+def test_watchparty_creates_a_stage_event_row_and_announcement(monkeypatch):
+    async def go(env):
+        stage = add_stage(env)
+        i = await watchparty(env, link="https://www.youtube.com/watch?v=abc123")
+        [ev] = env.guild.events.values()
+        kw = ev.kwargs
+        assert kw["name"] == "Watch party: Dune Part Two" and kw["channel"] is stage
+        assert kw["entity_type"] is discord.EntityType.stage_instance
+        assert kw["privacy_level"] is discord.PrivacyLevel.guild_only
+        assert kw["start_time"] == datetime.fromtimestamp(ts(2026, 10, 7, 21), timezone.utc)
+        assert kw["description"] == "Hosted by user1. Watching: https://www.youtube.com/watch?v=abc123"
+        assert await env.rows("SELECT * FROM hosted_events") == [dict(
+            event_id=ev.id, host_id=HOST, kind="watchparty", starts_at=ts(2026, 10, 7, 21), reminded=0)]
+        assert await env.rows("SELECT * FROM gamenights") == []  # game-night stats never count it
+        [post] = env.guild.gaming.sent  # announced where "Anything" game nights are
+        text = post["content"]
+        assert text.startswith("**Watch party: Dune Part Two** <t:")
+        assert stage.mention in text and "hosted by <@1>" in text and ev.url in text
+        assert "Watching: https://www.youtube.com/watch?v=abc123" in text  # a known host may embed
+        am = post["allowed_mentions"]
+        assert am.roles is False and am.users is False and am.everyone is False  # nobody is pinged
+        assert "/predict" not in text  # the games module isn't loaded here
+        [reply] = i.of("followup")
+        assert reply["ephemeral"] is True and ev.url in reply["content"] and stage.mention in reply["content"]
+    with_env(go, monkeypatch)
+
+
+def test_watchparty_unknown_host_link_is_shown_without_an_embed(monkeypatch):
+    async def go(env):
+        add_stage(env)
+        await watchparty(env, link="https://example.org/stream?x=1")
+        [post] = env.guild.gaming.sent
+        assert "Watching: <https://example.org/stream?x=1>" in post["content"]
+    with_env(go, monkeypatch)
+
+
+def test_watchparty_mentions_predictions_when_the_games_module_is_loaded(monkeypatch):
+    async def go(env):
+        add_stage(env)
+        env.bot.get_cog = lambda name: object() if name == "Games" else None
+        await watchparty(env)
+        assert "`/predict create`" in env.guild.gaming.sent[0]["content"]
+        env.bot.get_cog = lambda name: None
+        await watchparty(env, title="Finals", when="tomorrow 8pm")
+        assert "/predict" not in env.guild.gaming.sent[1]["content"]
+    with_env(go, monkeypatch)
+
+
+@pytest.mark.parametrize("stage_perms", [None, discord.Permissions(view_channel=True, manage_channels=True,
+                                                                  move_members=True)])
+def test_watchparty_falls_back_to_the_lobby_voice_channel(monkeypatch, stage_perms):
+    """No stage channel, or one the bot may not schedule on (Mute Members missing)."""
+    async def go(env):
+        if stage_perms is not None:
+            add_stage(env, stage_perms)
+        await watchparty(env)
+        [ev] = env.guild.events.values()
+        assert ev.kwargs["channel"] is env.guild.lobby and ev.kwargs["entity_type"] is discord.EntityType.voice
+        assert env.guild.lobby.mention in env.guild.gaming.sent[0]["content"]
+    with_env(go, monkeypatch)
+
+
+def test_watchparty_with_nowhere_to_host(monkeypatch):
+    async def go(env):
+        env.guild.voice_channels = []
+        i = await watchparty(env)
+        assert "nowhere to host" in i.texts()[0] and not env.guild.events
+    with_env(go, monkeypatch)
+
+
+@pytest.mark.parametrize("link", [
+    "http://example.org/stream", "javascript:alert(1)", "example.org", "https://example.org/a b",
+    "https://user:pw@example.org/x", "[click](https://example.org)",
+])
+def test_watchparty_refuses_links_that_are_not_plain_https(monkeypatch, link):
+    async def go(env):
+        add_stage(env)
+        i = await watchparty(env, link=link)
+        (reply,) = i.of("send_message")
+        assert reply["ephemeral"] is True and reply["content"] == cogmod.BAD_LINK
+        assert not env.guild.events and not env.guild.gaming.sent
+        assert await env.rows("SELECT * FROM hosted_events") == []
+    with_env(go, monkeypatch)
+
+
+@pytest.mark.parametrize("title, link, reason", [
+    ("join discord.gg/raid", None, "invite"),
+    ("free nitro at https://phish.example", None, "link"),  # the title may not carry a link
+    ("watch at phish.com", None, "link"),
+    ("you c.u.n.t", None, "word"),
+    ("Movie night", "https://discord.gg/raid", "invite"),  # the link field may, but never an invite
+])
+def test_watchparty_blocked_text_is_refused_before_anything_is_made(monkeypatch, title, link, reason):
+    from logic import textfilter
+
+    async def go(env):
+        add_stage(env)
+        i = await watchparty(env, title=title, link=link)
+        (reply,) = i.of("send_message")
+        assert reply["ephemeral"] is True and reply["content"] == textfilter.MESSAGES[reason]
+        assert not env.guild.events and not env.guild.gaming.sent
+    with_env(go, monkeypatch)
+
+
+def test_watchparty_title_cannot_ping_or_format(monkeypatch):
+    async def go(env):
+        add_stage(env)
+        await watchparty(env, title="**big** <@&700> @everyone")
+        [post] = env.guild.gaming.sent
+        assert r"\*\*big\*\*" in post["content"]
+        am = post["allowed_mentions"]
+        assert am.roles is False and am.users is False and am.everyone is False
+    with_env(go, monkeypatch)
+
+
+@pytest.mark.parametrize("when, word", [("soonish", "couldn't read"), ("today 9am", "in the past"),
+                                        ("2027-01-01 20:00", "more than 30 days")])
+def test_watchparty_bad_when(monkeypatch, when, word):
+    async def go(env):
+        add_stage(env)
+        i = await watchparty(env, when=when)
+        assert word in i.texts()[0] and not env.guild.events
+    with_env(go, monkeypatch)
+
+
+def test_watchparty_shares_the_game_night_limits_and_needs_an_established_account(monkeypatch):
+    """Security: the same anti-spam limits as /gamenight, counted together, plus an age floor."""
+    async def go(env):
+        add_stage(env)
+        alt = young_account()
+        refused = await watchparty(env, uid=alt, staff=False)
+        assert refused.texts()[0] == cogmod.TOO_NEW and not env.guild.events
+        assert alt not in env.cog.last_created
+
+        await watchparty(env, uid=USER_A, staff=False)
+        assert len(env.guild.events) == 1
+        second = await watchparty(env, title="Another", uid=USER_A, staff=False)
+        assert "just scheduled an event" in second.texts()[0]
+        night = await env.gamenight(uid=USER_A, staff=False)  # the cooldown covers both commands
+        assert "just made a game night" in night.texts()[0]
+        env.cog.last_created.clear()
+        third = await watchparty(env, title="Another", uid=USER_A, staff=False)
+        assert "already have an event coming up" in third.texts()[0]
+        assert USER_A not in env.cog.last_created  # the refused request gave the cooldown back
+        night = await env.gamenight(uid=USER_A, staff=False)  # ...and the upcoming limit does too
+        assert "already have a game night" in night.texts()[0]
+        assert len(env.guild.events) == 1
+
+        # A game night blocks a watch party the same way.
+        await env.gamenight(uid=USER_A + 1, staff=False)
+        env.cog.last_created.clear()
+        blocked = await watchparty(env, uid=USER_A + 1, staff=False)
+        assert "already have an event coming up" in blocked.texts()[0]
+        # Staff aren't limited, whatever the account's age.
+        await watchparty(env, uid=alt, staff=True)
+        await watchparty(env, title="Two", when="tomorrow 8pm", uid=alt, staff=True)
+        assert len(await env.rows("SELECT * FROM hosted_events WHERE host_id = ?", (alt,))) == 2
+    with_env(go, monkeypatch)
+
+
+def test_concurrent_watchparties_from_one_member_create_only_one(monkeypatch):
+    async def go(env):
+        add_stage(env)
+        await asyncio.gather(watchparty(env, uid=USER_A, staff=False),
+                             watchparty(env, title="Other", uid=USER_A, staff=False),
+                             env.gamenight(uid=USER_A, staff=False))
+        made = (await env.rows("SELECT event_id FROM gamenights WHERE host_id = ?", (USER_A,))
+                + await env.rows("SELECT event_id FROM hosted_events WHERE host_id = ?", (USER_A,)))
+        assert len(made) == 1 and len(env.guild.events) == 1
+    with_env(go, monkeypatch)
+
+
+@pytest.mark.parametrize("status", [403, 500])
+def test_watchparty_discord_error_replies_and_gives_the_cooldown_back(monkeypatch, status):
+    async def go(env):
+        add_stage(env)
+        if status == 403:
+            env.guild.forbidden = True
+        else:
+            env.guild.create_error = discord.HTTPException(SimpleNamespace(status=500, reason="x"), "x")
+        i = await watchparty(env, uid=USER_A, staff=False)
+        [reply] = i.of("followup")
+        assert ("Create Events" in reply["content"]) == (status == 403)
+        assert USER_A not in env.cog.last_created
+        assert await env.rows("SELECT * FROM hosted_events") == [] and not env.guild.gaming.sent
+    with_env(go, monkeypatch)
+
+
+def test_a_members_watchparty_reminder_pings_interested_people_but_not_the_role(monkeypatch):
+    """The title is the host's own words and any member can make one: it must not be a way to
+    ping everyone with the Game Night role."""
+    async def go(env):
+        add_stage(env)
+        gn = FakeRole(710, config.GAMENIGHT_ROLE)
+        env.guild.roles.append(gn)
+
+        async def reminder(**who):
+            await watchparty(env, title="free nitro at my place", **who)
+            ev = list(env.guild.events.values())[-1]
+            ev.interested = [FakeUser(A)]
+            env.guild.gaming.sent.clear()
+            env.t = ts(2026, 10, 7, 21) - 10 * MIN
+            await env.cog.run_reminders()
+            [post] = env.guild.gaming.sent
+            return post
+        post = await reminder(uid=USER_A, staff=False)
+        assert gn.mention not in post["content"] and "Watch party: free nitro at my place" in post["content"]
+        assert not post["allowed_mentions"].roles and post["allowed_mentions"].everyone is False
+        assert [u.id for u in post["allowed_mentions"].users] == [A]  # Interested people still hear about it
+        # a host who has left by then is nobody's staff either
+        env.t = T0
+        await env.db.execute("DELETE FROM hosted_events")
+        env.cog.last_created.clear()
+        env.cog.reminded.clear()
+        env.guild.events.clear()
+        late = FakeEvent(9001, env.guild, name="Watch party: gone", start_time=datetime.fromtimestamp(
+            ts(2026, 10, 7, 21), timezone.utc), channel=env.guild.lobby)
+        env.guild.events[late.id] = late
+        env.guild.cached.add(late.id)
+        await env.db.execute("INSERT INTO hosted_events (event_id, host_id, kind, starts_at) VALUES (9001, 4242,"
+                             " 'watchparty', ?)", (ts(2026, 10, 7, 21),))
+        env.guild.gaming.sent.clear()
+        env.t = ts(2026, 10, 7, 21) - 10 * MIN
+        await env.cog.run_reminders()
+        [post] = env.guild.gaming.sent
+        assert gn.mention not in post["content"] and not post["allowed_mentions"].roles
+    with_env(go, monkeypatch)
+
+
+def test_a_staff_watchparty_reminder_pings_interested_and_the_game_night_role(monkeypatch):
+    async def go(env):
+        add_stage(env)
+        gn = FakeRole(710, config.GAMENIGHT_ROLE)
+        env.guild.roles.append(gn)
+        await watchparty(env)
+        [ev] = env.guild.events.values()
+        ev.interested = [FakeUser(A)]
+        env.guild.gaming.sent.clear()
+        env.t = ts(2026, 10, 7, 21) - 10 * MIN
+        await env.cog.run_reminders()
+        await env.cog.run_reminders()
+        [post] = env.guild.gaming.sent
+        assert post["content"].startswith(gn.mention) and "Watch party: Dune Part Two" in post["content"]
+        assert [r.id for r in post["allowed_mentions"].roles] == [gn.id]
+        assert [u.id for u in post["allowed_mentions"].users] == [A]
+    with_env(go, monkeypatch)
+
+
+# ---------------------------------------------------------------- Town Hall
+SAT_BEFORE = ts(2026, 10, 31, 12)  # the Saturday a week before November's first Saturday
+TOWNHALL_AT = ts(2026, 11, 7, 12)
+
+
+def townhall_guild(env, perms=None):
+    add_stage(env, perms)
+    env.bot.user = ME
+    env.guild.announcements = FakeText(302, config.ANNOUNCEMENTS_CHANNEL)
+    env.guild.text_channels.append(env.guild.announcements)
+    env.guild.forums = [SimpleNamespace(name=config.SUGGESTIONS_FORUM, mention="<#400>")]
+    env.cog.townhall_job = cogmod.Weekly("townhall", weekday=5, hour=12, minute=0)
+
+
+async def townhall_seen(env):
+    """The bot's first run just records that it has seen the job; the next Saturday is the first real one."""
+    await env.cog.run_townhall()
+    assert not env.guild.events
+
+
+def townhall_rows(env):
+    return env.rows("SELECT * FROM hosted_events WHERE kind = 'townhall'")
+
+
+def test_townhall_is_created_a_week_ahead_once_and_announced_once(monkeypatch):
+    async def go(env):
+        townhall_guild(env)
+        await townhall_seen(env)
+        for day in (10, 17, 24):  # these Saturdays are not a week before a first Saturday
+            env.t = ts(2026, 10, day, 12, 1)
+            await env.cog.run_townhall()
+        assert not env.guild.events and not env.guild.announcements.sent
+        env.t = SAT_BEFORE - 60
+        await env.cog.run_townhall()
+        assert not env.guild.events
+        env.t = SAT_BEFORE + 60
+        await env.cog.run_townhall()
+        [ev] = env.guild.events.values()
+        kw = ev.kwargs
+        assert kw["name"] == "Town Hall" and kw["channel"] is env.guild.stage
+        assert kw["entity_type"] is discord.EntityType.stage_instance
+        assert kw["start_time"] == datetime.fromtimestamp(TOWNHALL_AT, timezone.utc)
+        assert await townhall_rows(env) == [dict(event_id=ev.id, host_id=BOTUSER, kind="townhall", starts_at=TOWNHALL_AT,
+                                                 reminded=0)]
+        [post] = env.guild.announcements.sent
+        embed = post["embed"]
+        assert embed.title.startswith("Town Hall") and "Agenda" in embed.description
+        assert "<#400>" in embed.description and ev.url in embed.description and "<#102>" in embed.description
+        assert embed.footer.text == "TOWN HALL · NOVEMBER 2026"
+        am = post["allowed_mentions"]
+        assert not am.roles and not am.users and am.everyone is False
+        # Every later tick that week, and the weeks after: nothing more.
+        for later in (SAT_BEFORE + 600, SAT_BEFORE + 3 * 86400, ts(2026, 11, 7, 12, 5), ts(2026, 11, 14, 12, 5)):
+            env.t = later
+            await env.cog.run_townhall()
+        assert len(env.guild.events) == 1 and len(env.guild.announcements.sent) == 1
+        # December's is scheduled on November 28.
+        env.t = ts(2026, 11, 28, 12, 5)
+        await env.cog.run_townhall()
+        assert len(env.guild.events) == 2
+        assert (await townhall_rows(env))[1]["starts_at"] == ts(2026, 12, 5, 12)
+    with_env(go, monkeypatch)
+
+
+def test_townhall_catches_up_after_downtime_but_never_schedules_in_the_past(monkeypatch):
+    async def go(env):
+        townhall_guild(env)
+        await townhall_seen(env)
+        env.t = ts(2026, 11, 3, 9)  # off since before the 31st, back on Tuesday: still worth creating
+        await env.cog.run_townhall()
+        assert len(env.guild.events) == 1 and (await townhall_rows(env))[0]["starts_at"] == TOWNHALL_AT
+        # Off through all of late November: the Dec 5 Town Hall's own week is over, so it is skipped.
+        env.t = ts(2026, 12, 5, 12, 30)
+        await env.cog.run_townhall()
+        assert len(env.guild.events) == 1
+    with_env(go, monkeypatch)
+
+
+def test_townhall_is_not_created_twice_when_the_job_row_was_lost(monkeypatch):
+    async def go(env):
+        townhall_guild(env)
+        await townhall_seen(env)
+        env.t = SAT_BEFORE + 60
+        await env.cog.run_townhall()
+        await env.db.execute("DELETE FROM jobs WHERE key LIKE 'townhall:%'")  # as if the write after it failed
+        await env.cog.run_townhall()
+        assert len(env.guild.events) == 1 and len(env.guild.announcements.sent) == 1
+    with_env(go, monkeypatch)
+
+
+@pytest.mark.parametrize("case, word", [
+    ("no stage", "no 🎙・stage channel"),
+    ("no permission", "missing Mute Members"),
+    ("forbidden", "Create Events"),
+])
+def test_townhall_is_skipped_cleanly_with_the_reason_logged_once(monkeypatch, caplog, case, word):
+    async def go(env):
+        perms = discord.Permissions(view_channel=True, manage_channels=True, move_members=True)
+        townhall_guild(env, perms if case == "no permission" else None)
+        if case == "no stage":
+            env.guild.stage_channels = []
+        if case == "forbidden":
+            env.guild.forbidden = True
+        await townhall_seen(env)
+        for minute in (1, 6, 11):  # three ticks: one warning, not three
+            env.t = SAT_BEFORE + minute * MIN
+            await env.cog.run_townhall()
+        assert not env.guild.events and not env.guild.announcements.sent
+        assert await townhall_rows(env) == []
+    with caplog.at_level(logging.WARNING, logger="cogs.events"):
+        with_env(go, monkeypatch)
+    warnings = [r.getMessage() for r in caplog.records if "town hall" in r.getMessage()]
+    assert len(warnings) == 1 and "skipped" in warnings[0] and word in warnings[0]
+
+
+def test_townhall_discord_error_retries_then_gives_up_after_a_day(monkeypatch):
+    async def go(env):
+        townhall_guild(env)
+        await townhall_seen(env)
+        env.guild.create_error = discord.HTTPException(SimpleNamespace(status=500, reason="x"), "x")
+        env.t = SAT_BEFORE + 60
+        await env.cog.run_townhall()
+        assert not env.guild.events and not any(k.startswith("townhall:2026-W44") for k in await env.jobs())
+        env.guild.create_error = None
+        env.t += 300
+        await env.cog.run_townhall()
+        assert len(env.guild.events) == 1
+
+        # The next month Discord stays down for a day: that month is dropped, with no retry storm after.
+        env.guild.create_error = discord.HTTPException(SimpleNamespace(status=500, reason="x"), "x")
+        env.t = ts(2026, 11, 28, 12, 5)
+        await env.cog.run_townhall()
+        env.t = ts(2026, 11, 29, 12, 5)
+        await env.cog.run_townhall()
+        env.guild.create_error = None
+        env.t += 300
+        await env.cog.run_townhall()
+        assert len(env.guild.events) == 1
+    with_env(go, monkeypatch)
+
+
+def test_townhall_announcement_failure_keeps_the_event(monkeypatch):
+    async def go(env):
+        townhall_guild(env)
+        env.guild.announcements.fail = True
+        await townhall_seen(env)
+        env.t = SAT_BEFORE + 60
+        await env.cog.run_townhall()
+        await env.cog.run_townhall()
+        assert len(env.guild.events) == 1 and len(await townhall_rows(env)) == 1
+    with_env(go, monkeypatch)
+
+
+def test_townhall_time_setting(monkeypatch, caplog):
+    async def go(env):
+        job = Events(env.bot, environ={}).townhall_job
+        assert (job.name, job.weekday, job.hour, job.minute) == ("townhall", 5, 12, 0)
+        job = Events(env.bot, environ={"TOWNHALL_TIME": "7:30pm"}).townhall_job
+        assert (job.hour, job.minute) == (19, 30)
+        townhall_guild(env)
+        env.cog.townhall_job = Events(env.bot, environ={"TOWNHALL_TIME": "off"}).townhall_job
+        assert env.cog.townhall_job is None
+        env.t = SAT_BEFORE + 60
+        await env.cog.run_townhall()  # off: no job rows, no event
+        assert not env.guild.events and await env.jobs() == set()
+        assert not caplog.records
+        assert Events(env.bot, environ={"TOWNHALL_TIME": "lunchtime"}).townhall_job is None
+        assert "TOWNHALL_TIME" in caplog.records[-1].getMessage()
+    with caplog.at_level(logging.WARNING, logger="cogs.events"):
+        with_env(go, monkeypatch)
+
+
+def test_townhall_reminder_goes_to_announcements_without_the_game_night_ping(monkeypatch):
+    async def go(env):
+        townhall_guild(env)
+        gn = FakeRole(710, config.GAMENIGHT_ROLE)
+        env.guild.roles.append(gn)
+        await townhall_seen(env)
+        env.t = SAT_BEFORE + 60
+        await env.cog.run_townhall()
+        [ev] = env.guild.events.values()
+        ev.interested = [FakeUser(A)]
+        env.guild.announcements.sent.clear()
+        env.t = TOWNHALL_AT - 10 * MIN
+        await env.cog.run_reminders()
+        [post] = env.guild.announcements.sent
+        assert post["content"].startswith("**Town Hall** starts") and "<@2>" in post["content"]
+        assert gn.mention not in post["content"] and post["allowed_mentions"].roles is False
+        assert not env.guild.gaming.sent
+    with_env(go, monkeypatch)
+
+
+def test_weekly_loop_runs_both_jobs_and_never_raises(monkeypatch):
+    async def go(env):
+        ran = []
+
+        async def boom():
+            ran.append("free")
+            raise RuntimeError("x")
+
+        async def also():
+            ran.append("townhall")
+            raise RuntimeError("y")
+        monkeypatch.setattr(env.cog, "run_weekly", boom)
+        monkeypatch.setattr(env.cog, "run_townhall", also)
+        await env.cog.weekly.coro(env.cog)
+        assert ran == ["free", "townhall"]  # one job failing doesn't stop the other
+    with_env(go, monkeypatch)

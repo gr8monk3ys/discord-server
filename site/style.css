@@ -558,3 +558,47 @@ footer { border-top: 1px solid color-mix(in srgb, var(--hairline) 60%, transpare
 .recover a:first-child { color: var(--ink); }
 .recover a:hover { color: var(--pen); text-decoration: underline; }
 @media (max-width: 767px), (hover: none) and (pointer: coarse) { .recover a { min-height: 2.75rem; } }
+
+/* -------------------------------------------------------------------- live */
+/* What app.js fills in from the published aggregates. Everything here starts
+   with the hidden attribute, which has to win over the display values above;
+   without data (or without JavaScript) none of it exists on the page. */
+[hidden] { display: none !important; }
+
+/* The masthead's "next up" line: a wall label set into the hero's bottom
+   margin, out of the flow, so showing it moves nothing. */
+.hero-grid { position: relative; }
+.now { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; height: 64px; }
+@media (min-width: 768px) { .now { height: 96px; } }
+@media (min-width: 1024px) { .now { height: 112px; } }
+.now a {
+  min-width: 0;
+  margin-left: -4px;
+  padding: 8px 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: inherit;
+  text-decoration: none;
+  transition: color var(--default) var(--ease-ui);
+}
+.now a:hover { color: var(--pen); }
+.now .dot { display: inline-block; margin-right: 8px; }
+
+/* The live ledger: the same groups as "What's inside", spaced by a gap so a
+   group that has no data leaves no margin behind. */
+.live-body { display: grid; gap: 40px; }
+.live-body .group + .group { margin-top: 0; }
+.live-body .days { border-top: 0; }
+.live-body .games { margin-top: 16px; }
+.tally { margin-top: 20px; gap: 4px 20px; }
+.game-hours { font: 500 0.72rem/1 var(--mono); letter-spacing: 0.04em; font-feature-settings: "tnum" 1; color: var(--ink-muted); }
+
+/* House standings: name and points on one line, a hairline-thin bar under it.
+   The leader gets the pen; the rest are the pen thinned out. */
+.houses { margin-top: 16px; }
+.houses li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 8px 16px; }
+.houses li + li { margin-top: 16px; }
+.bar { grid-column: 1 / -1; height: 6px; border-radius: 9999px; background: var(--tint); overflow: hidden; }
+.bar-fill { display: block; width: 0; height: 100%; border-radius: inherit; background: color-mix(in srgb, var(--pen) 45%, transparent); }
+.houses li:first-child .bar-fill { background: var(--pen); }

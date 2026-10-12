@@ -523,6 +523,28 @@ def test_status_without_errors_or_backups(monkeypatch, tmp_path):
     with_env(go, monkeypatch, tmp_path)
 
 
+def test_status_shows_the_realms_bridge_when_that_module_is_loaded(monkeypatch, tmp_path):
+    from cogs import realms
+
+    async def go(env):
+        async def fields():
+            inter = FakeInteraction(FakeMember(OWNER, env.guild))
+            await Ops.status.callback(env.cog, inter)
+            return {f.name: f.value for f in inter.calls[0]["embed"].fields}
+        assert realms.HEALTH_NAME == "Realms bridge" and realms.Realms.__cog_name__ == "Realms"
+        assert realms.HEALTH_NAME not in await fields()  # this fake bot has no get_cog at all
+        loaded = {}
+        env.bot.get_cog = loaded.get
+        assert realms.HEALTH_NAME not in await fields()  # the module is off: no empty field
+        health = SimpleNamespace(health_text=lambda: "ok (status, whitelist)")
+        loaded["Realms"] = health
+        assert (await fields())[realms.HEALTH_NAME] == "ok (status, whitelist)"
+        health.health_text = lambda: 1 / 0
+        shown = await fields()
+        assert shown[realms.HEALTH_NAME] == "check failed, see bot.log" and shown["Uptime"]  # the rest still shows
+    with_env(go, monkeypatch, tmp_path)
+
+
 # ---------------------------------------------------------------- permission self-check
 class PermChan:
     """A channel whose permissions_for(bot) is whatever the test sets."""
@@ -550,7 +572,9 @@ def perm_guild(env, loaded=("ops", "cards", "recap", "levels", "events")):
     g.mod_log = PermChan(config.MOD_LOG_CHANNEL)
     names = dict.fromkeys(n.channel for n in O.CHANNEL_NEEDS if n.kind == "text")
     g.text_channels = [g.mod_log] + [PermChan(n) for n in names if n != config.MOD_LOG_CHANNEL]
-    g.forums = [PermChan(n) for n in (config.LFG_FORUM, config.SUGGESTIONS_FORUM)]
+    g.forums = [PermChan(n) for n in (config.LFG_FORUM, config.SUGGESTIONS_FORUM,
+                                      config.GUIDES_FORUM, config.SETUPS_FORUM)]
+    g.stage_channels = [PermChan(config.STAGE_CHANNEL)]
     g.voice_channels = [PermChan(n) for n in (config.SQUAD_VOICE, config.LOBBY_VOICE, config.NEW_SQUAD_VOICE)]
     g.categories = [PermChan(config.VOICE_CATEGORY)]
     g.roles = g.roles + [Named(name, 1) for name in dict(O.ROLE_NEEDS)]

@@ -76,6 +76,10 @@ BADGES: tuple[Badge, ...] = (
     Badge("early_member", "🌱", "Founding Member", "Joined before November 2026", lambda f: f.early_member),
     # Granted by cogs/quests.py when the starter quest is finished, never by the sweep.
     Badge("starter", "🧭", "Settled In", "Finish the starter quest (/quest)", lambda f: False),
+    # Granted by cogs/crew.py at the fifth greeting, never by the sweep.
+    Badge("welcoming", "👋", "Welcoming Committee", "Greet 5 newcomers as Welcome Crew (/crew)", lambda f: False),
+    # Granted by cogs/clipcast.py when a clip is posted with the author's consent, never by the sweep.
+    Badge("clipcast", "📺", "On the Channel", "Get a clip posted on the server's YouTube", lambda f: False),
 )
 BY_KEY = {b.key: b for b in BADGES}
 # Granted without a congratulation post: every early joiner gets it just for joining.
@@ -124,9 +128,20 @@ def event_badges(held: Iterable[str]) -> list[Badge]:
     return found
 
 
+WRAPPED_KEY = re.compile(r"^wrapped_(\d{4})$")
+
+
+def wrapped_badges(held: Iterable[str]) -> list[Badge]:
+    """Wrapped badges (cogs/wrapped.py grants wrapped_2026 for sharing that year's card). Like
+    event badges they need no catalogue entry and don't count toward the N/TOTAL progress."""
+    years = sorted(m.group(1) for m in map(WRAPPED_KEY.match, held) if m)
+    return [Badge(f"wrapped_{year}", "📓", f"Wrapped {year}", f"Shared your {year} Wrapped card (/wrapped)",
+                  lambda f: False) for year in years]
+
+
 def held_badges(held: Iterable[str]) -> list[Badge]:
     held = set(held)
-    return [b for b in BADGES if b.key in held] + event_badges(held)
+    return [b for b in BADGES if b.key in held] + event_badges(held) + wrapped_badges(held)
 
 
 def grid(held: Iterable[str], per_row: int = PER_ROW) -> str:

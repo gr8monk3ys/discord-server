@@ -8,7 +8,9 @@ import re
 from dataclasses import dataclass
 from datetime import date
 
-SITE_URL = "https://discord.lscaturchio.xyz"
+import config
+
+SITE_URL = config.SITE_URL  # one definition, in config.py
 INVITE_URL = "https://discord.gg/C25hy9Ca9W"
 PRESENCE_MINUTES = 5
 VIEW_TIMEOUT = 10 * 60  # the select menu stops answering after this (ephemeral, so no cleanup)
@@ -49,8 +51,15 @@ MODULE_CATEGORY = {
     "recap": "community", "cards": "community", "starboard": "community", "staffapps": "community",
     "news": "games", "seasonal": "community", "votehub": "community", "catchup": "utility",
     "gamelink": "stats",
+    "crew": "community", "supporter": "community",
+    "realms": "games",
     "creators": "creators", "clips": "creators",
     "utility": "utility", "moderation": "utility", "ops": "utility", "helpdesk": "utility", "heartbeat": "utility",
+    "houses": "community",
+    "clipcast": "creators",
+    "wrapped": "stats",
+    "sitedata": "utility",
+    "appeals": "utility",
 }
 
 # Staff commands say so in their description: "Staff: ...", "... (mods only)", "... (staff only)",

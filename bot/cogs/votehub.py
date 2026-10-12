@@ -2,9 +2,11 @@
 the member's own bump count and when the next bump is ready, discord.me, top.gg ("coming
 soon" until logic.votehub.TOPGG_URL is set) and the short share link.
 
-Weekly Supporter thanks: Sundays 17:00 local the top three Disboard bumpers of the past
+Weekly bump thanks: Sundays 17:00 local the top three Disboard bumpers of the past
 week are thanked in the games channel and paid 300/200/100 coins (ledger refs
 support:WEEK:PLACE, so a retry or restart never pays twice). Nobody bumped = no post.
+(It was called "Supporter thanks" until the Supporter tier arrived; only the wording
+changed, so the job, ledger reason and refs still say "support".)
 Accounts younger than MIN_ACCOUNT_DAYS are thanked without coins.
 
 Nothing is stored here: bumps are read from the growth cog's `bumps` table and its pending
@@ -93,7 +95,7 @@ class VoteHub(commands.Cog):
         return V.next_bump_at(due, last["at"] if last else None, G.REMINDER_DELAY)
 
     async def my_bumps(self, user_id: int, t: int) -> tuple[int, int]:
-        """(bumps since the last Supporter thanks, bumps in the past 30 days)."""
+        """(bumps since the last bump thanks, bumps in the past 30 days)."""
         week_start = latest_due(V.SUPPORT_JOB, t, self.tz).scheduled_at
         row = await self.db.fetchone(
             "SELECT COALESCE(SUM(at >= ?), 0) AS week, COUNT(*) AS month FROM bumps WHERE user_id = ? AND at >= ?",
@@ -126,7 +128,7 @@ class VoteHub(commands.Cog):
             log.exception("votehub: /vote failed")
             await reply_error(interaction)
 
-    # ------------------------------------------------------------ weekly Supporter thanks
+    # ------------------------------------------------------------ weekly bump thanks
     @tasks.loop(minutes=5)
     async def tick(self) -> None:
         await self.run_support()
@@ -168,13 +170,13 @@ class VoteHub(commands.Cog):
     def warn_once(self, period, why: str) -> None:
         if period.key not in self.warned:
             self.warned.add(period.key)
-            log.warning("supporter thanks %s: %s", period.key, why)
+            log.warning("bump thanks %s: %s", period.key, why)
 
     async def post_support(self, period) -> bool:
         """True when the week is finished (posted, or nobody bumped)."""
         podium = await self.podium(period)
         if not podium:
-            log.info("supporter thanks %s: nobody bumped, nothing to post", period.key)
+            log.info("bump thanks %s: nobody bumped, nothing to post", period.key)
             return True
         guild = self.guild()
         channel = config.match_by_name(guild.text_channels, config.GAMES_CHANNEL) if guild else None
@@ -186,14 +188,14 @@ class VoteHub(commands.Cog):
             for p in podium:
                 if p.coins:
                     await economy.apply_tx(tx, p.user_id, p.coins, V.REASON, t, V.ref(period.key, p.rank))
-        embed = style.embed(title=f"Supporters · {V.week_of(period.key)}", description=V.thanks_text(podium),
-                            footer=style.label("supporters", "top Disboard bumpers of the week"))
+        embed = style.embed(title=f"Bump thanks · {V.week_of(period.key)}", description=V.thanks_text(podium),
+                            footer=style.label("bump thanks", "top Disboard bumpers of the week"))
         try:
             await channel.send(embed=embed, allowed_mentions=NO_PINGS)
         except discord.Forbidden:
             self.warn_once(period, f"can't post in {config.GAMES_CHANNEL}")
             return False
-        log.info("supporter thanks %s: posted %d place(s)", period.key, len(podium))
+        log.info("bump thanks %s: posted %d place(s)", period.key, len(podium))
         return True
 
 

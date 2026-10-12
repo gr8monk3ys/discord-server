@@ -42,12 +42,13 @@ class FakeGuild:
         self.me = NS(id=2, name="Front Desk", top_role=FakeRole(id=3, name="Front Desk", position=50))
         self.roles = [self.default_role, self.me.top_role, *roles]
         self.categories, self.text_channels, self.voice_channels, self.forums = [], [], [], []
+        self.stage_channels = []
         self.calls = []
         self._next = 100
 
     @property
     def channels(self):
-        return [*self.categories, *self.text_channels, *self.voice_channels, *self.forums]
+        return [*self.categories, *self.text_channels, *self.voice_channels, *self.forums, *self.stage_channels]
 
     def get_channel(self, cid):
         return next((c for c in self.channels if c.id == cid), None)
@@ -70,6 +71,9 @@ class FakeGuild:
 
     async def create_forum(self, name, **kw):
         return self._make("forum", name, **kw)
+
+    async def create_stage_channel(self, name, **kw):
+        return self._make("stage", name, **kw)
 
     async def create_role(self, **kw):
         self.calls.append(("role", kw["name"], kw))
@@ -203,7 +207,7 @@ def test_public_mode_hoists_existing_unhoisted_role():
     hype = FakeRole(id=20, name="Hype", position=4, hoist=False, edit=edit)
     guild = FakeGuild(roles=[
         hype,
-        *(FakeRole(id=21 + i, name=n, position=3, hoist=n in ("Season Champ", "Birthday", "Event Champ"))
+        *(FakeRole(id=21 + i, name=n, position=3, hoist=n in ("Season Champ", "Birthday", "Event Champ", "Supporter"))
           for i, n in enumerate(public_mode.BOT_ROLES) if n != "Hype"),
     ])
     asyncio.run(public_mode.PublicMode(guild, apply=True).roles())
@@ -505,3 +509,248 @@ def test_bot_posting_lets_the_bot_open_ticket_threads_in_help():
     [(target, ow)] = sets
     assert target is guild.me
     assert ow.create_private_threads is True and ow.send_messages_in_threads is True and ow.manage_threads is True
+
+
+# ------------------------------------------------------------ forums and the stage
+
+
+def _spec(name):
+    return next(s for s in setup_server.layout_channels() if slug(s["name"]) == slug(name))
+
+
+def _with_categories(guild):
+    for cat_spec in layout.CATEGORIES:
+        guild.categories.append(NS(id=len(guild.categories) + 10, name=cat_spec["name"], overwrites={}))
+    return guild
+
+
+def test_layout_forums_and_stage_fit_discords_limits():
+    forums = [s for s in setup_server.layout_channels() if s.get("type") == "forum"]
+    assert {"guides", "setups"} <= {slug(s["name"]) for s in forums}
+    for spec in forums:
+        tags = spec.get("tags", [])
+        assert len(tags) <= 20, spec["name"]  # Discord: 20 tags per forum
+        assert len({n for n, _ in tags}) == len(tags)
+        assert all(0 < len(n) <= 20 for n, _ in tags), spec["name"]
+        assert 0 < len(spec["topic"]) <= 4096
+        setup_server.forum_options(spec)  # every layout/sort name is one the scripts know
+    guides = _spec("guides")
+    assert {role for _, _, role in layout.GAMES} <= {n for n, _ in guides["tags"]}  # one tag per game
+    assert _spec("setups")["layout"] == "gallery"
+    assert _spec("stage")["type"] == "stage"
+    # Public channels must be Onboarding defaults, or onboarded members never see them. The
+    # Stage is the exception: Discord may refuse one as a default (see layout.py).
+    defaults = {slug(n) for n in layout.ONBOARDING_DEFAULT_CHANNELS}
+    assert {"guides", "setups"} <= defaults and "stage" not in defaults
+
+
+def test_forum_options_only_pass_what_the_spec_sets():
+    assert setup_server.forum_options({"name": "x"}) == {"default_layout": discord.ForumLayoutType.list_view}
+    assert setup_server.forum_options(_spec("setups")) == {
+        "default_layout": discord.ForumLayoutType.gallery_view,
+        "default_sort_order": discord.ForumOrderType.creation_date,
+        "default_reaction_emoji": "🔥",
+        "slowmode_delay": 600,
+        "default_thread_slowmode_delay": 5,
+    }
+
+
+def test_public_mode_creates_new_forums_and_the_stage_once(capsys):
+    guild = _with_categories(FakeGuild())
+    asyncio.run(public_mode.PublicMode(guild, apply=True).new_channels())
+    made = {slug(name): (kind, kw) for kind, name, kw in guild.calls}
+    kind, kw = made["guides"]
+    assert kind == "forum" and kw["category"].name == "03 · games"
+    assert {t.name for t in kw["available_tags"]} >= {"Minecraft", "Beginner", "Question"}
+    assert kw["default_layout"] is discord.ForumLayoutType.list_view
+    assert kw["default_sort_order"] is discord.ForumOrderType.latest_activity
+    assert kw["default_reaction_emoji"] == "👍" and kw["slowmode_delay"] == 600
+    assert "overwrites" not in kw  # same permissions as the other public channels in the category
+    kind, kw = made["setups"]
+    assert kind == "forum" and kw["default_layout"] is discord.ForumLayoutType.gallery_view
+    kind, kw = made["stage"]
+    assert kind == "stage" and kw["category"].name == "05 · voice"
+    assert made["general"][0] == "text" and made["lobby"][0] == "voice"  # the stage isn't mistaken for either
+    assert "can't schedule Stage events without Manage Channels, Mute Members, Move Members" in capsys.readouterr().out
+
+    # Second run with everything in place: nothing is created, moved or edited.
+    for kind, name, kw in guild.calls:
+        pool = {"forum": guild.forums, "stage": guild.stage_channels, "voice": guild.voice_channels,
+                "text": guild.text_channels}[kind]
+        pool.append(NS(id=1000 + len(pool), name=name, overwrites={},
+                       permissions_for=lambda me: discord.Permissions.all()))
+    guild.calls.clear()
+    asyncio.run(public_mode.PublicMode(guild, apply=True).new_channels())
+    assert guild.calls == []
+    assert "Stage events" not in capsys.readouterr().out
+
+
+def test_public_mode_forums_and_stage_dry_run_and_missing_category(capsys):
+    guild = _with_categories(FakeGuild())
+    asyncio.run(public_mode.PublicMode(guild, apply=False).new_channels())
+    assert guild.calls == []
+    out = capsys.readouterr().out
+    assert "#📚・guides (forum) in 03 · games with 14 tags (layout, sort, reaction, post_slowmode, slowmode)" in out
+    assert "🎙・stage (stage) in 05 · voice" in out
+
+    bare = FakeGuild()  # no categories at all: skipped with a reason, never created loose
+    asyncio.run(public_mode.PublicMode(bare, apply=True).new_channels())
+    assert bare.calls == []
+    assert "🎙・stage (stage): category 05 · voice doesn't exist" in capsys.readouterr().out
+
+
+def test_public_mode_reports_a_stage_the_bot_cannot_schedule_on(capsys):
+    guild = _with_categories(FakeGuild())
+    guild.stage_channels.append(NS(id=77, name="🎙・stage", overwrites={}, permissions_for=lambda me: discord.Permissions(
+        manage_channels=True, move_members=True)))
+    asyncio.run(public_mode.PublicMode(guild, apply=True).new_stage(_spec("stage"), guild.categories[0], "05 · voice"))
+    assert guild.calls == []
+    out = capsys.readouterr().out
+    assert "without Mute Members (" in out and "Manage Channels" not in out
+
+
+def test_setup_creates_the_stage_as_a_stage_and_forums_with_their_settings():
+    guild = FakeGuild()
+    m = setup_server.Makeover(guild, apply=True)
+    asyncio.run(m.make_channels())
+    made = {slug(name): (kind, kw) for kind, name, kw in guild.calls}
+    assert made["stage"][0] == "stage"
+    assert made["setups"][1]["default_layout"] is discord.ForumLayoutType.gallery_view
+    assert made["lfg"][1]["default_layout"] is discord.ForumLayoutType.list_view  # unchanged for the old forums
+    # Re-running finds the stage instead of making a text channel with its name.
+    guild.stage_channels.append(NS(id=5, name="🎙・stage", category_id=None))
+    guild.calls.clear()
+    asyncio.run(setup_server.Makeover(guild, apply=True).make_stage(_spec("stage"), None))
+    assert guild.calls == []
+
+
+# ------------------------------------------------------------ wave 9: everything new, on a server that has none of it
+
+WAVE9_ROLES = ("House Fern", "House Kestrel", "House Otter", "Welcome Crew", "Supporter")
+WAVE9_PUBLIC = {"📚・guides": "forum", "🖥・setups": "forum", "🎙・stage": "stage", "⛏️・realms": "text"}
+WAVE9_PRIVATE = {"💜・supporters": {"Supporter", "Keeper", "Moderator"}, "🔒・appeals": {"Keeper", "Moderator"}}
+
+
+def _wave9_guild():
+    """A server from before wave 9: staff roles above Front Desk, every category, no new channel."""
+    keeper = FakeRole(id=10, name="Keeper", position=60, managed=False)
+    mod = FakeRole(id=12, name="Moderator", position=55, managed=False)
+    guild = FakeGuild(roles=[keeper, mod, FakeRole(id=11, name="Squad", position=4, managed=False)])
+    guild.name = "test"
+    guild.me.guild_permissions = discord.Permissions.all()
+    for cat_spec in layout.CATEGORIES:
+        want = setup_server.private_overwrites(guild, cat_spec.get("private_to", ()))
+        guild.categories.append(NS(  # private categories are already private, as on the live server
+            id=len(guild.categories) + 10, name=cat_spec["name"], overwrites={},
+            permissions_for=lambda me: discord.Permissions.all(),
+            overwrites_for=lambda target, want=want: want.get(target, discord.PermissionOverwrite())))
+    return guild
+
+
+async def _wave9_steps(pm):
+    await pm.roles()
+    await pm.new_channels()
+    await pm.bot_posting()
+    await pm.private()
+
+
+def test_public_mode_dry_run_lists_everything_wave9_adds_and_changes_nothing(capsys):
+    guild = _wave9_guild()
+    asyncio.run(_wave9_steps(public_mode.PublicMode(guild, apply=False)))
+    assert guild.calls == []
+    out = capsys.readouterr().out
+    assert set(layout.HOUSE_ROLES.values()) == set(WAVE9_ROLES[:3])
+    for name in WAVE9_ROLES:
+        assert f"  create  @{name}\n" in out, name
+    assert "create  #📚・guides (forum) in 03 · games" in out
+    assert "create  #🖥・setups (forum) in " in out
+    assert "create  🎙・stage (stage) in 05 · voice" in out
+    assert "create  #⛏️・realms in 03 · games" in out
+    assert "create  #💜・supporters (private)" in out
+    assert "create  #🔒・appeals (private)" in out
+
+
+def test_public_mode_apply_creates_wave9_roles_at_the_bottom_and_private_channels_private():
+    guild = _wave9_guild()
+    assert not hasattr(guild, "edit_role_positions")  # the script has no way to move a role
+    asyncio.run(_wave9_steps(public_mode.PublicMode(guild, apply=True)))
+    roles = {name: kw for kind, name, kw in guild.calls if kind == "role"}
+    assert set(WAVE9_ROLES) <= set(roles)
+    for name, kw in roles.items():
+        # no position: Discord creates the role at the bottom, under Front Desk, and moves nothing
+        assert set(kw) == {"name", "colour", "hoist", "mentionable", "reason"}, name
+        assert kw["colour"].value == next(r.get("color", 0) for r in layout.ROLES if r.get("name") == name)
+    made = {name: (kind, kw) for kind, name, kw in guild.calls if kind != "role"}
+    for name, kind in WAVE9_PUBLIC.items():
+        assert made[name][0] == kind, name
+        assert "overwrites" not in made[name][1], name  # public: the category's own permissions
+    by_name = {r.name: r for r in guild.roles}
+    for name, who in WAVE9_PRIVATE.items():
+        kind, kw = made[name]
+        ow = kw["overwrites"]
+        assert kind == "text" and _hidden(ow, guild) and ow[guild.me].view_channel is True, name
+        seen = {target.name for target, o in ow.items() if o.view_channel and target is not guild.me}
+        assert seen == who, name  # exactly the roles layout.py names, nobody else
+        assert all(ow[by_name[r]].view_channel for r in who & set(by_name)), name
+    # Supporter was created a moment ago in the same run and is not in guild.roles yet:
+    # the lounge still lets it in, instead of waiting for a second run.
+    assert "Supporter" not in by_name
+    supporter = next(t for t in made["💜・supporters"][1]["overwrites"] if getattr(t, "name", "") == "Supporter")
+    assert supporter.position < guild.me.top_role.position
+    assert not any(kind == "category" for kind, _, _ in guild.calls)  # nothing existing was recreated
+
+
+def test_bot_posting_ignores_forums_and_the_stage():
+    """A forum or Stage has no text-channel permissions to fix and is never looked up as one."""
+    guild = _wave9_guild()
+
+    def explode(*_):
+        raise AssertionError("bot_posting touched a forum or the stage")
+    for name, kind in WAVE9_PUBLIC.items():
+        pool = {"forum": guild.forums, "stage": guild.stage_channels, "text": guild.text_channels}[kind]
+        pool.append(NS(id=700 + len(pool), name=name, overwrites={}, permissions_for=explode,
+                       overwrites_for=explode, set_permissions=explode))
+    _, sets = _read_only_channel(guild, "📣・announcements", ["view_channel"])
+    asyncio.run(public_mode.PublicMode(guild, apply=True).bot_posting())
+    assert len(sets) == 1
+    read_only = {slug(s["name"]) for s in setup_server.layout_channels() if s.get("read_only")}
+    assert not read_only & {slug(n) for n in (*WAVE9_PUBLIC, *WAVE9_PRIVATE)}
+
+
+def test_onboarding_defaults_are_ordinary_public_channels_only():
+    specs = {}
+    for cat_spec in layout.CATEGORIES:
+        for spec in cat_spec["channels"]:
+            specs[slug(spec["name"])] = (spec.get("type", "text"),
+                                         bool(spec.get("private_to") or cat_spec.get("private_to")))
+    for name in layout.ONBOARDING_DEFAULT_CHANNELS:
+        kind, private = specs[slug(name)]  # KeyError: a default that is not in the layout
+        assert kind in ("text", "forum", "voice") and not private, name
+    defaults = {slug(n) for n in layout.ONBOARDING_DEFAULT_CHANNELS}
+    assert {slug(n) for n in ("📚・guides", "🖥・setups", "⛏️・realms")} <= defaults
+    assert not defaults & {slug(n) for n in ("🎙・stage", "💜・supporters", "🔒・appeals", "📋・mod-log")}
+
+
+def test_onboarding_step_adds_forums_but_never_the_stage_or_a_private_channel(capsys):
+    guild = _wave9_guild()
+    existing = NS(id=500, name="💬・general")
+    guild.text_channels += [existing, NS(id=501, name="⛏️・realms"), NS(id=502, name="💜・supporters"),
+                            NS(id=503, name="🔒・appeals")]
+    guild.forums += [NS(id=510, name="📚・guides"), NS(id=511, name="🖥・setups")]
+    guild.stage_channels.append(NS(id=520, name="🎙・stage"))
+    ob = NS(default_channels=[existing], prompts=[])
+    edits = []
+
+    async def onboarding():
+        return ob
+
+    async def edit_onboarding(**kw):
+        edits.append(kw)
+    guild.onboarding, guild.edit_onboarding = onboarding, edit_onboarding
+    asyncio.run(public_mode.PublicMode(guild, apply=False).onboarding())
+    assert edits == []
+    asyncio.run(public_mode.PublicMode(guild, apply=True).onboarding())
+    (edit,) = edits
+    names = [c.name for c in edit["default_channels"]]
+    assert names == ["💬・general", "📚・guides", "🖥・setups", "⛏️・realms"]  # the existing ones first, kept
+    assert "🎙・stage" not in capsys.readouterr().out

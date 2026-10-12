@@ -9,8 +9,10 @@ Administrator. It needs Manage Roles, Manage Channels, Manage Server and
 Create Invite on Front Desk's role.
 
 Steps, all driven by layout.py:
-- create the roles Front Desk hands out (Clip of the Week, Recruiter, Bumper)
-- create any public layout channel that doesn't exist yet (never moves or edits existing ones)
+- create the roles Front Desk hands out (Clip of the Week, Recruiter, Bumper, the house roles,
+  Welcome Crew, Supporter, ...); new roles land at the bottom of the list and nothing is moved
+- create any public layout channel that doesn't exist yet (never moves or edits existing ones),
+  forums with their tags, layout, sort order, default reaction and slowmode, and the Stage channel
 - create private categories/channels ("private_to") and keep them private
 - set the server description and the welcome-screen text (layout.PUBLIC)
 - refresh the rules and welcome posts in place
@@ -33,14 +35,16 @@ from dotenv import load_dotenv
 
 import layout
 from names import slug
-from setup_server import Makeover, find, private_overwrites
+from setup_server import Makeover, find, forum_options, private_overwrites
 
 sys.stdout.reconfigure(encoding="utf-8")
 
 BOT_ROLES = ("Season Champ", "Hype", "Birthday", "Tournament Champ", "Event Champ", "Counting Champ", "Clip of the Week", "Recruiter", "Bumper",
              "Game Night", "Mythic", "Legend", "Elite", "Veteran", "Regular",
              "PC", "PlayStation", "Xbox", "Switch", "Mobile", "NA", "EU", "LATAM", "Asia", "OCE",
-             "Early Bird", "Night Owl", "Weekend Warrior")  # roles Front Desk hands out
+             "Early Bird", "Night Owl", "Weekend Warrior",
+             "Welcome Crew", "Supporter")  # roles Front Desk hands out
+BOT_ROLES += tuple(layout.HOUSE_ROLES.values())  # the three house roles (created at the bottom)
 NEEDED = ("manage_roles", "manage_channels", "manage_guild", "create_instant_invite")
 
 # Onboarding questions added after the existing ones (matched by title; existing prompts are
@@ -90,6 +94,9 @@ class PublicMode:
     def __init__(self, guild: discord.Guild, apply: bool):
         self.guild = guild
         self.apply = apply
+        # Roles made in this run: guild.roles only learns about them from the gateway a moment
+        # later, and the private channels made further down need them straight away.
+        self.made_roles: dict[str, discord.Role] = {}
 
     async def do(self, verb, what, action):
         print(f"  {verb:<7} {what}")
@@ -121,9 +128,13 @@ class PublicMode:
             hoist = spec.get("hoist", False)
             role = self.role(name)
             if role is None:
-                await self.do("create", f"@{name}", lambda: self.guild.create_role(
+                # No position: Discord puts a new role at the bottom, below Front Desk, and
+                # nothing is ever moved.
+                made = await self.do("create", f"@{name}", lambda: self.guild.create_role(
                     name=name, colour=discord.Colour(spec.get("color", 0)), hoist=hoist,
                     mentionable=spec.get("mentionable", False), reason="Public server"))
+                if made is not None:
+                    self.made_roles[name] = made
             elif role.hoist != hoist and role < self.guild.me.top_role:
                 await self.do("update", f"@{name}: {'hoist' if hoist else 'unhoist'}",
                               lambda: role.edit(hoist=hoist, reason="Public server"))
@@ -143,6 +154,9 @@ class PublicMode:
                     continue
                 if spec.get("type") == "forum":
                     await self.new_forum(spec, cat, cat_spec["name"])
+                    continue
+                if spec.get("type") == "stage":
+                    await self.new_stage(spec, cat, cat_spec["name"])
                     continue
                 voice = spec.get("type") == "voice"
                 pool = self.guild.voice_channels if voice else self.guild.text_channels
@@ -178,13 +192,39 @@ class PublicMode:
             print(f"! skip    {label}: category {cat_name} doesn't exist (run setup_server.py)")
             return
         tags = [discord.ForumTag(name=n, emoji=e) for n, e in spec.get("tags", [])]
-        await self.do("create", f"{label} in {cat.name} with {len(tags)} tags",
+        options = forum_options(spec)
+        extras = ", ".join(k for k in ("layout", "sort", "reaction", "post_slowmode", "slowmode") if k in spec)
+        await self.do("create", f"{label} in {cat.name} with {len(tags)} tags" + (f" ({extras})" if extras else ""),
                       lambda: self.guild.create_forum(spec["name"], category=cat, topic=spec.get("topic", ""),
-                                                      available_tags=tags))
+                                                      available_tags=tags, **options))
+
+    # Scheduling a Stage event needs these in the stage channel, on top of Create Events.
+    STAGE_EVENT_PERMS = ("manage_channels", "mute_members", "move_members")
+
+    async def new_stage(self, spec, cat, cat_name):
+        """Create a missing Stage channel (inherits the category's permissions, like the voice
+        channels). Front Desk can't grant itself a permission it doesn't hold, so a missing
+        one is only reported: the owner turns it on for the Front Desk role."""
+        ch = find(getattr(self.guild, "stage_channels", []), spec)
+        label = f"{spec['name']} (stage)"
+        if ch is None:
+            if cat is None:
+                print(f"! skip    {label}: category {cat_name} doesn't exist (run setup_server.py)")
+                return
+            await self.do("create", f"{label} in {cat.name}",
+                          lambda: self.guild.create_stage_channel(spec["name"], category=cat))
+            perms = getattr(self.guild.me, "guild_permissions", None)
+        else:
+            perms = ch.permissions_for(self.guild.me)
+        missing = [p for p in self.STAGE_EVENT_PERMS if not getattr(perms, p, False)]
+        if missing:
+            print(f"! note    {label}: Front Desk can't schedule Stage events without "
+                  + ", ".join(p.replace("_", " ").title() for p in missing)
+                  + " (Server Settings -> Roles -> Front Desk). Watch parties use the Lobby until then.")
 
     # ------------------------------------------------------------ private spaces
     def private_overwrites(self, role_names):
-        return private_overwrites(self.guild, role_names)
+        return private_overwrites(self.guild, role_names, known=self.made_roles)
 
     @staticmethod
     def is_private(ch, ow) -> bool:

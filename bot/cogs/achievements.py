@@ -1,4 +1,4 @@
-"""Achievements: 20 badges earned from what members already do here (squads, voice,
+"""Achievements: badges earned from what members already do here (squads, voice,
 messages, clips, streaks, tournaments...), granted once each and stored in the
 `achievements` table, plus /profile and /badges.
 
@@ -372,6 +372,9 @@ class Achievements(commands.Cog):
         name = discord.utils.escape_markdown(getattr(member, "display_name", None) or "member")
         embed = style.embed(title=name, footer=style.label("profile", f"{A.progress(held)} badges"))
         embed.set_thumbnail(url=member.display_avatar.url)
+        supporter = self.bot.get_cog("Supporter") if hasattr(self.bot, "get_cog") else None
+        if supporter is not None:
+            embed.description = await supporter.profile_flair(member)  # None for everyone else
         embed.add_field(name="Coins", value=f"{await economy.balance(self.db, uid):,}")
         embed.add_field(name="Season points", value=f"{await self.season_points(uid):,} this month")
         if await self.db.tracking_allowed(uid):

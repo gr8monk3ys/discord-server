@@ -305,7 +305,7 @@ class Need:
     cog: str  # extension name without "cogs."
     channel: str  # as in config.py
     perms: tuple[str, ...]
-    kind: str = "text"  # text | forum | voice | category
+    kind: str = "text"  # text | forum | voice | category | stage
 
 
 @dataclass(frozen=True)
@@ -379,9 +379,32 @@ CHANNEL_NEEDS: list[Need] = [
     Need("vibes", config.ANNOUNCEMENTS_CHANNEL, POST),  # member of the month
     Need("growth", config.BOT_COMMANDS_CHANNEL, POST),  # bump reminders
     Need("stats", config.GENERAL_CHANNEL, POST),  # weekly MVP
+    Need("crew", config.GENERAL_CHANNEL, POST),  # the crew ping
+    Need("crew", config.MOD_LOG_CHANNEL, POST),
+    Need("supporter", config.GENERAL_CHANNEL, POST),  # the thank-you
+    Need("supporter", config.MOD_LOG_CHANNEL, POST),
+    # the bot reacts to new posts and reads the starter message to judge the reward
+    Need("forums", config.GUIDES_FORUM, VIEW + ("add_reactions", "read_message_history"), "forum"),
+    Need("forums", config.SETUPS_FORUM, VIEW + ("add_reactions", "read_message_history"), "forum"),
+    # Stage events (Town Hall, watch parties): Discord wants these three in the stage channel.
+    # Without the channel or one of them the Town Hall is skipped and watch parties use the Lobby.
+    Need("events", config.STAGE_CHANNEL, VIEW + ("connect", "manage_channels", "mute_members", "move_members"),
+         "stage"),
+    Need("clipcast", config.CLIPS_CHANNEL, POST + ("read_message_history",)),  # consent fallback, "as seen on"
+    Need("clipcast", config.MOD_LOG_CHANNEL, POST),  # picks, upload notes, takedown alerts
+    # status panel (edited in place) and the chat relay; reactions say "not relayed"
+    Need("realms", config.REALMS_CHANNEL, POST + ("read_message_history", "add_reactions")),
+    Need("realms", config.MOD_LOG_CHANNEL, POST),  # whitelist changes
+    # appeals: delete the raw webhook message, read missed ones after downtime, open a discussion thread
+    Need("appeals", config.APPEALS_CHANNEL, POST + ("manage_messages", "read_message_history",
+                                                    "create_public_threads", "send_messages_in_threads")),
+    Need("appeals", config.MOD_LOG_CHANNEL, POST),
+    Need("wrapped", config.ANNOUNCEMENTS_CHANNEL, POST + ("attach_files",)),  # the server-wide card is an image
+    Need("houses", config.ANNOUNCEMENTS_CHANNEL, POST),  # House Cup results, the one-time introduction
 ]
 
-ROLE_HOLDERS = ("clips", "engagement", "growth", "levels", "selfroles", "shop", "tournaments")
+ROLE_HOLDERS = ("clips", "engagement", "growth", "levels", "selfroles", "shop", "tournaments", "crew", "supporter",
+                "houses")
 EVENT_MAKERS = ("engagement", "events", "tournaments")
 CREATE_EVENTS_HINT = "Server Settings -> Roles -> Front Desk -> turn on Create Events"
 GUILD_NEEDS: list[GuildNeed] = [
@@ -394,6 +417,8 @@ GUILD_NEEDS: list[GuildNeed] = [
     GuildNeed("manage_messages", ("moderation",)),
     GuildNeed("manage_guild", ("growth",)),  # reading invites
     GuildNeed("move_members", ("tempvoice",)),
+    GuildNeed("ban_members", ("appeals", "moderation"),  # /ban, checking a ban, unbanning on Accept
+              "Server Settings -> Roles -> Front Desk -> turn on Ban Members"),
 ]
 
 # Roles the bot hands out: each must exist and sit below the bot's top role. Moderator is
@@ -411,6 +436,11 @@ ROLE_NEEDS: list[tuple[str, str]] = [
     (config.BIRTHDAY_ROLE, "engagement"),
     (config.COUNTING_ROLE, "engagement"),
     (config.TOURNEY_ROLE, "tournaments"),
+    # Supporter is left out on purpose: the bot only reacts to it, and a Server Subscriptions
+    # role is managed by Discord and may sit anywhere.
+    (config.CREW_ROLE, "crew"),
+    # Like every role above, reported until public_mode.py has made them (houses work without).
+    *((name, "houses") for name in config.HOUSE_ROLES.values()),
 ]
 
 PERMISSION_NAMES = sorted({p for n in CHANNEL_NEEDS for p in n.perms} | {n.perm for n in GUILD_NEEDS})

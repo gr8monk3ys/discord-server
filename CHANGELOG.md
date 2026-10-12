@@ -12,6 +12,34 @@ All notable changes to this project are recorded here. The format follows
 - `/catchup` can use a local Ollama model, so summaries need no API key and stay on the bot's machine.
 - `docs/ARCHITECTURE.md`, `SECURITY.md`, `CONTRIBUTING.md`, issue and pull request templates.
 - `ruff.toml`, `pyrightconfig.json`, `requirements-dev.txt`.
+- Houses: three houses (Fern, Kestrel, Otter) that members are sorted into, `/house`, a weekly
+  House Cup scored from what the other modules already record, and a trophy each calendar
+  quarter; staff `/house-admin move`.
+- Welcome Crew (`/crew`): an opt-in role with a bar to join, one batched crew ping for new
+  arrivals, and a coin reward when the newcomer answers; staff `/crew-stats`.
+- Supporter tier: cosmetic perks for holders of the Supporter role (thank-you, `/profile`
+  flair, a private lounge, a small monthly stipend), `/support`, staff `/supporter grant/revoke`.
+  The role comes from Ko-fi's Discord integration or Server Subscriptions; the bot has no
+  payment code.
+- Guides and setups forums with a first reaction from the bot and a small one-time reward for
+  posts that stay up a day; a Stage channel; `/watchparty`; a monthly Town Hall.
+- Clipcast: the week's top clips uploaded to the server's YouTube channel, only with each
+  author's consent for that clip (`/clipcast consent`, `/clipcast remove`); staff
+  `/clipcast status/skip`. Without YouTube credentials the approved clips are listed for staff.
+- The Realms: a bridge to the Minecraft server with a status panel, `/realms link` (whitelist
+  over RCON), two-way chat and playtime coins; mods `/realms remove` and `/realms adopt`.
+- Wrapped: `/wrapped` year-in-review cards from December 1 to January 15, a server-wide card
+  and staff `/wrapped-preview`.
+- Live landing page: the bot writes server-wide aggregates (`/sitedata refresh`),
+  `server/publish_site_data.py` pushes them to the `site-data` branch, and the page shows
+  upcoming events, house standings, top games and weekly totals.
+- Ban appeals: `/ban`, an appeal form on the site (`site/appeal/`, `site/api/appeal.js`),
+  review cards with Accept and Deny in a staff channel, `/appeals list` and `/appeals code`.
+- Linked Roles for verified Steam, Xbox, PlayStation and Epic Games connections
+  (`site/api/linked-role/`, `server/register_linked_roles.py`, `docs/LINKED_ROLES.md`).
+- Two badges, Welcoming Committee and On the Channel (23 in the catalogue), and a per-year
+  Wrapped badge outside it.
+- `docs/WAVE9_SETUP.md`: the owner checklist for turning these on.
 
 ### Security
 
@@ -20,6 +48,23 @@ All notable changes to this project are recorded here. The format follows
 ### Changed
 
 - Requirements are complete and pinned (Pillow and aiohttp were missing); the Docker image installs from them.
+- The bot now asks for the Ban Members and Mute Members permissions (`main.py --invite`): Ban
+  Members for `/ban` and for lifting a ban when an appeal is accepted, Mute Members for Stage
+  events. The owner has to turn both on for the Front Desk role.
+- The site's Content-Security-Policy `connect-src` now allows `'self'` (the appeal form posts to
+  `/api/appeal`) and `https://raw.githubusercontent.com` (the live data).
+- The site sets one short-lived cookie during Linked Roles sign-in (`__Host-fd_linked_role`,
+  HttpOnly, 10 minutes, deleted when the member comes back). It had no cookies before.
+- The schema is at version 23 (eight new migrations) and the bot loads 46 modules.
+- CI also runs the site function tests (`node --test` in `site/api`).
+- `/privacy tracking:off` also deletes a member's Minecraft playtime, forum post records and
+  Welcome Crew greetings at once, removes them from the level snapshots and withdraws clipcast
+  consent for anything not posted yet. Caps and once-only rewards are counted from the ledger,
+  so opting out and back in resets none of them.
+- The weekly thanks for Disboard bumpers is now called "Bump thanks" (it was "Supporter
+  thanks" before the Supporter tier existed).
+- The site footers say "No tracking · No analytics" instead of "No cookies · No trackers",
+  since Linked Roles sign-in sets a cookie.
 
 ## [1.0.0] - 2026-10-11
 

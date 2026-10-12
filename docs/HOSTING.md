@@ -249,7 +249,25 @@ The first `docker compose build` takes a few minutes on a Pi.
 
 ## What stays on the PC after moving (B or C)
 
-Nothing. The bot, its database, its backups and its restart logic all live on the new host.
+Nothing, unless you use one of the two features below. The bot, its database, its backups and
+its restart logic all live on the new host.
+
+- **The Realms (Minecraft bridge).** The bot talks to the Minecraft server over RCON, which only
+  accepts localhost or a private-network address, and reads the Minecraft server's log file from
+  disk (`REALMS_LOG_PATH`). After a move to a VPS neither is reachable. Leave the five `REALMS_*`
+  lines out of the new `server/.env` (the bridge then stays off and says so), or run the bot on a
+  machine on the same network as the Minecraft server and accept that Minecraft-to-Discord chat
+  needs the log file mounted into the container.
+- **Live site data.** `server/publish_site_data.py` reads `bot/data/site/stats.json` from the
+  bot's data folder and pushes with git. On the new host that file is inside the
+  `front-desk-data` volume, and the host needs git plus push access to the repo. Until you set
+  that up there (a cron line that copies the file out and runs the script with `--file`), the
+  landing page hides its live section by itself after 48 hours. Disable the PC's publishing task.
+
+Clipcast needs nothing extra: it downloads each clip into `bot/data/clipcast` (inside the data
+volume, up to 200 MB a clip, deleted after the upload). The site functions (ban appeals, Linked
+Roles) run on Vercel and do not move with the bot; `APPEAL_SECRET` must stay the same in the new
+`server/.env`.
 
 - Keep both Windows tasks **disabled** for a week as the rollback path, then remove them
   (`Unregister-ScheduledTask 'Front Desk bot'`, same for the watchdog). Do not re-run

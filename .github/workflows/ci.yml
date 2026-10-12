@@ -1,4 +1,4 @@
-# Lint and both test suites, on every pull request and every push to main.
+# Lint, both Python test suites and the site function tests, on every pull request and every push to main.
 # No path filters on purpose: the job always reports, so "Lint and tests" can be a required check.
 name: CI
 
@@ -50,3 +50,14 @@ jobs:
       - name: Server tests
         working-directory: server
         run: python -m pytest -q tests
+
+      # The site's Vercel functions (ban appeal form, Linked Roles). Built-in test runner, no
+      # dependencies, no network. Run from the folder so the runner finds the test files itself:
+      # that works the same on every Node since 20, where a directory argument does not.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+
+      - name: Site function tests
+        working-directory: site/api
+        run: node --test

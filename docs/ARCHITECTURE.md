@@ -2,7 +2,7 @@
 
 A map of the system for the next engineer or AI session. `README.md` is the feature list and
 runbook; this file says how the pieces fit together. Everything here was read from the code
-on 2026-10-11 (schema v15, 37 modules). When this file and the code disagree, the code wins:
+on 2026-10-12 (schema v23, 46 modules). When this file and the code disagree, the code wins:
 fix the file.
 
 ## The four parts
@@ -11,7 +11,7 @@ fix the file.
 |---|---|---|
 | Server as code | `server/` | One-shot scripts that build and extend the Discord server from `layout.py`, a read-only snapshot, the watchdog and the host-migration tool |
 | Front Desk | `bot/` | The server's own discord.py bot: one process, one guild, one SQLite file |
-| Landing page | `site/` | Static page and the `/join` redirect; no build step |
+| Landing page | `site/` | Static pages (home, `/join`, `/appeal`, `/linked-role`) and three Vercel functions under `site/api/`; no build step |
 | Client theme and assets | `theme/`, `assets/` | Vencord/BetterDiscord CSS; generated icon, emoji, sounds and listing art plus the scripts that make them |
 
 `server/layout.py` is the shared source of truth. `bot/config.py` puts `server/` on `sys.path`
@@ -26,7 +26,14 @@ looked up by name at run time, never by a stored ID.
    default `America/Los_Angeles`). Optional feature settings are read from the environment by
    their own cogs: the `/catchup` summary provider and key (catchup; see `server/.env.example`)
    and `TWITCH_CLIENT_ID` + `TWITCH_CLIENT_SECRET` (creators). Without them those features
-   say they are not set up and the rest of the bot is unaffected.
+   say they are not set up and the rest of the bot is unaffected. The newer ones are read
+   through helpers in `bot/config.py` or by the cog: `CREW_PING_MINUTES`, `CREW_QUIET_HOURS`
+   (crew), `SUPPORT_URL` (supporter), `TOWNHALL_TIME` (events), `YOUTUBE_CLIENT_ID`,
+   `YOUTUBE_CLIENT_SECRET`, `YOUTUBE_REFRESH_TOKEN`, `YOUTUBE_PRIVACY` (clipcast),
+   `REALMS_ADDRESS`, `REALMS_RCON_HOST`, `REALMS_RCON_PORT`, `REALMS_RCON_PASSWORD`,
+   `REALMS_LOG_PATH` (realms), `SITE_DATA` (sitedata), and `APPEAL_SECRET`,
+   `APPEAL_COOLING_DAYS`, `APPEAL_REAPPEAL_DAYS`, `SITE_URL` (appeals, and `/ban`'s DM).
+   All are optional; `docs/WAVE9_SETUP.md` says what each turns on.
 2. `single_instance_lock()` takes an exclusive lock on `bot/data/bot.lock` for the life of the
    process, so a second copy on the same machine exits at once.
 3. `FrontDesk.setup_hook()` connects the database, applies pending migrations, loads every
@@ -88,23 +95,23 @@ is set). Loops without a wall-clock time are plain `tasks.loop` intervals.
 | Module | Owns | Writes | Scheduled work | Channels and roles |
 |---|---|---|---|---|
 | `lfg` | `/lfg` squad posts, Join/Leave/Close | `lfg_posts`, `lfg_members` | expiry sweep 5 min (posts close after 3 h) | 🎮・lfg forum; game roles, LFG |
-| `stats` | voice/message/game-time recording, `/stats`, `/leaderboard`, `/privacy`, weekly MVP | `voice_sessions`, `game_sessions`, `message_counts`, `privacy_optout` (and deletes a member's rows on opt-out) | MVP Sun 18:00; 1 min presence heartbeat | 💬・general |
+| `stats` | voice/message/game-time recording, `/stats`, `/leaderboard`, `/privacy`, weekly MVP | `voice_sessions`, `game_sessions`, `message_counts`, `privacy_optout` (and, in `opt_out()`, deletes a member's rows on opt-out, in other cogs' tables too: see Privacy opt-out below) | MVP Sun 18:00; 1 min presence heartbeat | 💬・general |
 | `growth` | invite tracking, Recruiter role, Disboard bump reminders, `/invites`, `/recruiters`, `/bumpers`, `/bumpping` | `invite_uses`, `joins`, `bumps` | bump reminder 1 min; recruiter sweep 24 h | 🤖・bot-commands; Bumper, Recruiter |
 | `community` | welcome after Onboarding, `/report`, mod log of joins/leaves/bans/AutoMod | `welcomed`, `reports` | none | 💬・general, 📋・mod-log, 🛡️・mod |
 | `starboard` | hall of fame at 3 stars | `starboard` | none | ⭐・hall-of-fame |
 | `clips` | clip collection, weekly poll, winner role | `clips`, `clip_polls` | poll Sun 18:05 (open 24 h) | 📸・clips, 🛡️・mod; Clip of the Week |
 | `tempvoice` | join-to-create voice, `/squad` | `temp_voice` | none (deletes 30 s after empty) | 05 · voice category, ➕ New Squad |
-| `events` | `/gamenight`, 15-minute reminders, free games | `gamenights`, `free_games` | free games Thu 18:00; reminders 1 min | 🕹️・gaming, game channels, voice channels; Game Night |
+| `events` | `/gamenight`, `/watchparty`, the monthly Town Hall, 15-minute reminders, free games | `gamenights`, `hosted_events`, `free_games` | free games Thu 18:00; reminders 1 min; Town Hall job Saturdays at `TOWNHALL_TIME` (default 12:00), which schedules the first Saturday of a month a week ahead | 🕹️・gaming, game channels, voice channels, 🎙・stage (else 🔊 Lobby), 📣・announcements; Game Night |
 | `economy` | earning (voice, chat, clips, squads, MVP, clip of the week), `/daily`, `/balance`, `/give`, `/coinflip`, `/richest` | `wallets` streak columns; coins via `economy.py` | voice coins 5 min | none of its own |
 | `games` | `/slots`, `/blackjack`, `/trivia`, `/predict` | `predictions`, `prediction_bets`, `blackjack_open` | none (open blackjack bets refunded at start) | none of its own |
 | `shop` | `/shop`, `/buy`, `/season`, `/raffle`, Spotlight | `perks`, `seasons` | raffle draw Sun 20:00; month-end season results; perk expiry 5 min | 💬・general, 📣・announcements; Hype, Season Champ, colour roles |
 | `engagement` | QOTD, this-or-that poll, counting, auto game night, `/birthday` | `qotd_used`, `poll_used`, `counting`, `counting_run`, `birthdays`, `gamenights` | birthdays 09:00, QOTD 12:00, poll 18:00 daily; auto game night Fri 12:00 | 💬・general, 🔢・counting, 🕹️・gaming; Birthday, Counting Champ |
-| `moderation` | `/warn`, `/timeout`, `/untimeout`, `/cases`, `/purge`, auto-escalation, anti-spam, anti-raid | `cases` | raid restore check 30 s | 📋・mod-log, 🛡️・mod |
+| `moderation` | `/warn`, `/timeout`, `/untimeout`, `/ban`, `/cases`, `/purge`, auto-escalation, anti-spam, anti-raid, the ban DM with the appeal code | `cases`, `appeal_bans` | raid restore check 30 s | 📋・mod-log, 🛡️・mod |
 | `ops` | backups, error alerts, back-online note, drift check, permission self-check, `/status` | none | backup 04:00 daily; drift Sun 03:00; permission check 60 s after ready and 09:00 daily | 📋・mod-log |
 | `utility` | `/remind`, `/reminders`, `/afk`, suggestion votes and tags, stat channels, tickets | `reminders`, `afk`, `tickets` | reminders 30 s; stat channels 10 min | 🆘・help, 💡・suggestions forum, 01 · front desk category |
 | `cards` | welcome card image | none | retry failed cards every 10 min for 24 h | 👋・welcome |
 | `tournaments` | `/tournament`, brackets, result confirmation, auto tournaments | `tournaments`, `tournament_entries`, `tournament_matches` | first Monday of the month 12:00 opens one, auto-start Sat 19:00; 1 min tick (reminders, nudges, 48 h staff flag) | 🏆・tournaments, 📋・mod-log; Tournament Champ |
-| `achievements` | badges, `/profile`, `/badges` | `achievements` | hourly sweep | 💬・general |
+| `achievements` | badges, `/profile` (asks `supporter` for the flair), `/badges` | `achievements` | hourly sweep | 💬・general |
 | `creators` | `/creator` linking and verification, upload and go-live posts | `creators`, `creator_pending`, `creator_seen` | YouTube 15 min; Twitch 3 min; pending cleanup hourly | 📺・creators, 📋・mod-log |
 | `levels` | XP from chat and voice, level roles, `/rank`, `/levels`, `/xp` | `xp` | voice XP sweep 10 min | 🤖・bot-commands, 📋・mod-log; Regular, Veteran, Elite, Legend, Mythic |
 | `recap` | weekly recap, owner digest, member milestones, invite contest | none | recap Mon 10:00; digest Mon 10:05; contest on the 1st 12:00 | 📣・announcements, 📋・mod-log |
@@ -121,9 +128,28 @@ is set). Loops without a wall-clock time are plain `tasks.loop` intervals.
 | `staffapps` | `/apply staff/status`, `/apps list`, review cards | `staff_apps` | none | 📋・mod-log; Moderator (only if below the bot) |
 | `seasonal` | seasonal events: drops, daily quest, `/event`, finale | `event_drops`, `event_claims`, `achievements` (event badge) | 1 min tick (seeded drop times 10:00 to 23:30, start and finale); quest sweep hourly | 💬・general, 🎲・games, 📣・announcements; Event Champ |
 | `gamelink` | `/link`, `/unlink`, `/accounts`, Steam section on `/profile` | `game_accounts`, `game_account_pending` | upkeep 30 min (each account re-read at most daily) | 📋・mod-log |
-| `votehub` | `/vote`, weekly Supporter thanks | none (reads `bumps`) | thanks Sun 17:00 | 🎲・games, 🤖・bot-commands |
+| `votehub` | `/vote`, weekly bump thanks (the job, ledger reason and refs still say `support`) | none (reads `bumps`) | thanks Sun 17:00 | 🎲・games, 🤖・bot-commands |
 | `catchup` | `/catchup` AI summary, staff `/catchup-usage` | `catchup_usage` | none | any public text channel (never the staff category) |
 | `vibes` | chat revival, join anniversaries, booster thanks and stipend, member of the month | `qotd_used` | 1 min tick: anniversaries 11:00 daily; stipend on the 1st 12:00; member of the month on the 1st 12:30 | 💬・general, 📣・announcements |
+| `houses` | three houses, `/house`, staff `/house-admin move`, weekly House Cup, quarterly trophy | `house_members`, `house_results` | placement and role sweep 10 min (one role change a second; a one-time introduction post when the first members are sorted); 1 min tick: House Cup Mon 10:10, season close on the 1st 10:20 (acts when a quarter ended) | 📣・announcements; House Fern, House Kestrel, House Otter |
+| `crew` | Welcome Crew: `/crew` with Join/Leave buttons, the crew ping, greeting reward, staff `/crew-stats` | `crew_arrivals`, `crew_greetings`, `achievements` (Welcoming Committee) | 1 min tick (crew ping, first-time joins only; hourly upkeep: opt-out cleanup, role taken back after a case) | 💬・general, 📋・mod-log; Welcome Crew |
+| `supporter` | Supporter tier: thank-you, `/profile` flair, stipend, `/support`, staff `/supporter grant/revoke` | `supporters` | reconcile 5 min; stipend on the 1st 12:15 | 💬・general, 📋・mod-log; Supporter (only read, unless staff grant it by hand) |
+| `forums` | first reaction on guide and setup posts, delayed one-time post reward | `forum_posts` | settle sweep 10 min (a post is judged once it is a day old) | 📚・guides and 🖥・setups forums |
+| `clipcast` | weekly top clips to YouTube with per-clip consent, `/clipcast consent/remove` (coins are paid only after 7 days up), staff `/clipcast status/skip` | `clipcast`, `clipcast_prefs`, `achievements` (On the Channel) | 5 min tick: opt-out and crash sweep, 7-day payouts, ask Sun 18:30, post Tue 18:30 | 📸・clips, 📋・mod-log, DMs |
+| `realms` | Minecraft bridge: status panel, `/realms link/unlink/status/top`, mods `/realms remove/adopt`, two-way chat, playtime coins | `realms_links`, `realms_playtime` | 15 s tick (server poll every 2 min, backing off to 15 min while it is down; whitelist sync; departed-member sweep 30 min); chat flush 3 s | ⛏️・realms, 📋・mod-log |
+| `wrapped` | `/wrapped` cards (Dec 1 to Jan 15), server card, staff `/wrapped-preview` | `achievements` (`wrapped_YEAR`); `meta` only otherwise | 5 min tick: announcement Dec 1 10:00, reminder Dec 20 10:00, level snapshot once in January | 📣・announcements; wherever a member shares a card |
+| `sitedata` | aggregates file for the landing page, staff `/sitedata refresh` | none (writes `bot/data/site/stats.json`) | 1 min tick, rebuilds every 30 min | none |
+| `appeals` | ban appeals from the website: review cards with Accept/Deny, discussion threads, staff `/appeals list/code` | `appeals` | 5 min tick: re-reads the channel for webhook posts missed while down; expiry daily 09:00 (30 days untouched; answers blanked 180 days after a decision) | 🔒・appeals, 📋・mod-log |
+
+Two of the new `logic/` modules have no cog of their own: `linkedroles.py` validates
+`site/api/linked-role/metadata.json` and plans the registration diff for
+`server/register_linked_roles.py`, and `wrappedcard.py` draws the Wrapped cards.
+`logic/sitedata.py` shares its schema with the publisher through `server/site_schema.py`.
+Cross-cog reads added with these modules, all by `bot.get_cog(...)` and all optional (a missing
+or failing cog just leaves its line out): `recap` asks `Forums.fresh_line` for the weekly recap
+and `Crew.digest_line` for the owner digest, `ops` asks `Realms.health_text` for `/status`,
+`achievements` asks `Supporter.profile_flair`, and `sitedata` and `wrapped` read house standings
+and membership through `logic/houses.py`.
 
 The exact channel permissions and roles each cog needs are data, not prose: `CHANNEL_NEEDS`,
 `GUILD_NEEDS` and `ROLE_NEEDS` in `bot/logic/ops.py`. The permission self-check and `/status`
@@ -152,9 +178,19 @@ Staff applications use their own 90-day rule in `logic/staffapps.py`.
 **Privacy opt-out.** `db.tracking_allowed(user_id)` is the one gate (`privacy_optout` table).
 Every recorder of activity (stats, coins, XP, quest steps, clips) checks it first; readers
 that rank or show members filter opted-out members out. `/privacy tracking:off` also deletes
-the member's voice, message and game history and XP. Things a member does on purpose (a
-partner or staff application, Daily Word, a linked account) are not tracking and are not
-gated. If a change stores something new about members, update `PRIVACY.md`.
+the member's voice, message and game history and XP. `opt_out()` in `cogs/stats.py` does
+all of it in one transaction, for the newer tables too: it deletes `realms_playtime`,
+`forum_posts` and `crew_greetings` rows (either side), removes the member from the level
+snapshots in `meta`, deletes a Wrapped share time whose 6-hour cooldown is over, and then asks
+`clipcast` to withdraw consent for anything not posted (a posted video needs `/clipcast
+remove`). The rule is "opting out removes the detail, never a limit": every cap, cooldown and
+once-only reward is either counted from the ledger, which is never deleted (forum weekly cap,
+crew daily cap, playtime slots), or its bare row is kept (`crew_arrivals`, which tells a rejoin
+from a first join; a Wrapped share time still inside its cooldown). The cogs' own sweeps
+(`crew` hourly, `realms` at each poll, `clipcast` and `wrapped` every 5 minutes) remain as a
+second pass. A new table about members needs a line in `opt_out()`. Things a member does on purpose (a
+partner or staff application, Daily Word, a linked account, a house, a Minecraft link, a ban
+appeal) are not tracking and are not gated. If a change stores something new about members, update `PRIVACY.md`.
 
 **Member text the bot reposts.** Discord AutoMod never acts on bots, so
 `logic/textfilter.py` (`check`, `check_all`, `message`) stands in for it: other servers'
@@ -232,14 +268,28 @@ SQLite at `bot/data/front_desk.db` (gitignored). `MIGRATIONS` in `bot/db.py` is 
 | Seasonal events | `event_drops`, `event_claims` | 15 |
 | Game accounts | `game_accounts`, `game_account_pending` | 15 |
 | Catch-up | `catchup_usage` | 15 |
+| Houses | `house_members` (one row per member ever placed; `left_at` set = left), `house_results` (one frozen row per closed week and per season) | 16 |
+| Welcome Crew | `crew_arrivals` (latest arrival per member), `crew_greetings` (one per newcomer ever) | 17 |
+| Supporter tier | `supporters` | 17 |
+| Forums | `forum_posts` (state: pending, paid, unpaid, skipped, deleted) | 18 |
+| Watch parties, Town Hall | `hosted_events` (kept out of `gamenights` so game-night counts leave them out) | 18 |
+| Clipcast | `clipcast` (one row per shortlisted clip; `status` is the state machine in `logic/clipcast.py`), `clipcast_prefs` | 19 |
+| The Realms | `realms_links` (state: add, ok, remove; unique index "one name per member"), `realms_playtime` (seconds per member per local day); `realms_links.managed` (1 = the bot added the name or staff adopted it; only such a name is ever sent `whitelist remove`) | 20; 22 |
+| Ban appeals | `appeals` (unique index "one open appeal per user"), `appeal_bans` (when a ban happened; written by `moderation`) | 21 |
 
-Derived, not stored: badges, challenge progress, quest steps, event points, recap numbers and
-season standings are recomputed from the owning tables every time, so a restart or a missed
+Wrapped, sitedata and Linked Roles add no tables. Wrapped keeps its share cooldown and the
+January level snapshot in `meta` (`wrapped:shared:YEAR:USER`, `wrapped:levels:YEAR`).
+
+Derived, not stored: badges, challenge progress, quest steps, event points, recap numbers,
+season standings, the running week's house points and everything on a Wrapped card are
+recomputed from the owning tables every time, so a restart or a missed
 event cannot lose progress. Raffle tickets are ledger rows. No message text is stored; the
-exceptions are a quoted reported message and the hall-of-fame copy (both in Discord, not the DB).
+exceptions are a quoted reported message and the hall-of-fame copy (both in Discord, not the DB),
+the title of a guide or setup post, and the answers on a ban appeal (blanked after 180 days).
 
 Other files in `bot/data/`: `bot.log*`, `bot.lock`, `heartbeat`, `backups/` (fallback backup
-target), `migrate/` (host-move archives), and the two tracked banks `qotd.txt` and `polls.txt`.
+target), `migrate/` (host-move archives), `site/stats.json` (the landing page's live data,
+written by `sitedata`), and the two tracked banks `qotd.txt` and `polls.txt`.
 
 ## Server as code (`server/`)
 
@@ -254,6 +304,9 @@ target), `migrate/` (host-move archives), and the two tracked banks `qotd.txt` a
 | `snapshot_server.py` + `snapshot_lib.py` | Read-only dump of live config to `server/snapshot/*.json` (names not IDs, sorted); `--compare` lists drift from `layout.py` | never |
 | `watchdog.py`, `install_watchdog.ps1` | Downtime watchdog and its Task Scheduler install | no (webhook alert only) |
 | `migrate_host.py` | `pack` / `unpack` the database for a host move (database and manifest only, never `.env`) | no |
+| `site_schema.py` | Schema and leak guard for `stats.json`: a whitelist of keys, types and game names that refuses anything ID-like, mention-like or link-like. Imported by the bot and by the publisher | no (pure) |
+| `publish_site_data.py` | Checks `bot/data/site/stats.json` again and pushes it as one parentless commit to the `site-data` branch (force-push with a lease, from a throwaway repository in the temp directory; any other branch is refused) | no (it changes GitHub, with `--apply`) |
+| `register_linked_roles.py` | Writes the Linked Roles metadata records and the verification URL to the Discord application (`docs/LINKED_ROLES.md`) | the application, not the server; with `--apply` |
 
 Every script dry-runs by default. None deletes roles or channels that are missing from
 `layout.py`; they are listed for a human. Because Front Desk now sits below Keeper and
@@ -270,12 +323,32 @@ Two drift checks exist and compare different things:
 
 ## Landing page (`site/`)
 
-Plain HTML, CSS and JS with a strict CSP in `vercel.json` (no inline script or style). The
+Plain HTML, CSS and JS with a strict CSP in `vercel.json` (no inline script or style;
+`connect-src` is this origin, `https://discord.com` and `https://raw.githubusercontent.com`). The
 invite code lives only in `site/config.js`; `app.js` shows live counts from Discord's public
 invite endpoint and `join/` redirects to the invite. The games block in `index.html` is
 generated from `layout.GAMES` by `python -m logic.sitegen` (run in `bot/`), and
 `bot/tests/test_sitegen.py` fails when the page drifts from `layout.py` or breaks the CSP.
 `logic/textfilter.py` reads the server's own invite code from `site/config.js` to allow it.
+
+Live data: `cogs/sitedata.py` writes `bot/data/site/stats.json`, `server/publish_site_data.py`
+pushes it to the `site-data` branch, and `app.js` fetches `STATS_URL` (`config.js`) from
+raw.githubusercontent.com, checks every field again and renders with `textContent`. The live
+section stays hidden when the fetch fails or the file is older than 48 hours. `site-data` is a
+data branch holding one force-pushed commit; nothing but the publisher may write to it.
+
+Functions: Vercel builds each `.js` file under `site/api/` as a Node function. They have no
+dependencies and there is no `package.json`; files and folders starting with `_` are not
+endpoints. Each answers 503 and does nothing until its variables are set.
+
+| Path | File | What it does | Vercel env vars |
+|---|---|---|---|
+| `POST /api/appeal` | `api/appeal.js` | Backend of the appeal form (`appeal/index.html`, `appeal/appeal.js`). Checks the appeal code (an HMAC of the user ID, the same as `logic/appeals.py`) and forwards a small JSON payload to a webhook in the staff appeals channel, where `cogs/appeals.py` verifies it again. A wrong code gets the same 200 as a right one | `APPEAL_SECRET`, `APPEAL_WEBHOOK_URL`, optional `APPEAL_ORIGIN` |
+| `GET /api/linked-role/start` | `api/linked-role/start.js` | Sets the signed state cookie and redirects to Discord's consent screen | `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `LINKED_ROLE_STATE_SECRET`, `LINKED_ROLE_REDIRECT_URI` |
+| `GET /api/linked-role/callback` | `api/linked-role/callback.js` | Exchanges the code, reads the member's connections once, writes the role-connection metadata to Discord and redirects to `/linked-role` with a result flag. Shared code is in `api/linked-role/_lib.js`, the records in `metadata.json` | the same four |
+
+Tests: `node --test` run in `site/api/` (CI runs them the same way). The GitHub Pages mirror is static and has no
+functions, so `/appeal` says so there and Linked Roles must use the Vercel domain.
 
 ## Deployment
 
@@ -285,7 +358,8 @@ generated from `layout.GAMES` by `python -m logic.sitegen` (run in `bot/`), and
 | Watchdog | Task "Front Desk watchdog", `server/watchdog.py` every 5 minutes | Installed by `server/install_watchdog.ps1` |
 | Backups | `ops` daily 04:00, SQLite online backup, integrity-checked, newest 14 kept | `config.BACKUP_DIR`, falling back to `bot/data/backups` when that drive is missing |
 | Container kit | `Dockerfile`, `docker-compose.yml`, `bot/run_container.sh` | Not the live deployment. Read-only root, non-root user, data volume, heartbeat healthcheck and an in-container monitor with the watchdog's thresholds. Steps and cut-over checklist: `docs/HOSTING.md` |
-| Site | Vercel project rooted at `site/`, production branch `main` | No build or install command |
+| Site | Vercel project rooted at `site/`, production branch `main` | No build or install command. The functions under `site/api/` read their settings from the Vercel project's environment variables |
+| Site data | A scheduled task the owner creates runs `server/publish_site_data.py --apply --quiet` every 30 minutes | Needs git push access to `origin` on that machine; exits 0 without output when there is nothing to do |
 | Site mirror | GitHub Pages via `.github/workflows/pages.yml` on pushes that touch `site/` | Rewrites `404.html` paths for the project sub-path |
 
 Never run the bot on two machines with the same token: the lock is per machine. The
@@ -308,5 +382,6 @@ Never run the bot on two machines with the same token: the lock is per machine. 
 | Add a persistent button | A `DynamicItem` with ids in `custom_id`, registered in the cog's setup; re-read state from the DB on click |
 
 Related docs: `README.md` (features, runbook), `PRIVACY.md`, `docs/ECONOMY.md`,
-`docs/HOSTING.md`, `docs/LISTING.md`, `site/README.md`, and the original design and build
+`docs/HOSTING.md`, `docs/LISTING.md`, `docs/LINKED_ROLES.md`, `docs/WAVE9_SETUP.md`,
+`site/README.md`, and the original design and build
 history in `docs/superpowers/specs/2026-10-01-front-desk-bot-design.md`.

@@ -69,12 +69,20 @@ ROLES = [
     *({"name": n} for n in ("NA", "EU", "LATAM", "Asia", "OCE")),
     *({"name": n} for n in ("Early Bird", "Night Owl", "Weekend Warrior")),
     *({"name": role, "mentionable": True} for _, _, role in GAMES),
+    {"name": "Welcome Crew", "mentionable": True},  # opt-in via /crew: pinged when someone new arrives
+    # Cosmetic thank-you tier: no colour and no permissions, so it can't pass for staff. Given by
+    # Ko-fi's Discord bot or Server Subscriptions (or /supporter grant).
+    {"name": "Supporter", "hoist": True},
 ]
 
 # ---------------------------------------------------------------- channels
 # Categories are numbered like a catalogue; Discord uppercases them, which
 # gives you the site's wall-label look for free.
 # "read_only": everyone can read and react, only Keepers (and the bot) post.
+# Forums ("type": "forum") may also set "layout" (list | gallery), "sort" (latest_activity |
+# creation_date), "reaction" (the default reaction emoji), "post_slowmode" (seconds between
+# new posts per member) and "slowmode" (seconds between messages inside a post).
+# "type": "stage" is a Stage channel (needs Community).
 CATEGORIES = [
     {
         "name": "01 · front desk",
@@ -102,6 +110,8 @@ CATEGORIES = [
             {"name": "⭐・hall-of-fame", "topic": "3 ⭐ on any message and it lands here.", "read_only": True},
             {"name": "🔢・counting", "topic": "Count up together. Same person can't go twice; a wrong number resets."},
             {"name": "🎲・games", "topic": "Daily word game, weekly challenges, /slots, /trivia and friends."},
+            {"name": "💜・supporters", "topic": "A quiet corner for supporters. Thank you for keeping the lights on.",
+             "private_to": ["Supporter", "Keeper", "Moderator"]},
         ],
     },
     {
@@ -128,6 +138,31 @@ CATEGORIES = [
                 {"name": f"{emoji}・{channel}", "topic": f"{role} talk, squads, and strats. Ping @{role}."}
                 for emoji, channel, role in GAMES
             ),
+            {
+                # A forum stays readable when things are quiet: a guide from last month is
+                # still the first thing you see, where a chat channel would just look dead.
+                "name": "📚・guides",
+                "type": "forum",
+                "topic": "\n".join(
+                    [
+                        "Tips, builds, settings and how-tos that are worth finding again next month.",
+                        "One topic per post. Put the game and the point in the title, like "
+                        "\"Valorant: crosshair settings that work\".",
+                        "Tag the game. Write it so someone new can follow it: steps, numbers, a screenshot if it helps.",
+                        "Your own words, please: no pasted articles, no link-only posts.",
+                        "A real guide that stays up for a day earns a few coins (a couple of posts a week at most).",
+                    ]
+                ),
+                "tags": [*((role, emoji) for emoji, _, role in GAMES),
+                         ("Beginner", "🌱"), ("Advanced", "🧠"), ("Settings", "⚙️"), ("Question", "❓")],
+                "layout": "list", "sort": "latest_activity", "reaction": "👍",
+                "post_slowmode": 600, "slowmode": 5,
+            },
+            # Front Desk's bridge to our Minecraft server: pinned status panel, chat both ways.
+            {"name": "⛏️・realms", "topic": "The Realms, our Minecraft server. Status is pinned; chat here reaches "
+                                           "the game, and linked players' chat comes back. /realms link gets "
+                                           "you on the whitelist.",
+             "slowmode": 2},
         ],
     },
     {
@@ -140,6 +175,25 @@ CATEGORIES = [
             {"name": "🤖・bot-commands", "topic": "Music (/play), bump reminders, and other bot spam."},
             {"name": "📺・creators", "topic": "Members' streams and uploads. Link yours with /creator.", "read_only": True},
             {"name": "🤝・partners", "topic": "Servers we partner with. Apply with /partner apply.", "read_only": True},
+            {
+                # Image-first: the gallery layout shows each post's first picture.
+                "name": "🖥・setups",
+                "type": "forum",
+                "topic": "\n".join(
+                    [
+                        "Battlestations, PC builds, console corners, desks and in-game bases. Lead with a picture.",
+                        "One setup per post. Say what we're looking at: parts, the game, how long the base took.",
+                        "Tag the type. Your own photos and screenshots only, and nothing that shows an address "
+                        "or a face you'd rather keep private.",
+                        "A setup with a picture that stays up for a day earns a few coins "
+                        "(a couple of posts a week at most).",
+                    ]
+                ),
+                "tags": [("Battlestation", "🖥️"), ("PC Build", "🔧"), ("Console", "🎮"), ("Desk", "🪑"),
+                         ("In-game Base", "🏰"), ("Work in Progress", "🚧")],
+                "layout": "gallery", "sort": "creation_date", "reaction": "🔥",
+                "post_slowmode": 600, "slowmode": 5,
+            },
         ],
     },
     {
@@ -150,6 +204,8 @@ CATEGORIES = [
             {"name": "➕ New Squad", "type": "voice"},  # join to get your own channel
             {"name": "🎮 Squad", "type": "voice", "user_limit": 5, "was": ["🎮 Squad I", "General 2"]},
             {"name": "💤 AFK", "type": "voice", "afk": True},
+            # Watch parties and the monthly Town Hall (Front Desk schedules both as Stage events).
+            {"name": "🎙・stage", "type": "stage"},
         ],
     },
     {
@@ -161,6 +217,10 @@ CATEGORIES = [
             {"name": "🔒・admin", "was": ["admin"]},
             # Front Desk logs joins, leaves, bans, AutoMod hits and /report here.
             {"name": "📋・mod-log", "private_to": ["Keeper", "Moderator"]},
+            # Ban appeals from the website arrive here through a webhook; Front Desk turns each
+            # into a review card (bot/cogs/appeals.py).
+            {"name": "🔒・appeals", "private_to": ["Keeper", "Moderator"],
+             "topic": "Ban appeals from the website. Front Desk posts a card for each one."},
         ],
     },
     {
@@ -238,9 +298,14 @@ ONBOARDING_DEFAULT_CHANNELS = [
     "🆘・help", "💡・suggestions", "🤣・memes", "📸・clips", "⭐・hall-of-fame", "🔢・counting", "🎲・games", "🕹️・gaming", "🎮・lfg", "🎨・art", "💻・code",
     "👗・fashion", "♟️・chess", "🤖・bot-commands", "📺・creators", "🏆・tournaments", "🎭・roles", "🤝・partners",
     "🔊 Lobby", "➕ New Squad", "🎮 Squad", "💤 AFK",
+    "📚・guides", "🖥・setups",
+    "⛏️・realms",
 ]
 # Anything public that's neither a default channel nor an Onboarding option is
 # hidden from members who went through Onboarding, so keep this list complete.
+# Two kinds never go in it: private ("private_to") channels, and the Stage channel. Discord
+# may refuse a Stage as a default channel, and one refused channel fails the whole
+# Onboarding edit; a Stage shows itself to everyone while an event is live anyway.
 ONBOARDING_PROMPTS = [
     {
         "title": "What do you play?",
@@ -304,3 +369,16 @@ MEDIA_ROLES = ["Keeper", "Moderator", "Squad", "Verified"]
 # Every bot member (except Front Desk itself) gets this role, so bots are
 # grouped together in the member list.
 BOT_ROLE = "Bots"
+
+# ---------------------------------------------------------------- houses
+# Three teams, named like specimens pressed into the notebook. Front Desk sorts every member
+# into one and hands out its role; the colours are quiet inks so the One Pen stays the loudest.
+HOUSES = [
+    # (key stored in the database, name, emoji, colour)
+    ("fern", "Fern", "🌿", 0x7FA36B),
+    ("kestrel", "Kestrel", "🪶", 0xC48A4A),
+    ("otter", "Otter", "🦦", 0x6F93A8),
+]
+HOUSE_ROLES = {key: f"House {name}" for key, name, _, _ in HOUSES}
+# Appended, so they are created at the bottom of the stack (below Front Desk).
+ROLES += [{"name": HOUSE_ROLES[key], "color": color} for key, _, _, color in HOUSES]

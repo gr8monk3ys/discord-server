@@ -313,7 +313,9 @@ def test_guild_problems_and_the_create_events_hint():
     assert ops.guild_problems(everything - {"create_events"}, loaded={"moderation", "lfg"}) == []
     assert ops.guild_problems(set(), loaded={"moderation"}) == [
         Problem(ops.SERVER, "missing Moderate Members (moderation)"),
-        Problem(ops.SERVER, "missing Manage Messages (moderation)")]
+        Problem(ops.SERVER, "missing Manage Messages (moderation)"),
+        Problem(ops.SERVER, "missing Ban Members (moderation): Server Settings -> Roles -> Front Desk -> "
+                            "turn on Ban Members")]
 
 
 def test_role_problems_missing_and_not_below_the_bot():
@@ -332,7 +334,7 @@ def test_requirements_tables_cover_config():
     by_channel = {}
     for n in ops.CHANNEL_NEEDS:
         by_channel.setdefault(n.channel, set()).update(n.perms)
-        assert n.kind in ("text", "forum", "voice", "category")
+        assert n.kind in ("text", "forum", "voice", "category", "stage")
         assert "view_channel" in n.perms
     # every channel a cog posts to
     for name in (config.GENERAL_CHANNEL, config.MOD_LOG_CHANNEL, config.MOD_CHANNEL, config.BOT_COMMANDS_CHANNEL,
@@ -358,6 +360,29 @@ def test_requirements_tables_cover_config():
                      config.CLIP_ROLE, config.TOURNEY_ROLE, config.RECRUITER_ROLE, config.BUMPER_ROLE,
                      config.GAMENIGHT_ROLE, config.LFG_ROLE}
     assert config.MOD_ROLE not in roles and config.KEEPER_ROLE not in roles  # above the bot by design
+    # wave 9: the Wrapped card is an image in announcements; houses post there and hand out three roles
+    announce = {n.cog: set(n.perms) for n in ops.CHANNEL_NEEDS if n.channel == config.ANNOUNCEMENTS_CHANNEL}
+    assert {"send_messages", "embed_links", "attach_files"} <= announce["wrapped"]
+    assert {"send_messages", "embed_links"} <= announce["houses"]
+    assert roles >= set(config.HOUSE_ROLES.values()) | {config.CREW_ROLE} and len(config.HOUSE_ROLES) == 3
+    assert "houses" in ops.ROLE_HOLDERS and config.SUPPORTER_ROLE not in roles
+
+
+def test_wave9_needs_are_reported_like_the_rest():
+    import config
+    have = {config.ANNOUNCEMENTS_CHANNEL: {"view_channel", "send_messages", "embed_links"}}
+    assert ops.channel_problems(have, loaded={"wrapped", "houses"}) == [
+        Problem(config.ANNOUNCEMENTS_CHANNEL, "missing Attach Files (wrapped)")]
+    assert ops.channel_problems(have, loaded={"houses"}) == []
+    assert ops.channel_problems({}, loaded={"houses"}) == [
+        Problem(config.ANNOUNCEMENTS_CHANNEL, "channel not found (needed by houses)")]
+    # house roles behave like every other role the bot hands out: missing or too high is a problem
+    made = {name: 1 for name in config.HOUSE_ROLES.values()}
+    assert ops.role_problems(made, 5, loaded={"houses"}) == []
+    assert ops.role_problems({}, 5, loaded={"houses"}) == [
+        Problem(ops.ROLES, f"{name}: role not found (houses)") for name in config.HOUSE_ROLES.values()]
+    assert ops.role_problems(made, 5, loaded={"wrapped", "lfg"}) == []  # not loaded: not asked for
+    assert ops.guild_problems(set(), loaded={"houses"}) == [Problem(ops.SERVER, "missing Manage Roles (houses)")]
 
 
 def test_requirements_only_name_real_cogs_and_permissions():
@@ -394,3 +419,46 @@ def test_problems_report_groups_by_channel_and_truncates():
 @pytest.mark.parametrize("n,text", [(0, "OK"), (1, "1 problem, see mod-log"), (4, "4 problems, see mod-log")])
 def test_permissions_status(n, text):
     assert ops.permissions_status(n) == text
+
+
+def test_modules_do_not_collide():
+    """Things every module shares with the others, each of which must be unique across them:
+    slash command names, cog names (get_cog), the first part of a persistent button's custom_id,
+    and scheduled job names (the `jobs` table and `first_seen:<name>` in meta are keyed on them)."""
+    import importlib
+    import inspect
+    import re
+    from collections import defaultdict
+
+    import discord
+    from discord.ext import commands
+
+    import main
+    commands_by, cogs_by, prefixes, jobs = defaultdict(set), defaultdict(set), defaultdict(set), defaultdict(set)
+    for ext, _ in main.MODULES:
+        short = ext.removeprefix("cogs.")
+        module = importlib.import_module(ext)
+        for _, obj in inspect.getmembers(module, inspect.isclass):
+            if obj.__module__ != module.__name__:
+                continue
+            if issubclass(obj, commands.Cog):
+                cogs_by[obj.__cog_name__].add(short)
+                for cmd in obj.__cog_app_commands__:
+                    commands_by[(type(cmd).__name__, cmd.name)].add(short)
+            if issubclass(obj, discord.ui.DynamicItem):
+                prefixes[re.split(r"[:(]", obj.__discord_ui_compiled_template__.pattern)[0]].add(short)
+        for name in (ext, f"logic.{short}"):
+            try:
+                values = vars(importlib.import_module(name)).values()
+            except ImportError:
+                continue
+            for value in values:
+                if type(value).__name__ in ("Weekly", "Daily", "Monthly", "Annual") and isinstance(
+                        getattr(value, "name", None), str):
+                    jobs[value.name].add(short)
+    assert len(cogs_by) == len(main.MODULES) and len(commands_by) > 60 and len(prefixes) > 10 and len(jobs) > 25
+    for what, found in (("command", commands_by), ("cog", cogs_by), ("custom_id prefix", prefixes), ("job", jobs)):
+        shared = {str(k): sorted(v) for k, v in found.items() if len(v) > 1}
+        assert shared == {}, f"{what} names used by more than one module: {shared}"
+    # a job key is "<name>:<period>" and is looked up with LIKE "<name>:%"
+    assert not [n for n in jobs if ":" in n or "%" in n]

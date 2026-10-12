@@ -163,8 +163,15 @@ class Community(commands.Cog):
     @commands.Cog.listener()
     @never_raise
     async def on_member_ban(self, guild: discord.Guild, user) -> None:
-        if self.ours(guild):
-            await self.mod_log(guild, f"🔨 {who(user)} was banned", style.MUTED)
+        if not self.ours(guild):
+            return
+        # A ban made with /ban already has its case line (who, why, by whom) from the
+        # moderation cog; this plain line is for bans made in Discord's own menu.
+        get_cog = getattr(self.bot, "get_cog", None)
+        moderation = get_cog("Moderation") if get_cog is not None else None
+        if moderation is not None and await moderation.own_ban(user.id):
+            return
+        await self.mod_log(guild, f"🔨 {who(user)} was banned", style.MUTED)
 
     @commands.Cog.listener()
     @never_raise

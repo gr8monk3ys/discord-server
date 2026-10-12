@@ -104,8 +104,8 @@
               Join the server
             </a>
             <p class="counts label" id="counts" hidden aria-live="polite">
-              <span><span class="dot" aria-hidden="true"></span><strong id="count-online">0</strong> online</span>
-              <span><span class="sep" aria-hidden="true">·</span><strong id="count-members">0</strong> members</span>
+              <span id="count-online-wrap"><span class="dot" aria-hidden="true"></span><strong id="count-online">0</strong> online</span>
+              <span><span class="sep" id="count-sep" aria-hidden="true">·</span><strong id="count-members">0</strong> members</span>
             </p>
           </div>
         </div>
@@ -118,6 +118,9 @@
           </div>
           <figcaption class="label"><span>Chill Gamers</span><span>Discord · Gaming</span></figcaption>
         </figure>
+        <!-- Filled in by app.js from the live data; sits in the masthead's bottom margin, so
+             showing it moves nothing. Stays hidden without JavaScript or without data. -->
+        <p class="now label" id="now" hidden><a href="#live"><span class="dot" aria-hidden="true"></span><span id="now-text"></span></a></p>
       </div>
     </section>
 
@@ -178,6 +181,35 @@
               <li><span class="label">Sat</span><div><h3 class="card-title">Tournament night</h3><p>The monthly bracket kicks off at 7 PM.</p></div></li>
               <li><span class="label">Sun</span><div><h3 class="card-title">MVP &amp; Clip of the Week</h3><p>The week's MVP and the community's favourite clip.</p></div></li>
             </ol>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Live: aggregates the bot publishes (no names, no IDs). Hidden until app.js has fresh
+         data; if the fetch fails or the data is stale it stays hidden and the page is unchanged. -->
+    <section id="live" hidden>
+      <div class="wrap">
+        <div class="ledger">
+          <div class="ledger-head">
+            <p class="label">Live — Right now</p>
+            <h2>What's on at the moment</h2>
+            <p class="blurb" id="live-updated"></p>
+            <p class="counts label tally" id="live-tally" hidden></p>
+          </div>
+          <div class="ledger-body live-body">
+            <div class="group" id="live-events" hidden>
+              <div class="group-head"><h3>Coming up</h3><span class="label" id="live-events-count">00</span></div>
+              <ol class="days" id="live-events-list"></ol>
+            </div>
+            <div class="group" id="live-houses" hidden>
+              <div class="group-head"><h3>House standings</h3><span class="label">Points per member</span></div>
+              <ol class="houses" id="live-houses-list"></ol>
+            </div>
+            <div class="group" id="live-games" hidden>
+              <div class="group-head"><h3>Most played this week</h3><span class="label">Hours</span></div>
+              <ul class="games" id="live-games-list"></ul>
+            </div>
           </div>
         </div>
       </div>
@@ -329,7 +361,7 @@
       </div>
       <div class="foot-legal">
         <p class="label">© <span id="year">2026</span> · Chill Gamers · Not affiliated with Discord</p>
-        <p class="label">No cookies · No trackers</p>
+        <p class="label">No tracking · No analytics</p>
       </div>
     </div>
   </footer>

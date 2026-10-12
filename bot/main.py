@@ -61,9 +61,18 @@ MODULES = [
     ("cogs.staffapps", set()),  # /apply staff|status, /apps list, staff application review cards
     ("cogs.seasonal", {"members"}),  # seasonal events: drops in general, daily quest, /event, end-of-event prizes
     ("cogs.gamelink", set()),  # /link steam|verify|approve|remove, /unlink, /accounts: Steam accounts on /profile
-    ("cogs.votehub", set()),  # /vote hub, weekly Supporter thanks for Disboard bumpers
+    ("cogs.votehub", set()),  # /vote hub, weekly bump thanks for Disboard bumpers
     ("cogs.catchup", {"message_content"}),  # /catchup AI summary of a public channel, /catchup-usage
     ("cogs.vibes", {"members"}),  # chat revival, join anniversaries, booster thanks + stipend, member of the month
+    ("cogs.houses", {"members"}),  # three houses: /house, weekly House Cup, season trophy, /house-admin
+    ("cogs.crew", {"members", "presences"}),  # Welcome Crew: /crew, crew ping for newcomers, greeting rewards, /crew-stats
+    ("cogs.supporter", {"members"}),  # Supporter tier: /support, thank-you, stipend, /supporter grant|revoke
+    ("cogs.forums", {"message_content"}),  # guides + setups forums: reaction, one-time post reward, recap line
+    ("cogs.clipcast", {"members", "message_content"}),  # consented weekly clips to YouTube Shorts, /clipcast
+    ("cogs.realms", {"members", "message_content"}),  # Minecraft bridge: status panel, whitelist, chat relay, playtime
+    ("cogs.wrapped", {"members"}),  # /wrapped year-in-review cards (Dec 1 - Jan 15), /wrapped-preview (staff)
+    ("cogs.sitedata", {"members", "presences"}),  # landing page live data: aggregates file every 30 min, /sitedata refresh
+    ("cogs.appeals", {"message_content"}),  # ban appeals from the website: review cards, /appeals list|code
 ]
 
 PERMISSIONS = discord.Permissions(
@@ -90,6 +99,10 @@ PERMISSIONS = discord.Permissions(
     # Moderation autopilot: timeouts and spam cleanup.
     moderate_members=True,
     manage_messages=True,
+    # Stage events (watch parties, Town Hall): Discord asks for Manage Channels, Move Members
+    # and Mute Members in the stage channel. The first two are above.
+    mute_members=True,
+    ban_members=True,  # /ban, and unbanning when a ban appeal is accepted
 )
 
 def build_intents(privileged: bool = True) -> discord.Intents:

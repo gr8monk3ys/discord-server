@@ -1,4 +1,4 @@
-"""Vote hub: the places members can support the server, and the weekly Supporter thanks.
+"""Vote hub: the places members can support the server, and the weekly bump thanks.
 Pure: no Discord, no database.
 
 /vote lists Disboard (bumped with /bump in the bot channel; the growth cog records who
@@ -14,12 +14,13 @@ MIN_ACCOUNT_DAYS are thanked without coins.
 from dataclasses import dataclass
 from typing import Callable, Iterable
 
+import config
 from logic.quests import MIN_ACCOUNT_DAYS, established
 from logic.schedule import Weekly
 
 DISCORD_ME_URL = "https://discord.me/chill-gamers-hq"
 TOPGG_URL = ""  # the server's top.gg page; empty until the listing is approved
-SHARE_URL = "https://discord.lscaturchio.xyz/join"
+SHARE_URL = f"{config.SITE_URL}/join"
 
 SUPPORT_JOB = Weekly("support", weekday=6, hour=17, minute=0)
 REWARDS = (300, 200, 100)  # coins for 1st, 2nd, 3rd

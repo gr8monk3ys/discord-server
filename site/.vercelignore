@@ -1,1 +1,3 @@
 README.md
+api/*.test.mjs
+api/**/_tests

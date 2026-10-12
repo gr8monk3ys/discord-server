@@ -205,14 +205,54 @@ def test_channel_fields_by_type():
     assert lobby["🎮 Squad"]["user_limit"] == 5
     assert lobby["🎮 Squad"]["bitrate"] == 64000
     assert lobby["🎮・lfg"]["require_tag"] is True
-    assert lobby["🎮・lfg"]["tags"] == [
-        {"name": "Wardogs", "emoji": "🪖", "moderated": False},
-        {"name": "Ranked", "emoji": ":trophy:", "moderated": True},
+    assert lobby["🎮・lfg"]["tags"] == [  # sorted by name, whatever order Discord lists them in
         {"name": "Plain", "emoji": None, "moderated": False},
+        {"name": "Ranked", "emoji": ":trophy:", "moderated": True},
+        {"name": "Wardogs", "emoji": "🪖", "moderated": False},
     ]
+    # A forum made before these settings existed: plain defaults, no crash.
+    assert lobby["🎮・lfg"]["layout"] is None and lobby["🎮・lfg"]["sort_order"] is None
+    assert lobby["🎮・lfg"]["default_reaction"] is None and lobby["🎮・lfg"]["thread_slowmode"] == 0
     desk = snap["categories"][0]
     assert desk["overwrites"] == {"role:@everyone": {"allow": [], "deny": ["send_messages"]}}
     assert desk["channels"][0]["synced"] is True
+
+
+def test_forum_settings_and_tags_use_names_and_are_sorted():
+    class More(Enum):
+        gallery_view = 2
+        creation_date = 1
+        stage_voice = 13
+
+    def forum(tags):
+        ch = channel("🖥・setups", Kind.forum, 0, 3000000000000000010, slowmode=600, tags=tags)
+        ch.default_thread_slowmode_delay = 5
+        ch.default_layout = More.gallery_view
+        ch.default_sort_order = More.creation_date
+        ch.default_reaction_emoji = NS(name="🔥", id=None)
+        return ch
+
+    tags = [
+        NS(id=5000000000000000002, name="desk", emoji=NS(name="🪑", id=None), moderated=False),
+        NS(id=5000000000000000003, name="Battlestation", emoji=NS(name="rig", id=5000000000000000004), moderated=False),
+        NS(id=5000000000000000001, name="Console", emoji=None, moderated=True),
+    ]
+    out = lib.channel_dict(forum(tags))
+    assert out["slowmode"] == 600 and out["thread_slowmode"] == 5
+    assert out["layout"] == "gallery_view" and out["sort_order"] == "creation_date"
+    assert out["default_reaction"] == "🔥"
+    assert [t["name"] for t in out["tags"]] == ["Battlestation", "Console", "desk"]
+    assert out["tags"][0]["emoji"] == ":rig:"
+    assert lib.channel_dict(forum(tags[::-1])) == out  # input order never matters
+    assert lib.find_leaks(out) == []  # tag and emoji IDs stay out
+
+    stage = channel("🎙・stage", More.stage_voice, 4, 3000000000000000011, user_limit=0)
+    voice = channel("🔊 Lobby", Kind.voice, 0, 3000000000000000012)
+    text = channel("💬・general", Kind.text, 9, 3000000000000000013)
+    snap = lib.channels_snapshot([stage, text, voice])
+    assert [c["name"] for c in snap["uncategorized"]] == ["💬・general", "🔊 Lobby", "🎙・stage"]
+    listed = snap["uncategorized"][2]
+    assert listed["type"] == "stage_voice" and listed["bitrate"] == 64000 and "tags" not in listed
 
 
 # ------------------------------------------------------------ server, welcome, onboarding, automod

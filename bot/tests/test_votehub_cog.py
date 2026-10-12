@@ -237,7 +237,7 @@ def test_vote_never_raises(monkeypatch):
     with_env(go, monkeypatch)
 
 
-# ------------------------------------------------------------ weekly Supporter thanks
+# ------------------------------------------------------------ weekly bump thanks
 
 def test_first_run_only_marks_the_week_done(monkeypatch):
     async def go(env):
@@ -262,7 +262,10 @@ def test_thanks_top_three_and_pays_with_refs(monkeypatch):
         (msg,) = env.guild.games.sent
         assert msg["allowed_mentions"].to_dict() == discord.AllowedMentions.none().to_dict()
         text = msg["embed"].description
-        assert "2026-W41" in msg["embed"].title
+        assert msg["embed"].title == "Bump thanks · 2026-W41"
+        # "Supporter" now means the Supporter tier: the bump thanks never uses the word
+        shown = f"{msg['embed'].title} {text} {msg['embed'].footer.text}".lower()
+        assert "supporter" not in shown and "bump thanks" in msg["embed"].footer.text.lower()
         assert text.index(f"<@{B}>") < text.index(f"<@{A}>") < text.index(f"<@{C}>")
         assert f"<@{D}>" not in text
         assert "4 bumps · +300 coins" in text and "2 bumps · +200 coins" in text and "1 bump · +100 coins" in text

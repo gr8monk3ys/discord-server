@@ -14,7 +14,11 @@ anything from `bot/data/` (the SQLite DB, logs and lock file live there and are 
   imports it (via `bot/config.py`), so the setup scripts and the bot always agree
 - `server/setup_server.py` (first build), `polish_server.py` (Community, Onboarding, AutoMod),
   `public_mode.py` (additive changes only), `expressions.py` (emoji and soundboard upload),
-  `snapshot_server.py` + `snapshot_lib.py` (read-only config dump to `server/snapshot/*.json`)
+  `snapshot_server.py` + `snapshot_lib.py` (read-only config dump to `server/snapshot/*.json`),
+  `publish_site_data.py` + `site_schema.py` (push the landing page's live data),
+  `register_linked_roles.py` (Linked Roles metadata, `docs/LINKED_ROLES.md`)
+- `site/` the landing page; `site/api/` its Vercel functions (ban appeal form, Linked Roles),
+  which read their secrets from Vercel environment variables, never from `server/.env`
 - `bot/main.py` entry point; `MODULES` lists every cog with the privileged intents it needs
 - `bot/logic/<name>.py` pure rules (no Discord I/O), `bot/cogs/<name>.py` Discord I/O
 - `bot/db.py` SQLite via aiosqlite with append-only `MIGRATIONS`; `bot/economy.py` the only code
@@ -30,14 +34,16 @@ The bot and scripts share one virtualenv at `server/.venv` (gitignored); it runs
 - Install: `python -m venv server/.venv`, then `server/.venv/Scripts/pip install -r requirements-dev.txt`
   (the runtime pins in `bot/requirements.txt` plus pytest and ruff; `server/requirements.txt` is a
   subset of the runtime pins). A new third-party import needs a line in `bot/requirements.txt`.
-- Bot tests: `cd bot && ../server/.venv/Scripts/python -m pytest -q -p no:warnings` (~2,900 tests, about three minutes)
-- Server tests: `cd server && .venv/Scripts/python -m pytest -q tests`
+- Bot tests: `cd bot && ../server/.venv/Scripts/python -m pytest -q -p no:warnings` (~3,940 tests, a few minutes)
+- Server tests: `cd server && .venv/Scripts/python -m pytest -q tests` (216 tests)
+- Site function tests: `cd site/api && node --test` (34 tests, no network, no `npm install`;
+  run from that folder, as CI does, so every Node version finds the test files)
 - Lint: `server/.venv/Scripts/ruff check .` from the repo root (`ruff.toml`: bug-catching rules only,
   no formatter). `pyrightconfig.json` is for editors; pyright is not clean and is not part of CI.
 - Every server script dry-runs by default and changes Discord only with `--apply`.
 - `python main.py --invite` (in `bot/`) prints the invite link with the permissions the bot needs.
 
-CI (`.github/workflows/ci.yml`) runs ruff and both test suites on every pull request and push to
+CI (`.github/workflows/ci.yml`) runs ruff, both Python test suites and the site function tests on every pull request and push to
 `main`; still run them locally before pushing.
 
 ## Conventions
@@ -63,4 +69,7 @@ CI (`.github/workflows/ci.yml`) runs ruff and both test suites on every pull req
   `python server/watchdog.py --pause 60` before stopping the bot on purpose.
 - Keep the `front-desk-bot` branch: the bot's public privacy-policy link points at `PRIVACY.md`
   on that branch. After changing `PRIVACY.md` on `main`, fast-forward that branch to `main`.
+- The `site-data` branch is not a code branch: it holds one force-pushed, parentless commit
+  with the single file `stats.json`, written only by `server/publish_site_data.py`. Never
+  commit to it, merge it, rebase onto it or delete it; the landing page reads it.
 - Soundboard uploads must be MP3 (discord.py only accepts MP3); `make_sounds.py` needs ffmpeg.

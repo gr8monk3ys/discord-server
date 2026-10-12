@@ -470,6 +470,175 @@ MIGRATIONS = [
         PRIMARY KEY (day, user_id)
     )""",
     ],
+    [
+        # Houses: one row per member ever placed (left_at set = left, kept for the rejoin
+        # cooldown), and one frozen result per closed week / season (the House Cup).
+        """CREATE TABLE house_members (
+        user_id INTEGER PRIMARY KEY,
+        house TEXT NOT NULL,
+        joined_at INTEGER NOT NULL,
+        left_at INTEGER,
+        source TEXT NOT NULL DEFAULT 'auto'
+    )""",
+        """CREATE TABLE house_results (
+        kind TEXT NOT NULL,
+        period TEXT NOT NULL,
+        season TEXT NOT NULL,
+        winner TEXT,
+        data TEXT NOT NULL,
+        closed_at INTEGER NOT NULL,
+        PRIMARY KEY (kind, period)
+    )""",
+        "CREATE INDEX house_results_season ON house_results (kind, season)",
+    ],
+    [
+        # Wave 9: Welcome Crew. Arrivals waiting for (or covered by) a crew ping, one row per
+        # member (the latest arrival), and one greeting per newcomer ever (first crew member wins).
+        """CREATE TABLE crew_arrivals (
+        user_id INTEGER PRIMARY KEY,
+        at INTEGER NOT NULL,
+        fresh INTEGER NOT NULL DEFAULT 1,
+        pinged_at INTEGER,
+        skipped INTEGER NOT NULL DEFAULT 0
+    )""",
+        """CREATE TABLE crew_greetings (
+        newcomer_id INTEGER PRIMARY KEY,
+        crew_id INTEGER NOT NULL,
+        at INTEGER NOT NULL,
+        coins INTEGER NOT NULL DEFAULT 0
+    )""",
+        "CREATE INDEX crew_greetings_crew ON crew_greetings (crew_id, at)",
+        # Supporter tier: who holds (or held) the Supporter role, and when they were thanked.
+        """CREATE TABLE supporters (
+        user_id INTEGER PRIMARY KEY,
+        since INTEGER NOT NULL,
+        source TEXT NOT NULL DEFAULT 'role',
+        thanked_at INTEGER,
+        ended_at INTEGER
+    )""",
+    ],
+    [
+        # Forums: guide and setup posts by tracking-allowed members, waiting for their one-time
+        # reward. state: pending | paid | skipped (didn't qualify) | deleted.
+        """CREATE TABLE forum_posts (
+        thread_id INTEGER PRIMARY KEY,
+        kind TEXT NOT NULL,
+        author_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        state TEXT NOT NULL DEFAULT 'pending',
+        settled_at INTEGER
+    )""",
+        "CREATE INDEX forum_posts_state ON forum_posts (state, created_at)",
+        "CREATE INDEX forum_posts_author ON forum_posts (author_id, settled_at)",
+        # Watch parties and the Town Hall: scheduled events that share the game-night reminder
+        # loop and host limits, kept out of `gamenights` so game-night stats don't count them.
+        # kind: watchparty | townhall.
+        """CREATE TABLE hosted_events (
+        event_id INTEGER PRIMARY KEY,
+        host_id INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        starts_at INTEGER NOT NULL,
+        reminded INTEGER NOT NULL DEFAULT 0
+    )""",
+    ],
+    [
+        # Clipcast: member clips shortlisted for the server's YouTube channel. One row per clip
+        # (its message id) with the author's answer, who gave it and when; `status` is the state
+        # machine in logic/clipcast.py. No clip text or media is stored.
+        """CREATE TABLE clipcast (
+        message_id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        channel_id INTEGER NOT NULL,
+        posted_at INTEGER NOT NULL,
+        reactions INTEGER NOT NULL DEFAULT 0,
+        backers INTEGER NOT NULL DEFAULT 0,
+        week TEXT NOT NULL,
+        status TEXT NOT NULL,
+        credit TEXT,
+        credit_name TEXT,
+        answered_by INTEGER,
+        answered_at INTEGER,
+        answered_via TEXT,
+        asked_at INTEGER,
+        asked_via TEXT,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        upload_started_at INTEGER,
+        video_id TEXT,
+        published_at INTEGER,
+        notice_message_id INTEGER,
+        note TEXT,
+        updated_at INTEGER NOT NULL
+    )""",
+        "CREATE INDEX clipcast_status ON clipcast (status, user_id)",
+        # Standing answer from /clipcast consent (always | ask | never).
+        """CREATE TABLE clipcast_prefs (
+        user_id INTEGER PRIMARY KEY,
+        pref TEXT NOT NULL,
+        credit TEXT,
+        set_at INTEGER NOT NULL
+    )""",
+    ],
+    [
+        # The Realms (Minecraft bridge). One row per Minecraft name: state 'add' (whitelist add not
+        # confirmed by the server yet), 'ok', or 'remove' (unlinked; whitelist remove not confirmed yet).
+        """CREATE TABLE realms_links (
+        name_key TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        user_id INTEGER NOT NULL,
+        state TEXT NOT NULL DEFAULT 'add',
+        attempts INTEGER NOT NULL DEFAULT 0,
+        linked_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+    )""",
+        # one Minecraft name per member (a removal still waiting does not count)
+        "CREATE UNIQUE INDEX realms_links_user ON realms_links (user_id) WHERE state != 'remove'",
+        # Seconds online per member per local day, measured from player-list polls.
+        """CREATE TABLE realms_playtime (
+        user_id INTEGER NOT NULL,
+        day TEXT NOT NULL,
+        seconds INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (user_id, day)
+    )""",
+    ],
+    [
+        # Ban appeals sent through the website. status: open | accepted | denied | expired | closed.
+        # source_message_id is the webhook message it came from, so one message is one appeal.
+        """CREATE TABLE appeals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'open',
+        answers TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        touched_at INTEGER NOT NULL,
+        source_message_id INTEGER UNIQUE,
+        card_message_id INTEGER,
+        thread_id INTEGER,
+        decided_by INTEGER,
+        decided_at INTEGER,
+        decision_reason TEXT
+    )""",
+        "CREATE UNIQUE INDEX idx_appeals_one_open ON appeals (user_id) WHERE status = 'open'",
+        "CREATE INDEX idx_appeals_user ON appeals (user_id)",
+        # When a ban happened (written by cogs/moderation.py), for the appeal cooling-off period.
+        # source: command (/ban) | manual (banned in Discord's own menu).
+        """CREATE TABLE appeal_bans (
+        user_id INTEGER PRIMARY KEY,
+        banned_at INTEGER NOT NULL,
+        source TEXT NOT NULL
+    )""",
+    ],
+    [
+        # The Realms: 1 once the server said "Added <name>" to this bot's own whitelist add (or
+        # staff adopted the name). Only such a name is ever sent `whitelist remove`, and only
+        # such a name may answer "already whitelisted" to an add.
+        "ALTER TABLE realms_links ADD COLUMN managed INTEGER NOT NULL DEFAULT 0",
+    ],
+    [
+        # Clipcast: when a published clip's payout was settled (paid, or decided against: the
+        # ledger ref clipcast:<message_id> says which). NULL: still waiting out PAYOUT_DAYS.
+        "ALTER TABLE clipcast ADD COLUMN payout_at INTEGER",
+    ],
 ]
 
 

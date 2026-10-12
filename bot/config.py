@@ -68,6 +68,20 @@ GAMES_CHANNEL = "🎲・games"  # daily word game results, challenge board
 SQUAD_VOICE = "🎮 Squad"
 LOBBY_VOICE = "🔊 Lobby"
 MODES = ("Ranked", "Casual")
+# Houses: (key, name, emoji, colour) and the role each house carries, from layout.py
+HOUSES = layout.HOUSES
+HOUSE_ROLES = layout.HOUSE_ROLES
+# Wave 9: Welcome Crew and Supporter tier
+CREW_ROLE = "Welcome Crew"  # opt-in with a bar (/crew): pinged when someone new arrives
+SUPPORTER_ROLE = "Supporter"  # given by Ko-fi's Discord bot or Server Subscriptions; cosmetic perks
+SUPPORTERS_CHANNEL = "💜・supporters"  # private lounge for the Supporter role
+# Forums and Stage events
+GUIDES_FORUM = "📚・guides"
+SETUPS_FORUM = "🖥・setups"
+STAGE_CHANNEL = "🎙・stage"  # watch parties, the monthly Town Hall
+# The Realms (Minecraft bridge): status panel and two-way chat live in this channel.
+REALMS_CHANNEL = "⛏️・realms"
+REALMS_ENV = ("REALMS_ADDRESS", "REALMS_RCON_HOST", "REALMS_RCON_PORT", "REALMS_RCON_PASSWORD", "REALMS_LOG_PATH")
 
 
 @dataclass(frozen=True)
@@ -116,3 +130,73 @@ def load_settings() -> Settings:
         guild_id=int(os.environ["GUILD_ID"]),
         tz=ZoneInfo(os.environ.get("TZ", "America/Los_Angeles")),
     )
+
+
+def crew_env() -> tuple[str, str]:
+    """Optional Welcome Crew settings, raw (logic/crew.py validates them and has the defaults):
+    CREW_PING_MINUTES (gap between crew pings) and CREW_QUIET_HOURS (local hours, like "22-9")."""
+    return os.environ.get("CREW_PING_MINUTES", ""), os.environ.get("CREW_QUIET_HOURS", "")
+
+
+def support_url_env() -> str:
+    """SUPPORT_URL, raw (logic/supporter.py validates it). Unset: /support says it isn't open."""
+    return os.environ.get("SUPPORT_URL", "")
+# Clipcast (cogs/clipcast.py): optional YouTube upload settings. All three credentials unset
+# means the feature posts nothing itself and lists the week's approved clips for staff.
+CLIPCAST_ENV = ("YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "YOUTUBE_REFRESH_TOKEN", "YOUTUBE_PRIVACY")
+
+
+def clipcast_env(environ=None) -> dict[str, str]:
+    """The clipcast settings from the environment (or a mapping, in tests); missing ones are ''."""
+    environ = os.environ if environ is None else environ
+    return {key: str(environ.get(key) or "").strip() for key in CLIPCAST_ENV}
+def realms_environ(environ=None) -> dict[str, str]:
+    """The Minecraft bridge's settings (REALMS_ENV) as they are in the environment; server/.env
+    was loaded by load_settings(). logic/realms.py validates them; all empty means the bridge is off."""
+    environ = os.environ if environ is None else environ
+    return {name: environ.get(name) or "" for name in REALMS_ENV}
+# Live site data (cogs/sitedata.py): aggregates for the landing page, written here every 30
+# minutes and pushed by server/publish_site_data.py. SITE_DATA=off stops the bot writing it.
+SITE_DATA_FILE = DATA_DIR / "site" / "stats.json"
+
+
+def site_data_enabled() -> bool:
+    return os.environ.get("SITE_DATA", "on").strip().lower() not in {"off", "0", "false", "no"}
+# Ban appeals (logic/appeals.py). Off unless APPEAL_SECRET is set in server/.env.
+APPEALS_CHANNEL = "🔒・appeals"  # staff only; the website's webhook posts here
+SITE_URL = "https://discord.lscaturchio.xyz"
+APPEAL_SECRET_MIN = 16  # characters; site/api/appeal.js applies the same floor
+
+
+@dataclass(frozen=True)
+class AppealSettings:
+    secret: str
+    page_url: str  # the form banned members fill in
+    join_url: str
+    cooling: int  # seconds after a ban before an appeal is read
+    reappeal: int  # seconds after a denial before the next one is read
+
+
+def _env_days(env, key: str, default: int) -> int:
+    try:
+        days = int(str(env.get(key, "")).strip() or default)
+    except ValueError:
+        return default
+    return days if 0 <= days <= 3650 else default
+
+
+def appeal_settings(env=None) -> AppealSettings | None:
+    """None (the whole feature is off) unless APPEAL_SECRET is set and long enough.
+    Optional: APPEAL_COOLING_DAYS (default 7), APPEAL_REAPPEAL_DAYS (default 90) and
+    SITE_URL (default the public site; https only)."""
+    env = os.environ if env is None else env
+    secret = str(env.get("APPEAL_SECRET", "")).strip()
+    if len(secret) < APPEAL_SECRET_MIN:
+        return None
+    site = str(env.get("SITE_URL", "")).strip().rstrip("/")
+    if not site.startswith("https://") or any(c.isspace() or c in "<>" for c in site):
+        site = SITE_URL
+    day = 24 * 60 * 60
+    return AppealSettings(secret=secret, page_url=f"{site}/appeal", join_url=f"{site}/join",
+                          cooling=_env_days(env, "APPEAL_COOLING_DAYS", 7) * day,
+                          reappeal=_env_days(env, "APPEAL_REAPPEAL_DAYS", 90) * day)
