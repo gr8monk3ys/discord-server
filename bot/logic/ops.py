@@ -399,9 +399,12 @@ CHANNEL_NEEDS: list[Need] = [
     Need("appeals", config.APPEALS_CHANNEL, POST + ("manage_messages", "read_message_history",
                                                     "create_public_threads", "send_messages_in_threads")),
     Need("appeals", config.MOD_LOG_CHANNEL, POST),
+    Need("wrapped", config.ANNOUNCEMENTS_CHANNEL, POST + ("attach_files",)),  # the server-wide card is an image
+    Need("houses", config.ANNOUNCEMENTS_CHANNEL, POST),  # House Cup results, the one-time introduction
 ]
 
-ROLE_HOLDERS = ("clips", "engagement", "growth", "levels", "selfroles", "shop", "tournaments", "crew", "supporter")
+ROLE_HOLDERS = ("clips", "engagement", "growth", "levels", "selfroles", "shop", "tournaments", "crew", "supporter",
+                "houses")
 EVENT_MAKERS = ("engagement", "events", "tournaments")
 CREATE_EVENTS_HINT = "Server Settings -> Roles -> Front Desk -> turn on Create Events"
 GUILD_NEEDS: list[GuildNeed] = [
@@ -436,6 +439,8 @@ ROLE_NEEDS: list[tuple[str, str]] = [
     # Supporter is left out on purpose: the bot only reacts to it, and a Server Subscriptions
     # role is managed by Discord and may sit anywhere.
     (config.CREW_ROLE, "crew"),
+    # Like every role above, reported until public_mode.py has made them (houses work without).
+    *((name, "houses") for name in config.HOUSE_ROLES.values()),
 ]
 
 PERMISSION_NAMES = sorted({p for n in CHANNEL_NEEDS for p in n.perms} | {n.perm for n in GUILD_NEEDS})

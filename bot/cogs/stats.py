@@ -2,6 +2,7 @@
 time (counts and durations only, never message text), answers /stats and
 /leaderboard, posts the weekly MVP, and handles /privacy."""
 
+import json
 import logging
 import time
 from datetime import datetime
@@ -12,8 +13,10 @@ from discord.ext import commands, tasks
 
 import config
 import style
+from cogs.recap import LEVELS_KEY as RECAP_LEVELS_KEY
 from logic import quests as Q
 from logic import stats as S
+from logic import wrapped as W
 from logic.schedule import Weekly, plan
 
 log = logging.getLogger(__name__)
@@ -351,6 +354,18 @@ class Stats(commands.Cog):
         await interaction.followup.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
 
     # ------------------------------------------------------------ /privacy
+    async def withdraw_clips(self, user_id: int) -> None:
+        """Clipcast: consent for clips not posted yet is withdrawn now instead of at its next
+        sweep. The consent rows themselves stay (they are the record of what was answered)."""
+        get_cog = getattr(self.bot, "get_cog", None)
+        clipcast = get_cog("Clipcast") if get_cog is not None else None
+        if clipcast is None:
+            return
+        try:
+            await clipcast.withdraw("user_id", [user_id], "privacy")
+        except Exception:
+            log.exception("/privacy: withdrawing clipcast consent for %s failed (its sweep will retry)", user_id)
+
     @app_commands.command(name="privacy", description="Turn stat tracking off (deletes your stats) or back on")
     @app_commands.choices(tracking=[app_commands.Choice(name="off: stop tracking and delete my stats", value="off"),
                                     app_commands.Choice(name="on: track my stats again", value="on")])
@@ -359,11 +374,28 @@ class Stats(commands.Cog):
         if tracking.value == "off":
             async with self.db.transaction() as tx:
                 await tx.execute("INSERT OR IGNORE INTO privacy_optout (user_id, at) VALUES (?, ?)", (uid, now()))
-                for table in ("voice_sessions", "game_sessions", "message_counts", "xp"):
+                for table in ("voice_sessions", "game_sessions", "message_counts", "xp", "realms_playtime",
+                              "crew_arrivals"):
                     await tx.execute(f"DELETE FROM {table} WHERE user_id = ?", (uid,))
                 # Starter-quest steps that came from tracking (logic/quests.py).
                 await tx.execute("DELETE FROM quest_steps WHERE user_id = ? AND step IN ('say_hi', 'join_voice')",
                                  (uid,))
+                # What the newer modules keep per member. Coins already paid stay paid (their ledger
+                # refs stop a second payout). Kept on purpose: consent and moderation records
+                # (clipcast, appeals, appeal_bans) and the house row that holds a rejoin cooldown.
+                await tx.execute("DELETE FROM forum_posts WHERE author_id = ?", (uid,))
+                await tx.execute("DELETE FROM crew_greetings WHERE crew_id = ? OR newcomer_id = ?", (uid, uid))
+                await tx.execute("DELETE FROM meta WHERE key LIKE ?", (W.share_keys_like(uid),))
+                # Level snapshots (Wrapped's January ones, the weekly recap's): JSON {user: level}.
+                for row in await tx.fetchall("SELECT key, value FROM meta WHERE key LIKE ? OR key = ?",
+                                             (W.LEVELS_PREFIX + "%", RECAP_LEVELS_KEY)):
+                    try:
+                        levels = json.loads(row["value"])
+                    except ValueError:
+                        continue
+                    if isinstance(levels, dict) and levels.pop(str(uid), None) is not None:
+                        await tx.execute("UPDATE meta SET value = ? WHERE key = ?", (json.dumps(levels), row["key"]))
+            await self.withdraw_clips(uid)
             text = ("Done. Front Desk no longer tracks your voice time, messages or games, and your past stats "
                     "are deleted. Run `/privacy tracking:on` any time to start again.")
         else:

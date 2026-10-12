@@ -400,6 +400,12 @@ class Moderation(commands.Cog):
         await self.log_case(guild, case_id, "ban", user, mod, reason, None, extra)
         await self.done(interaction, f"Case #{case_id}: banned {user.mention}." + (f" {extra}." if extra else ""))
 
+    async def own_ban(self, user_id: int) -> bool:
+        """True when a ban event for this user is the echo of a /ban that just ran (which has
+        its own mod-log case line). cogs/community.py asks, so one ban is one line."""
+        row = await self.db.fetchone("SELECT banned_at, source FROM appeal_bans WHERE user_id = ?", (user_id,))
+        return row is not None and row["source"] == "command" and now() - row["banned_at"] < BAN_ECHO
+
     @commands.Cog.listener()
     @never_raise
     async def on_member_ban(self, guild: discord.Guild, user) -> None:
@@ -408,8 +414,7 @@ class Moderation(commands.Cog):
         if not self.ours(guild):
             return
         t = now()
-        row = await self.db.fetchone("SELECT banned_at, source FROM appeal_bans WHERE user_id = ?", (user.id,))
-        if row is not None and row["source"] == "command" and t - row["banned_at"] < BAN_ECHO:
+        if await self.own_ban(user.id):
             return  # our own /ban: the DM went out before it
         await self.db.execute(
             "INSERT OR REPLACE INTO appeal_bans (user_id, banned_at, source) VALUES (?, ?, 'manual')", (user.id, t))

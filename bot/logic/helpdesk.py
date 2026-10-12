@@ -8,7 +8,9 @@ import re
 from dataclasses import dataclass
 from datetime import date
 
-SITE_URL = "https://discord.lscaturchio.xyz"
+import config
+
+SITE_URL = config.SITE_URL  # one definition, in config.py
 INVITE_URL = "https://discord.gg/C25hy9Ca9W"
 PRESENCE_MINUTES = 5
 VIEW_TIMEOUT = 10 * 60  # the select menu stops answering after this (ephemeral, so no cleanup)

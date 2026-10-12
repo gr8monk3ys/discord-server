@@ -960,6 +960,44 @@ def test_own_ban_is_not_handled_twice(monkeypatch):
     with_env(go, monkeypatch)
 
 
+def test_one_ban_is_one_mod_log_line_with_the_community_cog_loaded(monkeypatch):
+    """The community cog logs "was banned" for every ban event; for /ban the case line already says it."""
+    from cogs.community import Community
+
+    async def go(env):
+        arm_bans(env, monkeypatch)
+        community = Community(env.bot)
+        env.bot.get_cog = {"Moderation": env.cog, "Community": community}.get
+
+        async def ban_event(user):  # Discord tells every cog
+            await community.on_member_ban(env.guild, user)
+            await env.cog.on_member_ban(env.guild, user)
+        a = env.member(A)
+        await Moderation.ban.callback(env.cog, env.inter(BANNER), a, "spam in general", 0)
+        assert await env.cog.own_ban(A) is True
+        env.tick(2)
+        await ban_event(a)
+        (line,) = logs(env.guild.mod_log)  # the richer one: case number, moderator, reason
+        assert "Case #1" in line and "spam in general" in line and f"<@{BANNER}>" in line
+        assert "was banned" not in line
+        # A ban made in Discord's own menu still gets the plain line (and the appeal note).
+        other = env.member(B)
+        assert await env.cog.own_ban(B) is False
+        await ban_event(other)
+        new = logs(env.guild.mod_log)[1:]
+        assert len(new) == 2 and "was banned" in new[0] and "outside `/ban`" in new[1]
+        # Long after a /ban its row no longer hides a ban event (unbanned by hand elsewhere, banned again).
+        env.tick(cogmod.BAN_ECHO)
+        assert await env.cog.own_ban(A) is False
+        await community.on_member_ban(env.guild, a)
+        assert "was banned" in logs(env.guild.mod_log)[-1]
+        # Without the moderation cog the community cog logs every ban, as before.
+        env.bot.get_cog = {}.get
+        await community.on_member_ban(env.guild, a)
+        assert len(logs(env.guild.mod_log)) == 5
+    with_env(go, monkeypatch)
+
+
 def test_manual_ban_with_appeals_off_is_silent(monkeypatch):
     async def go(env):
         arm_bans(env, monkeypatch, secret=None)

@@ -299,6 +299,89 @@ class FakeOps:
         self.monitor = SimpleNamespace(totals=totals)
 
 
+# ---------------------------------------------------------------- lines from other modules
+class FakeLineCog:
+    """Stands in for Crew / Forums: the one read-only method the recap cog calls."""
+
+    def __init__(self, method, line):
+        self.line = line
+        self.asked = []
+        setattr(self, method, self.answer)
+
+    async def answer(self, start, end):
+        self.asked.append((start, end))
+        if isinstance(self.line, Exception):
+            raise self.line
+        return self.line
+
+
+def test_the_hooks_exist_on_the_real_cogs():
+    import inspect
+
+    from cogs.crew import Crew
+    from cogs.forums import Forums
+    for cog, method in ((Crew, "digest_line"), (Forums, "fresh_line")):
+        assert list(inspect.signature(getattr(cog, method)).parameters) == ["self", "start", "end"]
+        assert cog.__cog_name__ == cog.__name__  # what get_cog() is asked for
+
+
+def test_recap_adds_the_forums_line_when_there_is_one(monkeypatch):
+    async def go(env):
+        await busy_week(env)
+        period = period_for(R.RECAP_JOB, MON)
+        line = "Fresh in the forums: 2 new guides. Latest: **Aim basics** (<#555>)"
+        forums = env.bot.cogs["Forums"] = FakeLineCog("fresh_line", line)
+        assert await env.cog.post_recap(period) is True
+        post = env.guild.announcements.sent[-1]
+        assert fields(post["embed"])["Forums"] == line and list(fields(post["embed"]))[-1] == "Forums"
+        assert post["allowed_mentions"].users is False
+        assert forums.asked == [(WEEK_START, WEEK_START + 7 * DAY)]  # the same week as every other section
+        forums.line = None  # nothing new in the forums: no empty section
+        assert await env.cog.post_recap(period) is True
+        assert "Forums" not in fields(env.guild.announcements.sent[-1]["embed"])
+        del env.bot.cogs["Forums"]  # the module is off
+        assert await env.cog.post_recap(period) is True
+        assert "Forums" not in fields(env.guild.announcements.sent[-1]["embed"])
+    with_env(go, monkeypatch)
+
+
+def test_a_forums_line_alone_is_worth_a_recap_and_a_broken_one_costs_nothing(monkeypatch, caplog):
+    async def go(env):
+        period = period_for(R.RECAP_JOB, MON)
+        env.bot.cogs["Forums"] = FakeLineCog("fresh_line", "Fresh in the forums: 1 new setup.")
+        assert await env.cog.post_recap(period) is True
+        (post,) = env.guild.announcements.sent
+        assert fields(post["embed"]) == {"Forums": "Fresh in the forums: 1 new setup."}
+        env.bot.cogs["Forums"].line = RuntimeError("boom")
+        await busy_week(env)
+        assert await env.cog.post_recap(period) is True
+        f = fields(env.guild.announcements.sent[-1]["embed"])
+        assert "Forums" not in f and "Chat" in f and "recap: Forums.fresh_line failed" in caplog.text
+    with_env(go, monkeypatch)
+
+
+def test_digest_adds_the_crew_line_when_there_is_one(monkeypatch):
+    async def go(env):
+        env.guild.owner = env.member(OWNER)
+        env.t = MON + 5 * 60
+        period = period_for(R.DIGEST_JOB, env.t)
+        line = "4 newcomers, 3 greeted by the crew (75%) · crew of 5"
+        crew = env.bot.cogs["Crew"] = FakeLineCog("digest_line", line)
+        assert await env.cog.send_digest(period) is True
+        f = fields(env.guild.owner.dms[-1]["embed"])
+        assert f[config.CREW_ROLE] == line and list(f)[-2:] == [config.CREW_ROLE, "Needs you"]
+        assert crew.asked == [(WEEK_START, WEEK_START + 7 * DAY)]
+        for off in (None, RuntimeError("boom")):  # nothing to say, or the crew module failing
+            crew.line = off
+            assert await env.cog.send_digest(period) is True
+            f = fields(env.guild.owner.dms[-1]["embed"])
+            assert config.CREW_ROLE not in f and "Needs you" in f
+        del env.bot.cogs["Crew"]
+        assert await env.cog.send_digest(period) is True
+        assert config.CREW_ROLE not in fields(env.guild.owner.dms[-1]["embed"])
+    with_env(go, monkeypatch)
+
+
 def test_digest_dms_the_owner_and_says_nothing_needs_them(monkeypatch):
     async def go(env):
         env.guild.owner = env.member(OWNER)

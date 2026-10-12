@@ -3,6 +3,7 @@ plus lightweight fakes for the bot, guild, channels, members and interactions.
 No network. Time is controlled by patching cogs.stats.now."""
 
 import asyncio
+import json
 from datetime import date, datetime
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
@@ -14,12 +15,14 @@ import config
 import db as dbmod
 from cogs import stats as cogmod
 from cogs.stats import MVP_JOB, Stats
+from logic import wrapped as W
 from logic.schedule import occurrence
 
 TZ = ZoneInfo("America/Los_Angeles")
 GUILD_ID = 999
 A, B, C, D, BOTUSER = 1, 2, 3, 4, 50
 HOUR = 3600
+DAY = 24 * HOUR
 MIN = 60
 
 
@@ -607,6 +610,101 @@ def test_privacy_off_deletes_own_rows_only_idempotent_then_on(monkeypatch):
         assert await env.db.tracking_allowed(A) is True
         await env.say(A)
         assert len(await env.rows("message_counts", A)) == 1
+    with_env(go, monkeypatch)
+
+
+async def seed_wave9(env, uid, other):
+    """What the newer modules keep about `uid` (and one row each about `other`)."""
+    ex = env.db.execute
+    for who in (uid, other):
+        await ex("INSERT INTO realms_playtime (user_id, day, seconds) VALUES (?, '2026-09-30', 600)", (who,))
+        await ex("INSERT INTO crew_arrivals (user_id, at, fresh) VALUES (?, ?, 1)", (who, T0))
+        await ex("INSERT INTO meta (key, value) VALUES (?, ?)", (W.share_key(2026, who), str(T0)))
+        await ex("INSERT INTO house_members (user_id, house, joined_at, left_at) VALUES (?, 'fern', ?, ?)",
+                 (who, T0 - DAY, T0))  # left: the row is what holds the rejoin cooldown
+        await ex("INSERT INTO appeal_bans (user_id, banned_at, source) VALUES (?, ?, 'ban')", (who, T0))
+        await ex("INSERT INTO appeals (user_id, status, answers, created_at, touched_at) VALUES (?, 'denied', '{}', ?, ?)",
+                 (who, T0, T0))
+        await ex("INSERT INTO clipcast_prefs (user_id, pref, set_at) VALUES (?, 'always', ?)", (who, T0))
+    for i, (author, state) in enumerate(((uid, "pending"), (uid, "paid"), (uid, "skipped"), (other, "pending"))):
+        await ex("INSERT INTO forum_posts (thread_id, kind, author_id, title, created_at, state) VALUES (?, 'guides',"
+                 " ?, 'A post', ?, ?)", (9000 + i, author, T0, state))
+    # greeted by someone, greeted someone, and a greeting between two other people
+    for newcomer, crew in ((uid, other), (7001, uid), (7002, other)):
+        await ex("INSERT INTO crew_greetings (newcomer_id, crew_id, at, coins) VALUES (?, ?, ?, 5)", (newcomer, crew, T0))
+    levels = json.dumps({str(uid): 7, str(other): 3})
+    for key in (W.levels_key(2026), W.levels_key(2027), cogmod.RECAP_LEVELS_KEY):
+        await ex("INSERT INTO meta (key, value) VALUES (?, ?)", (key, levels))
+    await ex("INSERT INTO meta (key, value) VALUES (?, 'not json')", (W.levels_key(2025),))
+
+
+def test_privacy_off_deletes_what_the_newer_modules_keep(monkeypatch):
+    async def go(env):
+        async def count(sql, *params):
+            return (await env.db.fetchone(f"SELECT COUNT(*) AS n FROM {sql}", params))["n"]
+        await seed_wave9(env, A, B)
+        await Stats.privacy.callback(env.cog, env.inter(A), choice("off"))
+        for table in ("realms_playtime", "crew_arrivals"):
+            assert await env.rows(table, A) == [] and len(await env.rows(table, B)) == 1, table
+        assert await count("forum_posts WHERE author_id = ?", A) == 0  # pending and settled alike
+        assert await count("forum_posts WHERE author_id = ?", B) == 1
+        greetings = await env.db.fetchall("SELECT newcomer_id, crew_id FROM crew_greetings")
+        assert [(r["newcomer_id"], r["crew_id"]) for r in greetings] == [(7002, B)]
+        shared = await env.db.fetchall("SELECT key FROM meta WHERE key LIKE 'wrapped:shared:%'")
+        assert [r["key"] for r in shared] == [W.share_key(2026, B)]
+        for key in (W.levels_key(2026), W.levels_key(2027), cogmod.RECAP_LEVELS_KEY):
+            row = await env.db.fetchone("SELECT value FROM meta WHERE key = ?", (key,))
+            assert json.loads(row["value"]) == {str(B): 3}, key
+        assert (await env.db.fetchone("SELECT value FROM meta WHERE key = ?", (W.levels_key(2025),)))["value"] == "not json"
+        # consent and moderation records, and the house cooldown row, are kept on purpose
+        for table in ("house_members", "appeal_bans", "appeals", "clipcast_prefs"):
+            assert len(await env.rows(table, A)) == 1, table
+    with_env(go, monkeypatch)
+
+
+def test_privacy_share_key_pattern_matches_only_that_member():
+    assert W.share_keys_like(11) == W.share_key("%", 11)
+    import fnmatch
+    like = W.share_keys_like(11).replace("%", "*")
+    assert fnmatch.fnmatchcase(W.share_key(2026, 11), like)
+    assert not fnmatch.fnmatchcase(W.share_key(2026, 9911), like)
+    assert not fnmatch.fnmatchcase(W.share_key(2026, 111), like)
+
+
+def test_privacy_off_withdraws_unposted_clipcast_consent_and_keeps_the_rows(monkeypatch):
+    from cogs.clipcast import Clipcast
+    from logic import clipcast as L
+
+    async def go(env):
+        async def clip(message_id, uid, status):
+            await env.db.execute(
+                "INSERT INTO clipcast (message_id, user_id, channel_id, posted_at, week, status, updated_at)"
+                " VALUES (?, ?, 100, ?, '2026-W40', ?, ?)", (message_id, uid, T0, status, T0))
+
+        async def statuses():
+            return {r["message_id"]: r["status"] for r in await env.db.fetchall("SELECT message_id, status FROM clipcast")}
+        waiting, posted = L.APPROVED, L.PUBLISHED
+        await clip(1, A, waiting)
+        await clip(2, A, posted)
+        await clip(3, B, waiting)
+        await Stats.privacy.callback(env.cog, env.inter(A), choice("off"))  # no get_cog on this bot: nothing breaks
+        assert (await statuses())[1] == waiting
+        await Stats.privacy.callback(env.cog, env.inter(A), choice("on"))
+        loaded = {}
+        env.bot.get_cog = loaded.get
+        await Stats.privacy.callback(env.cog, env.inter(A), choice("off"))  # the clipcast module is off
+        assert (await statuses())[1] == waiting
+        await Stats.privacy.callback(env.cog, env.inter(A), choice("on"))
+        loaded["Clipcast"] = Clipcast(env.bot, http=object(), environ={})
+        await Stats.privacy.callback(env.cog, env.inter(A), choice("off"))
+        assert await statuses() == {1: L.WITHDRAWN, 2: posted, 3: waiting}  # rows kept; only A's unposted one moves
+
+        async def boom(*args):
+            raise RuntimeError("boom")
+        loaded["Clipcast"].withdraw = boom
+        inter = env.inter(B)
+        await Stats.privacy.callback(env.cog, inter, choice("off"))  # still answers, still opts out
+        assert "deleted" in inter.of("send_message")[0]["content"] and await env.db.tracking_allowed(B) is False
     with_env(go, monkeypatch)
 
 

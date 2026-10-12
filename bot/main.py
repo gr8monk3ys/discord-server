@@ -61,7 +61,7 @@ MODULES = [
     ("cogs.staffapps", set()),  # /apply staff|status, /apps list, staff application review cards
     ("cogs.seasonal", {"members"}),  # seasonal events: drops in general, daily quest, /event, end-of-event prizes
     ("cogs.gamelink", set()),  # /link steam|verify|approve|remove, /unlink, /accounts: Steam accounts on /profile
-    ("cogs.votehub", set()),  # /vote hub, weekly Supporter thanks for Disboard bumpers
+    ("cogs.votehub", set()),  # /vote hub, weekly bump thanks for Disboard bumpers
     ("cogs.catchup", {"message_content"}),  # /catchup AI summary of a public channel, /catchup-usage
     ("cogs.vibes", {"members"}),  # chat revival, join anniversaries, booster thanks + stipend, member of the month
     ("cogs.houses", {"members"}),  # three houses: /house, weekly House Cup, season trophy, /house-admin

@@ -104,6 +104,18 @@ class Recap(commands.Cog):
         row = await self.db.fetchone(sql, params)
         return row["n"] if row else 0
 
+    async def line_from(self, cog_name: str, method: str, start: int, end: int) -> str | None:
+        """Another module's own line about [start, end), or None when that module is off, has
+        nothing to say or fails: a recap never waits on, or breaks over, somebody else's line."""
+        cog = self.bot.get_cog(cog_name)
+        if cog is None:
+            return None
+        try:
+            return await getattr(cog, method)(start, end)
+        except Exception:
+            log.exception("recap: %s.%s failed; left out", cog_name, method)
+            return None
+
     # ------------------------------------------------------------ scheduling
     @tasks.loop(minutes=1)
     async def tick(self) -> None:
@@ -241,6 +253,9 @@ class Recap(commands.Cog):
         start, end, first = R.week_bounds(period.scheduled_at, self.tz)
         recap = await self.gather_recap(guild, start, end, first)
         sections = R.recap_sections(recap)
+        forums = await self.line_from("Forums", "fresh_line", start, end)
+        if forums is not None:
+            sections.append(("Forums", forums))
         if not sections:
             log.info("recap %s: quiet week, nothing posted", period.key)
             await self.save_levels()
@@ -324,7 +339,11 @@ class Recap(commands.Cog):
                             description=f"{discord.utils.escape_markdown(guild.name)} · {R.week_label(first)}",
                             footer=style.label("owner digest", "private"),
                             color=style.FOREST if R.needs_you(digest) else style.MUTED)
-        for name, value in R.digest_fields(digest, first):
+        fields = R.digest_fields(digest, first)
+        crew = await self.line_from("Crew", "digest_line", start, end)
+        if crew is not None:
+            fields.insert(len(fields) - 1, (config.CREW_ROLE, crew))  # "Needs you" stays last
+        for name, value in fields:
             embed.add_field(name=name, value=value[:1024], inline=False)
         owner = await self.owner(guild)
         if owner is not None:

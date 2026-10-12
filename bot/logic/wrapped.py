@@ -692,6 +692,11 @@ def share_key(year: int, user_id: int) -> str:
     return f"wrapped:shared:{year}:{user_id}"
 
 
+def share_keys_like(user_id: int) -> str:
+    """SQL LIKE pattern for this member's share_key of every year."""
+    return f"wrapped:shared:%:{user_id}"
+
+
 def badge_key(year: int) -> str:
     return f"{WRAPPED_BADGE_PREFIX}{year}"
 

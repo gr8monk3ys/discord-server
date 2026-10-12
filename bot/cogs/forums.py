@@ -195,9 +195,11 @@ class Forums(commands.Cog):
                 # Opted out since posting: drop the record instead of settling it.
                 await tx.execute("DELETE FROM forum_posts WHERE thread_id = ?", (tid,))
                 return F.DELETED
+            # Counted in the ledger, not in forum_posts: /privacy off deletes a member's rows
+            # there, and the cap has to outlive that.
             paid = await tx.fetchone(
-                "SELECT COUNT(*) AS n FROM forum_posts WHERE author_id = ? AND state = ? AND settled_at > ?",
-                (author_id, F.PAID, t - F.WEEK))
+                "SELECT COUNT(*) AS n FROM ledger WHERE user_id = ? AND reason = ? AND delta > 0 AND at > ?",
+                (author_id, F.REASON, t - F.WEEK))
             state = F.decide(row["kind"], starter.content, images, author_id=author_id,
                              created_at=row["created_at"], locked=bool(getattr(thread, "locked", False)),
                              paid_this_week=paid["n"])

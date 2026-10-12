@@ -36,6 +36,29 @@ def test_labels_cover_every_known_reason():
     assert ES.label("mystery") == "mystery"
 
 
+def test_every_ledger_reason_in_the_code_has_a_label():
+    """Reasons named by a module constant, and the string literals the cogs pass to economy.py."""
+    import re
+    from pathlib import Path
+
+    from logic import challenges, clipcast, crew, forums, houses, quests, realms, recap, seasonal, supporter
+    from logic import vibes, votehub, wordgame
+    constants = {challenges.REASON, clipcast.REASON, crew.REASON, forums.REASON, houses.REASON, quests.REASON,
+                 realms.REASON, recap.CONTEST_REASON, seasonal.REASON, S.SHOP_REASON, S.SEASON_REASON,
+                 S.RAFFLE_REASON, supporter.STIPEND_REASON, vibes.BOOST_REASON, vibes.STIPEND_REASON,
+                 vibes.MOTM_REASON, votehub.REASON, wordgame.REASON}
+    assert {"housecup", "forum_post", "realms", "crew", "supporterstipend", "clipcast"} <= constants
+    literals = set()
+    call = re.compile(r"economy\.(?:apply|apply_tx|transfer|transfer_tx)\((?:[^,()]+,\s*){3}\"([a-z_]+)\"")
+    for path in (Path(__file__).resolve().parents[1] / "cogs").glob("*.py"):
+        literals |= set(call.findall(path.read_text(encoding="utf-8")))
+    assert {"birthday", "tournament", "slots"} <= literals  # the scan finds them
+    for reason in sorted(constants | literals):
+        assert ES.label(reason) != reason, reason
+    assert len(set(ES.LABELS.values())) == len(ES.LABELS)  # no two reasons share a label
+    assert ES.label(votehub.REASON) == "Bump thanks" and ES.label(supporter.STIPEND_REASON).startswith("Supporter")
+
+
 def test_flow_lines_and_pct():
     assert ES.flow_lines([]) == "none"
     assert ES.flow_lines([ES.Flow("daily", 1200), ES.Flow("shop", -300)]) == "Daily: +1,200\nShop: -300"

@@ -254,3 +254,19 @@ def test_boost_text():
 
 def test_links():
     assert H.SITE_URL.startswith("https://") and H.INVITE_URL.startswith("https://discord.gg/")
+
+
+def test_the_site_address_is_defined_once():
+    """config.SITE_URL is the source; nothing else in the bot spells the address out."""
+    import re
+    from pathlib import Path
+
+    import config
+    from logic import clipcast, votehub
+    assert H.SITE_URL == config.SITE_URL == "https://discord.lscaturchio.xyz"
+    assert votehub.SHARE_URL == clipcast.JOIN_URL == f"{config.SITE_URL}/join"
+    assert config.appeal_settings({"APPEAL_SECRET": "x" * config.APPEAL_SECRET_MIN}).page_url == f"{config.SITE_URL}/appeal"
+    bot = Path(__file__).resolve().parents[1]
+    spelled = [p.relative_to(bot).as_posix() for folder in ("logic", "cogs") for p in (bot / folder).glob("*.py")
+               if re.search(r"https://discord\.lscaturchio\.xyz", p.read_text(encoding="utf-8"))]
+    assert spelled == [] and "https://discord.lscaturchio.xyz" in (bot / "config.py").read_text(encoding="utf-8")
