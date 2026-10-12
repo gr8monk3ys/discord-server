@@ -72,17 +72,32 @@ class FakeText:
         self.category = category
         self.sent = []
         self.fail = None
-        self.parent = None  # set to the parent channel to make this a thread
         self.muted = set()  # member ids who can read here but not post
+        self.perms = {}  # member id -> the exact permissions they have here, when a test sets them
 
     def permissions_for(self, member):
+        if member.id in self.perms:
+            return self.perms[member.id]
         can = member.id not in self.muted
-        return discord.Permissions(view_channel=True, send_messages=can, send_messages_in_threads=can)
+        return discord.Permissions(view_channel=True, send_messages=can, send_messages_in_threads=can,
+                                   attach_files=can)
 
     async def send(self, content=None, **kwargs):
         if self.fail is not None:
             raise self.fail
         self.sent.append(dict(content=content, **kwargs))
+
+
+class FakeThread(FakeText):
+    """A thread under `parent`. isinstance(x, discord.Thread) is what the cog asks."""
+
+    def __init__(self, name, parent, locked=False, archived=False):
+        super().__init__(name)
+        self.parent, self.locked, self.archived = parent, locked, archived
+
+    @property
+    def __class__(self):
+        return discord.Thread
 
 
 class FakeMember:
@@ -97,6 +112,10 @@ class FakeMember:
         self.guild_permissions = SimpleNamespace(administrator=False)
         self.display_avatar = FakeAsset(f"avatar{uid}")
         self.joined_at = datetime(2026, 2, 10, tzinfo=timezone.utc)
+
+    @property
+    def __class__(self):  # a guild member, as far as isinstance() is concerned
+        return discord.Member
 
 
 class FakeGuild:
@@ -592,13 +611,6 @@ def test_share_needs_the_member_to_be_able_to_post_there(monkeypatch):
         assert await env.meta(W.share_key(2026, U1)) is None  # no cooldown burned
         await env.share(U2)  # someone who can post is not affected
         assert len(general.sent) == 1
-        # in a thread the thread permission is what counts
-        thread = FakeText("a thread")
-        thread.parent = general
-        thread.permissions_for = lambda m: discord.Permissions(send_messages=True, send_messages_in_threads=False)
-        assert "can't post in this channel" in (await env.share(U3, channel=thread)).said and thread.sent == []
-        thread.permissions_for = lambda m: discord.Permissions(send_messages=False, send_messages_in_threads=True)
-        assert "Shared." in (await env.share(U3, channel=thread)).said and len(thread.sent) == 1
         # a channel that can't say what the member may do is refused, not trusted
         odd = FakeText("odd")
         del FakeText.permissions_for
@@ -607,6 +619,71 @@ def test_share_needs_the_member_to_be_able_to_post_there(monkeypatch):
         finally:
             FakeText.permissions_for = permissions_for
     permissions_for = FakeText.permissions_for
+    with_env(body, monkeypatch)
+
+
+ALL_THREE = dict(view_channel=True, send_messages=True, attach_files=True)
+
+
+def test_share_needs_every_permission_posting_an_image_takes(monkeypatch):
+    """The card is an image: seeing the channel, sending messages and attaching files."""
+    async def body(env):
+        general = env.guild.general
+        for missing in ALL_THREE:
+            general.perms[U1] = discord.Permissions(**{**ALL_THREE, missing: False})
+            i = await env.share(U1)
+            assert "can't post in this channel" in i.said and general.sent == [], missing
+            assert await env.meta(W.share_key(2026, U1)) is None, missing  # no cooldown burned
+        # Send Messages in Threads is not what a channel asks for
+        general.perms[U1] = discord.Permissions(view_channel=True, send_messages_in_threads=True, attach_files=True)
+        assert "can't post in this channel" in (await env.share(U1)).said
+        general.perms[U1] = discord.Permissions(**ALL_THREE)
+        assert "Shared." in (await env.share(U1)).said and len(general.sent) == 1
+        assert await env.meta(W.share_key(2026, U1)) == str(env.t)  # claimed only once everything passed
+    with_env(body, monkeypatch)
+
+
+def test_share_in_a_thread_uses_the_thread_permission_and_respects_locks(monkeypatch):
+    async def body(env):
+        in_thread = dict(view_channel=True, send_messages_in_threads=True, attach_files=True)
+        thread = FakeThread("a thread", env.guild.general)
+        assert isinstance(thread, discord.Thread) and not isinstance(env.guild.general, discord.Thread)
+        thread.perms[U1] = discord.Permissions(**ALL_THREE)  # Send Messages alone is not enough in a thread
+        assert "can't post in this channel" in (await env.share(U1, channel=thread)).said and thread.sent == []
+        for missing in in_thread:
+            thread.perms[U1] = discord.Permissions(**{**in_thread, missing: False})
+            assert "can't post in this channel" in (await env.share(U1, channel=thread)).said, missing
+        thread.perms[U1] = discord.Permissions(**in_thread)
+        for state in ("locked", "archived"):
+            setattr(thread, state, True)
+            assert "can't post in this channel" in (await env.share(U1, channel=thread)).said, state
+            thread.perms[U2] = discord.Permissions(**in_thread, manage_threads=True)
+            assert "Shared." in (await env.share(U2, channel=thread)).said, state  # a mod still can
+            env.t += W.SHARE_COOLDOWN
+            setattr(thread, state, False)
+        assert len(thread.sent) == 2 and await env.meta(W.share_key(2026, U1)) is None
+        assert "Shared." in (await env.share(U1, channel=thread)).said and len(thread.sent) == 3
+        # something that merely has a `parent` attribute is not a thread: channel rules apply
+        lookalike = FakeText("lookalike")
+        lookalike.parent = env.guild.general
+        lookalike.perms[U3] = discord.Permissions(**in_thread)
+        assert "can't post in this channel" in (await env.share(U3, channel=lookalike)).said
+    with_env(body, monkeypatch)
+
+
+def test_share_is_refused_for_someone_who_is_not_a_member_of_the_server(monkeypatch):
+    async def body(env):
+        await env.busy_year()
+        member = env.member(U1)
+        user = SimpleNamespace(id=U1, bot=False, name="user", display_name="User", mention=f"<@{U1}>", roles=[],
+                               guild=None, guild_permissions=SimpleNamespace(administrator=False),
+                               display_avatar=member.display_avatar)
+        assert not isinstance(user, discord.Member) and isinstance(member, discord.Member)
+        i = FakeInteraction(env.bot, user)  # a plain User: a user-installed context, not the server
+        await env.cog.handle_share(i, 2026, U1)
+        assert "can't post in this channel" in i.said and env.guild.general.sent == []
+        assert await env.meta(W.share_key(2026, U1)) is None
+        assert not cogmod.Wrapped.may_post(env.guild.general, user) and cogmod.Wrapped.may_post(env.guild.general, member)
     with_env(body, monkeypatch)
 
 

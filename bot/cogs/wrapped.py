@@ -435,14 +435,23 @@ class Wrapped(commands.Cog):
 
     @staticmethod
     def may_post(channel, member) -> bool:
-        """Whether the member could post here themselves. The bot posts the card for them, so
-        without this the button would speak in channels (or locked threads) they can only read."""
+        """Whether the member could post this card here themselves. The bot posts an image for
+        them, so without this the button would speak where they can only read: they need to
+        see the channel, to send messages in it (in threads, for a thread) and to attach
+        files, and a locked or archived thread takes Manage Threads. Someone who is not a
+        member of the server (a user-installed context, a DM) is never posted for.
+        discord.py's permissions_for already takes everything from a timed-out member."""
+        if not isinstance(member, discord.Member):
+            return False
         try:
             perms = channel.permissions_for(member)
         except Exception:
             return False
-        in_thread = getattr(channel, "parent", None) is not None
-        return bool(perms.send_messages_in_threads if in_thread else perms.send_messages)
+        thread = isinstance(channel, discord.Thread)
+        if thread and (channel.locked or channel.archived) and not perms.manage_threads:
+            return False
+        send = perms.send_messages_in_threads if thread else perms.send_messages
+        return bool(perms.view_channel and send and perms.attach_files)
 
     async def handle_share(self, interaction: discord.Interaction, year: int, user_id: int) -> None:
         user = interaction.user
