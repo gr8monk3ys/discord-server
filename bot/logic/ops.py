@@ -392,6 +392,9 @@ CHANNEL_NEEDS: list[Need] = [
          "stage"),
     Need("clipcast", config.CLIPS_CHANNEL, POST + ("read_message_history",)),  # consent fallback, "as seen on"
     Need("clipcast", config.MOD_LOG_CHANNEL, POST),  # picks, upload notes, takedown alerts
+    # status panel (edited in place) and the chat relay; reactions say "not relayed"
+    Need("realms", config.REALMS_CHANNEL, POST + ("read_message_history", "add_reactions")),
+    Need("realms", config.MOD_LOG_CHANNEL, POST),  # whitelist changes
 ]
 
 ROLE_HOLDERS = ("clips", "engagement", "growth", "levels", "selfroles", "shop", "tournaments", "crew", "supporter")

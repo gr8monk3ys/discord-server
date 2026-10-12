@@ -79,6 +79,9 @@ SUPPORTERS_CHANNEL = "💜・supporters"  # private lounge for the Supporter rol
 GUIDES_FORUM = "📚・guides"
 SETUPS_FORUM = "🖥・setups"
 STAGE_CHANNEL = "🎙・stage"  # watch parties, the monthly Town Hall
+# The Realms (Minecraft bridge): status panel and two-way chat live in this channel.
+REALMS_CHANNEL = "⛏️・realms"
+REALMS_ENV = ("REALMS_ADDRESS", "REALMS_RCON_HOST", "REALMS_RCON_PORT", "REALMS_RCON_PASSWORD", "REALMS_LOG_PATH")
 
 
 @dataclass(frozen=True)
@@ -147,3 +150,8 @@ def clipcast_env(environ=None) -> dict[str, str]:
     """The clipcast settings from the environment (or a mapping, in tests); missing ones are ''."""
     environ = os.environ if environ is None else environ
     return {key: str(environ.get(key) or "").strip() for key in CLIPCAST_ENV}
+def realms_environ(environ=None) -> dict[str, str]:
+    """The Minecraft bridge's settings (REALMS_ENV) as they are in the environment; server/.env
+    was loaded by load_settings(). logic/realms.py validates them; all empty means the bridge is off."""
+    environ = os.environ if environ is None else environ
+    return {name: environ.get(name) or "" for name in REALMS_ENV}

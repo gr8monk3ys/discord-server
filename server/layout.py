@@ -158,6 +158,10 @@ CATEGORIES = [
                 "layout": "list", "sort": "latest_activity", "reaction": "👍",
                 "post_slowmode": 600, "slowmode": 5,
             },
+            # Front Desk's bridge to our Minecraft server: pinned status panel, chat both ways.
+            {"name": "⛏️・realms", "topic": "The Realms, our Minecraft server. Status is pinned; chat here reaches "
+                                           "the game and back. /realms link gets you on the whitelist.",
+             "slowmode": 2},
         ],
     },
     {
@@ -290,6 +294,7 @@ ONBOARDING_DEFAULT_CHANNELS = [
     "👗・fashion", "♟️・chess", "🤖・bot-commands", "📺・creators", "🏆・tournaments", "🎭・roles", "🤝・partners",
     "🔊 Lobby", "➕ New Squad", "🎮 Squad", "💤 AFK",
     "📚・guides", "🖥・setups", "🎙・stage",
+    "⛏️・realms",
 ]
 # Anything public that's neither a default channel nor an Onboarding option is
 # hidden from members who went through Onboarding, so keep this list complete.

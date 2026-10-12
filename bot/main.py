@@ -69,6 +69,7 @@ MODULES = [
     ("cogs.supporter", {"members"}),  # Supporter tier: /support, thank-you, stipend, /supporter grant|revoke
     ("cogs.forums", {"message_content"}),  # guides + setups forums: reaction, one-time post reward, recap line
     ("cogs.clipcast", {"members", "message_content"}),  # consented weekly clips to YouTube Shorts, /clipcast
+    ("cogs.realms", {"members", "message_content"}),  # Minecraft bridge: status panel, whitelist, chat relay, playtime
 ]
 
 PERMISSIONS = discord.Permissions(
