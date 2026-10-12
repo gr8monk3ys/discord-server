@@ -124,9 +124,20 @@ def event_badges(held: Iterable[str]) -> list[Badge]:
     return found
 
 
+WRAPPED_KEY = re.compile(r"^wrapped_(\d{4})$")
+
+
+def wrapped_badges(held: Iterable[str]) -> list[Badge]:
+    """Wrapped badges (cogs/wrapped.py grants wrapped_2026 for sharing that year's card). Like
+    event badges they need no catalogue entry and don't count toward the N/TOTAL progress."""
+    years = sorted(m.group(1) for m in map(WRAPPED_KEY.match, held) if m)
+    return [Badge(f"wrapped_{year}", "📓", f"Wrapped {year}", f"Shared your {year} Wrapped card (/wrapped)",
+                  lambda f: False) for year in years]
+
+
 def held_badges(held: Iterable[str]) -> list[Badge]:
     held = set(held)
-    return [b for b in BADGES if b.key in held] + event_badges(held)
+    return [b for b in BADGES if b.key in held] + event_badges(held) + wrapped_badges(held)
 
 
 def grid(held: Iterable[str], per_row: int = PER_ROW) -> str:
