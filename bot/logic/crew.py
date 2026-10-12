@@ -131,7 +131,7 @@ REJOIN_DAYS = 30
 def is_fresh(now: int, earlier: Iterable[int | None]) -> bool:
     """A first arrival, not a rejoin: `earlier` holds the times of anything we know about an
     earlier stay (a previous arrival, a previous leave). Any of them in the last REJOIN_DAYS
-    makes this a rejoin, which is still pinged for but never rewarded."""
+    makes this a rejoin, which is neither pinged for nor rewarded."""
     return not any(t is not None and now - t < REJOIN_DAYS * DAY for t in earlier)
 
 

@@ -322,15 +322,26 @@ def test_weekly_cap_per_member(monkeypatch):
 
 def test_weekly_cap_outlives_a_privacy_round_trip(monkeypatch):
     """/privacy off deletes the member's forum_posts rows; the cap is counted in the ledger."""
+    from cogs.stats import opt_out
+
     async def go(env):
-        for _ in range(F.WEEKLY_CAP):
-            await env.post(owner=A)
+        paid = [await env.post(owner=A) for _ in range(F.WEEKLY_CAP)]
         await env.later(F.SURVIVE)
+        waiting = await env.post(owner=A)  # not judged yet when they opt out
         assert await env.bal(A) == F.REWARD * F.WEEKLY_CAP
-        await env.db.execute("DELETE FROM forum_posts WHERE author_id = ?", (A,))  # what /privacy off does
-        again = await env.post(owner=A)  # tracking back on, same week
+        await opt_out(env.db, A, env.t)  # /privacy tracking:off ...
+        assert [await env.row(t) for t in (*paid, waiting)] == [None] * (F.WEEKLY_CAP + 1)
+        await env.db.execute("DELETE FROM privacy_optout WHERE user_id = ?", (A,))  # ... and on again
+        again = await env.post(owner=A)  # same week
         await env.later(F.SURVIVE)
         assert await env.state(again) == "unpaid" and await env.bal(A) == F.REWARD * F.WEEKLY_CAP
+        assert await env.row(waiting) is None  # a forgotten post is never judged, so never paid
+        rows = await env.db.fetchall("SELECT ref FROM ledger WHERE user_id = ? ORDER BY id", (A,))
+        assert [r["ref"] for r in rows] == [F.ref(t.id) for t in paid]  # one payout per post, no more
+        env.t += F.WEEK  # the cap window passes like for anyone else
+        later = await env.post(owner=A)
+        await env.later(F.SURVIVE)
+        assert await env.state(later) == "paid"
     with_env(go, monkeypatch)
 
 

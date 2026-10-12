@@ -33,6 +33,49 @@ def now() -> int:
     return int(time.time())
 
 
+async def opt_out(db, user_id: int, t: int) -> None:
+    """/privacy tracking:off, in one transaction: record the opt-out and delete what is kept
+    about the member's activity.
+
+    The rule for every table here: opting out removes the detail, never a limit. A cap, a
+    cooldown or a once-only rule must still hold after `/privacy off` then `on`, so each one
+    is either counted in the ledger (never deleted) or its bare row is kept:
+
+    - realms_playtime: deleted. Half hours are paid by ledger ref (member, day, slot), so
+      played time that starts again from zero re-earns nothing that was paid.
+    - forum_posts: deleted. A post pays once by ledger ref and the weekly cap is counted in
+      the ledger (cogs/forums.py); a deleted record is never judged again.
+    - crew_greetings: deleted, on either side. A newcomer pays once by ledger ref and the
+      daily cap is counted in the ledger (cogs/crew.py).
+    - crew_arrivals: kept (member id and times only). It is what makes a later join a rejoin,
+      which is neither pinged for nor rewarded; an arrival still waiting just never pings.
+    - Wrapped share time (meta): kept while the share cooldown runs, deleted once it is over.
+    - level snapshots (meta): the member's entry is removed. Nothing is limited by them.
+
+    Not touched: consent and moderation records (clipcast, appeals, appeal_bans) and the house
+    row that holds a rejoin cooldown."""
+    async with db.transaction() as tx:
+        await tx.execute("INSERT OR IGNORE INTO privacy_optout (user_id, at) VALUES (?, ?)", (user_id, t))
+        for table in ("voice_sessions", "game_sessions", "message_counts", "xp", "realms_playtime"):
+            await tx.execute(f"DELETE FROM {table} WHERE user_id = ?", (user_id,))
+        # Starter-quest steps that came from tracking (logic/quests.py).
+        await tx.execute("DELETE FROM quest_steps WHERE user_id = ? AND step IN ('say_hi', 'join_voice')",
+                         (user_id,))
+        await tx.execute("DELETE FROM forum_posts WHERE author_id = ?", (user_id,))
+        await tx.execute("DELETE FROM crew_greetings WHERE crew_id = ? OR newcomer_id = ?", (user_id, user_id))
+        await tx.execute("UPDATE crew_arrivals SET skipped = 1 WHERE user_id = ? AND pinged_at IS NULL", (user_id,))
+        await tx.execute("DELETE FROM meta WHERE key LIKE ? AND CAST(value AS INTEGER) <= ?",
+                         (W.share_keys_like(user_id), t - W.SHARE_COOLDOWN))
+        for row in await tx.fetchall("SELECT key, value FROM meta WHERE key LIKE ? OR key = ?",
+                                     (W.LEVELS_PREFIX + "%", RECAP_LEVELS_KEY)):
+            try:
+                levels = json.loads(row["value"])  # JSON {user: level}
+            except ValueError:
+                continue
+            if isinstance(levels, dict) and levels.pop(str(user_id), None) is not None:
+                await tx.execute("UPDATE meta SET value = ? WHERE key = ?", (json.dumps(levels), row["key"]))
+
+
 def playing(member: discord.Member) -> str | None:
     """The game a member is playing right now, from their presence."""
     for activity in member.activities:
@@ -372,29 +415,7 @@ class Stats(commands.Cog):
     async def privacy(self, interaction: discord.Interaction, tracking: app_commands.Choice[str]) -> None:
         uid = interaction.user.id
         if tracking.value == "off":
-            async with self.db.transaction() as tx:
-                await tx.execute("INSERT OR IGNORE INTO privacy_optout (user_id, at) VALUES (?, ?)", (uid, now()))
-                for table in ("voice_sessions", "game_sessions", "message_counts", "xp", "realms_playtime",
-                              "crew_arrivals"):
-                    await tx.execute(f"DELETE FROM {table} WHERE user_id = ?", (uid,))
-                # Starter-quest steps that came from tracking (logic/quests.py).
-                await tx.execute("DELETE FROM quest_steps WHERE user_id = ? AND step IN ('say_hi', 'join_voice')",
-                                 (uid,))
-                # What the newer modules keep per member. Coins already paid stay paid (their ledger
-                # refs stop a second payout). Kept on purpose: consent and moderation records
-                # (clipcast, appeals, appeal_bans) and the house row that holds a rejoin cooldown.
-                await tx.execute("DELETE FROM forum_posts WHERE author_id = ?", (uid,))
-                await tx.execute("DELETE FROM crew_greetings WHERE crew_id = ? OR newcomer_id = ?", (uid, uid))
-                await tx.execute("DELETE FROM meta WHERE key LIKE ?", (W.share_keys_like(uid),))
-                # Level snapshots (Wrapped's January ones, the weekly recap's): JSON {user: level}.
-                for row in await tx.fetchall("SELECT key, value FROM meta WHERE key LIKE ? OR key = ?",
-                                             (W.LEVELS_PREFIX + "%", RECAP_LEVELS_KEY)):
-                    try:
-                        levels = json.loads(row["value"])
-                    except ValueError:
-                        continue
-                    if isinstance(levels, dict) and levels.pop(str(uid), None) is not None:
-                        await tx.execute("UPDATE meta SET value = ? WHERE key = ?", (json.dumps(levels), row["key"]))
+            await opt_out(self.db, uid, now())
             await self.withdraw_clips(uid)
             text = ("Done. Front Desk no longer tracks your voice time, messages or games, and your past stats "
                     "are deleted. Run `/privacy tracking:on` any time to start again.")

@@ -619,7 +619,9 @@ async def seed_wave9(env, uid, other):
     for who in (uid, other):
         await ex("INSERT INTO realms_playtime (user_id, day, seconds) VALUES (?, '2026-09-30', 600)", (who,))
         await ex("INSERT INTO crew_arrivals (user_id, at, fresh) VALUES (?, ?, 1)", (who, T0))
-        await ex("INSERT INTO meta (key, value) VALUES (?, ?)", (W.share_key(2026, who), str(T0)))
+        # one Wrapped share long ago, one an hour ago (its 6-hour cooldown is still running)
+        await ex("INSERT INTO meta (key, value) VALUES (?, ?)", (W.share_key(2025, who), str(T0 - W.SHARE_COOLDOWN)))
+        await ex("INSERT INTO meta (key, value) VALUES (?, ?)", (W.share_key(2026, who), str(T0 - HOUR)))
         await ex("INSERT INTO house_members (user_id, house, joined_at, left_at) VALUES (?, 'fern', ?, ?)",
                  (who, T0 - DAY, T0))  # left: the row is what holds the rejoin cooldown
         await ex("INSERT INTO appeal_bans (user_id, banned_at, source) VALUES (?, ?, 'ban')", (who, T0))
@@ -644,14 +646,18 @@ def test_privacy_off_deletes_what_the_newer_modules_keep(monkeypatch):
             return (await env.db.fetchone(f"SELECT COUNT(*) AS n FROM {sql}", params))["n"]
         await seed_wave9(env, A, B)
         await Stats.privacy.callback(env.cog, env.inter(A), choice("off"))
-        for table in ("realms_playtime", "crew_arrivals"):
-            assert await env.rows(table, A) == [] and len(await env.rows(table, B)) == 1, table
+        assert await env.rows("realms_playtime", A) == [] and len(await env.rows("realms_playtime", B)) == 1
         assert await count("forum_posts WHERE author_id = ?", A) == 0  # pending and settled alike
         assert await count("forum_posts WHERE author_id = ?", B) == 1
         greetings = await env.db.fetchall("SELECT newcomer_id, crew_id FROM crew_greetings")
         assert [(r["newcomer_id"], r["crew_id"]) for r in greetings] == [(7002, B)]
-        shared = await env.db.fetchall("SELECT key FROM meta WHERE key LIKE 'wrapped:shared:%'")
-        assert [r["key"] for r in shared] == [W.share_key(2026, B)]
+        # Kept, because a limit hangs on it: the bare arrival row (a later join is a rejoin), now
+        # marked so it never leads to a ping, and the share time whose cooldown is still running.
+        (arrival,) = await env.rows("crew_arrivals", A)
+        assert (arrival["at"], arrival["fresh"], arrival["skipped"]) == (T0, 1, 1)
+        assert (await env.rows("crew_arrivals", B))[0]["skipped"] == 0
+        shared = await env.db.fetchall("SELECT key FROM meta WHERE key LIKE 'wrapped:shared:%' ORDER BY key")
+        assert [r["key"] for r in shared] == [W.share_key(2025, B), W.share_key(2026, A), W.share_key(2026, B)]
         for key in (W.levels_key(2026), W.levels_key(2027), cogmod.RECAP_LEVELS_KEY):
             row = await env.db.fetchone("SELECT value FROM meta WHERE key = ?", (key,))
             assert json.loads(row["value"]) == {str(B): 3}, key

@@ -563,6 +563,102 @@ def test_daily_cap_per_crew_member(monkeypatch):
     with_env(body, monkeypatch)
 
 
+async def privacy_round_trip(env, uid):
+    """/privacy tracking:off, then on again: what cogs/stats.py really does."""
+    from cogs.stats import opt_out
+    await opt_out(env.db, uid, env.t)
+    await env.db.execute("DELETE FROM privacy_optout WHERE user_id = ?", (uid,))
+
+
+def test_daily_cap_and_one_payout_per_newcomer_outlive_a_privacy_round_trip(monkeypatch):
+    async def body(env):
+        crew = env.member(20, crew=True)
+        newcomers = [env.newcomer(uid) for uid in range(101, 101 + C.DAILY_REWARDS)]
+        for new in newcomers:
+            await env.cog.arrived(new)
+            await env.exchange(crew, new)
+        capped = C.COINS * C.DAILY_REWARDS
+        assert await env.balance(20) == capped
+        await privacy_round_trip(env, 20)
+        assert await env.greetings() == {}  # the detail is gone...
+        another = env.newcomer(150)
+        await env.cog.arrived(another)
+        await env.exchange(crew, another)
+        assert (await env.greetings())[150] == (20, 0) and await env.balance(20) == capped  # ...the cap is not
+        # greeting the same newcomers again (their rows were deleted too) pays nothing either,
+        # today or tomorrow: one payout per newcomer, by ledger ref
+        env.t += DAY
+        for new in newcomers:
+            await env.exchange(crew, new)
+        assert await env.balance(20) == capped
+        rows = await env.db.fetchall("SELECT ref FROM ledger WHERE user_id = 20 ORDER BY id")
+        assert [r["ref"] for r in rows] == [C.ref(n.id) for n in newcomers]
+    with_env(body, monkeypatch)
+
+
+def test_a_newcomer_cannot_be_new_twice_by_opting_out(monkeypatch):
+    async def body(env):
+        crew, new = env.member(20, crew=True), env.newcomer(101)
+        await env.cog.arrived(new)
+        assert await env.cog.flush() and len(env.guild.general.sent) == 1
+        await env.exchange(crew, new)
+        assert await env.balance(20) == C.COINS
+        await privacy_round_trip(env, 101)
+        row = (await env.arrivals())[101]  # kept: id and times, nothing else
+        assert row["fresh"] == 1 and row["pinged_at"] is not None and 101 not in await env.greetings()
+        # they leave and come straight back: a rejoin, so no second ping and no second reward
+        env.t += 2 * C.HOUR
+        assert await env.cog.arrived(new)
+        assert (await env.arrivals())[101]["fresh"] == 0
+        assert not await env.cog.flush() and len(env.guild.general.sent) == 1
+        await env.exchange(crew, new)
+        assert await env.balance(20) == C.COINS and 101 not in await env.greetings()
+    with_env(body, monkeypatch)
+
+
+def test_an_arrival_still_waiting_never_pings_after_an_opt_out(monkeypatch):
+    async def body(env):
+        env.member(20, crew=True)
+        for uid in (101, 102):
+            await env.cog.arrived(env.newcomer(uid))
+        await privacy_round_trip(env, 101)
+        assert (await env.arrivals())[101]["skipped"] == 1
+        assert await env.cog.flush()
+        (sent,) = env.guild.general.sent
+        assert "<@102>" in sent["content"] and "<@101>" not in sent["content"]
+    with_env(body, monkeypatch)
+
+
+def test_only_fresh_joins_ping_the_crew(monkeypatch):
+    """One account joining and leaving can't ring the bell again and again."""
+    async def body(env):
+        env.member(20, crew=True)
+        hopper = env.newcomer(101)
+        await env.cog.arrived(hopper)
+        assert await env.cog.flush() and len(env.guild.general.sent) == 1
+        for _ in range(5):  # leaves and rejoins, well past the ping gap each time
+            env.t += C.HOUR
+            assert await env.cog.arrived(hopper)
+            row = (await env.arrivals())[101]
+            assert row["fresh"] == 0 and row["pinged_at"] is None
+            assert not await env.cog.flush()
+            assert (await env.arrivals())[101]["skipped"] == 1  # dropped, not left waiting
+        assert len(env.guild.general.sent) == 1
+        # a rejoin waiting next to a real newcomer: only the newcomer is announced
+        env.t += C.HOUR
+        await env.cog.arrived(hopper)
+        await env.cog.arrived(env.newcomer(102))
+        assert await env.cog.flush()
+        assert "<@102>" in env.guild.general.sent[-1]["content"] and "<@101>" not in env.guild.general.sent[-1]["content"]
+        # the growth cog's join log says the same about someone the crew cog never saw before
+        await env.db.execute("INSERT INTO joins (user_id, joined_at, left_at) VALUES (103, ?, ?)",
+                             (env.t - 10 * DAY, env.t - DAY))
+        env.t += C.HOUR
+        await env.cog.arrived(env.newcomer(103))
+        assert not await env.cog.flush() and len(env.guild.general.sent) == 2
+    with_env(body, monkeypatch)
+
+
 def test_opt_out_on_either_side_records_nothing(monkeypatch):
     async def body(env):
         crew, quiet_crew = env.member(20, crew=True), env.member(21, crew=True)
@@ -732,7 +828,9 @@ def test_upkeep_deletes_rows_of_members_who_opted_out(monkeypatch):
             await env.exchange(crew, new)
         await env.db.execute("INSERT INTO privacy_optout (user_id, at) VALUES (102, 1)")
         await env.cog.upkeep()
-        assert set(await env.greetings()) == {101} and set(await env.arrivals()) == {101}
+        assert set(await env.greetings()) == {101}
+        # the bare arrival row stays: it is what makes a later join a rejoin
+        assert set(await env.arrivals()) == {101, 102}
         await env.db.execute("INSERT INTO privacy_optout (user_id, at) VALUES (20, 1)")
         env.t += C.HOUR
         await env.cog.upkeep()

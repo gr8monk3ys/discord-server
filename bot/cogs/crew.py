@@ -6,15 +6,18 @@
   member who picks up a case loses the role at the next hourly check (logged to the mod log).
 - When a member arrives (the same moment the Community welcome and the welcome card use: joined
   with Onboarding done or off, or Onboarding just finished) the arrival is recorded, and a
-  1-minute tick posts ONE line in general pinging the crew role only: at most once per
+  1-minute tick posts ONE line in general pinging the crew role only (for fresh joins: someone
+  who left and came back within 30 days is not announced again): at most once per
   CREW_PING_MINUTES (arrivals in between share the next ping), never in CREW_QUIET_HOURS, never
   during a join raid (the moderation cog's lockdown state, plus the same weighted join window
   counted here) and only while a crew member is online. Arrivals older than 12 hours are dropped.
 - A greeting is recorded when the newcomer answers a crew member (see logic/crew.py for what
   counts). One per newcomer ever; the crew member earns coins through economy.py with a ref
   keyed on the newcomer, capped per day, and the Welcoming Committee badge at five greetings.
-  Nothing is recorded when either side has turned tracking off, and the hourly check deletes
-  the rows of anyone who opts out later.
+  Nothing is recorded when either side has turned tracking off. When someone opts out later
+  their greetings are deleted (by /privacy at once, and by the hourly check); the bare arrival
+  row (id and times) stays so a rejoin is still a rejoin, and the daily coin cap is counted in
+  the ledger, so opting out and back in resets neither.
 - /crew-stats (staff) and `digest_line()` for the owner digest.
 
 Needs the Server Members intent (arrivals). With the Presence intent off, "is a crew member
@@ -275,13 +278,15 @@ class Crew(commands.Cog):
         role = self.role(guild)
         if role is None:
             return False  # not set up: arrivals just go stale
-        rows = await self.db.fetchall("SELECT user_id, at FROM crew_arrivals WHERE pinged_at IS NULL"
+        rows = await self.db.fetchall("SELECT user_id, at, fresh FROM crew_arrivals WHERE pinged_at IS NULL"
                                       " AND skipped = 0 ORDER BY at, user_id")
         if not rows:
             return False
         t = now()
-        waiting = [r["user_id"] for r in rows if not C.is_stale(r["at"], t) and guild.get_member(r["user_id"])]
-        await self.skip({r["user_id"] for r in rows} - set(waiting))  # stale, or they left already
+        # Only a fresh join pings: an account that leaves and comes back can't ring the bell again.
+        waiting = [r["user_id"] for r in rows
+                   if r["fresh"] and not C.is_stale(r["at"], t) and guild.get_member(r["user_id"])]
+        await self.skip({r["user_id"] for r in rows} - set(waiting))  # a rejoin, stale, or they left already
         if not waiting:
             return False
         last = await self.meta(LAST_PING_KEY)
@@ -329,7 +334,10 @@ class Crew(commands.Cog):
         async with self.db.transaction() as tx:
             await tx.execute("DELETE FROM crew_greetings WHERE crew_id IN (SELECT user_id FROM privacy_optout)"
                              " OR newcomer_id IN (SELECT user_id FROM privacy_optout)")
-            await tx.execute("DELETE FROM crew_arrivals WHERE user_id IN (SELECT user_id FROM privacy_optout)")
+            # The arrival row stays: it is what makes a later join a rejoin (no second ping, no
+            # reward). It just never leads to a ping, and /crew-stats does not count it.
+            await tx.execute("UPDATE crew_arrivals SET skipped = 1 WHERE pinged_at IS NULL"
+                             " AND user_id IN (SELECT user_id FROM privacy_optout)")
         guild = self.guild()
         role = self.role(guild)
         if role is None or not assignable(guild, role):
@@ -494,7 +502,8 @@ class Crew(commands.Cog):
         a = await self.db.fetchone(
             "SELECT COUNT(*) AS arrivals, COUNT(CASE WHEN pinged_at > 0 THEN 1 END) AS pinged,"
             " COUNT(DISTINCT CASE WHEN pinged_at > 0 THEN pinged_at END) AS pings"
-            " FROM crew_arrivals WHERE at >= ? AND at < ?", (start, end))
+            " FROM crew_arrivals WHERE at >= ? AND at < ?"
+            " AND user_id NOT IN (SELECT user_id FROM privacy_optout)", (start, end))
         g = await self.db.fetchone("SELECT COUNT(*) AS greeted, COALESCE(SUM(coins), 0) AS coins"
                                    " FROM crew_greetings WHERE at >= ? AND at < ?", (start, end))
         top = await self.db.fetchall(
