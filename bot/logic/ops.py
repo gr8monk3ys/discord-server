@@ -390,6 +390,8 @@ CHANNEL_NEEDS: list[Need] = [
     # Without the channel or one of them the Town Hall is skipped and watch parties use the Lobby.
     Need("events", config.STAGE_CHANNEL, VIEW + ("connect", "manage_channels", "mute_members", "move_members"),
          "stage"),
+    Need("clipcast", config.CLIPS_CHANNEL, POST + ("read_message_history",)),  # consent fallback, "as seen on"
+    Need("clipcast", config.MOD_LOG_CHANNEL, POST),  # picks, upload notes, takedown alerts
 ]
 
 ROLE_HOLDERS = ("clips", "engagement", "growth", "levels", "selfroles", "shop", "tournaments", "crew", "supporter")

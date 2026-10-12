@@ -68,6 +68,7 @@ MODULES = [
     ("cogs.crew", {"members", "presences"}),  # Welcome Crew: /crew, crew ping for newcomers, greeting rewards, /crew-stats
     ("cogs.supporter", {"members"}),  # Supporter tier: /support, thank-you, stipend, /supporter grant|revoke
     ("cogs.forums", {"message_content"}),  # guides + setups forums: reaction, one-time post reward, recap line
+    ("cogs.clipcast", {"members", "message_content"}),  # consented weekly clips to YouTube Shorts, /clipcast
 ]
 
 PERMISSIONS = discord.Permissions(

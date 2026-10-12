@@ -1,4 +1,4 @@
-"""Achievements: 20 badges earned from what members already do here (squads, voice,
+"""Achievements: badges earned from what members already do here (squads, voice,
 messages, clips, streaks, tournaments...), granted once each and stored in the
 `achievements` table, plus /profile and /badges.
 

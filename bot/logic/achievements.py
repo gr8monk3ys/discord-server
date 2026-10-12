@@ -78,6 +78,8 @@ BADGES: tuple[Badge, ...] = (
     Badge("starter", "🧭", "Settled In", "Finish the starter quest (/quest)", lambda f: False),
     # Granted by cogs/crew.py at the fifth greeting, never by the sweep.
     Badge("welcoming", "👋", "Welcoming Committee", "Greet 5 newcomers as Welcome Crew (/crew)", lambda f: False),
+    # Granted by cogs/clipcast.py when a clip is posted with the author's consent, never by the sweep.
+    Badge("clipcast", "📺", "On the Channel", "Get a clip posted on the server's YouTube", lambda f: False),
 )
 BY_KEY = {b.key: b for b in BADGES}
 # Granted without a congratulation post: every early joiner gets it just for joining.
