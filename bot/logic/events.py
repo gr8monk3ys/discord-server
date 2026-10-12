@@ -3,6 +3,8 @@
 - `parse_when` turns "9pm", "tomorrow 8pm", "fri 21:30", "2026-10-10 20:00" into an aware
   local datetime; `check_when` says whether it's in the allowed window.
 - `reminder_state` decides when a game-night reminder goes out.
+- `watch_link` / `show_link` vet a watch party's link; `townhall_start` picks the first
+  Saturday of the month.
 - `select_giveaways` filters the GamerPower feed down to new, active, linkable games.
 """
 
@@ -136,6 +138,85 @@ def event_description(host_name: str, note: str | None, size: int | None) -> str
     if note:
         parts.append(note)
     return " ".join(parts)[:1000]
+
+
+# ---------------------------------------------------------------- watch parties and the Town Hall
+# `hosted_events.kind`. Both are scheduled events that share the game-night reminder loop.
+WATCHPARTY, TOWNHALL = "watchparty", "townhall"
+# What Discord asks for, in the stage channel, before a bot may schedule a Stage event.
+STAGE_EVENT_PERMS = ("manage_channels", "mute_members", "move_members")
+# Hosts whose links may unfurl in the announcement. Anything else is shown as plain text
+# (wrapped in <>), so an unknown site never gets a preview card under the bot's name.
+WATCH_HOSTS = frozenset({
+    "youtube.com", "youtu.be", "twitch.tv", "netflix.com", "disneyplus.com", "primevideo.com",
+    "max.com", "hulu.com", "crunchyroll.com", "kick.com", "vimeo.com",
+})
+MAX_LINK = 300
+TOWNHALL_NAME = "Town Hall"
+TOWNHALL_WEEKDAY = 5  # Saturday
+TOWNHALL_DEFAULT = time(12, 0)
+TOWNHALL_OFF = {"off", "none", "no", "false", "0", "disabled"}
+
+
+def watch_link(url: str | None) -> str | None:
+    """`url` if it is a plain https link with a host and no credentials, else None."""
+    if not isinstance(url, str):
+        return None
+    url = url.strip()
+    if len(url) > MAX_LINK or safe_url(url) is None:
+        return None
+    parts = urlsplit(url)
+    if parts.scheme != "https" or "@" in parts.netloc or not parts.hostname or "." not in parts.hostname:
+        return None
+    return url
+
+
+def known_watch_host(url: str) -> bool:
+    host = (urlsplit(url).hostname or "").lower().removeprefix("www.").removeprefix("m.")
+    return any(host == h or host.endswith("." + h) for h in WATCH_HOSTS)
+
+
+def show_link(url: str) -> str:
+    """The link as the bot posts it: bare (Discord may embed it) for a known host, else <url>."""
+    return url if known_watch_host(url) else f"<{url}>"
+
+
+def watchparty_name(title: str) -> str:
+    return f"Watch party: {' '.join(title.split())}"[:100]
+
+
+def watchparty_description(host_name: str, link: str | None) -> str:
+    parts = [f"Hosted by {host_name}."]
+    if link:
+        parts.append(f"Watching: {link}")
+    return " ".join(parts)[:1000]
+
+
+def parse_townhall_time(text: str | None) -> time | None:
+    """The TOWNHALL_TIME setting: "12:00", "7pm", ... (Pacific wall-clock). Unset means the
+    default; "off" (or anything unreadable) means no Town Hall."""
+    if text is None or not text.strip():
+        return TOWNHALL_DEFAULT
+    words = " ".join(text.lower().split())
+    if words in TOWNHALL_OFF:
+        return None
+    return _parse_time(words)
+
+
+def townhall_start(scheduled_at: int, tz: tzinfo) -> datetime | None:
+    """The weekly job runs on Saturdays at the Town Hall time. The Saturday a week later gets
+    a Town Hall when it is the first Saturday of its month; this returns that start (same
+    wall-clock time), or None in the other weeks."""
+    local = datetime.fromtimestamp(scheduled_at, tz)
+    day = local.date() + timedelta(days=7)
+    if day.weekday() != TOWNHALL_WEEKDAY or day.day > 7:
+        return None
+    return datetime.combine(day, local.time().replace(second=0, microsecond=0), tzinfo=tz)
+
+
+def townhall_description() -> str:
+    return ("The monthly open mic: what's working, what isn't, and what the server does next. "
+            "Tap Interested for a reminder. Bring a topic or just listen.")
 
 
 # ---------------------------------------------------------------- reminders

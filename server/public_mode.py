@@ -10,7 +10,8 @@ Create Invite on Front Desk's role.
 
 Steps, all driven by layout.py:
 - create the roles Front Desk hands out (Clip of the Week, Recruiter, Bumper)
-- create any public layout channel that doesn't exist yet (never moves or edits existing ones)
+- create any public layout channel that doesn't exist yet (never moves or edits existing ones),
+  forums with their tags, layout, sort order, default reaction and slowmode, and the Stage channel
 - create private categories/channels ("private_to") and keep them private
 - set the server description and the welcome-screen text (layout.PUBLIC)
 - refresh the rules and welcome posts in place
@@ -33,7 +34,7 @@ from dotenv import load_dotenv
 
 import layout
 from names import slug
-from setup_server import Makeover, find, private_overwrites
+from setup_server import Makeover, find, forum_options, private_overwrites
 
 sys.stdout.reconfigure(encoding="utf-8")
 
@@ -146,6 +147,9 @@ class PublicMode:
                 if spec.get("type") == "forum":
                     await self.new_forum(spec, cat, cat_spec["name"])
                     continue
+                if spec.get("type") == "stage":
+                    await self.new_stage(spec, cat, cat_spec["name"])
+                    continue
                 voice = spec.get("type") == "voice"
                 pool = self.guild.voice_channels if voice else self.guild.text_channels
                 label = spec["name"] if voice else f"#{spec['name']}"
@@ -180,9 +184,35 @@ class PublicMode:
             print(f"! skip    {label}: category {cat_name} doesn't exist (run setup_server.py)")
             return
         tags = [discord.ForumTag(name=n, emoji=e) for n, e in spec.get("tags", [])]
-        await self.do("create", f"{label} in {cat.name} with {len(tags)} tags",
+        options = forum_options(spec)
+        extras = ", ".join(k for k in ("layout", "sort", "reaction", "post_slowmode", "slowmode") if k in spec)
+        await self.do("create", f"{label} in {cat.name} with {len(tags)} tags" + (f" ({extras})" if extras else ""),
                       lambda: self.guild.create_forum(spec["name"], category=cat, topic=spec.get("topic", ""),
-                                                      available_tags=tags))
+                                                      available_tags=tags, **options))
+
+    # Scheduling a Stage event needs these in the stage channel, on top of Create Events.
+    STAGE_EVENT_PERMS = ("manage_channels", "mute_members", "move_members")
+
+    async def new_stage(self, spec, cat, cat_name):
+        """Create a missing Stage channel (inherits the category's permissions, like the voice
+        channels). Front Desk can't grant itself a permission it doesn't hold, so a missing
+        one is only reported: the owner turns it on for the Front Desk role."""
+        ch = find(getattr(self.guild, "stage_channels", []), spec)
+        label = f"{spec['name']} (stage)"
+        if ch is None:
+            if cat is None:
+                print(f"! skip    {label}: category {cat_name} doesn't exist (run setup_server.py)")
+                return
+            await self.do("create", f"{label} in {cat.name}",
+                          lambda: self.guild.create_stage_channel(spec["name"], category=cat))
+            perms = getattr(self.guild.me, "guild_permissions", None)
+        else:
+            perms = ch.permissions_for(self.guild.me)
+        missing = [p for p in self.STAGE_EVENT_PERMS if not getattr(perms, p, False)]
+        if missing:
+            print(f"! note    {label}: Front Desk can't schedule Stage events without "
+                  + ", ".join(p.replace("_", " ").title() for p in missing)
+                  + " (Server Settings -> Roles -> Front Desk). Watch parties use the Lobby until then.")
 
     # ------------------------------------------------------------ private spaces
     def private_overwrites(self, role_names):

@@ -50,7 +50,8 @@ BACKUP_FAIL_META = "ops:backup_fail_note"  # local date of the last failure note
 PERMS_JOB = O.Daily("permcheck", hour=9, minute=0)  # daily 09:00 local
 PERMS_STARTUP_DELAY = 60  # seconds after ready, once the role and channel caches have settled
 PERMS_META = "ops:perms"  # digest of the last reported set of problems
-POOLS = {"text": "text_channels", "forum": "forums", "voice": "voice_channels", "category": "categories"}
+POOLS = {"text": "text_channels", "forum": "forums", "voice": "voice_channels", "category": "categories",
+         "stage": "stage_channels"}
 
 
 def now() -> int:

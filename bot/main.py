@@ -67,6 +67,7 @@ MODULES = [
     ("cogs.houses", {"members"}),  # three houses: /house, weekly House Cup, season trophy, /house-admin
     ("cogs.crew", {"members", "presences"}),  # Welcome Crew: /crew, crew ping for newcomers, greeting rewards, /crew-stats
     ("cogs.supporter", {"members"}),  # Supporter tier: /support, thank-you, stipend, /supporter grant|revoke
+    ("cogs.forums", {"message_content"}),  # guides + setups forums: reaction, one-time post reward, recap line
 ]
 
 PERMISSIONS = discord.Permissions(
@@ -93,6 +94,9 @@ PERMISSIONS = discord.Permissions(
     # Moderation autopilot: timeouts and spam cleanup.
     moderate_members=True,
     manage_messages=True,
+    # Stage events (watch parties, Town Hall): Discord asks for Manage Channels, Move Members
+    # and Mute Members in the stage channel. The first two are above.
+    mute_members=True,
 )
 
 def build_intents(privileged: bool = True) -> discord.Intents:

@@ -42,12 +42,13 @@ class FakeGuild:
         self.me = NS(id=2, name="Front Desk", top_role=FakeRole(id=3, name="Front Desk", position=50))
         self.roles = [self.default_role, self.me.top_role, *roles]
         self.categories, self.text_channels, self.voice_channels, self.forums = [], [], [], []
+        self.stage_channels = []
         self.calls = []
         self._next = 100
 
     @property
     def channels(self):
-        return [*self.categories, *self.text_channels, *self.voice_channels, *self.forums]
+        return [*self.categories, *self.text_channels, *self.voice_channels, *self.forums, *self.stage_channels]
 
     def get_channel(self, cid):
         return next((c for c in self.channels if c.id == cid), None)
@@ -70,6 +71,9 @@ class FakeGuild:
 
     async def create_forum(self, name, **kw):
         return self._make("forum", name, **kw)
+
+    async def create_stage_channel(self, name, **kw):
+        return self._make("stage", name, **kw)
 
     async def create_role(self, **kw):
         self.calls.append(("role", kw["name"], kw))
@@ -505,3 +509,115 @@ def test_bot_posting_lets_the_bot_open_ticket_threads_in_help():
     [(target, ow)] = sets
     assert target is guild.me
     assert ow.create_private_threads is True and ow.send_messages_in_threads is True and ow.manage_threads is True
+
+
+# ------------------------------------------------------------ forums and the stage
+
+
+def _spec(name):
+    return next(s for s in setup_server.layout_channels() if slug(s["name"]) == slug(name))
+
+
+def _with_categories(guild):
+    for cat_spec in layout.CATEGORIES:
+        guild.categories.append(NS(id=len(guild.categories) + 10, name=cat_spec["name"], overwrites={}))
+    return guild
+
+
+def test_layout_forums_and_stage_fit_discords_limits():
+    forums = [s for s in setup_server.layout_channels() if s.get("type") == "forum"]
+    assert {"guides", "setups"} <= {slug(s["name"]) for s in forums}
+    for spec in forums:
+        tags = spec.get("tags", [])
+        assert len(tags) <= 20, spec["name"]  # Discord: 20 tags per forum
+        assert len({n for n, _ in tags}) == len(tags)
+        assert all(0 < len(n) <= 20 for n, _ in tags), spec["name"]
+        assert 0 < len(spec["topic"]) <= 4096
+        setup_server.forum_options(spec)  # every layout/sort name is one the scripts know
+    guides = _spec("guides")
+    assert {role for _, _, role in layout.GAMES} <= {n for n, _ in guides["tags"]}  # one tag per game
+    assert _spec("setups")["layout"] == "gallery"
+    assert _spec("stage")["type"] == "stage"
+    # Public channels must be Onboarding defaults, or onboarded members never see them.
+    defaults = {slug(n) for n in layout.ONBOARDING_DEFAULT_CHANNELS}
+    assert {"guides", "setups", "stage"} <= defaults
+
+
+def test_forum_options_only_pass_what_the_spec_sets():
+    assert setup_server.forum_options({"name": "x"}) == {"default_layout": discord.ForumLayoutType.list_view}
+    assert setup_server.forum_options(_spec("setups")) == {
+        "default_layout": discord.ForumLayoutType.gallery_view,
+        "default_sort_order": discord.ForumOrderType.creation_date,
+        "default_reaction_emoji": "🔥",
+        "slowmode_delay": 600,
+        "default_thread_slowmode_delay": 5,
+    }
+
+
+def test_public_mode_creates_new_forums_and_the_stage_once(capsys):
+    guild = _with_categories(FakeGuild())
+    asyncio.run(public_mode.PublicMode(guild, apply=True).new_channels())
+    made = {slug(name): (kind, kw) for kind, name, kw in guild.calls}
+    kind, kw = made["guides"]
+    assert kind == "forum" and kw["category"].name == "03 · games"
+    assert {t.name for t in kw["available_tags"]} >= {"Minecraft", "Beginner", "Question"}
+    assert kw["default_layout"] is discord.ForumLayoutType.list_view
+    assert kw["default_sort_order"] is discord.ForumOrderType.latest_activity
+    assert kw["default_reaction_emoji"] == "👍" and kw["slowmode_delay"] == 600
+    assert "overwrites" not in kw  # same permissions as the other public channels in the category
+    kind, kw = made["setups"]
+    assert kind == "forum" and kw["default_layout"] is discord.ForumLayoutType.gallery_view
+    kind, kw = made["stage"]
+    assert kind == "stage" and kw["category"].name == "05 · voice"
+    assert made["general"][0] == "text" and made["lobby"][0] == "voice"  # the stage isn't mistaken for either
+    assert "can't schedule Stage events without Manage Channels, Mute Members, Move Members" in capsys.readouterr().out
+
+    # Second run with everything in place: nothing is created, moved or edited.
+    for kind, name, kw in guild.calls:
+        pool = {"forum": guild.forums, "stage": guild.stage_channels, "voice": guild.voice_channels,
+                "text": guild.text_channels}[kind]
+        pool.append(NS(id=1000 + len(pool), name=name, overwrites={},
+                       permissions_for=lambda me: discord.Permissions.all()))
+    guild.calls.clear()
+    asyncio.run(public_mode.PublicMode(guild, apply=True).new_channels())
+    assert guild.calls == []
+    assert "Stage events" not in capsys.readouterr().out
+
+
+def test_public_mode_forums_and_stage_dry_run_and_missing_category(capsys):
+    guild = _with_categories(FakeGuild())
+    asyncio.run(public_mode.PublicMode(guild, apply=False).new_channels())
+    assert guild.calls == []
+    out = capsys.readouterr().out
+    assert "#📚・guides (forum) in 03 · games with 14 tags (layout, sort, reaction, post_slowmode, slowmode)" in out
+    assert "🎙・stage (stage) in 05 · voice" in out
+
+    bare = FakeGuild()  # no categories at all: skipped with a reason, never created loose
+    asyncio.run(public_mode.PublicMode(bare, apply=True).new_channels())
+    assert bare.calls == []
+    assert "🎙・stage (stage): category 05 · voice doesn't exist" in capsys.readouterr().out
+
+
+def test_public_mode_reports_a_stage_the_bot_cannot_schedule_on(capsys):
+    guild = _with_categories(FakeGuild())
+    guild.stage_channels.append(NS(id=77, name="🎙・stage", overwrites={}, permissions_for=lambda me: discord.Permissions(
+        manage_channels=True, move_members=True)))
+    asyncio.run(public_mode.PublicMode(guild, apply=True).new_stage(_spec("stage"), guild.categories[0], "05 · voice"))
+    assert guild.calls == []
+    out = capsys.readouterr().out
+    assert "without Mute Members (" in out and "Manage Channels" not in out
+
+
+def test_setup_creates_the_stage_as_a_stage_and_forums_with_their_settings():
+    guild = FakeGuild()
+    m = setup_server.Makeover(guild, apply=True)
+    asyncio.run(m.make_channels())
+    made = {slug(name): (kind, kw) for kind, name, kw in guild.calls}
+    assert made["stage"][0] == "stage"
+    assert made["setups"][1]["default_layout"] is discord.ForumLayoutType.gallery_view
+    assert made["lfg"][1]["default_layout"] is discord.ForumLayoutType.list_view  # unchanged for the old forums
+    # Re-running finds the stage instead of making a text channel with its name.
+    guild.stage_channels.append(NS(id=5, name="🎙・stage", category_id=None))
+    guild.calls.clear()
+    asyncio.run(setup_server.Makeover(guild, apply=True).make_stage(_spec("stage"), None))
+    assert guild.calls == []

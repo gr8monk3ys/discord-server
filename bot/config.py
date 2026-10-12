@@ -75,6 +75,10 @@ HOUSE_ROLES = layout.HOUSE_ROLES
 CREW_ROLE = "Welcome Crew"  # opt-in with a bar (/crew): pinged when someone new arrives
 SUPPORTER_ROLE = "Supporter"  # given by Ko-fi's Discord bot or Server Subscriptions; cosmetic perks
 SUPPORTERS_CHANNEL = "💜・supporters"  # private lounge for the Supporter role
+# Forums and Stage events
+GUIDES_FORUM = "📚・guides"
+SETUPS_FORUM = "🖥・setups"
+STAGE_CHANNEL = "🎙・stage"  # watch parties, the monthly Town Hall
 
 
 @dataclass(frozen=True)
