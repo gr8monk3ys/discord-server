@@ -222,11 +222,14 @@ done, and the tests are in `docs/LINKED_ROLES.md`.
    delete a video itself; without it the bot tells you to delete it by hand. The repo has no
    helper for this step; any standard "installed app" OAuth sign-in for Google works.
 
-Two Google rules to know about. **Both are unverified**: they are not checked by anything in
-this repo and were not tested against Google, so read Google's current pages before relying on
-them. A consent screen left in "Testing" hands out refresh
-tokens that stop working after about a week, and Google may keep uploads from an API project it
-has not reviewed locked to private, whatever `YOUTUBE_PRIVACY` says.
+Two Google rules to know about, both read from Google's own pages on 2026-10-12 (not tested
+with a real upload):
+
+- A consent screen left in "Testing" with an external user type hands out refresh tokens that
+  expire after 7 days. Set the publishing status to "In production" before you take the token.
+- Uploads from an unverified API project are not forced to private, so `YOUTUBE_PRIVACY`
+  decides what members see. `videos.insert` is limited to 100 calls a day; Front Desk posts at
+  most three clips a week.
 
 ### D.2 Ko-fi, or Discord Server Subscriptions (for the Supporter role)
 
