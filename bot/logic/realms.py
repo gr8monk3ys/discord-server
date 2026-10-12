@@ -628,6 +628,29 @@ MAX_ATTEMPTS = 5  # refused whitelist changes are retried this often at poll spe
 SLOW_RETRY = 60 * 60  # ...then once an hour
 LINK_COOLDOWN = 30  # seconds between one member's /realms link attempts
 LINK_MEMBER_DAYS = 14  # days in this server before /realms link works (staff can /realms adopt sooner)
+# Chat from Minecraft is relayed for a linked name only while its member may talk in Discord.
+MEMBER_RECHECK = 5 * 60  # how long an API answer about a member who isn't cached is trusted
+REMOVED_KEEP = 24 * 60 * 60  # a name stays tied to its last member this long after the link is gone
+REMOVED_PREFIX = "realms:removed:"  # meta: + name key -> "<user id>:<unix time>"
+
+
+def removed_key(name: str) -> str:
+    return f"{REMOVED_PREFIX}{name_key(name)}"
+
+
+def removed_value(user_id: int, at: int) -> str:
+    return f"{user_id}:{at}"
+
+
+def removed_member(value: str | None, now: int) -> int | None:
+    """The member a removed name still counts as, or None once REMOVED_KEEP has passed (or
+    the record is unreadable). A whitelist removal does not disconnect a player who is
+    already on the server, so someone just banned can go on chatting there for a while."""
+    try:
+        user_id, at = (int(part) for part in (value or "").split(":"))
+    except ValueError:
+        return None
+    return user_id if 0 <= now - at < REMOVED_KEEP else None
 
 
 def poll_delay(failures: int) -> int:

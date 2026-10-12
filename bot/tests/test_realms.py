@@ -269,6 +269,17 @@ def test_whitelist_result():
     assert R.whitelist_result("remove", "Unknown or incomplete command") == "error"
 
 
+def test_removed_name_record():
+    assert R.removed_key("Steve_01") == R.removed_key("steve_01") == "realms:removed:steve_01"
+    value = R.removed_value(42, 1000)
+    assert R.removed_member(value, 1000) == 42 and R.removed_member(value, 1000 + R.REMOVED_KEEP - 1) == 42
+    assert R.removed_member(value, 1000 + R.REMOVED_KEEP) is None  # a day on: nobody's
+    assert R.removed_member(value, 999) is None  # a clock that makes no sense
+    for bad in (None, "", "42", "x:y", "1:2:3"):
+        assert R.removed_member(bad, 1000) is None
+    assert R.REMOVED_KEEP == 24 * 3600 and 60 <= R.MEMBER_RECHECK <= 600
+
+
 def test_linking_needs_two_weeks_in_the_server():
     day = 86400
     assert R.LINK_MEMBER_DAYS == 14

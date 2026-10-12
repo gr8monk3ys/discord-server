@@ -128,6 +128,12 @@ class FakeText:
         self.id, self.name, self.guild = cid, name, guild
         self.messages: list[FakeMessage] = []
         self.fail_send = self.fail_edit = self.fail_pin = None
+        self.muted: set[int] = set()  # members who can read here but not post (an overwrite, a muted role)
+
+    def permissions_for(self, member):
+        # as discord.py does it: a timed-out member is left with nothing but reading
+        can = member.id not in self.muted and not member.is_timed_out()
+        return discord.Permissions(view_channel=True, send_messages=can)
 
     async def send(self, content=None, **kwargs):
         if self.fail_send:
@@ -174,9 +180,20 @@ class FakeGuild:
         self.mod_log = FakeText(3, config.MOD_LOG_CHANNEL, self)
         self.text_channels = [self.general, self.mod_log] + ([self.realms] if with_channel else [])
         self.members: dict[int, FakeMember] = {}
+        self.uncached: dict[int, FakeMember] = {}  # in the server, but only the API knows
+        self.fetches: list[int] = []
+        self.fetch_fail = None
 
     def get_member(self, uid):
         return self.members.get(uid)
+
+    async def fetch_member(self, uid):
+        self.fetches.append(uid)
+        if self.fetch_fail is not None:
+            raise self.fetch_fail
+        if uid not in self.uncached:
+            raise not_found()
+        return self.uncached[uid]
 
 
 class FakeBot:
@@ -980,40 +997,169 @@ def test_minecraft_chat_reaches_discord_as_one_batched_message(monkeypatch):
     with_env(go, monkeypatch)
 
 
-def test_minecraft_chat_from_a_timed_out_or_departed_member_is_dropped(monkeypatch):
+async def chat(env, *names):
+    """What reaches Discord when these players each say something in Minecraft."""
+    before = len(env.posts)
+    await env.log(*(P + f"<{name}> hi from {name}" for name in names))
+    return env.posts[-1].kwargs["content"] if len(env.posts) > before else ""
+
+
+def test_minecraft_chat_from_a_timed_out_member_is_dropped(monkeypatch):
     """The game is not a way around a timeout: Discord moderation applies to linked names."""
     async def go(env):
-        async def chat(*names):
-            before = len(env.posts)
-            await env.log(*(P + f"<{name}> hi from {name}" for name in names))
-            return env.posts[-1].kwargs["content"] if len(env.posts) > before else ""
         await env.link(U1, "Steve")
         await env.link(U2, "Alex")
-        assert (await chat("Steve", "Alex", "Stranger")).count("hi from") == 3
+        assert (await chat(env, "Steve", "Alex", "Stranger")).count("hi from") == 3
         env.member(U1).timed_out = True
-        text = await chat("Steve", "steve", "Alex", "Stranger")  # the server's spelling may differ in case
+        text = await chat(env, "Steve", "steve", "Alex", "Stranger")  # the server's spelling may differ in case
         assert "Steve" not in text and "steve" not in text and "hi from Alex" in text
         assert "hi from Stranger" in text  # nobody linked that name: just a player
         # their join, death and leave lines carry no words of theirs and still show
         await env.log(P + "Steve was slain by Zombie", P + "Steve left the game")
         assert "💀 **Steve** was slain by Zombie" in env.posts[-1].kwargs["content"]
         env.member(U1).timed_out = False
-        assert "hi from Steve" in await chat("Steve")
-        # gone from the server, the whitelist removal still waiting for the Minecraft server
+        assert "hi from Steve" in await chat(env, "Steve")
+        assert env.guild.fetches == []  # cached members never cost an API call
+    with_env(go, monkeypatch)
+
+
+def test_a_link_in_any_state_counts_when_chat_is_relayed(monkeypatch):
+    """Hole 1: only confirmed ('ok') links used to count, so a name waiting to be added or
+    waiting to come off the whitelist was treated as a stranger's."""
+    async def go(env):
+        await env.link(U1, "Steve")
         env.rcon.down = True
-        await env.cog.on_member_ban(env.guild, SimpleNamespace(id=U2))
-        del env.guild.members[U2]
-        assert await env.links() == [("Alex", U2, "remove"), ("Steve", U1, "ok")]
-        await env.db.execute("UPDATE realms_links SET state = 'ok' WHERE user_id = ?", (U2,))  # even if still 'ok'
-        assert await chat("Alex") == ""
-        env.guild.chunked = False  # a cold member cache proves nothing: don't silence everyone
-        assert "hi from Alex" in await chat("Alex")
-        # a link the server has not confirmed proves nothing about whose name it is
-        env.guild.chunked = True
+        await env.link(U3, "Herobrine")  # waiting to be added
+        await env.cog.on_member_ban(env.guild, SimpleNamespace(id=U1))  # banned; the removal is waiting
+        del env.guild.members[U1]
+        assert await env.links() == [("Herobrine", U3, "add"), ("Steve", U1, "remove")]
+        assert await chat(env, "Steve") == ""  # the banned member's session is still connected
+        assert "hi from Herobrine" in await chat(env, "Herobrine")  # in good standing: relayed
         env.member(U3).timed_out = True
-        await env.link(U3, "Herobrine")
-        assert await env.links() == [("Alex", U2, "ok"), ("Herobrine", U3, "add"), ("Steve", U1, "ok")]
-        assert "hi from Herobrine" in await chat("Herobrine")
+        assert await chat(env, "Herobrine") == ""
+        # someone who only unlinked is still a member in good standing: their chat goes on
+        env.rcon.down = False
+        await env.link(U2, "Alex")
+        env.rcon.down = True
+        await env.unlink(U2)
+        assert ("Alex", U2, "remove") in await env.links()
+        assert "hi from Alex" in await chat(env, "Alex")
+        env.member(U2).timed_out = True
+        assert await chat(env, "Alex") == ""
+    with_env(go, monkeypatch)
+
+
+def test_a_linked_name_fails_closed_when_the_member_cannot_be_confirmed(monkeypatch):
+    """Hole 2: a member missing from the cache used to be waved through unless the cache was
+    complete. Now the API is asked, once per few minutes, and no answer means no relay."""
+    async def go(env):
+        await env.link(U1, "Steve")
+        member = env.guild.members.pop(U1)
+        env.guild.chunked = False  # whatever the cache claims about itself
+        # really gone: asked once, then remembered
+        assert await chat(env, "Steve", "Steve", "Steve") == "" and env.guild.fetches == [U1]
+        await env.log(P + "<Steve> again")
+        assert env.guild.fetches == [U1] and "again" not in "".join(p.kwargs["content"] for p in env.posts)
+        env.t += R.MEMBER_RECHECK  # the answer has aged out: asked again
+        env.guild.uncached[U1] = member  # in the server after all, just not cached
+        assert "hi from Steve" in await chat(env, "Steve") and env.guild.fetches == [U1, U1]
+        assert "hi from Steve" in await chat(env, "Steve") and len(env.guild.fetches) == 2
+        # the fetched member is held to the same rules as a cached one
+        env.t += R.MEMBER_RECHECK
+        member.timed_out = True
+        assert await chat(env, "Steve") == "" and len(env.guild.fetches) == 3
+        # Discord not answering is not a yes
+        member.timed_out = False
+        env.t += R.MEMBER_RECHECK
+        env.guild.fetch_fail = discord.HTTPException(SimpleNamespace(status=503, reason="x"), "down")
+        assert await chat(env, "Steve") == "" and len(env.guild.fetches) == 4
+        # none of this touches a name nobody linked
+        assert "hi from Stranger" in await chat(env, "Stranger") and len(env.guild.fetches) == 4
+    with_env(go, monkeypatch)
+
+
+def test_a_member_who_cannot_post_in_the_realms_channel_is_not_relayed(monkeypatch):
+    """Hole 3: a timeout is not the only mute. What counts is Send Messages in the channel."""
+    async def go(env):
+        await env.link(U1, "Steve")
+        await env.link(U2, "Alex")
+        env.guild.realms.muted = {U1}  # a channel overwrite or a muted role; no timeout involved
+        assert not env.member(U1).is_timed_out()
+        text = await chat(env, "Steve", "Alex")
+        assert "hi from Steve" not in text and "hi from Alex" in text
+        env.guild.realms.muted = set()
+        assert "hi from Steve" in await chat(env, "Steve")
+
+        def broken(member):
+            raise RuntimeError("no permissions today")
+        env.guild.realms.permissions_for = broken  # can't tell: not relayed, and nothing blows up
+        assert await chat(env, "Steve") == ""
+    with_env(go, monkeypatch)
+
+
+def test_discord_py_takes_send_messages_from_a_timed_out_member():
+    """What hole 3's fix leans on, checked against the installed library: permissions_for
+    leaves a timed-out member only View Channel and Read Message History."""
+    import inspect
+
+    from discord import abc
+    source = inspect.getsource(abc.GuildChannel.permissions_for)
+    assert "is_timed_out()" in source and "_timeout_mask()" in source
+    left = discord.Permissions(discord.Permissions.all().value & discord.Permissions._timeout_mask())
+    assert left == discord.Permissions(view_channel=True, read_message_history=True) and not left.send_messages
+
+
+def test_a_removed_name_still_counts_as_its_members_for_a_day(monkeypatch):
+    """Hole 4: taking a name off the whitelist does not disconnect the player, and once the
+    server confirmed the removal the link row is gone."""
+    async def go(env):
+        await env.link(U1, "Steve")
+        await env.link(U2, "Alex")
+        await env.cog.on_member_ban(env.guild, SimpleNamespace(id=U1))  # removal confirmed at once
+        del env.guild.members[U1]
+        assert await env.links() == [("Alex", U2, "ok")] and env.rcon.whitelist == {"alex"}
+        text = await chat(env, "Steve", "steve", "Alex")
+        assert "teve" not in text and "hi from Alex" in text
+        # it survives a restart (it is in the database, not in memory)
+        env.cog = Realms(env.cog.bot, environ=ALL_ON, pinger=env.pinger, rcon=env.rcon, reader=env.reader)
+        assert await chat(env, "Steve") == ""
+        env.t += R.REMOVED_KEEP - 60
+        assert await chat(env, "Steve") == ""
+        env.t += 60  # a day on, the session is long gone: the name is nobody's again
+        assert "hi from Steve" in await chat(env, "Steve")
+        await env.poll(R.SWEEP_EVERY)
+        assert await env.db.fetchall("SELECT 1 FROM meta WHERE key LIKE ?", (R.REMOVED_PREFIX + "%",)) == []
+    with_env(go, monkeypatch)
+
+
+def test_a_removed_name_follows_its_last_member_and_a_new_link_takes_over(monkeypatch):
+    async def go(env):
+        await env.link(U1, "Steve")
+        await env.unlink(U1)  # their own choice; still a member in good standing
+        assert await env.links() == [] and "hi from Steve" in await chat(env, "Steve")
+        env.member(U1).timed_out = True  # ...until they are not
+        assert await chat(env, "Steve") == ""
+        # somebody else links the name: it is theirs now, whatever its last member is up to
+        assert (await env.link(U2, "Steve"))["content"] == MESSAGES["linked"].format(name="Steve")
+        assert "hi from Steve" in await chat(env, "Steve")
+        # a staff removal of a member who is still here leaves them free to talk
+        await env.remove(MOD, U2)
+        assert "hi from Steve" in await chat(env, "Steve")
+    with_env(go, monkeypatch)
+
+
+def test_an_unconfirmed_claim_leaves_no_record_behind(monkeypatch):
+    """A name somebody only tried to link (the server never confirmed it) is not tied to them
+    once the claim is gone: otherwise claiming a name and leaving would mute its real player."""
+    async def go(env):
+        env.rcon.whitelist = {"ownerfriend"}
+        env.rcon.down = True
+        await env.link(U1, "OwnerFriend")
+        await env.cog.on_member_ban(env.guild, SimpleNamespace(id=U1))
+        del env.guild.members[U1]
+        assert await env.links() == []
+        assert await env.db.fetchall("SELECT 1 FROM meta WHERE key LIKE ?", (R.REMOVED_PREFIX + "%",)) == []
+        assert "hi from OwnerFriend" in await chat(env, "OwnerFriend")
     with_env(go, monkeypatch)
 
 

@@ -18,8 +18,10 @@ command says the bridge is not set up.
 - Chat, both ways, in the realms channel. Discord to Minecraft is a `tellraw` over RCON,
   rate limited, never for bots. Minecraft to Discord tails the server log read-only
   (REALMS_LOG_PATH) in a worker thread and posts at most one batched message every few
-  seconds, with no pings; chat from a name linked to a member who is timed out or gone is
-  dropped.
+  seconds, with no pings. Chat from a name that is somebody's (a link in any state, or one
+  removed in the last 24 hours, since taking a name off the whitelist does not disconnect a
+  player) is relayed only while that member is confirmed in the server and able to send
+  messages in the realms channel; a name nobody linked is just a player.
 - Playtime: a linked member seen in two player-list polls in a row, with at least one other
   player on in both (company, like voice coins: nobody is paid to idle alone), is credited
   the time between them; every full half hour pays a few coins up to a daily cap (refs keyed
@@ -288,6 +290,7 @@ class Realms(commands.Cog):
         self.limiter = R.RateLimit()
         self.noticed: dict[tuple[int, str], int] = {}
         self.last_link: dict[int, int] = {}
+        self.fetched: dict[int, tuple[int, object | None]] = {}  # uid -> (asked at, member or None)
         self.sync_lock = asyncio.Lock()
         self.said: set[str] = set()  # log lines already written once (see `once`)
 
@@ -420,6 +423,7 @@ class Realms(commands.Cog):
         if t - self.last_sweep_at >= R.SWEEP_EVERY:
             self.last_sweep_at = t
             steps.append(("member sweep", self.sweep_departed()))
+            steps.append(("removed names", self.forget_old_removals()))
         if self.setup.status_on and (reached or self.down_since is not None):
             steps.append(("panel", self.refresh_panel()))
         for what, step in steps:
@@ -597,8 +601,14 @@ class Realms(commands.Cog):
             if not row["managed"]:
                 await tx.execute("DELETE FROM realms_links WHERE name_key = ?", (row["name_key"],))
                 return {**dict(row), "unconfirmed": True}
+            t = now()
             await tx.execute("UPDATE realms_links SET state = 'remove', attempts = 0, updated_at = ?"
-                             " WHERE name_key = ?", (now(), row["name_key"]))
+                             " WHERE name_key = ?", (t, row["name_key"]))
+            # The row goes once the server confirms, but a player already online stays online:
+            # for a day the name still counts as this member's when chat is relayed (`silenced`).
+            # Only for a name the server confirmed as theirs: an unconfirmed claim proves nothing.
+            await tx.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+                             (R.removed_key(row["name"]), R.removed_value(user_id, t)))
         self.waiting += 1
         return dict(row)
 
@@ -907,20 +917,67 @@ class Realms(commands.Cog):
 
     # ------------------------------------------------------------ Minecraft -> Discord
     async def silenced(self, name: str) -> bool:
-        """True when a Minecraft name is linked to a member who may not talk here right now:
-        timed out, or gone from the server (a ban or a leave whose whitelist removal is still
-        on its way). The game must not be a way around a timeout. A player nobody linked is
-        just a player: their chat is relayed."""
-        row = await self.db.fetchone("SELECT user_id FROM realms_links WHERE name_key = ? AND state = 'ok'",
-                                     (R.name_key(name),))
-        guild = self.guild()
-        if row is None or guild is None:
+        """True when a Minecraft name belongs to a member who may not talk in the realms channel
+        right now. The game must not be a way around Discord moderation, so for a name that
+        is, or just was, somebody's this fails closed: the line is relayed only when that
+        member is confirmed here and able to post. A name nobody linked is just a player."""
+        user_id = await self.name_owner(name)
+        if user_id is None:
             return False
-        member = guild.get_member(row["user_id"])
+        return not await self.may_speak(user_id)
+
+    async def name_owner(self, name: str) -> int | None:
+        """Whose name this is: the member on its link row whatever the row's state (waiting
+        to be added, linked, or waiting to come off the whitelist), else the member it was
+        removed from in the last R.REMOVED_KEEP."""
+        row = await self.db.fetchone("SELECT user_id FROM realms_links WHERE name_key = ?", (R.name_key(name),))
+        if row is not None:
+            return row["user_id"]
+        return R.removed_member(await self.meta_get(R.removed_key(name)), now())
+
+    async def may_speak(self, user_id: int) -> bool:
+        """Is this member in the server and allowed to send messages in the realms channel?
+        (discord.py's permissions_for takes Send Messages from a timed-out member, and covers
+        channel overwrites and a muted role too.) Anything that can't be confirmed is a no."""
+        guild, channel = self.guild(), self.channel()
+        if guild is None or channel is None:
+            return False
+        member = guild.get_member(user_id)
         if member is None:
-            return bool(getattr(guild, "chunked", False))  # a cold member cache proves nothing
-        timed_out = getattr(member, "is_timed_out", None)
-        return bool(timed_out()) if callable(timed_out) else False
+            member = await self.fetched_member(guild, user_id)
+        if member is None:
+            return False
+        try:
+            if member.is_timed_out():
+                return False
+            return bool(channel.permissions_for(member).send_messages)
+        except Exception:
+            log.debug("realms: couldn't work out what %s may do in the realms channel", user_id, exc_info=True)
+            return False
+
+    async def fetched_member(self, guild, user_id: int):
+        """A member the cache doesn't have, asked from the API at most once per
+        R.MEMBER_RECHECK (a chatty player must not cost a request per line). None when they
+        are gone or Discord didn't answer: not confirmed is not here."""
+        t = now()
+        known = self.fetched.get(user_id)
+        if known is not None and 0 <= t - known[0] < R.MEMBER_RECHECK:
+            return known[1]
+        try:
+            member = await guild.fetch_member(user_id)
+        except Exception:
+            member = None
+        self.fetched = {u: v for u, v in self.fetched.items() if 0 <= t - v[0] < R.MEMBER_RECHECK}
+        self.fetched[user_id] = (t, member)
+        return member
+
+    async def forget_old_removals(self) -> int:
+        """Drop "this name was X's" records older than R.REMOVED_KEEP."""
+        t, gone = now(), 0
+        for row in await self.db.fetchall("SELECT key, value FROM meta WHERE key LIKE ?", (R.REMOVED_PREFIX + "%",)):
+            if R.removed_member(row["value"], t) is None:
+                gone += await self.db.execute("DELETE FROM meta WHERE key = ? AND value = ?", (row["key"], row["value"]))
+        return gone
 
     async def relay_once(self) -> None:
         """Read what the server logged since the last pass and post one batched message."""
