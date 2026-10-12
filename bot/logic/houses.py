@@ -364,6 +364,20 @@ def how_text() -> str:
             "housemate matters.")
 
 
+def intro_text() -> str:
+    """The one-time post when the first members are sorted. Names houses only, never a member."""
+    names = [h.title for h in HOUSES]
+    return "\n".join([
+        f"Everyone here now belongs to one of {len(HOUSES)} houses: {', '.join(names[:-1])} and {names[-1]}. "
+        "You were sorted so the houses stay the same size; nobody picks one.", "",
+        "Your house scores from what you already do here: chatting on different days, voice time with "
+        "others, squads, the daily word, challenges and tournaments. Each week the house with the most "
+        f"points per member takes the House Cup, and its active members get {WIN_REWARD} coins each.", "",
+        "`/house me` shows your house, this week's standings and what you've brought in.",
+        f"`/house leave` takes you out of the houses (you can join again after {REJOIN_COOLDOWN // DAY} days).",
+    ])
+
+
 def winner_text(week: Week, standings: list[Standing], paid: Collection[int]) -> str:
     first = winner(standings)
     house = BY_KEY[first.house]

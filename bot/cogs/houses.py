@@ -6,7 +6,10 @@
   again, and nobody picks a house, so they stay balanced. Staff move a member with
   `/house-admin move`. Each house has a role (config.HOUSE_ROLES); the same sweep keeps it in
   step, and everything works without the roles (they are skipped until public_mode.py made
-  them, and never given if they sit above the bot or carry moderator permissions).
+  them, and never given if they sit above the bot or carry moderator permissions). A sweep
+  changes one member's roles at a time with a pause between. The first sweep that places
+  anyone while no member has a house yet also posts a one-time introduction in the
+  announcements channel (no pings; meta `houses:intro` keeps it to once).
 - Scoring. Nothing is counted here and no other cog is hooked: logic/houses.py derives a
   week's points from the tables the other modules keep (formula in its docstring).
 - `/house me` (your house, this week, your contribution, private), `/house standings`,
@@ -25,6 +28,7 @@ Scheduled jobs follow logic/schedule.py semantics. Server Members intent: placem
 rosters fall back to everyone with a house row.
 """
 
+import asyncio
 import functools
 import logging
 import time
@@ -51,6 +55,10 @@ NO_HOUSE = "You're not in a house yet. `/house join` puts you in the one that ne
 TOO_NEW = (f"Houses open once your Discord account is {Q.MIN_ACCOUNT_DAYS} days old. "
            "Come back then and run `/house join`.")
 STAFF_ONLY = "Only staff can move members between houses."
+ROLE_PAUSE = 1.0  # seconds between two role changes in one sweep
+INTRO_KEY = "houses:intro"  # meta: "due" while the one-time introduction is owed, then when it went out
+INTRO_DUE = "due"
+pause = asyncio.sleep
 
 
 def now() -> int:
@@ -126,29 +134,34 @@ class Houses(commands.Cog):
         top = getattr(getattr(guild, "me", None), "top_role", None)
         return top is not None and top.position > role.position and not getattr(role, "managed", False)
 
-    async def sync_role(self, member, house: str | None) -> None:
+    async def sync_role(self, member, house: str | None) -> bool:
         """Give `member` their house's role and take the other house roles away (all of them
-        when `house` is None). Missing or unusable roles are skipped. Never raises."""
+        when `house` is None). Missing or unusable roles are skipped. Never raises. Returns
+        True when it asked Discord for a change, so a sweep can space those out."""
         guild = getattr(member, "guild", None)
         if guild is None:
-            return
+            return False
+        asked = False
         try:
             have = list(getattr(member, "roles", []))
             wanted = config.match_by_name(guild.roles, H.BY_KEY[house].role) if house in H.BY_KEY else None
             names = {h.role for h in H.HOUSES}
             extra = [r for r in have if r.name in names and r is not wanted and self.manageable(guild, r)]
             if extra:
+                asked = True
                 await member.remove_roles(*extra, reason="Houses: not this member's house")
             if wanted is None or wanted in have:
-                return
+                return asked
             if not self.manageable(guild, wanted):
                 log.warning("houses: can't give %s: it isn't below the bot's role", wanted.name)
             elif has_dangerous_permissions(wanted):
                 log.warning("houses: won't give %s: it has moderator permissions", wanted.name)
             else:
+                asked = True
                 await member.add_roles(wanted, reason="Houses: sorted into this house")
         except Exception:
             log.exception("houses: updating the house role for %s failed", member.id)
+        return asked
 
     # ------------------------------------------------------------ membership
     async def place(self, user_id: int, source: str, t: int, present: set[int] | None,
@@ -196,9 +209,36 @@ class Houses(commands.Cog):
                 continue
             known[m.id] = await self.place(m.id, "auto", t, present)
             placed += 1
+        if placed and placed == len(known):  # nobody had a house before this sweep: say what this is
+            await self.db.execute("INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)", (INTRO_KEY, INTRO_DUE))
+        await self.post_intro(guild, t)
         for m in members:
-            await self.sync_role(m, known.get(m.id))
+            # The first sweep gives everyone a role at once: one change at a time with a pause
+            # between, well inside Discord's limit for role changes, instead of a burst.
+            if await self.sync_role(m, known.get(m.id)):
+                await pause(ROLE_PAUSE)
         return placed
+
+    async def post_intro(self, guild, t: int) -> bool:
+        """The one-time "what are houses" post, if it is still owed. Recorded in meta before it
+        is sent (and put back if Discord refuses), so it can never go out twice."""
+        row = await self.db.fetchone("SELECT value FROM meta WHERE key = ?", (INTRO_KEY,))
+        if row is None or row["value"] != INTRO_DUE:
+            return False
+        await self.db.execute("UPDATE meta SET value = ? WHERE key = ?", (str(t), INTRO_KEY))
+        channel = self.announcements(guild)
+        if channel is None:
+            return False  # no announcements channel: skipped for good, quietly
+        embed = style.embed(title="Houses are here", description=H.intro_text(),
+                            footer=style.label("houses", "welcome"))
+        try:
+            await channel.send(embed=embed, allowed_mentions=NO_PINGS)
+        except discord.HTTPException:
+            log.warning("houses: couldn't post the introduction; retrying on the next sweep", exc_info=True)
+            await self.db.execute("UPDATE meta SET value = ? WHERE key = ?", (INTRO_DUE, INTRO_KEY))
+            return False
+        log.info("houses: introduction posted")
+        return True
 
     # ------------------------------------------------------------ scheduling
     @tasks.loop(minutes=1)

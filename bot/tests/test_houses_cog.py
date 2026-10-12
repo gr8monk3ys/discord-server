@@ -147,6 +147,7 @@ class Env:
     def __init__(self, db, guild, bot, cog):
         self.db, self.guild, self.bot, self.cog = db, guild, bot, cog
         self.t = T
+        self.pauses = []
 
     def member(self, uid, **kw):
         m = self.guild.get_member(uid)
@@ -202,6 +203,10 @@ def with_env(fn, monkeypatch, house_roles=True):
         cog = Houses(bot)
         env = Env(db, guild, bot, cog)
         monkeypatch.setattr(cogmod, "now", lambda: env.t)
+
+        async def pause(seconds):  # no real waiting: just note what the sweep asked for
+            env.pauses.append(seconds)
+        monkeypatch.setattr(cogmod, "pause", pause)
         try:
             await fn(env)
         finally:
@@ -287,6 +292,84 @@ def test_roles_above_the_bot_or_with_mod_powers_are_never_given(monkeypatch):
         await env.cog.run_sweep()
         assert env.member(U1).houses() == [] and env.member(U2).houses() == []
         assert env.member(U3).houses() == ["House Otter"]
+    with_env(go, monkeypatch)
+
+
+def test_first_sweep_spaces_out_the_role_changes(monkeypatch):
+    async def go(env):
+        people = [env.member(100 + n) for n in range(15)]
+        assert await env.cog.run_sweep() == 15
+        assert all(len(m.role_calls) == 1 for m in people)  # one role change each, never a retry
+        assert env.pauses == [cogmod.ROLE_PAUSE] * 15 and cogmod.ROLE_PAUSE >= 1
+        assert await env.cog.run_sweep() == 0 and len(env.pauses) == 15  # nothing to change: no waiting
+    with_env(go, monkeypatch)
+
+
+def intro_posts(env):
+    return [p for p in env.guild.announcements.sent if p["embed"].title == "Houses are here"]
+
+
+def test_first_placement_posts_the_introduction_once_without_pings(monkeypatch):
+    async def go(env):
+        for uid in (U1, U2, U3):
+            env.member(uid)
+        assert await env.cog.run_sweep() == 3
+        post, = intro_posts(env)
+        text = post["embed"].description
+        assert post["content"] is None and post["allowed_mentions"].to_dict() == {"parse": []}
+        assert all(h.title in text for h in H.HOUSES)
+        assert "`/house me`" in text and "`/house leave`" in text and "points per member" in text
+        assert "<@" not in text and "@everyone" not in text and "@here" not in text
+        # later sweeps, later arrivals and a restart never repeat it
+        env.member(U4)
+        assert await env.cog.run_sweep() == 1 and await env.cog.run_sweep() == 0
+        assert await Houses(env.bot).run_sweep() == 0
+        assert len(intro_posts(env)) == 1
+        row = await env.db.fetchone("SELECT value FROM meta WHERE key = ?", (cogmod.INTRO_KEY,))
+        assert row["value"] == str(T)
+    with_env(go, monkeypatch)
+
+
+def test_no_introduction_when_someone_already_had_a_house(monkeypatch):
+    async def go(env):
+        await env.house(U1, FERN, left_at=T - DAY)  # even a former member: houses are not new here
+        env.member(U2)
+        assert await env.cog.run_sweep() == 1
+        assert intro_posts(env) == []
+        assert await env.db.fetchone("SELECT 1 FROM meta WHERE key = ?", (cogmod.INTRO_KEY,)) is None
+    with_env(go, monkeypatch)
+
+
+def test_nothing_to_introduce_when_nobody_was_placed(monkeypatch):
+    async def go(env):
+        env.member(young_id(T))
+        assert await env.cog.run_sweep() == 0 and intro_posts(env) == []
+        env.member(U1)
+        assert await env.cog.run_sweep() == 1 and len(intro_posts(env)) == 1  # the first real placement
+    with_env(go, monkeypatch)
+
+
+def test_introduction_is_skipped_quietly_without_an_announcements_channel(monkeypatch, caplog):
+    async def go(env):
+        env.guild.text_channels = [c for c in env.guild.text_channels if c is not env.guild.announcements]
+        env.member(U1)
+        assert await env.cog.run_sweep() == 1
+        env.guild.text_channels.append(env.guild.announcements)  # made later: still not posted
+        env.member(U2)
+        assert await env.cog.run_sweep() == 1
+        assert intro_posts(env) == [] and "introduction" not in caplog.text
+    with_env(go, monkeypatch)
+
+
+def test_introduction_retries_after_a_refused_post_and_still_goes_out_once(monkeypatch):
+    async def go(env):
+        env.member(U1)
+        env.guild.announcements.fail = discord.HTTPException(SimpleNamespace(status=500, reason="x"), "boom")
+        assert await env.cog.run_sweep() == 1 and intro_posts(env) == []
+        assert env.member(U1).houses() != []  # the roles don't wait for the post
+        env.guild.announcements.fail = None
+        assert await env.cog.run_sweep() == 0 and len(intro_posts(env)) == 1
+        assert await env.cog.run_sweep() == 0 and len(intro_posts(env)) == 1
     with_env(go, monkeypatch)
 
 
