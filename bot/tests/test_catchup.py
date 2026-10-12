@@ -325,7 +325,7 @@ def test_ollama_request_body_shape():
         "options": {"temperature": 0.2, "num_predict": 500, "num_ctx": 16384},
     }
     body["options"]["num_ctx"] = 1  # a copy: the module's defaults can't be changed through it
-    assert C.OLLAMA_OPTIONS["num_ctx"] == 8192
+    assert C.OLLAMA_OPTIONS["num_ctx"] == 16384
     assert C.ollama_headers() == {"content-type": "application/json"}
     assert C.OLLAMA_TIMEOUT == 90
 
