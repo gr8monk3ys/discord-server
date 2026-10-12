@@ -204,7 +204,7 @@ POSTS = {
         "title": "Welcome in",
         "description": "\n".join(
             [
-                "Chill 18+ gamers. Read {#rules}, then say hi in {#general}.",
+                "Chill gamers. No tryhards, no toxicity. Read {#rules}, then say hi in {#general}.",
                 "",
                 "**Roles**",
                 "{@Keeper}  runs the place",
@@ -268,7 +268,7 @@ ONBOARDING_PROMPTS = [
 
 # Welcome Screen: the card new members see, with up to 5 channels.
 WELCOME_SCREEN = {
-    "description": "Chill 18+ gamers. No tryhards, no toxicity. Pick your games and find a squad tonight.",
+    "description": "Chill gamers. No tryhards, no toxicity. Pick your games and find a squad tonight.",
     "channels": [
         ("📌・rules", "📌", "Short and worth reading"),
         ("💬・general", "💬", "Say hi"),
@@ -286,7 +286,7 @@ REVOKE_PERMANENT_INVITES = False
 # Used by public_mode.py. The server description shows in invites and
 # Discovery; keep it under 120 characters.
 PUBLIC = {
-    "description": "Chill 18+ gaming community. No tryhards, no toxicity: squad up for Valorant, CoD, Fortnite, Minecraft and more.",
+    "description": "Chill gamers. No tryhards, no toxicity. Squad up for Valorant, CoD, Fortnite, Minecraft and more.",
     "invite_channel": "👋・welcome",
 }
 

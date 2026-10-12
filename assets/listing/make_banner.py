@@ -19,8 +19,8 @@ FONT = ROOT / "bot" / "assets" / "fonts" / "IBMPlexSans-Variable.ttf"
 ICON = ROOT / "assets" / "server-icon.png"
 
 NAME = "Lorenzo's Server"
-TAGLINE = ("Chill 18+ gamers.", "No tryhards, no toxicity.")
-LABEL = "DISCORD SERVER · 18+ · PACIFIC TIME"
+TAGLINE = ("Chill gamers.", "No tryhards, no toxicity.")
+LABEL = "DISCORD SERVER · PACIFIC TIME"
 GAMES = "Valorant · Call of Duty · Fortnite · Minecraft · Apex · CS2 · League · GTA Online · Roblox"
 INVITE = "discord.gg/C25hy9Ca9W"
 
