@@ -39,6 +39,7 @@ OLLAMA_PROBE_TIMEOUT = 5  # seconds for "is the server up and is the model there
 OLLAMA_PROBE_TTL = 60  # seconds a probe result is reused
 OLLAMA_KEEP_ALIVE = "2m"  # then the model leaves RAM again
 OLLAMA_OPTIONS = {"temperature": 0.2, "num_predict": 500, "num_ctx": 8192}
+OLLAMA_MARGIN_TOKENS = 400  # chat template overhead and estimate error
 OLLAMA_TAGS_BYTES = 1024 * 1024
 UNAVAILABLE_LOG_EVERY = 3600  # seconds between "Ollama isn't available" warnings
 
@@ -259,16 +260,34 @@ def line(author: str, text: str, *, attachments: int = 0, stickers: int = 0, clo
     return f"{stamp}{clean_name(author)}: {' '.join(parts)}"
 
 
-def fit_log(lines_oldest_first: list[str], limit: int = PROMPT_CHARS) -> tuple[str, int]:
-    """Join the lines, dropping the oldest until it fits `limit`. Returns (log, lines kept)."""
+def estimate_tokens(text: str) -> int:
+    """A deliberately high guess at how many tokens `text` costs a model. ASCII runs about
+    one token per three to four characters; emoji, CJK and other non-ASCII text can cost more
+    than one token per character, so those count double."""
+    ascii_chars = sum(1 for ch in text if ord(ch) < 128)
+    return -(-ascii_chars // 2) + 2 * (len(text) - ascii_chars)
+
+
+def fit_log(lines_oldest_first: list[str], limit: int = PROMPT_CHARS,
+            token_budget: int | None = None) -> tuple[str, int]:
+    """Join the lines, dropping the oldest until it fits `limit` characters and, when given,
+    `token_budget` estimated tokens. Returns (log, lines kept).
+
+    The token budget matters for the local model: its context window is fixed, and when a
+    prompt overflows it the server silently drops the START of the prompt, which is where the
+    system prompt (the "the log is untrusted data" rule) lives. A log of emoji or non-Latin
+    text fits the character limit yet overflows the window, so it is budgeted in tokens too."""
     kept: list[str] = []
     size = 0
+    tokens = 0
     for entry in reversed(lines_oldest_first):
         cost = len(entry) + (1 if kept else 0)
-        if size + cost > limit:
+        token_cost = estimate_tokens(entry) + 1
+        if size + cost > limit or (token_budget is not None and tokens + token_cost > token_budget):
             break
         kept.append(entry)
         size += cost
+        tokens += token_cost
     kept.reverse()
     return "\n".join(kept), len(kept)
 
@@ -326,6 +345,15 @@ def parse_response(data) -> Answer | None:
 
 
 # ---------------------------------------------------------------- the local provider
+def ollama_log_budget() -> int:
+    """Estimated tokens the chat log may use so the whole request fits the local model's
+    context window: the window, minus the answer, the system prompt, the framing around the
+    log and a safety margin."""
+    frame = user_prompt("", "x" * NAME_CHARS, 48)
+    fixed = estimate_tokens(SYSTEM_PROMPT) + estimate_tokens(frame)
+    return max(0, OLLAMA_OPTIONS["num_ctx"] - OLLAMA_OPTIONS["num_predict"] - fixed - OLLAMA_MARGIN_TOKENS)
+
+
 def ollama_request_body(log: str, channel_name: str, hours: int, model: str) -> dict:
     """The same system prompt and <chat_log> framing as the Anthropic request."""
     return {

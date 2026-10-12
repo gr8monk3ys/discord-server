@@ -399,7 +399,9 @@ class Catchup(commands.Cog):
             except (discord.HTTPException, asyncio.TimeoutError, TimeoutError) as exc:
                 log.warning("catchup: couldn't read channel history (%s)", type(exc).__name__)
                 return await self.say(interaction, MESSAGES["cant_read"])
-            log_text, used = C.fit_log(entries)
+            # The local model's context window is fixed: budget the log in tokens too, or an
+            # overflow would push the system prompt (the injection guard) out of the window.
+            log_text, used = C.fit_log(entries, token_budget=C.ollama_log_budget() if local else None)
             if used < C.MIN_MESSAGES:
                 quiet = MESSAGES["quiet"].format(channel=channel.mention, hours=hours)
                 if left_out:
