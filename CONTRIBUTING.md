@@ -38,13 +38,14 @@ click.
 ## Checks to run before pushing
 
 ```bash
-cd bot && ../server/.venv/Scripts/python -m pytest -q          # about 2,900 tests, a few minutes
-cd server && .venv/Scripts/python -m pytest -q tests           # about 160 tests, seconds
+cd bot && ../server/.venv/Scripts/python -m pytest -q          # about 3,940 tests, a few minutes
+cd server && .venv/Scripts/python -m pytest -q tests           # 216 tests, seconds
+cd site/api && node --test                                     # 34 tests, the site functions
 server/.venv/Scripts/python -m ruff check .                    # from the repo root
 ```
 
 The suites need no token, no `.env` and no network: they use fakes and in-memory or temporary
-SQLite databases. Run both,
+SQLite databases. CI runs all of them. Run both Python suites,
 since `bot/` imports `server/layout.py` and a layout change can break bot tests (and
 `bot/tests/test_sitegen.py` fails when `site/index.html` drifts from the games list).
 

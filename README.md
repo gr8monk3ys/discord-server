@@ -149,17 +149,17 @@ day-to-day attention. Design and history:
 | Hall of fame | 3 ⭐ from other members (accounts 30+ days old) reposts to ⭐・hall-of-fame (public channels only) |
 | Clips | clip of the week poll Sundays 18:05; winner gets Clip of the Week (only votes from accounts 30+ days old count, and not the clip author's own) |
 | Voice | join ➕ New Squad for your own channel; `/squad name`, `/squad limit`, `/squad claim` |
-| Events | `/gamenight`; 15-min reminders; free Epic/Steam games Thursdays 18:00 |
+| Events | `/gamenight`; `/watchparty` (a Stage event in 🎙・stage, or a voice event in the Lobby when the bot can't schedule on the stage; accounts 30+ days old; shares the game-night limits; its reminder pings the Game Night role only when staff host it); a Town Hall on the first Saturday of each month at 12:00 (`TOWNHALL_TIME`), created a week ahead and announced once; 15-min reminders; free Epic/Steam games Thursdays 18:00 |
 | Economy | `/daily`, `/balance`, `/give` (accounts 30+ days old), `/coinflip`, `/richest`; coins for voice, chat, clips, squads |
 | Games | `/slots`, `/blackjack`, `/trivia`, `/predict` |
 | Shop and seasons | `/shop`, `/buy` (colour role, Hype, shoutout), `/season`; monthly champions |
 | Engagement | question of the day 12:00, this-or-that poll 18:00, 🔢・counting, auto game night Fridays, `/birthday` |
-| Moderation | `/warn`, `/timeout`, `/untimeout`, `/cases`, `/purge` (shown only to members with Timeout Members, like `/xp` and `/suggestion`); auto-escalation, anti-spam, anti-raid |
+| Moderation | `/warn`, `/timeout`, `/untimeout`, `/cases`, `/purge` (shown only to members with Timeout Members, like `/xp` and `/suggestion`); `/ban` (staff who also hold Ban Members; DMs the reason first, plus the appeal code when appeals are set up; one line in 📋・mod-log per ban); auto-escalation, anti-spam, anti-raid |
 | Operations | daily DB backup 04:00, error alerts, back-online note, weekly config drift check, `/status`; permission self-check a minute after start and daily at 09:00 (every channel, permission and role the loaded modules need: one mod-log note when something is missing, one when it is fixed, and a line in `/status`) |
 | Utility | `/remind`, `/reminders`, `/afk`, suggestion voting, member/online stat channels, tickets in 🆘・help |
 | Welcome cards | an image card in 👋・welcome when someone finishes Onboarding (names them without a ping; the #general welcome is the one ping); a card that fails to post is retried every 10 minutes for up to 24 hours while the member is still here |
 | Tournaments | `/tournament create/start/cancel/bracket`; sign-up buttons, brackets with byes, both players confirm results, 1000/400 coin prizes, Tournament Champ role |
-| Achievements | 21 badges, `/profile`, `/badges`; checked on activity and hourly; Founding Member is granted without a post |
+| Achievements | 23 badges, `/profile`, `/badges`; checked on activity and hourly; Founding Member is granted without a post |
 | Creators | `/creator link/verify/unlink/list` (members prove ownership with a code in their channel description), staff `/creator approve/remove`; YouTube uploads and Twitch go-live in 📺・creators |
 | Levels | XP from chat (60 s cooldown) and voice; Regular/Veteran/Elite/Legend/Mythic at levels 5/10/20/30/50; `/rank` card, `/levels`, staff `/xp`; level-ups are announced from level 5 (the first reward role) |
 | Recap | weekly recap in 📣・announcements Mondays 10:00, owner digest by DM 10:05, member milestones, monthly invite contest (1500/750/300 coins) on the 1st |
@@ -181,6 +181,18 @@ day-to-day attention. Design and history:
 | Game accounts | `/link steam` + `/link verify` (members prove ownership with a code in their Steam profile summary), `/unlink`, `/accounts`; staff `/link approve/remove`; persona, Steam link and hours in the server's games show on `/profile`, refreshed daily. No API key |
 | Vote hub | `/vote` (private): Disboard with your bump count and when the next bump is ready, discord.me, top.gg ("coming soon" until listed) and the share link discord.lscaturchio.xyz/join; Sundays 17:00 the week's top 3 Disboard bumpers are thanked in 🎲・games and paid 300/200/100 coins (accounts 30+ days old) |
 | Catch-up | `/catchup [channel] [hours]`: a private AI summary (5-8 bullets plus a "good moment to jump in") of a public channel's last 1-48 hours (default 12). Two providers: a local Ollama model on the bot's own machine (`OLLAMA_MODEL`, default `llama3.2:3b`; nothing leaves the machine, one summary at a time) or the Anthropic API (`ANTHROPIC_API_KEY`); `CATCHUP_PROVIDER` picks one, otherwise the key wins and Ollama is the fallback, and with neither it says summaries aren't set up. Accounts 30+ days old, 3 a day per member and 60 a day server-wide; bots and members with tracking off are left out; staff `/catchup-usage` shows the provider, requests and tokens |
+| Houses | three houses (Fern, Kestrel, Otter): established members are sorted into the smallest one every 10 min and get its role (one introduction post in 📣・announcements the first time; the permission self-check lists the house roles until `public_mode.py --apply` has made them); `/house me/standings/join/leave/history` (leaving starts a 30-day wait), staff `/house-admin move`; points come from what the other modules already record, capped at 100 per member a week and scored per member of the house; House Cup Mondays 10:10 in 📣・announcements (100 coins to each member of the winning house with 10+ points, once 2 qualify); a season trophy each calendar quarter |
+| Welcome Crew | `/crew` with Join/Leave buttons (accounts 30+ days old, 14 days here, no moderation case in 30 days; a new case takes the role back); one crew ping in 💬・general per 30 min for first-time joins (`CREW_PING_MINUTES`; someone who left and came back is not announced again), never 22:00 to 09:00 (`CREW_QUIET_HOURS`), during a raid or with no crew member online; 40 coins when a newcomer answers you (once per newcomer, 3 paid a day), the Welcoming Committee badge at 5 greetings; staff `/crew-stats` and a line in the owner digest |
+| Supporter tier | cosmetic perks for whoever holds the Supporter role (given by Ko-fi's Discord integration, Server Subscriptions or staff `/supporter grant/revoke`; no payment code in the bot): a thank-you in 💬・general, a flair on `/profile`, the 💜・supporters lounge, 250 coins on the 1st at 12:15 (accounts 30+ days old); `/support` shows the perks and the `SUPPORT_URL` link |
+| Forums | 📚・guides and 🖥・setups: the bot adds the first reaction to every post; a post still up after a day that clears a minimum bar (guides: 200 characters and 25 different words; setups: a picture, or 150 characters and 20 words) earns 30 coins, 2 paid posts per member a week, accounts 30+ days old; locked or deleted posts earn nothing; a "fresh in the forums" line in the weekly recap |
+| Clipcast | the week's top 3 clips (one per author, Discord-hosted video files only) go to the server's YouTube channel, only with the author's yes for that clip: asked by DM Sundays 18:30 (credit by name, anonymous, or no), posted Tuesdays 18:30; `/clipcast consent always/ask/never` (switching to ask reopens clips the standing yes approved and that are not posted yet), `/clipcast remove` (takes a posted clip down); the On the Channel badge when posted, and 100 coins once the clip has stayed up 7 days (a clip taken down before then never pays); without the `YOUTUBE_*` settings the approved clips are listed in 📋・mod-log to post by hand; staff `/clipcast status/skip` |
+| The Realms | Minecraft bridge in ⛏️・realms, each part on only when its settings are in `server/.env`: a status panel edited in place (polled every 2 min), `/realms link/unlink` (whitelist over RCON, accounts 30+ days old and 14 days in the server, one name per member; a name that is already on the whitelist is refused, and the bot only ever removes names it added), chat both ways (no pings; in-game chat comes through only from players linked to a member who can post in the channel right now, join and leave lines for everyone), 5 coins per half hour online while at least two players are on, up to 40 a day; `/realms status`, `/realms top`, mods `/realms remove` and `/realms adopt` (link a name that was whitelisted by hand); the bridge's health shows in `/status` |
+| Wrapped | `/wrapped [year]`, December 1 to January 15: a private year-in-review card with a Share button (only in a channel you can post in yourself; sharing gives the Wrapped badge); "Wrapped is open" with the server-wide card December 1 at 10:00 and a reminder December 20; nothing for members with tracking off; staff `/wrapped-preview` |
+| Live site data | every 30 min the bot writes `bot/data/site/stats.json`: server-wide aggregates only (no names or IDs, nothing about fewer than 3 members, rounded numbers; house standings only when every house has 3+ members who scored that week; event titles are only the bot's own templates, never a tournament name or a hand-made title); `server/publish_site_data.py` pushes it to the `site-data` branch and the landing page shows it; staff `/sitedata refresh`; `SITE_DATA=off` stops it |
+| Ban appeals | a banned member appeals at discord.lscaturchio.xyz/appeal with the code from their ban DM; a review card appears in 🔒・appeals with Accept (unbans) and Deny buttons for staff with Ban Members, plus a discussion thread; read 7 days after the ban at the earliest, 90 days between a denial and the next appeal, open appeals close after 30 days; staff `/appeals list`, `/appeals code`; off until `APPEAL_SECRET` is set |
+| Linked Roles | Discord's own Linked Roles for verified Steam, Xbox, PlayStation and Epic Games connections, served by `site/api/linked-role/` on Vercel; the bot is not involved and nothing is stored. Setup: `docs/LINKED_ROLES.md` |
+
+Turning the newest features on (permissions, secrets, outside accounts): `docs/WAVE9_SETUP.md`.
 
 Short join link: <https://discord.lscaturchio.xyz/join>. Moving the bot off this PC: `docs/HOSTING.md`
 (Docker image, `docker-compose.yml`, `server/migrate_host.py`).
@@ -203,6 +215,9 @@ All times are Pacific. Every scheduled job catches up once after downtime and ne
   minutes. If the heartbeat is older than 10 minutes it restarts the bot task (at most 3 times an
   hour) and alerts 📋・mod-log through the webhook in `server\.env` (`WATCHDOG_WEBHOOK_URL`,
   `WATCHDOG_PING_USER_ID`). Install or update it with `server\install_watchdog.ps1`.
+- **Live site data:** the bot only writes `bot\data\site\stats.json`. A scheduled task you create
+  runs `server\.venv\Scripts\pythonw.exe publish_site_data.py --apply --quiet` in `server\` every
+  30 minutes and pushes the file to the `site-data` branch (`docs/WAVE9_SETUP.md`).
 
 ### Runbook
 
@@ -215,12 +230,17 @@ All times are Pacific. Every scheduled job catches up once after downtime and ne
 | A role won't be given out | The role must sit **below Front Desk** in Server Settings → Roles. Only the owner can move roles above the bot |
 | Run by hand (debugging) | `python server\watchdog.py --pause 60` first (or it restarts the task), stop the task, then `bot\run_bot.bat`; `--resume` afterwards |
 | Watchdog status | `python server\watchdog.py --check` |
-| Tests | `cd bot`, then `..\server\.venv\Scripts\python -m pytest -q` (about 2,950 tests) |
+| Tests | `cd bot`, then `..\server\.venv\Scripts\python -m pytest -q` (about 3,940 tests); `cd server`, then `.venv\Scripts\python -m pytest -q tests` (216); `cd site\api`, then `node --test` (34, the site functions). CI runs all three |
+| New roles or channels in `layout.py` | `cd server`, then `.venv\Scripts\python public_mode.py` (dry run) and `--apply`. It only adds; the permission self-check lists what is still missing in 📋・mod-log |
+| Turn on a new feature | `docs/WAVE9_SETUP.md`: one checklist, cheapest steps first. Secrets go in `server\.env` (bot; restart it afterwards) or the Vercel project (site functions; redeploy afterwards) |
+| Landing page live section is gone | It hides itself when the published data is 48 h old. Run `python server\publish_site_data.py` (dry run) to see why nothing is pushed; `/sitedata refresh` rebuilds the file |
+| Someone was banned without an appeal code | `/appeals code` shows it so you can pass it on. `/ban` sends it by DM before the ban; a ban from Discord's own menu usually can't |
 
 Required in the Developer Portal: the **Server Members**, **Message Content** and **Presence**
 intents. Required on the Front Desk role: the permissions printed by `main.py --invite`
-(includes Manage Roles/Channels/Server/Events, Create Events, Timeout Members, Manage Messages, Move Members;
-Create Events is separate from Manage Events, and without it game nights and tournament events fail with 403).
+(includes Manage Roles/Channels/Server/Events, Create Events, Timeout Members, Manage Messages, Move Members,
+Mute Members, Ban Members; Create Events is separate from Manage Events, and without it game nights and
+tournament events fail with 403. Mute Members is for Stage events, Ban Members for `/ban` and ban appeals).
 
 ### Adding a module
 

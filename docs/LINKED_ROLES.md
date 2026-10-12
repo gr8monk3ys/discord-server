@@ -158,7 +158,7 @@ Tests (no network):
     cd bot && ../server/.venv/Scripts/python -m pytest -q -p no:warnings tests/test_linkedroles.py
     cd server && .venv/Scripts/python -m pytest -q tests/test_register_linked_roles.py
 
-The Node tests are not part of CI yet (`ci.yml` runs Python only).
+CI runs the Node tests too (`node --test` from `site/api`).
 
 ## Not verified against the live service
 

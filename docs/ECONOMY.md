@@ -1,7 +1,8 @@
 # Economy audit
 
 How Front Desk's coins come into the server (sources), how they leave it (sinks), and roughly how
-fast an active member's balance grows. All numbers come from the code as of 2026-10-07. Live
+fast an active member's balance grows. All numbers come from the code as of 2026-10-07; the
+source rows from `crew` down were added on 2026-10-12. Live
 numbers are in `/economy` (staff only): coins in circulation, the last 7 days minted vs burned,
 and the biggest sources and sinks, read straight from the ledger.
 
@@ -32,7 +33,11 @@ Every coin moves through `bot/economy.py` (`apply`, `apply_tx`, `transfer`), so 
 | `birthday` | `cogs/engagement.py` | 250 | once a year | no |
 | `raffle` (win) | `logic/shop.py` | 80% of the week's pot | one winner a week | buying needs an established account |
 | `crew` (Welcome Crew greeting) | `logic/crew.py` | 40 when a newcomer answers you | once per newcomer ever, 3 paid a day (120) | yes (both accounts; fresh joins only, the newcomer has to reply) |
-| `supporterstipend` | `logic/supporter.py` | 250 | per Supporter per month | yes |
+| `supporterstipend` | `logic/supporter.py` | 250 | per Supporter per month (paid on the 1st, or once on getting the role) | yes |
+| `housecup` | `logic/houses.py` | 100 to each member of the week's winning house who brought it 10+ points | one house a week; nobody is paid unless 2 housemates qualify | yes (only established, tracked members score; points come from capped sources that need established company; the win is decided per member, not by headcount) |
+| `forum_post` | `logic/forums.py` | 30 per guide or setup post | 2 paid posts per member in any 7 days | yes (account age when posted; paid a day later, only if the post is still up, not locked and over a minimum-content bar) |
+| `clipcast` | `logic/clipcast.py` | 100 once a clip Front Desk uploaded to YouTube has stayed up 7 days | 3 clips a week, one per author | yes (established, tracked author, and at least one other established member reacted to the clip). Paid from the 5-minute tick, once, and only if the author is then still a member, established and tracked; a clip taken down (by the author or staff) before day 7 never pays |
+| `realms` (Minecraft playtime) | `logic/realms.py` | 5 per full half hour online | 40 a day (4 h) | yes (established accounts, 14 days in the server before `/realms link` works, a linked Minecraft name; time counts only between two player-list polls that both saw you and at least one other player, `MIN_PLAYERS = 2`, so idling alone earns nothing; half hours are paid by ledger ref, so `/privacy` off and on re-earns nothing) |
 
 Zero-sum or near zero-sum (they move coins around more than they create or destroy them):
 
@@ -78,6 +83,18 @@ friends, chats a fair bit, plays the Daily Word most days and finishes most week
 On top of that come the lumpy prizes: a monthly winner (season, invite contest, member of the
 month, a tournament) collects 1,000 to 1,500 at once, and a booster gets 500 a month.
 
+The table above predates the sources added on 2026-10-12 (`housecup`, `crew`, `forum_post`,
+`clipcast`, `realms`, `supporterstipend`). They are small next to it. For any member the most
+they can add in a week is 540: 100 for a House Cup win, 60 from two forum posts, 100 for a
+posted clip and 280 from Minecraft playtime (40 a day). A typical week is far less: a house
+wins about one week in three, and most members post no guide or clip. A Welcome Crew member
+can add up to 840 more (3 paid greetings a day), but only as many as newcomers arrive and
+answer. That puts the grinder's ceiling at about 7,900, or about 8,700 for a crew member; the
+typical total barely moves. A Supporter gets 250 a month. None of the new reasons is in
+`shop.SEASON_REASONS`, so none of them earns season points, and all of them need an
+established account, so the 600-a-day figure for alts above is unchanged. No new sink came
+with them.
+
 ## Is there enough to spend it on?
 
 Before this change, the only sinks were the colour (2,000 a month, about 470 a week), Hype and
@@ -114,3 +131,8 @@ Left out on purpose: buying XP or levels (levels should mean activity), renaming
 
 - Closed: the monthly invite contest used to count any invitee who stayed 3 days; invitees
   must now have an established account (`quests.established`) when they join.
+- Closed: the forum weekly cap was counted from `forum_posts` rows, which `/privacy` off
+  deletes. It is now counted from the ledger, like the crew daily cap, so opting out and back
+  in resets neither.
+- Open: the second player that makes Minecraft playtime count can be anyone on the Minecraft
+  server, linked or not, so two idle players pay each other up to 40 a day each.
