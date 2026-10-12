@@ -8,7 +8,6 @@ from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
 import discord
-import pytest
 from discord import app_commands
 
 import config

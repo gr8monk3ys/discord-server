@@ -42,9 +42,11 @@ it sends them only the channel's ID or handle, nothing about you. If you link a 
 account's public Steam profile.
 
 **AI summaries.** When a member runs `/catchup`, recent messages from that one public channel
-are sent to Anthropic to write the summary, which only that member sees. Messages from bots and
-from members who turned tracking off (`/privacy tracking:off`) are left out, and Front Desk does
-not keep the messages or the summary. If no API key is configured, nothing is sent.
+are summarised for that member only. Messages from bots and from members who turned tracking
+off (`/privacy tracking:off`) are left out, and Front Desk does not keep the messages or the
+summary. The summary is written either by a model running on the server owner's own computer
+(nothing leaves it) or, if the owner has set that up instead, by Anthropic's API, in which
+case those messages are sent to Anthropic. The summary's footer says which one wrote it.
 
 ## Your choices
 

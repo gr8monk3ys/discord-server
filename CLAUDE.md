@@ -27,14 +27,18 @@ anything from `bot/data/` (the SQLite DB, logs and lock file live there and are 
 
 The bot and scripts share one virtualenv at `server/.venv` (gitignored); it runs on Python 3.11.
 
-- Install: `python -m venv server/.venv`, then `pip install -r bot/requirements.txt` (a superset
-  of `server/requirements.txt`, adds pytest). `server/tests` also need `pillow`.
-- Bot tests: `cd bot && ../server/.venv/Scripts/python -m pytest -q` (~2,600 tests, about two minutes)
+- Install: `python -m venv server/.venv`, then `server/.venv/Scripts/pip install -r requirements-dev.txt`
+  (the runtime pins in `bot/requirements.txt` plus pytest and ruff; `server/requirements.txt` is a
+  subset of the runtime pins). A new third-party import needs a line in `bot/requirements.txt`.
+- Bot tests: `cd bot && ../server/.venv/Scripts/python -m pytest -q -p no:warnings` (~2,900 tests, about three minutes)
 - Server tests: `cd server && .venv/Scripts/python -m pytest -q tests`
+- Lint: `server/.venv/Scripts/ruff check .` from the repo root (`ruff.toml`: bug-catching rules only,
+  no formatter). `pyrightconfig.json` is for editors; pyright is not clean and is not part of CI.
 - Every server script dry-runs by default and changes Discord only with `--apply`.
 - `python main.py --invite` (in `bot/`) prints the invite link with the permissions the bot needs.
 
-There is no CI; run both test suites before pushing.
+CI (`.github/workflows/ci.yml`) runs ruff and both test suites on every pull request and push to
+`main`; still run them locally before pushing.
 
 ## Conventions
 

@@ -1,0 +1,6 @@
+# Everything needed to work on the repo: the runtime dependencies plus the test and lint tools.
+#   pip install -r requirements-dev.txt
+# CI installs exactly this file (.github/workflows/ci.yml).
+-r bot/requirements.txt
+pytest~=9.1.1
+ruff~=0.17.0

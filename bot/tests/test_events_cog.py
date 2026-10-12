@@ -402,7 +402,7 @@ def test_reminder_window_and_once_only(monkeypatch):
 
 def test_reminder_in_memory_guard_when_db_write_fails(monkeypatch):
     async def go(env):
-        ev = await make_night(env, interested=[A])
+        await make_night(env, interested=[A])
         env.t = ts(2026, 10, 7, 21) - 5 * MIN
         real = env.cog.mark_reminded
         calls = []

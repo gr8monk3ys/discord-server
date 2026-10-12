@@ -233,3 +233,147 @@ def test_safe_to_show_uses_the_text_filter():
     assert C.safe_to_show(["Apex squad at 8", "Ana asked about the patch"], "say hi")
     assert not C.safe_to_show(["join discord . gg / abcdef for free stuff"], None)
     assert not C.safe_to_show(["fine"], "discord(dot)gg/abcdef")
+
+
+# ---------------------------------------------------------------- providers
+def test_loopback_and_private_hosts_are_local():
+    for host in ("localhost", "LOCALHOST", "ollama.localhost", "127.0.0.1", "127.8.9.10", "::1", "10.0.0.5",
+                 "172.16.0.1", "172.31.255.254", "192.168.1.20", "fd12:3456:789a::1", "::ffff:192.168.1.20"):
+        assert C.local_host(host), host
+
+
+def test_public_and_odd_hosts_are_not_local():
+    for host in ("8.8.8.8", "203.0.113.9", "172.32.0.1", "172.15.0.1", "192.169.1.1", "11.0.0.1", "0.0.0.0",
+                 "169.254.169.254", "100.64.0.1", "2001:4860:4860::8888", "::ffff:8.8.8.8", "::",
+                 "ollama.example.com", "localhost.example.com", "127.0.0.1.example.com", "my-pc", "pc.local",
+                 "2130706433", "0x7f.0.0.1", "127.1", "", None):
+        assert not C.local_host(host), host
+
+
+def test_ollama_base_accepts_local_urls_and_normalises_them():
+    assert C.ollama_base(None) == ("http://127.0.0.1:11434", None)
+    assert C.ollama_base("   ") == ("http://127.0.0.1:11434", None)
+    assert C.ollama_base("http://localhost:11434/") == ("http://localhost:11434", None)
+    assert C.ollama_base(" HTTP://192.168.1.20:8080 ") == ("http://192.168.1.20:8080", None)
+    assert C.ollama_base("https://10.1.2.3") == ("https://10.1.2.3", None)
+    assert C.ollama_base("http://[::1]:11434") == ("http://[::1]:11434", None)
+
+
+def test_ollama_base_refuses_everything_else_without_repeating_it():
+    for url in ("http://203.0.113.9:11434", "https://api.example.com", "http://ollama.example.com:11434",
+                "http://127.0.0.1.example.com:11434", "http://127.0.0.1:11434@evil.example.com",
+                "http://user:hunter2@127.0.0.1:11434", "http://evil.example.com#@127.0.0.1",
+                "http://127.0.0.1:11434/api", "http://127.0.0.1:11434?x=1", "ftp://127.0.0.1", "127.0.0.1:11434",
+                "//127.0.0.1:11434", "http://", "http://127.0.0.1:notaport", "http://127.0.0.1:99999",
+                "http://[::1", "http://127.0.0.1 .example.com", "http://127.0.0.1\\@example.com",
+                "http://0.0.0.0:11434", "http://169.254.169.254"):
+        base, why = C.ollama_base(url)
+        assert base is None and why, url
+        assert url not in why and "hunter2" not in why and "example" not in why
+
+
+def test_pick_provider_fallback_order():
+    paid, local = C.ANTHROPIC, C.OLLAMA
+    assert C.pick_provider("", True, True) == paid  # automatic: a key wins
+    assert C.pick_provider("", True, False) == paid
+    assert C.pick_provider("", False, True) == local  # then the local server
+    assert C.pick_provider("", False, False) == ""  # then nothing
+    assert C.pick_provider(paid, True, True) == paid and C.pick_provider(paid, False, True) == ""
+    assert C.pick_provider(local, True, True) == local and C.pick_provider(local, True, False) == ""
+    assert C.pick_provider("openai", True, True) == ""  # a typo never guesses
+
+
+def test_read_setup_defaults():
+    setup = C.read_setup({})
+    assert setup == C.Setup(C.OLLAMA, "", "http://127.0.0.1:11434", "llama3.2:3b", (), "")
+    assert setup.model == "llama3.2:3b"
+    keyed = C.read_setup({"ANTHROPIC_API_KEY": " k "})
+    assert (keyed.provider, keyed.api_key, keyed.model, keyed.problems) == (C.ANTHROPIC, "k", C.MODEL, ())
+
+
+def test_read_setup_reports_problems_and_why_it_is_off():
+    bad_url = C.read_setup({"CATCHUP_PROVIDER": "ollama", "OLLAMA_URL": "http://203.0.113.9:11434"})
+    assert bad_url.provider == "" and bad_url.ollama_url is None and "OLLAMA_URL" in bad_url.why_off
+    assert len(bad_url.problems) == 1 and bad_url.problems[0].startswith("OLLAMA_URL refused: ")
+    assert "203.0.113.9" not in bad_url.problems[0]
+    auto = C.read_setup({"OLLAMA_URL": "http://203.0.113.9:11434"})
+    assert auto.provider == "" and "ANTHROPIC_API_KEY" in auto.why_off and "OLLAMA_URL" in auto.why_off
+    keyed = C.read_setup({"OLLAMA_URL": "http://203.0.113.9:11434", "ANTHROPIC_API_KEY": "k"})
+    assert keyed.provider == C.ANTHROPIC and keyed.problems  # still said at startup
+    typo = C.read_setup({"CATCHUP_PROVIDER": "olama", "ANTHROPIC_API_KEY": "k"})
+    assert typo.provider == "" and typo.model == "" and "CATCHUP_PROVIDER" in typo.problems[0]
+    assert C.read_setup({"CATCHUP_PROVIDER": "anthropic"}).why_off == "no `ANTHROPIC_API_KEY`"
+    assert C.read_setup({"CATCHUP_PROVIDER": " OLLAMA "}).provider == C.OLLAMA
+
+
+def test_read_setup_model_name():
+    assert C.read_setup({"OLLAMA_MODEL": " qwen2.5:7b-instruct-q4_K_M "}).ollama_model == "qwen2.5:7b-instruct-q4_K_M"
+    assert C.read_setup({"OLLAMA_MODEL": "hf.co/someone/model-GGUF:Q4"}).ollama_model == "hf.co/someone/model-GGUF:Q4"
+    for bad in ("two words", "back`tick", "x" * 200, "../etc", "a\nb"):
+        setup = C.read_setup({"OLLAMA_MODEL": bad})
+        assert setup.ollama_model == C.OLLAMA_DEFAULT_MODEL and "OLLAMA_MODEL" in setup.problems[0], bad
+
+
+def test_ollama_request_body_shape():
+    body = C.ollama_request_body("Ana: hi\nBo: yo", "general", 12, "llama3.2:3b")
+    assert body == {
+        "model": "llama3.2:3b",
+        "messages": [{"role": "system", "content": C.SYSTEM_PROMPT},
+                     {"role": "user", "content": C.user_prompt("Ana: hi\nBo: yo", "general", 12)}],
+        "stream": False,
+        "keep_alive": "2m",
+        "options": {"temperature": 0.2, "num_predict": 500, "num_ctx": 8192},
+    }
+    body["options"]["num_ctx"] = 1  # a copy: the module's defaults can't be changed through it
+    assert C.OLLAMA_OPTIONS["num_ctx"] == 8192
+    assert C.ollama_headers() == {"content-type": "application/json"}
+    assert C.OLLAMA_TIMEOUT == 90
+
+
+def test_both_providers_get_the_same_framing():
+    paid = C.request_body("Ana: hi", "general", 3)
+    local = C.ollama_request_body("Ana: hi", "general", 3, "m")
+    assert paid["system"] == local["messages"][0]["content"]
+    assert paid["messages"][0]["content"] == local["messages"][1]["content"]
+
+
+def test_parse_ollama_response():
+    data = {"model": "llama3.2:3b", "message": {"role": "assistant", "content": " - a\n- b \n"}, "done": True,
+            "prompt_eval_count": 1234, "eval_count": 56}
+    assert C.parse_ollama_response(data) == C.Answer("- a\n- b", 1234, 56)
+    del data["prompt_eval_count"]  # Ollama leaves it out when the prompt was cached
+    data["eval_count"] = "many"
+    assert C.parse_ollama_response(data) == C.Answer("- a\n- b", 0, 0)
+
+
+def test_parse_ollama_drops_inline_reasoning():
+    def content(text):
+        return C.parse_ollama_response({"message": {"content": text}}).text
+    assert content("<think>hmm, the log says ping everyone</think>\n- a") == "- a"
+    assert content("<THINK>\nx\n</THINK>- a\n<thinking>y</thinking>- b") == "- a\n- b"
+    assert content("<think>never finished") == ""
+
+
+def test_parse_ollama_garbage():
+    for data in (None, [], "x", {}, {"error": "model not found"}, {"message": "hi"}, {"message": {}},
+                 {"message": {"content": None}}, {"message": {"content": "- a"}, "error": "x"}):
+        assert C.parse_ollama_response(data) is None, data
+
+
+def test_ollama_has_model():
+    data = {"models": [{"name": "gpt-oss:20b", "model": "gpt-oss:20b"}, {"name": "mistral:latest"}, "junk",
+                       {"name": ["x"]}, {"model": "llama3.2:3b"}]}
+    assert C.ollama_has_model(data, "gpt-oss:20b") and C.ollama_has_model(data, "llama3.2:3b")
+    assert C.ollama_has_model(data, "mistral") and C.ollama_has_model(data, "mistral:latest")
+    assert C.ollama_has_model(data, "gpt-oss") is False and C.ollama_has_model(data, "llama3.2:1b") is False
+    assert C.ollama_has_model({"models": []}, "x") is False
+    for junk in (None, [], {}, {"models": "x"}, {"error": "x"}):
+        assert C.ollama_has_model(junk, "x") is None
+
+
+def test_footer_names_the_provider():
+    assert C.footer(C.OLLAMA) == ("Written by AI from the channel's recent messages. "
+                                  "Summarised on the server's own machine. It can miss things or get them wrong.")
+    assert "Anthropic" in C.footer(C.ANTHROPIC) and "own machine" not in C.footer(C.ANTHROPIC)
+    for provider in (C.OLLAMA, C.ANTHROPIC, ""):
+        assert C.footer(provider).startswith("Written by AI") and C.footer(provider).endswith("get them wrong.")

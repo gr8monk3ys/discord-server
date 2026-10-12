@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import discord
-import pytest
 
 import config
 import db as dbmod

@@ -1,6 +1,5 @@
 """Emoji/soundboard pack: generated files meet Discord's limits; upload plan logic."""
 import asyncio
-import re
 from types import SimpleNamespace
 
 import discord

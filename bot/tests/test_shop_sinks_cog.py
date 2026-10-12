@@ -16,7 +16,7 @@ from logic import quests as Q
 from logic import shop as S
 
 import test_shop_cog as base
-from test_shop_cog import A, B, C, D, TZ, FakeInteraction, http_error, not_found, ts
+from test_shop_cog import A, B, C, D, FakeInteraction, not_found, ts
 
 T0 = base.T0  # Sunday 2026-10-04 12:00 local
 DRAW = ts(2026, 10, 4, 20)  # that day's raffle draw
