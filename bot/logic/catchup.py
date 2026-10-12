@@ -38,7 +38,9 @@ OLLAMA_TIMEOUT = 90  # seconds; the first call loads the model into memory
 OLLAMA_PROBE_TIMEOUT = 5  # seconds for "is the server up and is the model there"
 OLLAMA_PROBE_TTL = 60  # seconds a probe result is reused
 OLLAMA_KEEP_ALIVE = "2m"  # then the model leaves RAM again
-OLLAMA_OPTIONS = {"temperature": 0.2, "num_predict": 500, "num_ctx": 8192}
+# num_ctx is sized so an ordinary log (PROMPT_CHARS of mostly ASCII) fits even though the log
+# is budgeted at one token per byte (see estimate_tokens and ollama_log_budget).
+OLLAMA_OPTIONS = {"temperature": 0.2, "num_predict": 500, "num_ctx": 16384}
 OLLAMA_MARGIN_TOKENS = 400  # chat template overhead and estimate error
 OLLAMA_TAGS_BYTES = 1024 * 1024
 UNAVAILABLE_LOG_EVERY = 3600  # seconds between "Ollama isn't available" warnings
@@ -261,11 +263,11 @@ def line(author: str, text: str, *, attachments: int = 0, stickers: int = 0, clo
 
 
 def estimate_tokens(text: str) -> int:
-    """A deliberately high guess at how many tokens `text` costs a model. ASCII runs about
-    one token per three to four characters; emoji, CJK and other non-ASCII text can cost more
-    than one token per character, so those count double."""
-    ascii_chars = sum(1 for ch in text if ord(ch) < 128)
-    return -(-ascii_chars // 2) + 2 * (len(text) - ascii_chars)
+    """An upper bound on how many tokens `text` costs a model: its length in UTF-8 bytes.
+    Byte-level tokenizers never emit more than one token per byte, whatever the text is
+    (runs of punctuation, digits, emoji sequences, rare scripts), so this cannot come in low.
+    Ordinary English is three to four bytes per token, so the bound is generous on purpose."""
+    return len(text.encode("utf-8", "surrogatepass"))
 
 
 def fit_log(lines_oldest_first: list[str], limit: int = PROMPT_CHARS,
@@ -349,7 +351,8 @@ def ollama_log_budget() -> int:
     """Estimated tokens the chat log may use so the whole request fits the local model's
     context window: the window, minus the answer, the system prompt, the framing around the
     log and a safety margin."""
-    frame = user_prompt("", "x" * NAME_CHARS, 48)
+    # Worst case for the framing: the longest channel name, in four-byte characters.
+    frame = user_prompt("", "\U0001F383" * NAME_CHARS, 48)
     fixed = estimate_tokens(SYSTEM_PROMPT) + estimate_tokens(frame)
     return max(0, OLLAMA_OPTIONS["num_ctx"] - OLLAMA_OPTIONS["num_predict"] - fixed - OLLAMA_MARGIN_TOKENS)
 

@@ -813,7 +813,7 @@ def test_ollama_summary(monkeypatch):
         body = call["body"]
         assert set(body) == {"model", "messages", "stream", "keep_alive", "options"}
         assert body["model"] == LOCAL_MODEL and body["stream"] is False and body["keep_alive"] == "2m"
-        assert body["options"] == {"temperature": 0.2, "num_predict": 500, "num_ctx": 8192}
+        assert body["options"] == {"temperature": 0.2, "num_predict": 500, "num_ctx": 16384}
         assert [m["role"] for m in body["messages"]] == ["system", "user"]
         assert body["messages"][0]["content"] == C.SYSTEM_PROMPT
         assert "<chat_log>" in env.prompt() and "Ana: message 0" in env.prompt() and "#general" in env.prompt()

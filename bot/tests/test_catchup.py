@@ -322,10 +322,10 @@ def test_ollama_request_body_shape():
                      {"role": "user", "content": C.user_prompt("Ana: hi\nBo: yo", "general", 12)}],
         "stream": False,
         "keep_alive": "2m",
-        "options": {"temperature": 0.2, "num_predict": 500, "num_ctx": 8192},
+        "options": {"temperature": 0.2, "num_predict": 500, "num_ctx": 16384},
     }
     body["options"]["num_ctx"] = 1  # a copy: the module's defaults can't be changed through it
-    assert C.OLLAMA_OPTIONS["num_ctx"] == 8192
+    assert C.OLLAMA_OPTIONS["num_ctx"] == 16384
     assert C.ollama_headers() == {"content-type": "application/json"}
     assert C.OLLAMA_TIMEOUT == 90
 
@@ -379,10 +379,21 @@ def test_footer_names_the_provider():
         assert C.footer(provider).startswith("Written by AI") and C.footer(provider).endswith("get them wrong.")
 
 
-def test_token_estimate_is_high_for_non_ascii():
-    assert C.estimate_tokens("a" * 100) == 50
-    assert C.estimate_tokens("🎃" * 100) == 200
-    assert C.estimate_tokens("日本語") == 6
+def test_token_estimate_is_an_upper_bound_one_token_per_byte():
+    assert C.estimate_tokens("a" * 100) == 100
+    assert C.estimate_tokens("!@#$%^&*()" * 10) == 100  # punctuation: about a token each
+    assert C.estimate_tokens("🎃" * 100) == 400
+    assert C.estimate_tokens("日本語") == 9
+    assert C.estimate_tokens("👨‍👩‍👧‍👦") == 25  # a ZWJ family: seven code points
+
+
+def test_log_budget_assumes_the_costliest_channel_name():
+    worst = C.user_prompt("", "🎃" * C.NAME_CHARS, 48)
+    fixed = C.estimate_tokens(C.SYSTEM_PROMPT) + C.estimate_tokens(worst)
+    o = C.OLLAMA_OPTIONS
+    assert C.ollama_log_budget() == o["num_ctx"] - o["num_predict"] - fixed - C.OLLAMA_MARGIN_TOKENS
+    # An ordinary ASCII log still gets the full character budget.
+    assert C.ollama_log_budget() >= C.PROMPT_CHARS
 
 
 def test_fit_log_token_budget_keeps_the_newest_lines():
@@ -399,7 +410,7 @@ def test_local_request_always_fits_the_context_window():
     assert len(C.fit_log(lines)[0]) > 11_000  # the old, character-only budget
     log, kept = C.fit_log(lines, token_budget=C.ollama_log_budget())
     assert kept >= 1
-    body = C.ollama_request_body(log, "general", 12, "llama3.2:3b")
+    body = C.ollama_request_body(log, "🎃" * 40, 48, "llama3.2:3b")
     total = sum(C.estimate_tokens(m["content"]) for m in body["messages"])
     assert total + C.OLLAMA_OPTIONS["num_predict"] <= C.OLLAMA_OPTIONS["num_ctx"]
     assert body["messages"][0]["content"] == C.SYSTEM_PROMPT

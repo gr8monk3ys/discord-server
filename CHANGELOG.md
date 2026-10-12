@@ -15,7 +15,7 @@ All notable changes to this project are recorded here. The format follows
 
 ### Security
 
-- `/catchup` with the local model budgets the chat log in tokens, so a log of emoji or non-Latin text can no longer overflow the context window and push the system prompt out of it.
+- `/catchup` with the local model budgets the chat log in tokens, so a log of emoji or non-Latin text can no longer overflow the context window and push the system prompt out of it (budgeted at one token per byte, a true upper bound, with the costliest channel name assumed).
 
 ### Changed
 
