@@ -14,10 +14,11 @@ import discord
 from discord.ext import commands, tasks
 
 import config
+import jobs
 from logic import clips as L
 from logic import quests as Q
 from logic.selfroles import has_dangerous_permissions
-from logic.schedule import Weekly, plan
+from logic.schedule import Weekly
 
 log = logging.getLogger(__name__)
 
@@ -176,22 +177,11 @@ class Clips(commands.Cog):
         await self.bot.wait_until_ready()
 
     async def run_weekly(self) -> None:
-        job = CLIP_JOB
-        seen_key = f"first_seen:{job.name}"
-        row = await self.db.fetchone("SELECT value FROM meta WHERE key = ?", (seen_key,))
-        first_seen = int(row["value"]) if row else None
-        done = {r["key"] for r in await self.db.fetchall("SELECT key FROM jobs WHERE key LIKE ?", (f"{job.name}:%",))}
-        t = now()
-        todo = plan(job, t, self.tz, done, first_seen)
-        async with self.db.transaction() as tx:
-            if first_seen is None:
-                await tx.execute("INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)", (seen_key, str(t)))
-            for period in todo.mark_done:
-                await tx.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (period.key, t))
-        if todo.run is not None:
+        period = await jobs.due(self.db, CLIP_JOB, self.tz, now())
+        if period is not None:
             # Marked done only after posting: a Discord error retries on the next tick.
-            await self.post_poll(todo.run)
-            await self.db.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (todo.run.key, now()))
+            await self.post_poll(period)
+            await jobs.done(self.db, period, now())
 
     async def clip_channel_id(self, message_id: int, default: int) -> int:
         row = await self.db.fetchone("SELECT value FROM meta WHERE key = ?", (thread_key(message_id),))

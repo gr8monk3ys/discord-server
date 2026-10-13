@@ -41,6 +41,7 @@ from discord.ext import commands, tasks
 
 import config
 import economy
+import jobs
 import style
 from cogkit import is_staff
 from cogs.clips import thread_key
@@ -50,7 +51,6 @@ from logic import achievements as A
 from logic import clipcast as L
 from logic import clips as clip_rules
 from logic import quests as Q
-from logic.schedule import plan
 
 log = logging.getLogger(__name__)
 
@@ -499,22 +499,12 @@ class Clipcast(commands.Cog):
         await self.run_job(L.PUBLISH_JOB, self.publish_week)
 
     async def run_job(self, job, work) -> None:
-        seen_key = f"first_seen:{job.name}"
-        row = await self.db.fetchone("SELECT value FROM meta WHERE key = ?", (seen_key,))
-        first_seen = int(row["value"]) if row else None
-        done = {r["key"] for r in await self.db.fetchall("SELECT key FROM jobs WHERE key LIKE ?", (f"{job.name}:%",))}
-        t = now()
-        todo = plan(job, t, self.tz, done, first_seen)
-        async with self.db.transaction() as tx:
-            if first_seen is None:
-                await tx.execute("INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)", (seen_key, str(t)))
-            for period in todo.mark_done:
-                await tx.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (period.key, t))
-        if todo.run is not None:
+        period = await jobs.due(self.db, job, self.tz, now())
+        if period is not None:
             # Marked done only after the work returned: a Discord error retries on the next
             # tick, and the clipcast rows keep a retry from asking or uploading twice.
-            await work(todo.run)
-            await self.db.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (todo.run.key, now()))
+            await work(period)
+            await jobs.done(self.db, period, now())
 
     # ------------------------------------------------------------ looking at a clip
     async def clip_channel_id(self, message_id: int, default: int) -> int:
