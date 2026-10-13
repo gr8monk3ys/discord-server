@@ -74,6 +74,7 @@ MODULES = [
     ("cogs.sitedata", {"members", "presences"}),  # landing page live data: aggregates file every 30 min, /sitedata refresh
     ("cogs.appeals", {"message_content"}),  # ban appeals from the website: review cards, /appeals list|code
     ("cogs.focus", set()),  # event-driven Onboarding defaults: tournaments while one is on, realms while it's online
+    ("cogs.tonight", {"members", "presences"}),  # one line in general while people are in voice (TONIGHT=off)
 ]
 
 PERMISSIONS = discord.Permissions(

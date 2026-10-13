@@ -209,3 +209,9 @@ def appeal_settings(env=None) -> AppealSettings | None:
     return AppealSettings(secret=secret, page_url=f"{site}/appeal", join_url=f"{site}/join",
                           cooling=_env_days(env, "APPEAL_COOLING_DAYS", 7) * day,
                           reappeal=_env_days(env, "APPEAL_REAPPEAL_DAYS", 90) * day)
+
+
+# Tonight (cogs/tonight.py): one line in general while people are in voice. TONIGHT=off turns it off.
+def tonight_enabled(environ=None) -> bool:
+    environ = os.environ if environ is None else environ
+    return str(environ.get("TONIGHT") or "on").strip().lower() not in {"off", "0", "false", "no"}
