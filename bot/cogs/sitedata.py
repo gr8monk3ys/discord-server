@@ -28,6 +28,7 @@ from discord.ext import commands, tasks
 
 import config
 from cogkit import is_staff
+from cogs.tournaments import ACTIVE as ACTIVE_TOURNAMENTS  # the statuses of a tournament that is on
 from logic import houses as H
 from logic import matchmaking as M
 from logic import seasonal as S
@@ -36,7 +37,6 @@ from logic import sitedata as SD
 log = logging.getLogger(__name__)
 
 OPTED_IN = "NOT IN (SELECT user_id FROM privacy_optout)"
-ACTIVE_TOURNAMENTS = ("signup", "running")
 
 
 def now() -> int:

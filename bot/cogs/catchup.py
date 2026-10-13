@@ -251,8 +251,9 @@ class Catchup(commands.Cog):
             return "kind"
         everyone = channel.permissions_for(guild.default_role)
         category = getattr(channel, "category", None)
-        if (not (everyone.view_channel and everyone.read_message_history)
-                or getattr(category, "name", None) == config.STAFF_CATEGORY):
+        # By slug, as everywhere else: the staff category stays off limits if its name is restyled.
+        in_staff = category is not None and config.match_by_name([category], config.STAFF_CATEGORY) is not None
+        if not (everyone.view_channel and everyone.read_message_history) or in_staff:
             return "private"
         mine = channel.permissions_for(member)
         if not (mine.view_channel and mine.read_message_history):

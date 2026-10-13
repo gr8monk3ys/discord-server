@@ -93,7 +93,8 @@ Rules that make this hold together:
   `Moderation.is_staff` and `Ops.is_staff` are methods of their cogs with the same rule.
 - A few cogs reuse another cog's helpers directly: `cogs.lfg.ping_only`, `cogs.stats`
   (voice presence, used by economy and tempvoice), `cogs.clips` (clip detection, used by
-  economy), `cogs.growth.BUMP_DUE_KEY` (votehub), `cogs.tempvoice` (matchmaking registers its
+  economy), `cogs.growth.BUMP_DUE_KEY` (votehub), `cogs.tournaments.ACTIVE` (sitedata: the statuses of
+  a tournament that is on), `cogs.tempvoice` (matchmaking registers its
   match channels there), `cogs.stats.Stats.in_staff` and `playing` plus
   `cogs.vibes.LAST_REVIVAL_KEY` (tonight). Many cogs read other cogs' tables; only the owner writes them.
 
@@ -328,7 +329,7 @@ written by `sitedata`), and the two tracked banks `qotd.txt` and `polls.txt`.
 | `names.py` | `slug()`: name matching that ignores emoji, case and separators | no |
 | `setup_server.py` | First build: create or restyle roles and channels, **reorder roles**, post rules and welcome | with `--apply` |
 | `polish_server.py` | Second pass: Community, Onboarding, welcome screen, AutoMod, media lock, trim empty channels | with `--apply` |
-| `public_mode.py` | Later changes: missing roles and channels, private categories, description, invite, Onboarding prompts, AutoMod gaps, and the games (role, channel, forum tag and "What do you play?" option for each game in `GAMES`; `restore_games` moves a re-listed game's channel back). Additive except for `retire_games`: a game in `RETIRED_GAMES` loses its Onboarding option and its channel moves into the staff-only `GAME_ARCHIVE` category (`99 · archive`). Never deletes: messages, roles and forum tags stay | with `--apply` |
+| `public_mode.py` | Later changes: missing roles and channels, private categories, description, invite, Onboarding prompts, AutoMod gaps, and the games (role, channel, forum tag and "What do you play?" option for each game in `GAMES`; `restore_games` moves a re-listed game's channel back). Additive except for retired games: a game in `RETIRED_GAMES` loses its Onboarding option (in `game_options`, in the same edit that adds a newly listed game, or else in `retire_games`) and its channel moves into the staff-only `GAME_ARCHIVE` category (`99 · archive`; `retire_games` only). Never deletes: messages, roles and forum tags stay | with `--apply` |
 | `focus_mode.py` | The short newcomer channel list, in one Onboarding edit: default channels become `ONBOARDING_DEFAULT_CHANNELS` (the core of 9) and one question, `FOCUS_PROMPT`, offers the `FOCUS_GROUPS`. `--plan` prints the plan from `layout.py` without connecting and fails when a public channel is in no list or in two; `--revert` restores `ONBOARDING_EVERYTHING` as the defaults and leaves the question. Never touches permissions, channels, roles or the other questions | with `--apply` |
 | `expressions.py` | Upload emoji and soundboard sounds from `assets/expressions/` (skips existing names) | with `--apply` |
 | `snapshot_server.py` + `snapshot_lib.py` | Read-only dump of live config to `server/snapshot/*.json` (names not IDs, sorted); `--compare` lists drift from `layout.py` | never |
@@ -339,10 +340,12 @@ written by `sitedata`), and the two tracked banks `qotd.txt` and `polls.txt`.
 | `register_linked_roles.py` | Writes the Linked Roles metadata records and the verification URL to the Discord application (`docs/LINKED_ROLES.md`) | the application, not the server; with `--apply` |
 
 Every script dry-runs by default. None deletes roles or channels that are missing from
-`layout.py`; they are listed for a human. The one step that takes something away from members
-is `public_mode.py`'s `retire_games`, which hides a retired game's channel in the archive; it
-runs after the option is removed from Onboarding, and `restore_games` runs before a re-listed
-game becomes an option again. Because Front Desk now sits below Keeper and
+`layout.py`; they are listed for a human. Retiring a game is the one thing that takes something
+away from members, and `public_mode.py` does it in two steps: `game_options` drops the retired
+games' options from "What do you play?" in the same Onboarding edit that adds a newly listed
+game (Discord caps the options of one question), and `retire_games` removes any option that is
+still there and then hides the game's channel in the archive. The channel is only hidden after
+its option is gone, and `restore_games` runs before a re-listed game becomes an option again. Because Front Desk now sits below Keeper and
 Moderator, `setup_server.py` (which calls `edit_role_positions`) must not be run against the
 live server again: use `public_mode.py`.
 

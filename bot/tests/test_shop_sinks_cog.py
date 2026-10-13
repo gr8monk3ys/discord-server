@@ -379,6 +379,7 @@ def test_raffle_young_accounts_and_dms_refused(monkeypatch):
         await env.fund(young, 5000)
         i = await env.tickets(young, 1)
         assert "too new" in i.text and await env.bal(young) == 5000
+        assert f"{Q.MIN_ACCOUNT_DAYS} days old" in i.text and "month" not in i.text  # the number, from the constant
         dm = FakeInteraction(1, base.SimpleNamespace(id=A))  # a DM: no roles
         await Shop.raffle_buy.callback(env.cog, dm, 1)
         assert "in the server" in dm.calls[0]["content"]

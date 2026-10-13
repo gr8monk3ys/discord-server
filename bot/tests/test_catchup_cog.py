@@ -484,6 +484,22 @@ def test_private_and_staff_channels_are_never_summarized(monkeypatch):
     with_env(go, monkeypatch)
 
 
+def test_the_staff_category_is_matched_by_slug_like_the_other_cogs():
+    """A public channel under the staff category is refused whatever the category's case, emoji
+    or separators are (cogs/stats.py `in_staff` matches the same way)."""
+    guild = FakeGuild()
+    mod = SimpleNamespace(id=MOD, guild=guild)
+
+    def problem(category):
+        return Catchup.channel_problem(FakeChannel(guild, "oops-public", 80, category=category), mod)
+
+    assert problem(config.STAFF_CATEGORY) == "private"
+    for restyled in ("00 · Staff", "🔒 00 · staff", "00-STAFF", "00 staff"):
+        assert problem(restyled) == "private", restyled
+    for other in (None, "02 · chat", "00 · staff lounge"):
+        assert problem(other) is None, other
+
+
 def test_member_must_be_able_to_see_the_channel(monkeypatch):
     async def go(env):
         env.chat(5, env.guild.hidden_public)

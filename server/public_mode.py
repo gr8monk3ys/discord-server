@@ -20,14 +20,19 @@ Steps, all driven by layout.py:
 - add any missing Onboarding default channels
 - add the self-assign Onboarding prompts (platform, region, Game Night pings) if missing
 - games (layout.GAMES): create a listed game's role and channel if missing, add its tag to the
-  forums that tag by game, and add it to the "What do you play?" question
+  forums that tag by game, and add it to the "What do you play?" question. When that edit adds
+  a game, the options of retired games leave the question in the same edit (Discord caps the
+  options of one question, so new ones may not fit beside them)
 - restore_games: a listed game whose channel sits in the archive (it was retired, and is listed
   again) gets its channel moved back to the games category
-- retire_games, THE ONE STEP THAT TAKES SOMETHING AWAY (layout.RETIRED_GAMES): the game leaves
-  the "What do you play?" question and its channel moves into the staff-only archive category
-  (layout.GAME_ARCHIVE). Nothing is deleted: the channel keeps its messages, the role stays on
-  the server and on every member who has it, and old forum tags stay on old posts. The dry run
-  prints every channel it would hide. Moving the game's line back into GAMES undoes it.
+- retire_games (layout.RETIRED_GAMES): the game leaves the "What do you play?" question, if the
+  games step has not already taken it out, and its channel moves into the staff-only archive
+  category (layout.GAME_ARCHIVE). RETIRING A GAME IS THE ONE THING HERE THAT TAKES SOMETHING
+  AWAY, in those two places: the Onboarding option (games step or this one) and the channel
+  (only this one). Nothing is deleted: the channel keeps its messages, the role stays on the
+  server and on every member who has it, and old forum tags stay on old posts. The dry run
+  prints every option that would leave and every channel it would hide. Moving the game's line
+  back into GAMES undoes it.
 - fill AutoMod gaps: create Discord's built-in rules the server doesn't have yet (spam,
   mention spam, slur/sexual-content preset, invite links to other servers); never edits or
   deletes an existing rule
@@ -88,9 +93,9 @@ TOO_MANY_QUESTIONS = "Too many questions"
 
 
 # AutoMod gaps (matched by trigger type, not name, so rules made by hand in Server Settings count).
-# Alerts go to the mod log; Keeper/Moderator and the staff category are exempt. Front Desk itself
-# has Manage Server, which AutoMod always exempts, so its partner posts are never blocked.
-AUTOMOD_ALERTS = "📋・mod-log"
+# Alerts go to layout.AUTOMOD_ALERTS, the same channel polish_server.py's rules use;
+# Keeper/Moderator and the staff category are exempt. Front Desk itself has Manage Server, which
+# AutoMod always exempts, so its partner posts are never blocked.
 AUTOMOD_EXEMPT_CATEGORY = "00 · staff"
 AUTOMOD_BLOCKED = "Blocked by AutoMod. Ask a Keeper if that was a mistake."
 AUTOMOD_INVITES = "Front Desk: invite links"
@@ -515,8 +520,10 @@ class PublicMode:
                                                 reason="Game listed again (layout.GAMES)"))
 
     async def game_options(self):
-        """Every listed game is an option of the "What do you play?" question. Additive: options
-        that are already there are kept as they are; retire_games() is what removes one."""
+        """Every listed game is an option of the "What do you play?" question. Options that are
+        already there are kept as they are, with one exception: when this adds a game, the
+        options of retired games are dropped in the same edit (see below). With nothing to add
+        it changes nothing, and retire_games() removes them."""
         print("\nGames in Onboarding")
         ob, prompt, readable = await self.games_prompt()
         if not readable:
@@ -554,7 +561,7 @@ class PublicMode:
             print("  ok      every listed game is an option")
             return
         # Listed games sit together, in layout order, where the first of them was; every other
-        # option (a retired game until retire_games() runs, "Just here to hang") stays in place.
+        # option ("Just here to hang") stays in place, except a retired game's, dropped below.
         order = [slug(role) for _, _, role in layout.GAMES]
         block = [have.get(k) or new[k] for k in order if k in have or k in new]
         merged, placed = [], False
@@ -585,10 +592,11 @@ class PublicMode:
         await self.do("add", what, edit)
 
     async def retire_games(self):
-        """THE ONE STEP THAT TAKES SOMETHING AWAY. For each game in layout.RETIRED_GAMES: its
-        option leaves the "What do you play?" question, then its channel moves into the
-        staff-only archive category. Never deletes: messages, the role and who holds it are
-        untouched, and restore_games() undoes the move once the game is back in GAMES."""
+        """Takes something away (so does game_options(), which drops a retired game's option when
+        it adds a new game). For each game in layout.RETIRED_GAMES: its option leaves the "What
+        do you play?" question if it is still there, then its channel moves into the staff-only
+        archive category. Never deletes: messages, the role and who holds it are untouched, and
+        restore_games() undoes the move once the game is back in GAMES."""
         print("\nRetired games (hidden, never deleted)")
         if not layout.RETIRED_GAMES:
             print("  ok      no retired games")
@@ -680,9 +688,9 @@ class PublicMode:
             return
         T = discord.AutoModRuleTriggerType
         have = {r.trigger.type for r in rules}
-        alerts = self.channel(AUTOMOD_ALERTS)
+        alerts = self.channel(layout.AUTOMOD_ALERTS)
         if alerts is None:
-            print(f"! skip    no {AUTOMOD_ALERTS} channel for alerts (run setup_server.py)")
+            print(f"! skip    no {layout.AUTOMOD_ALERTS} channel for alerts (run setup_server.py)")
             return
         exempt_roles = [r for r in map(self.role, layout.AUTOMOD_EXEMPT_ROLES) if r]
         staff = self.channel(AUTOMOD_EXEMPT_CATEGORY)
