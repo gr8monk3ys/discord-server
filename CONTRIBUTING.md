@@ -64,7 +64,7 @@ since `bot/` imports `server/layout.py` and a layout change can break bot tests 
 - **Member text** the bot reposts goes through `logic/textfilter`, has its markdown escaped
   and is sent with `ping_only(...)` or `AllowedMentions.none()`.
 - **Scheduled jobs** follow `logic/schedule.py`: local time, catch up once after downtime,
-  never run twice.
+  never run twice. A cog runs one through `bot/jobs.py` (`run_due`, or `due` and `done`).
 - **Server scripts** dry-run by default and change Discord only with `--apply`. Later
   changes to the live server go through `public_mode.py` (additive, apart from archiving the
   channels of retired games); do not add anything that reorders or deletes roles or channels.

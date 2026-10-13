@@ -62,6 +62,8 @@ CI (`.github/workflows/ci.yml`) runs ruff, both Python test suites and the site 
   bot-authored text is escaped (masked links, impersonation).
 - Purchased colour roles are prefixed so they can't look like staff roles.
 - Scheduled jobs use Pacific time (`TZ` overrides), catch up once after downtime and never run twice.
+- Scheduled jobs go through `bot/jobs.py` (`due` / `done` / `run_due`), not hand-written `first_seen:` and
+  `jobs` rows; the period key strings are live data, so never change their format (`docs/ARCHITECTURE.md`).
 - Snapshots use names, not IDs, and sorted output so `git diff server/snapshot` is meaningful.
 - A new module = `logic/` + tests, `cogs/`, then an entry in `MODULES` (README "Adding a module").
 

@@ -31,6 +31,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 import config
+import jobs
 import style
 from cogs.moderation import Moderation
 from errors import reply_error
@@ -40,7 +41,6 @@ from logic.ops import plan_daily
 log = logging.getLogger(__name__)
 
 NO_PINGS = discord.AllowedMentions.none()
-SEEN_KEY = f"first_seen:{A.EXPIRE_JOB.name}"
 SWEEP_LIMIT = 50  # newest messages re-read for webhook posts that arrived while the bot was off
 HANDLED_MAX = 500
 NOT_SET_UP = "Ban appeals aren't set up yet (`APPEAL_SECRET` is missing from `server/.env`)."
@@ -544,7 +544,7 @@ class Appeals(commands.Cog):
             period = await self.due()
             if period is not None:
                 await self.expire(now())
-                await self.db.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (period.key, now()))
+                await jobs.done(self.db, period, now())
         except Exception:
             log.exception("appeals: tick failed")
 
@@ -554,18 +554,7 @@ class Appeals(commands.Cog):
 
     async def due(self):
         """logic/schedule.py semantics: the latest due day only; the first run just marks it done."""
-        row = await self.db.fetchone("SELECT value FROM meta WHERE key = ?", (SEEN_KEY,))
-        first_seen = int(row["value"]) if row else None
-        done = {r["key"] for r in await self.db.fetchall("SELECT key FROM jobs WHERE key LIKE ?",
-                                                         (f"{A.EXPIRE_JOB.name}:%",))}
-        t = now()
-        todo = plan_daily(A.EXPIRE_JOB, t, self.bot.settings.tz, done, first_seen)
-        async with self.db.transaction() as tx:
-            if first_seen is None:
-                await tx.execute("INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)", (SEEN_KEY, str(t)))
-            for period in todo.mark_done:
-                await tx.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (period.key, t))
-        return todo.run
+        return await jobs.due(self.db, A.EXPIRE_JOB, self.bot.settings.tz, now(), plan_daily)
 
     async def expire(self, t: int) -> int:
         """Close open appeals nobody touched for 30 days, and blank old answers."""

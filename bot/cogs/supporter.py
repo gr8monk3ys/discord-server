@@ -29,6 +29,7 @@ from discord.ext import commands, tasks
 
 import config
 import economy
+import jobs
 import style
 from cogkit import is_staff
 from cogs.lfg import ping_only
@@ -220,21 +221,9 @@ class Supporter(commands.Cog):
             await self.db.execute("INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)", (STARTED_KEY, str(now())))
 
     async def run_stipend(self) -> None:
-        job, t = S.STIPEND_JOB, now()
-        seen_key = f"first_seen:{job.name}"
-        first_seen = await self.meta(seen_key)
-        first_seen = int(first_seen) if first_seen else None
-        done = {r["key"] for r in await self.db.fetchall("SELECT key FROM jobs WHERE key LIKE ?", (f"{job.name}:%",))}
-        todo = R.plan_monthly(job, t, self.tz, done, first_seen)
-        async with self.db.transaction() as tx:
-            if first_seen is None:
-                await tx.execute("INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)", (seen_key, str(t)))
-            for period in todo.mark_done:
-                await tx.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (period.key, t))
         # Marked done only after it worked: a failure retries on the next tick, and the refs
         # make that retry a no-op for anyone already paid.
-        if todo.run is not None and await self.stipend(todo.run):
-            await self.db.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (todo.run.key, now()))
+        await jobs.run_due(self.db, S.STIPEND_JOB, self.tz, now, self.stipend, R.plan_monthly)
 
     async def stipend(self, period: R.MonthPeriod) -> bool:
         guild = self.guild()

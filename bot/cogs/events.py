@@ -32,13 +32,14 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 import config
+import jobs
 import style
 from cogkit import is_staff
 from cogs.lfg import GAME_CHOICES, ping_only
 from logic import events as E
 from logic import quests as Q
 from logic import textfilter
-from logic.schedule import Weekly, plan
+from logic.schedule import Weekly
 
 log = logging.getLogger(__name__)
 
@@ -462,29 +463,19 @@ class Events(commands.Cog):
         job = self.townhall_job
         if job is None:
             return
-        seen_key = f"first_seen:{job.name}"
-        row = await self.db.fetchone("SELECT value FROM meta WHERE key = ?", (seen_key,))
-        first_seen = int(row["value"]) if row else None
-        done = {r["key"] for r in await self.db.fetchall("SELECT key FROM jobs WHERE key LIKE ?", (f"{job.name}:%",))}
-        t = now()
-        todo = plan(job, t, self.tz, done, first_seen)
-        async with self.db.transaction() as tx:
-            if first_seen is None:
-                await tx.execute("INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)", (seen_key, str(t)))
-            for period in todo.mark_done:
-                await tx.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (period.key, t))
-        if todo.run is not None:
+        period = await jobs.due(self.db, job, self.tz, now())
+        if period is not None:
             # Marked done only once handled: a Discord error retries on the next tick, for a day.
             try:
-                ok = await self.schedule_townhall(todo.run)
+                ok = await self.schedule_townhall(period)
             except Exception:
-                log.exception("town hall %s failed; retrying", todo.run.key)
+                log.exception("town hall %s failed; retrying", period.key)
                 ok = False
-            if not ok and now() - todo.run.scheduled_at >= TOWNHALL_GIVE_UP:
-                log.warning("town hall %s: giving up for this month", todo.run.key)
+            if not ok and now() - period.scheduled_at >= TOWNHALL_GIVE_UP:
+                log.warning("town hall %s: giving up for this month", period.key)
                 ok = True
             if ok:
-                await self.db.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (todo.run.key, now()))
+                await jobs.done(self.db, period, now())
 
     async def schedule_townhall(self, period) -> bool:
         """True when this week is handled (created, not a Town Hall week, or skipped for a
@@ -669,31 +660,20 @@ class Events(commands.Cog):
         await self.bot.wait_until_ready()
 
     async def run_weekly(self) -> None:
-        job = FREE_GAMES_JOB
-        seen_key = f"first_seen:{job.name}"
-        row = await self.db.fetchone("SELECT value FROM meta WHERE key = ?", (seen_key,))
-        first_seen = int(row["value"]) if row else None
-        done = {r["key"] for r in await self.db.fetchall("SELECT key FROM jobs WHERE key LIKE ?", (f"{job.name}:%",))}
-        t = now()
-        todo = plan(job, t, self.tz, done, first_seen)
-        async with self.db.transaction() as tx:
-            if first_seen is None:
-                await tx.execute("INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)", (seen_key, str(t)))
-            for period in todo.mark_done:
-                await tx.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (period.key, t))
-        if todo.run is not None:
+        period = await jobs.due(self.db, FREE_GAMES_JOB, self.tz, now())
+        if period is not None:
             # Marked done only after it worked: an API or Discord error retries on the next
             # tick, until a day has passed. free_games ids stop a retry from reposting.
             try:
-                ok = await self.post_free_games(todo.run)
+                ok = await self.post_free_games(period)
             except Exception:
-                log.exception("free games %s failed; retrying", todo.run.key)
+                log.exception("free games %s failed; retrying", period.key)
                 ok = False
-            if not ok and now() - todo.run.scheduled_at >= FREE_GAMES_GIVE_UP:
-                log.warning("free games %s: giving up for this week", todo.run.key)
+            if not ok and now() - period.scheduled_at >= FREE_GAMES_GIVE_UP:
+                log.warning("free games %s: giving up for this week", period.key)
                 ok = True
             if ok:
-                await self.db.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (todo.run.key, now()))
+                await jobs.done(self.db, period, now())
 
     async def post_free_games(self, period) -> bool:
         """True when this week is handled (posted, or nothing new); False to retry."""

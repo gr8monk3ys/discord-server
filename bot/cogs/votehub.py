@@ -22,17 +22,18 @@ from discord.ext import commands, tasks
 
 import config
 import economy
+import jobs
 import style
 from cogs.growth import BUMP_DUE_KEY, WINDOW
 from errors import reply_error
 from logic import growth as G
 from logic import votehub as V
-from logic.schedule import latest_due, plan
+from logic.schedule import latest_due
 
 log = logging.getLogger(__name__)
 
 NO_PINGS = discord.AllowedMentions.none()
-SEEN_KEY = f"first_seen:{V.SUPPORT_JOB.name}"
+SEEN_KEY = jobs.seen_key(V.SUPPORT_JOB.name)  # the tests seed it
 
 
 def now() -> int:
@@ -141,25 +142,9 @@ class VoteHub(commands.Cog):
     async def run_support(self) -> bool:
         """Thank and pay last week's bumpers once (the first run only marks the week done).
         True when the week was handled now."""
-        job = V.SUPPORT_JOB
-        row = await self.db.fetchone("SELECT value FROM meta WHERE key = ?", (SEEN_KEY,))
-        first_seen = int(row["value"]) if row else None
-        done = {r["key"] for r in await self.db.fetchall("SELECT key FROM jobs WHERE key LIKE ?", (f"{job.name}:%",))}
-        t = now()
-        todo = plan(job, t, self.tz, done, first_seen)
-        async with self.db.transaction() as tx:
-            if first_seen is None:
-                await tx.execute("INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)", (SEEN_KEY, str(t)))
-            for period in todo.mark_done:
-                await tx.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (period.key, t))
-        if todo.run is None:
-            return False
         # Marked done only after it worked: no channel yet or an error retries on the next tick
         # (the refs keep a retry from paying twice).
-        if await self.post_support(todo.run):
-            await self.db.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (todo.run.key, now()))
-            return True
-        return False
+        return await jobs.run_due(self.db, V.SUPPORT_JOB, self.tz, now, self.post_support)
 
     async def podium(self, period) -> list[V.Place]:
         rows = await self.db.fetchall(

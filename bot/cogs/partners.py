@@ -23,12 +23,12 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 import config
+import jobs
 import style
 from cogkit import is_staff
 from errors import reply_error
 from logic import partners as P
 from logic import textfilter
-from logic.schedule import plan
 
 log = logging.getLogger(__name__)
 
@@ -37,7 +37,6 @@ FETCH_TIMEOUT = 10
 MAX_BODY = 64 * 1024
 USER_AGENT = "FrontDesk Discord bot"
 SWEEP_PAUSE = 2  # seconds between invite checks in the sweep (the endpoint is rate limited)
-SEEN_KEY = f"first_seen:{P.SWEEP_JOB.name}"
 STAFF_ONLY = "Only Moderators and Keepers can do that."
 
 
@@ -376,7 +375,7 @@ class Partners(commands.Cog):
             period = await self.due()
             if period is not None and await self.sweep():
                 # Marked done only after every invite got a real answer: otherwise retry next tick.
-                await self.db.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (period.key, now()))
+                await jobs.done(self.db, period, now())
         except Exception:
             log.exception("partners: sweep failed")
 
@@ -386,18 +385,7 @@ class Partners(commands.Cog):
 
     async def due(self):
         """logic/schedule.py semantics: latest due week only; the first run just marks it done."""
-        row = await self.db.fetchone("SELECT value FROM meta WHERE key = ?", (SEEN_KEY,))
-        first_seen = int(row["value"]) if row else None
-        done = {r["key"] for r in await self.db.fetchall("SELECT key FROM jobs WHERE key LIKE ?",
-                                                         (f"{P.SWEEP_JOB.name}:%",))}
-        t = now()
-        todo = plan(P.SWEEP_JOB, t, self.bot.settings.tz, done, first_seen)
-        async with self.db.transaction() as tx:
-            if first_seen is None:
-                await tx.execute("INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)", (SEEN_KEY, str(t)))
-            for period in todo.mark_done:
-                await tx.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (period.key, t))
-        return todo.run
+        return await jobs.due(self.db, P.SWEEP_JOB, self.bot.settings.tz, now())
 
     async def sweep(self) -> bool:
         """Re-check every approved partner; True if every check got a real answer."""

@@ -38,6 +38,7 @@ from discord.ext import commands, tasks
 
 import config
 import economy
+import jobs
 import style
 from cogkit import is_staff
 from errors import reply_error
@@ -779,16 +780,16 @@ class Tournaments(commands.Cog):
     # ------------------------------------------------------------ automation: the tick
     @tasks.loop(minutes=1)
     async def tick(self) -> None:
-        jobs = (
+        steps = (
             ("monthly auto tournament", self.run_auto_create),
             ("missing events", self.retry_events),
             ("start reminders", self.send_reminders),
             ("auto start", self.auto_start_due),
             ("stale matches", self.sweep_matches),
         )
-        for name, job in jobs:
+        for name, step in steps:
             try:
-                await job()
+                await step()
             except Exception:
                 log.exception("tournaments: %s failed", name)
 
@@ -796,28 +797,10 @@ class Tournaments(commands.Cog):
     async def before_tick(self) -> None:
         await self.bot.wait_until_ready()
 
-    async def due(self, name: str, make_plan):
-        """Record first_seen and skipped periods; return the period to run now, if any."""
-        seen_key = f"first_seen:{name}"
-        first = await self.meta(seen_key)
-        first_seen = int(first) if first is not None else None
-        done = {r["key"] for r in await self.db.fetchall("SELECT key FROM jobs WHERE key LIKE ?", (f"{name}:%",))}
-        t = now()
-        todo = make_plan(t, done, first_seen)
-        async with self.db.transaction() as tx:
-            if first_seen is None:
-                await tx.execute("INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)", (seen_key, str(t)))
-            for period in todo.mark_done:
-                await tx.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (period.key, t))
-        return todo.run
-
     # ------------------------------------------------------------ automation: the monthly tournament
     async def run_auto_create(self) -> None:
-        job = T.AUTO_JOB
-        period = await self.due(job.name, lambda t, done, seen: T.plan_monthly(job, t, self.tz, done, seen))
-        # Marked done only after it worked: an error retries on the next tick.
-        if period is not None and await self.auto_create(period):
-            await self.db.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (period.key, now()))
+        # Marked done only after it worked (auto_create returned True): an error retries on the next tick.
+        await jobs.run_due(self.db, T.AUTO_JOB, self.tz, now, self.auto_create, T.plan_monthly)
 
     async def auto_create(self, period: T.MonthlyPeriod) -> bool:
         guild = self.guild()

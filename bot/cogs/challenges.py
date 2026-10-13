@@ -30,6 +30,7 @@ from discord.ext import commands, tasks
 
 import config
 import economy
+import jobs
 import style
 from cogs.lfg import ping_only
 from errors import reply_error
@@ -37,13 +38,11 @@ from logic import challenges as CH
 from logic import coins as C
 from logic import quests as Q
 from logic import stats as S
-from logic.schedule import plan
 from logic.starboard import PENDING
 
 log = logging.getLogger(__name__)
 
 NO_PINGS = discord.AllowedMentions.none()
-SEEN_KEY = f"first_seen:{CH.BOARD_JOB.name}"
 MAX_ANNOUNCE = 5  # claim lines per sweep; the rest are paid quietly
 NOT_YOURS = "These aren't your challenges. Run `/challenges` to see yours."
 TOO_NEW = (f"Your Discord account is under {Q.MIN_ACCOUNT_DAYS} days old, so challenge rewards "
@@ -387,24 +386,8 @@ class Challenges(commands.Cog):
     @never_raise
     async def run_board(self) -> bool:
         """Post this week's board once (first run only marks it done). True when posted."""
-        job = CH.BOARD_JOB
-        row = await self.db.fetchone("SELECT value FROM meta WHERE key = ?", (SEEN_KEY,))
-        first_seen = int(row["value"]) if row else None
-        done = {r["key"] for r in await self.db.fetchall("SELECT key FROM jobs WHERE key LIKE ?", (f"{job.name}:%",))}
-        t = now()
-        todo = plan(job, t, self.tz, done, first_seen)
-        async with self.db.transaction() as tx:
-            if first_seen is None:
-                await tx.execute("INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)", (SEEN_KEY, str(t)))
-            for period in todo.mark_done:
-                await tx.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (period.key, t))
-        if todo.run is None:
-            return False
         # Marked done only after it worked: no channel yet or an error retries on the next tick.
-        if await self.post_board(todo.run):
-            await self.db.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (todo.run.key, now()))
-            return True
-        return False
+        return await jobs.run_due(self.db, CH.BOARD_JOB, self.tz, now, self.post_board)
 
     def board_embed(self, week: CH.Week) -> discord.Embed:
         return style.embed(title=f"Weekly challenges · {week.key}", description=CH.board_text(CH.pick(week.key), week),

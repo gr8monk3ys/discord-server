@@ -39,12 +39,12 @@ from discord.ext import commands, tasks
 
 import config
 import economy
+import jobs
 import style
 from cogkit import is_staff
 from logic import houses as H
 from logic import quests as Q
 from logic import recap as R
-from logic.schedule import plan
 from logic.selfroles import has_dangerous_permissions
 
 log = logging.getLogger(__name__)
@@ -244,39 +244,14 @@ class Houses(commands.Cog):
         await self.run_weekly()
         await self.run_season()
 
-    async def due(self, name: str, make_plan):
-        """Record first_seen and skipped periods; return the period to run now, if any."""
-        seen_key = f"first_seen:{name}"
-        row = await self.db.fetchone("SELECT value FROM meta WHERE key = ?", (seen_key,))
-        first_seen = int(row["value"]) if row else None
-        done = {r["key"] for r in await self.db.fetchall("SELECT key FROM jobs WHERE key LIKE ?", (f"{name}:%",))}
-        t = now()
-        todo = make_plan(t, done, first_seen)
-        async with self.db.transaction() as tx:
-            if first_seen is None:
-                await tx.execute("INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)", (seen_key, str(t)))
-            for period in todo.mark_done:
-                await tx.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (period.key, t))
-        return todo.run
-
-    async def finish(self, period, action) -> bool:
-        # Marked done only after it worked: a failure retries on the next tick.
-        if await action(period):
-            await self.db.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (period.key, now()))
-            return True
-        return False
-
+    # Both: marked done only after it worked (the action returned True); a failure retries on the next tick.
     @never_raise
     async def run_weekly(self) -> bool:
-        job = H.WEEKLY_JOB
-        period = await self.due(job.name, lambda t, done, seen: plan(job, t, self.tz, done, seen))
-        return period is not None and await self.finish(period, self.close_week)
+        return await jobs.run_due(self.db, H.WEEKLY_JOB, self.tz, now, self.close_week)
 
     @never_raise
     async def run_season(self) -> bool:
-        job = H.SEASON_JOB
-        period = await self.due(job.name, lambda t, done, seen: R.plan_monthly(job, t, self.tz, done, seen))
-        return period is not None and await self.finish(period, self.close_season)
+        return await jobs.run_due(self.db, H.SEASON_JOB, self.tz, now, self.close_season, R.plan_monthly)
 
     def announcements(self, guild):
         return config.match_by_name(guild.text_channels, config.ANNOUNCEMENTS_CHANNEL)

@@ -34,6 +34,7 @@ from discord.ext import commands, tasks
 
 import config
 import economy
+import jobs
 import style
 from cogs.lfg import ping_only
 from logic import gamelist as GL
@@ -41,7 +42,6 @@ from logic import growth as G
 from logic import recap as R
 from logic import stats as S
 from logic import utility as U
-from logic.schedule import plan
 
 log = logging.getLogger(__name__)
 
@@ -122,16 +122,16 @@ class Recap(commands.Cog):
     # ------------------------------------------------------------ scheduling
     @tasks.loop(minutes=1)
     async def tick(self) -> None:
-        jobs = (
+        steps = (
             ("level snapshot", self.seed_levels),
             ("weekly recap", lambda: self.run_weekly(R.RECAP_JOB, self.post_recap)),
             ("owner digest", lambda: self.run_weekly(R.DIGEST_JOB, self.send_digest)),
             ("invite contest", self.run_contest),
             ("milestones", self.check_milestones),
         )
-        for name, job in jobs:
+        for name, step in steps:
             try:
-                await job()
+                await step()
             except Exception:
                 log.exception("recap: %s failed", name)
 
@@ -139,36 +139,12 @@ class Recap(commands.Cog):
     async def before_tick(self) -> None:
         await self.bot.wait_until_ready()
 
-    async def due(self, name: str, make_plan):
-        """Record first_seen and skipped periods; return the period to run now, if any."""
-        seen_key = f"first_seen:{name}"
-        first_seen = await self.meta(seen_key)
-        first_seen = int(first_seen) if first_seen else None
-        done = {r["key"] for r in await self.db.fetchall("SELECT key FROM jobs WHERE key LIKE ?", (f"{name}:%",))}
-        t = now()
-        todo = make_plan(t, done, first_seen)
-        async with self.db.transaction() as tx:
-            if first_seen is None:
-                await tx.execute("INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)", (seen_key, str(t)))
-            for period in todo.mark_done:
-                await tx.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (period.key, t))
-        return todo.run
-
-    async def finish(self, period, action) -> None:
-        # Marked done only after it worked: a failure retries on the next tick.
-        if await action(period):
-            await self.db.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (period.key, now()))
-
+    # Both: marked done only after it worked (the action returned True); a failure retries on the next tick.
     async def run_weekly(self, job, action) -> None:
-        period = await self.due(job.name, lambda t, done, seen: plan(job, t, self.tz, done, seen))
-        if period is not None:
-            await self.finish(period, action)
+        await jobs.run_due(self.db, job, self.tz, now, action)
 
     async def run_contest(self) -> None:
-        job = R.CONTEST_JOB
-        period = await self.due(job.name, lambda t, done, seen: R.plan_monthly(job, t, self.tz, done, seen))
-        if period is not None:
-            await self.finish(period, self.invite_contest)
+        await jobs.run_due(self.db, R.CONTEST_JOB, self.tz, now, self.invite_contest, R.plan_monthly)
 
     # ------------------------------------------------------------ weekly recap
     async def levels(self) -> dict[int, int]:
