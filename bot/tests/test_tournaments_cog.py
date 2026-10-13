@@ -964,6 +964,24 @@ def test_auto_tournament_retries_when_the_card_fails(monkeypatch):
     with_env(go, monkeypatch)
 
 
+def test_auto_tournament_waits_for_a_missing_channel_instead_of_skipping_the_month(monkeypatch):
+    """No tournaments channel at the tick used to mark the month done, so that month had no
+    tournament at all. Now the month stays open and the tournament is made once the channel is back."""
+    async def go(env):
+        await tick(env, ts(2026, 10, 7, 12))
+        env.cog.channel = lambda guild, name: None  # the channel is gone for now
+        await tick(env, NOV_FIRST_MONDAY)
+        await tick(env, NOV_FIRST_MONDAY + 300)
+        assert await env.rows("SELECT * FROM tournaments") == []
+        assert not await env.rows("SELECT key FROM jobs WHERE key = 'autotourney:2026-11'")
+        del env.cog.channel  # back to the real lookup
+        await tick(env, NOV_FIRST_MONDAY + 600)
+        await tick(env, NOV_FIRST_MONDAY + 900)
+        assert len(await env.rows("SELECT * FROM tournaments")) == 1
+        assert await env.rows("SELECT key FROM jobs WHERE key = 'autotourney:2026-11'")
+    with_env(go, monkeypatch)
+
+
 def test_auto_tournament_without_an_event_still_opens(monkeypatch):
     async def go(env):
         env.guild.event_fail = http_error(403)
