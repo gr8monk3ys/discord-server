@@ -148,7 +148,7 @@
     var ends = when(seasonal.ends);
     var name = text(seasonal.name, 40);
     if (name && ends !== null && ends > now) {
-      out.seasonal = { name: name, emoji: text(seasonal.emoji, 16), ends: ends };
+      out.seasonal = { name: name, ends: ends };
     }
 
     list(raw.houses, 8).forEach(function (h) {

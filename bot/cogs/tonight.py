@@ -10,8 +10,9 @@ their presence is not read. No pings, no embed, no commands, no coins, nothing s
 members: the state is one `meta` value (tonight:state), so a restart carries on from it and
 checks it against who is in voice now.
 
-- A member message in general after the line means the next session may post a new one;
-  otherwise the previous line is edited (a history scan on startup covers downtime).
+- The previous line is reused (edited) only while it is still the newest message in general.
+  Anything posted after it, by a member or by another bot post, means the next session posts
+  a new line, so the line is always at the bottom (a history look on startup covers downtime).
 - Not within an hour of the chat revival (cogs/vibes.py), which reads tonight:fired_at and
   waits an hour the other way.
 - A message a moderator deleted is not posted again for that session.
@@ -35,7 +36,6 @@ from logic import tonight as L
 log = logging.getLogger(__name__)
 
 NO_PINGS = discord.AllowedMentions.none()
-HISTORY_SCAN = 50
 
 
 def now() -> int:
@@ -58,8 +58,9 @@ class Tonight(commands.Cog):
         self.bot = bot
         self.enabled = config.tonight_enabled(os.environ if environ is None else environ)
         self.state: L.State | None = None  # loaded from meta on first use
-        self.human_since: bool | None = None  # a member wrote in general after our line; None: not known yet
+        self.newest_id: int | None = None  # newest message seen in general; None: not known yet
         self.warned = False
+        self.write_failed = False  # the last post or edit was refused (said once, not every retry)
 
     async def cog_load(self) -> None:
         if self.enabled:
@@ -125,7 +126,9 @@ class Tonight(commands.Cog):
             if not self.public_room(guild, channel):
                 continue
             members = [(uid, guild.get_member(uid)) for uid in channel.voice_states]
-            people = [(uid, m) for uid, m in members if m is None or not m.bot]
+            # Only members the cache knows: someone it can't see might be a bot, and "2 people"
+            # must never be one person and a music bot.
+            people = [(uid, m) for uid, m in members if m is not None and not m.bot]
             if len(people) < L.MIN_PEOPLE:
                 continue
             games = ()
@@ -143,21 +146,21 @@ class Tonight(commands.Cog):
     @commands.Cog.listener()
     @quietly
     async def on_message(self, message) -> None:
-        if not self.enabled or message.author.bot or message.guild is None:
+        if not self.enabled or message.guild is None:
             return
         if message.guild.id == self.bot.settings.guild_id and self.is_general(message.channel):
-            self.human_since = True
+            self.newest_id = max(self.newest_id or 0, message.id)  # anyone's, our own line included
 
-    async def scan(self, channel, message_id: int) -> bool:
-        """Did a member write in general after our line? Unknown counts as no: the old line is
-        edited rather than a second bot line stacked under it."""
+    async def scan(self, channel, message_id: int) -> int:
+        """The id of a message posted in general after our line, or the line's own id when it
+        is still the newest. Unknown counts as still the newest: the old line is edited rather
+        than a second line stacked under it."""
         try:
-            async for m in channel.history(limit=HISTORY_SCAN, after=discord.Object(message_id)):
-                if not m.author.bot:
-                    return True
+            async for m in channel.history(limit=1, after=discord.Object(message_id)):
+                return max(message_id, m.id)
         except Exception as e:
             log.info("tonight: couldn't scan %s history (%s)", config.GENERAL_CHANNEL, type(e).__name__)
-        return False
+        return message_id
 
     async def quiet_until(self) -> int:
         raw = await self.meta(LAST_REVIVAL_KEY)
@@ -184,9 +187,10 @@ class Tonight(commands.Cog):
             return
         state, t = await self.load(), now()
         rooms = await self.rooms(guild)
-        if self.human_since is None and state.message_id is not None:
-            self.human_since = await self.scan(channel, state.message_id)
-        state, action = L.step(state, rooms, t, self.bot.settings.tz, human_since=bool(self.human_since),
+        if self.newest_id is None and state.message_id is not None:
+            self.newest_id = await self.scan(channel, state.message_id)
+        buried = state.message_id is not None and (self.newest_id or 0) > state.message_id
+        state, action = L.step(state, rooms, t, self.bot.settings.tz, buried=buried,
                                quiet_until=await self.quiet_until())
         await self.save(await self.perform(channel, state, action, t))
 
@@ -199,7 +203,7 @@ class Tonight(commands.Cog):
             if isinstance(action, L.Post):
                 message = await channel.send(action.text, allowed_mentions=NO_PINGS)
                 state = L.posted(state, message.id, action.text, t, self.bot.settings.tz)
-                self.human_since = False
+                self.newest_id = max(self.newest_id or 0, message.id)
             else:
                 await channel.get_partial_message(action.message_id).edit(content=action.text,
                                                                           allowed_mentions=NO_PINGS)
@@ -208,10 +212,13 @@ class Tonight(commands.Cog):
             if isinstance(e, discord.NotFound) and isinstance(action, L.Edit):
                 log.info("tonight: the line was deleted")
                 return L.gone(state, t)
-            # Retried after the edit gap, so one line per attempt and no traceback.
-            log.warning("tonight: couldn't %s the line (%s)", "post" if isinstance(action, L.Post) else "edit",
-                        type(e).__name__)
+            # Retried after the edit gap. Said once, not on every retry of a long session.
+            if not self.write_failed:
+                self.write_failed = True
+                log.warning("tonight: couldn't %s the line (%s); retrying quietly",
+                            "post" if isinstance(action, L.Post) else "edit", type(e).__name__)
             return L.failed(state, t)
+        self.write_failed = False
         if L.fired(before, state):
             await self.set_meta(L.FIRED_KEY, t)
             log.info("tonight: line %s", "posted" if isinstance(action, L.Post) else "reused")

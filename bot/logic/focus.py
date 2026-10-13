@@ -58,8 +58,12 @@ def opt_in_names() -> list[str]:
 
 
 def focused(default_ids, opt_in_ids) -> bool:
-    """True when the short default list is in force: none of the opt-in channels is a default."""
-    return not set(default_ids) & set(opt_in_ids)
+    """True when the short default list is in force: fewer than half of the opt-in channels
+    are defaults. Not "none": focus_mode.py may have had to add a reserve channel to the core,
+    and the owner may make one opt-in channel a default by hand; neither undoes the focus.
+    After --revert every opt-in channel is a default again, which is clearly not focused."""
+    opt_in = set(opt_in_ids)
+    return not opt_in or 2 * len(opt_in & set(default_ids)) < len(opt_in)
 
 
 def decide(live: bool | None, in_defaults: bool, marked: bool, is_focused: bool) -> str:

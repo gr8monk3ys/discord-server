@@ -645,6 +645,7 @@ footer { border-top: 1px solid color-mix(in srgb, var(--hairline) 60%, transpare
 
   /* Inked: each piece arrives once. Rows and chips follow one another, capped
      at the eighth so a long list never keeps the reader waiting. */
+  .inks .armed > * { --n: 0; } /* set on every child: the property inherits, and a list sits inside an armed section */
   .inks .armed > :nth-child(2) { --n: 1; }
   .inks .armed > :nth-child(3) { --n: 2; }
   .inks .armed > :nth-child(4) { --n: 3; }

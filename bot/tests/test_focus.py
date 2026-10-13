@@ -51,10 +51,14 @@ def test_decide(live, in_defaults, marked, is_focused, want):
     assert F.decide(live, in_defaults, marked, is_focused) == want
 
 
-def test_focused_means_no_opt_in_channel_is_a_default():
+def test_focused_means_most_opt_in_channels_are_not_defaults():
     assert F.focused({1, 2, 3}, {7, 8}) is True
-    assert F.focused({1, 2, 7}, {7, 8}) is False
+    assert F.focused({1, 2, 7}, {7, 8}) is False  # half of them are defaults: not the short list
     assert F.focused({1, 2}, set()) is True
+    # one reserve channel in the core (focus_mode.py's fallback) or one the owner promoted
+    # by hand does not switch the module off
+    assert F.focused({1, 2, 7}, {7, 8, 9, 10}) is True
+    assert F.focused({1, 7, 8, 9, 10}, {7, 8, 9, 10}) is False  # after --revert
 
 
 def test_hold_only_delays_changes():
