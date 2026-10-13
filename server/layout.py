@@ -370,13 +370,10 @@ FOCUS_GROUPS = [
      "description": "The five-seat squad room and the AFK room.",
      "channels": ["🎮 Squad", "💤 AFK"]},
 ]
-# Event-driven: opt-in most of the time, and a default channel for newcomers while the thing
-# is live. Front Desk (bot/cogs/focus.py) adds the channel to the defaults when it starts and
-# takes it out again afterwards. These are the only channels that module may touch.
-FOCUS_EVENT_CHANNELS = {
-    "🏆・tournaments": "a tournament is open or running",
-    "⛏️・realms": "the Minecraft server is online",
-}
+# Event-driven channels (a default only while something is live): none. The bot module that
+# moved the tournaments and realms channels in and out of the defaults was removed, because a
+# default channel only reaches someone who joins during the event. Both are plain opt-in.
+FOCUS_EVENT_CHANNELS: dict[str, str] = {}
 # Public, but never a default and never an answer. Discord may refuse a Stage as a default
 # channel, and one refused channel fails the whole Onboarding edit; a Stage shows itself to
 # everyone while an event is live anyway.

@@ -29,7 +29,7 @@ class Sim:
         self.t = ts(19) if t is None else t
         self.s = state or State()
         self.rooms: list[Room] = []
-        self.human_since = False
+        self.buried = False
         self.quiet_until = 0
         self.messages: dict[int, str] = {}
         self.log: list[tuple[str, int, int]] = []  # (kind, message id, time)
@@ -44,7 +44,7 @@ class Sim:
         return self.tick() if tick else None
 
     def tick(self):
-        self.s, action = L.step(self.s, self.rooms, self.t, TZ, human_since=self.human_since,
+        self.s, action = L.step(self.s, self.rooms, self.t, TZ, buried=self.buried,
                                 quiet_until=self.quiet_until)
         if action is None:
             return None
@@ -55,7 +55,7 @@ class Sim:
             self.messages[self.next_id] = action.text
             self.log.append(("post", self.next_id, self.t))
             self.s = L.posted(self.s, self.next_id, action.text, self.t, TZ)
-            self.human_since = False
+            self.buried = False
         elif action.message_id not in self.messages:
             self.s = L.gone(self.s, self.t)
         else:
@@ -263,7 +263,7 @@ def test_back_within_45_minutes_reuses_the_message():
     sim.people(0)
     sim.run(40)  # ended 40 minutes ago
     first = sim.s.message_id
-    sim.human_since = True  # even with chat in between, it is still the same session
+    sim.buried = True  # even with chat in between, it is still the same session
     sim.people(2)
     actions = sim.run(4)
     assert actions == [Edit(first, f"2 people are in <#{LOBBY}> right now. Click the channel to join.")]
@@ -281,7 +281,7 @@ def test_back_after_45_minutes_is_a_new_session():
     sim.people(0)
     sim.run(50)
     first = sim.s.message_id
-    sim.human_since = True
+    sim.buried = True
     sim.people(2)
     sim.run(4)
     assert len(sim.posts()) == 2 and sim.s.message_id != first
@@ -310,7 +310,7 @@ def test_member_message_since_the_last_line_allows_a_new_one():
     live(sim, 3)
     sim.people(0)
     sim.run(120)
-    sim.human_since = True
+    sim.buried = True
     sim.people(2)
     assert [type(a) for a in sim.run(4)] == [Post]
 
@@ -330,7 +330,7 @@ def test_a_new_session_waits_out_the_chat_revival_hour():
 def test_never_more_than_three_new_messages_a_day():
     sim = Sim(t=ts(9))
     for _ in range(5):
-        sim.human_since = True
+        sim.buried = True
         sim.people(2)
         sim.run(10)
         sim.people(0)
@@ -339,7 +339,7 @@ def test_never_more_than_three_new_messages_a_day():
     assert all(text.startswith("That voice session ran") for text in sim.messages.values())
     assert datetime.fromtimestamp(sim.t, TZ).day == 7
     sim.t = ts(9, d=8)  # the next local day
-    sim.human_since = True
+    sim.buried = True
     sim.people(2)
     sim.run(10)
     assert len(sim.posts()) == 4 and L.posts_today(sim.s, sim.t, TZ) == 1
@@ -348,7 +348,7 @@ def test_never_more_than_three_new_messages_a_day():
 def test_capped_session_with_quiet_chat_still_reuses_the_last_line():
     sim = Sim(t=ts(9))
     for _ in range(3):
-        sim.human_since = True
+        sim.buried = True
         sim.people(2)
         sim.run(10)
         sim.people(0)
@@ -370,7 +370,7 @@ def test_deleted_message_is_not_recreated_for_that_session():
     sim.run(30)
     sim.people(0)
     sim.run(20)
-    sim.human_since = True
+    sim.buried = True
     sim.people(2)  # back within 45 minutes: still that session
     assert sim.run(20) == [] and len(sim.posts()) == 1
     sim.people(0)
@@ -447,7 +447,7 @@ def test_restart_after_a_long_outage_starts_a_new_session():
     live(sim, 3, minutes=30)
     first = sim.s.message_id
     sim.s = L.load(L.dump(sim.s))
-    sim.human_since = True
+    sim.buried = True
     sim.people(2, tick=False)
     sim.t += 3 * 3600
     assert sim.tick() == Edit(first, "That voice session ran 30 min with up to 3 people.")

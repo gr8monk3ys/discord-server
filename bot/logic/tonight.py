@@ -208,24 +208,25 @@ def _end_stretch(s: State, at: int) -> State:
                    want=ended_text(active, s.peak))
 
 
-def _action(s: State, now: int, tz: tzinfo, human_since: bool, quiet_until: int) -> Post | Edit | None:
+def _action(s: State, now: int, tz: tzinfo, buried: bool, quiet_until: int) -> Post | Edit | None:
     if s.gone or not s.want or now - s.tried_at < EDIT_GAP:
         return None
     if s.own:  # this session's line: keep it current
         return Edit(s.message_id, s.want) if s.message_id is not None and s.want != s.text else None
     if not s.live or now < quiet_until:
         return None
-    if s.message_id is not None and not human_since:
-        return Edit(s.message_id, s.want)  # nobody wrote since the last line: reuse it, never stack
+    if s.message_id is not None and not buried:
+        return Edit(s.message_id, s.want)  # still the newest message in general: reuse it, never stack
     return Post(s.want) if posts_today(s, now, tz) < MAX_PER_DAY else None
 
 
-def step(state: State, rooms: Iterable[Room], now: int, tz: tzinfo, *, human_since: bool = False,
+def step(state: State, rooms: Iterable[Room], now: int, tz: tzinfo, *, buried: bool = False,
          quiet_until: int = 0) -> tuple[State, Post | Edit | None]:
     """One tick: the new state and at most one thing to do in general.
 
-    `rooms`: the public voice channels as they are now. `human_since`: a member wrote in general
-    after the message in `state.message_id`. `quiet_until`: a new session's line waits for this
+    `rooms`: the public voice channels as they are now. `buried`: something was posted in general
+    after the message in `state.message_id` (by anyone, another bot post included), so editing
+    it would put the line where nobody looks. `quiet_until`: a new session's line waits for this
     time (the chat revival's last post plus REVIVAL_GAP). Report the result of the action with
     posted(), edited(), failed() or gone()."""
     rooms = open_rooms(rooms)
@@ -260,7 +261,7 @@ def step(state: State, rooms: Iterable[Room], now: int, tz: tzinfo, *, human_sin
             below = now if s.below_since is None else s.below_since
             s = _end_stretch(s, below) if now - below >= HOLD else replace(s, below_since=below)
     s = replace(s, seen_at=now if s.live or s.pending_since is not None else 0)
-    return s, _action(s, now, tz, human_since, quiet_until)
+    return s, _action(s, now, tz, buried, quiet_until)
 
 
 def stop(state: State, now: int) -> tuple[State, Edit | None]:

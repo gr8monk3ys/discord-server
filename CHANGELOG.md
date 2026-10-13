@@ -50,9 +50,6 @@ All notable changes to this project are recorded here. The format follows
 - `server/focus_mode.py` (`--plan`, dry run by default, `--apply`, `--revert`): cuts the
   Onboarding default channels to a core of nine and puts the other public channels behind one
   optional question, "What else do you want to see?". No permission changes, nothing deleted.
-- `focus` module: adds the tournaments channel to the Onboarding defaults while a tournament
-  is open or running and the realms channel while the Minecraft server is online, and removes
-  them again afterwards.
 - `tonight` module: one line in general while two or more people are in a public voice
   channel (counts, the shared game and a channel mention, never names), edited in place and
   kept as a record afterwards. `TONIGHT=off` turns it off.
@@ -75,7 +72,7 @@ All notable changes to this project are recorded here. The format follows
   `/api/appeal`) and `https://raw.githubusercontent.com` (the live data).
 - The site sets one short-lived cookie during Linked Roles sign-in (`__Host-fd_linked_role`,
   HttpOnly, 10 minutes, deleted when the member comes back). It had no cookies before.
-- The schema is at version 23 (eight new migrations) and the bot loads 48 modules.
+- The schema is at version 23 (eight new migrations) and the bot loads 47 modules.
 - The games list is now Risk of Rain 2, Gears of War, Overwatch, Marvel Rivals, Minecraft,
   Tabletop Simulator, Wardogs and Apex Legends. Fortnite, Valorant, Call of Duty, League of
   Legends, Counter-Strike 2, GTA Online and Roblox are retired: their roles stay (members keep

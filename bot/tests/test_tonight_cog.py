@@ -159,9 +159,8 @@ class Env:
 
     def say(self, uid=42, bot=False, channel=None):
         channel = channel or self.guild.general
-        if channel is self.guild.general:
-            channel.add("hello", bot=bot)
-        return SimpleNamespace(author=SimpleNamespace(id=uid, bot=bot), guild=self.guild, channel=channel)
+        mid = channel.add("hello", bot=bot).id if channel is self.guild.general else 999_999
+        return SimpleNamespace(id=mid, author=SimpleNamespace(id=uid, bot=bot), guild=self.guild, channel=channel)
 
     def restart(self, **kw):
         self.cog = Tonight(self.bot, environ=kw.pop("environ", {}))
@@ -372,18 +371,44 @@ def test_a_post_that_fails_is_retried_later_not_every_minute(monkeypatch):
 
 
 # ---------------------------------------------------------------- stacking
-def test_second_session_edits_the_old_line_when_nobody_wrote_since(monkeypatch):
+def test_second_session_edits_the_old_line_while_it_is_still_the_newest_message(monkeypatch):
     async def body(env):
         ch = env.guild.general
         await session(env)
         env.leave()
         await env.minutes(120)
         fired = await env.meta(L.FIRED_KEY)
-        ch.add("question of the day", bot=True)  # other bot posts are not a member writing
-        await env.cog.on_message(env.say(bot=True))
         await session(env, people=(1, 2))
         assert len(ch.sent) == 1 and env.lines[0].content.startswith("2 people are in")
         assert int(await env.meta(L.FIRED_KEY)) > int(fired)  # reusing the line counts as it appearing
+    with_env(body, monkeypatch)
+
+
+def test_another_bot_post_under_the_line_means_a_new_line_not_a_buried_edit(monkeypatch):
+    """The chat revival, a welcome or an anniversary posted under yesterday's line: editing that
+    line would say "right now" where nobody looks, so the new session posts at the bottom."""
+    async def body(env):
+        ch = env.guild.general
+        await session(env)
+        env.leave()
+        await env.minutes(120)
+        await env.cog.on_message(env.say(bot=True))  # question of the day, from a bot
+        await session(env, people=(1, 2))
+        assert len(ch.sent) == 2 and ch.sent[1]["content"].startswith("2 people are in")
+        assert env.lines[0].content.startswith("That voice session ran")
+    with_env(body, monkeypatch)
+
+
+def test_a_bot_post_made_while_down_is_found_in_history(monkeypatch):
+    async def body(env):
+        ch = env.guild.general
+        await session(env)
+        env.leave()
+        await env.minutes(120)
+        env.say(bot=True)  # posted while the bot was down: no event, only history
+        env.restart()
+        await session(env, people=(1, 2))
+        assert len(ch.sent) == 2
     with_env(body, monkeypatch)
 
 
@@ -525,7 +550,7 @@ def test_off_switch_posts_nothing(monkeypatch):
         await session(env)
         await env.cog.on_message(env.say())
         assert env.guild.general.sent == [] and await env.meta(L.STATE_KEY) is None
-        assert env.cog.human_since is None
+        assert env.cog.newest_id is None
     with_env(body, monkeypatch, environ={"TONIGHT": "off"})
 
 
