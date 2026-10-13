@@ -345,7 +345,8 @@ def test_requirements_tables_cover_config():
                  *(g.channel_name for g in config.GAMES)):
         assert {"send_messages", "embed_links"} <= by_channel[name], name
     assert "attach_files" in by_channel[config.WELCOME_CHANNEL]  # welcome cards are images
-    assert "manage_messages" in by_channel[config.GENERAL_CHANNEL]  # the Spotlight pin
+    assert "pin_messages" in by_channel[config.GENERAL_CHANNEL]  # the Spotlight pin
+    assert "manage_messages" not in by_channel[config.GENERAL_CHANNEL]  # it no longer pins (Discord, 2026-02-23)
     assert "create_public_threads" in by_channel[config.GENERAL_CHANNEL]  # QOTD thread
     assert "create_private_threads" in by_channel[config.HELP_CHANNEL]  # tickets
     assert "manage_threads" in by_channel[config.LFG_FORUM]
@@ -375,7 +376,7 @@ def test_requirements_tables_cover_config():
     assert {"send_messages", "embed_links"} <= announce["events"] and {"send_messages", "embed_links"} <= announce[
         "seasonal"]
     assert (config.EVENT_ROLE, "seasonal") in ops.ROLE_NEEDS and "seasonal" in ops.ROLE_HOLDERS
-    assert "manage_messages" in by_channel[config.REALMS_CHANNEL]  # the status panel is pinned
+    assert "pin_messages" in by_channel[config.REALMS_CHANNEL]  # the status panel is pinned
     assert ops.role_problems({}, 5, loaded={"seasonal"}) == [
         Problem(ops.ROLES, f"{config.EVENT_ROLE}: role not found (seasonal)")]
 

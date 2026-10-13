@@ -340,7 +340,9 @@ CHANNEL_NEEDS: list[Need] = [
     Need("events", config.LOBBY_VOICE, VIEW + ("connect",), "voice"),
     Need("events", config.ANNOUNCEMENTS_CHANNEL, POST),  # the Town Hall announcement and its reminder
     *_game_channels("events"),
-    Need("shop", config.GENERAL_CHANNEL, POST + ("manage_messages",)),  # the Spotlight pin
+    # The Spotlight pin (and unpin). Discord split Pin Messages from Manage Messages (2025-08-20);
+    # since 2026-02-23 Manage Messages alone no longer pins. The bot only deletes its own post here.
+    Need("shop", config.GENERAL_CHANNEL, POST + ("pin_messages",)),
     Need("shop", config.ANNOUNCEMENTS_CHANNEL, POST),  # season results
     # QOTD answers thread, daily poll
     Need("engagement", config.GENERAL_CHANNEL, POST + ("create_public_threads", "send_polls")),
@@ -399,8 +401,8 @@ CHANNEL_NEEDS: list[Need] = [
          "stage"),
     Need("clipcast", config.CLIPS_CHANNEL, POST + ("read_message_history",)),  # consent fallback, "as seen on"
     Need("clipcast", config.MOD_LOG_CHANNEL, POST),  # picks, upload notes, takedown alerts
-    # status panel (edited in place, pinned: Manage Messages) and the chat relay; reactions say "not relayed"
-    Need("realms", config.REALMS_CHANNEL, POST + ("read_message_history", "add_reactions", "manage_messages")),
+    # status panel (edited in place, pinned: Pin Messages) and the chat relay; reactions say "not relayed"
+    Need("realms", config.REALMS_CHANNEL, POST + ("read_message_history", "add_reactions", "pin_messages")),
     Need("realms", config.MOD_LOG_CHANNEL, POST),  # whitelist changes
     # appeals: delete the raw webhook message, read missed ones after downtime, open a discussion thread
     Need("appeals", config.APPEALS_CHANNEL, POST + ("manage_messages", "read_message_history",

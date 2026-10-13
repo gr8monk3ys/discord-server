@@ -401,7 +401,7 @@ class Shop(commands.Cog):
         except discord.HTTPException:
             log.exception("spotlight pin failed for %s", member.id)
             await self.quietly(sent.delete())
-            return ("Couldn't pin your spotlight (Front Desk needs Manage Messages, or general has too many pins). "
+            return ("Couldn't pin your spotlight (Front Desk needs Pin Messages, or general has too many pins). "
                     "You weren't charged.")
         slot = S.Spotlight(member.id, channel.id, sent.id, t + S.SPOTLIGHT_PIN)
         result = await self.charge(member.id, item, t + item.duration, None, ref, spotlight=slot)

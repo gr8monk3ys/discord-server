@@ -265,9 +265,11 @@ All times are Pacific. Every scheduled job catches up once after downtime and ne
 
 Required in the Developer Portal: the **Server Members**, **Message Content** and **Presence**
 intents. Required on the Front Desk role: the permissions printed by `main.py --invite`
-(includes Manage Roles/Channels/Server/Events, Create Events, Timeout Members, Manage Messages, Move Members,
-Mute Members, Ban Members; Create Events is separate from Manage Events, and without it game nights and
-tournament events fail with 403. Mute Members is for Stage events, Ban Members for `/ban` and ban appeals).
+(includes Manage Roles/Channels/Server/Events, Create Events, Timeout Members, Manage Messages, Pin Messages,
+Move Members, Mute Members, Ban Members; Create Events is separate from Manage Events, and without it game
+nights and tournament events fail with 403. Pin Messages is separate from Manage Messages in the same way:
+without it the Spotlight and the Realms panel cannot be pinned. Mute Members is for Stage events, Ban Members
+for `/ban` and ban appeals).
 
 ### Adding a module
 

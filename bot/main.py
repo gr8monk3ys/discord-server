@@ -100,6 +100,7 @@ PERMISSIONS = discord.Permissions(
     # Moderation autopilot: timeouts and spam cleanup.
     moderate_members=True,
     manage_messages=True,
+    pin_messages=True,  # split from Manage Messages: the Spotlight and the Realms panel are pinned
     # Stage events (watch parties, Town Hall): Discord asks for Manage Channels, Move Members
     # and Mute Members in the stage channel. The first two are above.
     mute_members=True,
