@@ -45,8 +45,8 @@ from discord.ext import commands, tasks
 import config
 import economy
 import style
+from cogkit import is_staff
 from logic import coins as coin_rules
-from logic import community as community_rules
 from logic import quests
 from logic import realms as R
 
@@ -243,13 +243,6 @@ def read_log(path: str, state: R.TailState) -> tuple[R.TailState, bytes, bool] |
     except OSError:
         return None
     return R.TailState(info.st_ino, start + len(data)), data, reset
-
-
-def is_staff(user) -> bool:
-    guild = getattr(user, "guild", None)
-    if guild is None:
-        return False
-    return community_rules.can_handle(guild.owner_id == user.id, user.guild_permissions.administrator, user.roles)
 
 
 def parse_ref(raw: str | None) -> tuple[int, int] | None:

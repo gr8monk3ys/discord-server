@@ -21,8 +21,8 @@ from discord.ext import commands
 
 import config
 import style
+from cogkit import is_staff
 from errors import reply_error
-from logic import community as community_rules
 from logic import staffapps as S
 
 log = logging.getLogger(__name__)
@@ -52,15 +52,6 @@ def role_names(user) -> list[str]:
 def is_owner(user) -> bool:
     guild = getattr(user, "guild", None)
     return guild is not None and guild.owner_id == user.id
-
-
-def is_staff(user) -> bool:
-    guild = getattr(user, "guild", None)
-    if guild is None:
-        return False
-    perms = getattr(user, "guild_permissions", None)
-    return community_rules.can_handle(guild.owner_id == user.id, bool(getattr(perms, "administrator", False)),
-                                      getattr(user, "roles", None) or [])
 
 
 def timed_out(member) -> bool:

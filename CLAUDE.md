@@ -28,7 +28,8 @@ anything from `bot/data/` (the SQLite DB, logs and lock file live there and are 
 - `bot/logic/<name>.py` pure rules (no Discord I/O), `bot/cogs/<name>.py` Discord I/O
 - `bot/db.py` SQLite via aiosqlite with append-only `MIGRATIONS`; `bot/economy.py` the only code
   that moves coins (ledger row + wallet update in one transaction)
-- `bot/config.py` channel/role names and settings; `bot/style.py` embed colours
+- `bot/config.py` channel/role names and settings; `bot/style.py` embed colours;
+  `bot/cogkit.py` helpers the cogs share (`is_staff`: import it, don't write another)
 - `assets/` generated server icon, emoji and sounds plus the scripts that generate them
 - `theme/field-notebook.theme.css` Vencord/BetterDiscord theme
 

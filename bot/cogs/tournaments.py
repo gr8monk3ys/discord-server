@@ -39,6 +39,7 @@ from discord.ext import commands, tasks
 import config
 import economy
 import style
+from cogkit import is_staff
 from errors import reply_error
 from logic.selfroles import has_dangerous_permissions
 from logic import engagement as EG
@@ -81,18 +82,6 @@ def ping_only(users=()) -> discord.AllowedMentions:
 
 def esc(text) -> str:
     return discord.utils.escape_markdown(str(text or ""))
-
-
-def is_staff(member) -> bool:
-    """Owner, administrators, Keepers and Moderators."""
-    guild = getattr(member, "guild", None)
-    if guild is not None and getattr(guild, "owner_id", None) == member.id:
-        return True
-    perms = getattr(member, "guild_permissions", None)
-    if perms is not None and getattr(perms, "administrator", False):
-        return True
-    roles = list(getattr(member, "roles", []))
-    return any(config.match_by_name(roles, n) is not None for n in (config.KEEPER_ROLE, config.MOD_ROLE))
 
 
 # meta keys for the Discord side (the migration has no columns for these)

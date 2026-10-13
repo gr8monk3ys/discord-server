@@ -27,7 +27,7 @@ from discord.ext import commands, tasks
 
 import config
 import style
-from logic import community as community_rules
+from cogkit import is_staff
 from logic import creators as C
 
 log = logging.getLogger(__name__)
@@ -106,13 +106,6 @@ class Unreachable(Exception):
 
 class NotFound(Exception):
     pass
-
-
-def is_staff(user) -> bool:
-    guild = getattr(user, "guild", None)
-    if guild is None:
-        return False
-    return community_rules.can_handle(guild.owner_id == user.id, user.guild_permissions.administrator, user.roles)
 
 
 def esc(text: str) -> str:

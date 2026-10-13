@@ -222,6 +222,7 @@ class Env:
         user = FakeUser(uid)
         # Staff are exempt from the /gamenight spam limits; most tests aren't about those.
         user.roles = [SimpleNamespace(name=config.KEEPER_ROLE)] if staff else []
+        user.guild = self.guild  # whoever runs a slash command in the server is a Member
         self.guild.members[uid] = user
         return FakeInteraction(user, self.guild)
 
@@ -742,6 +743,24 @@ def test_members_get_one_upcoming_gamenight_and_an_hourly_cooldown(monkeypatch):
         await env.gamenight(game="minecraft", uid=USER_A + 1, staff=True)
         await env.gamenight(game="wardogs", uid=USER_A + 1, staff=True)
         assert len(await env.rows("SELECT * FROM gamenights WHERE host_id = ?", (USER_A + 1,))) == 2
+    with_env(go, monkeypatch)
+
+
+@pytest.mark.parametrize("role_name", ["🛡️ moderator", "KEEPER", "🔑・Keeper"])
+def test_a_staff_role_with_other_case_or_an_emoji_still_counts_as_staff(monkeypatch, role_name):
+    """Staff roles are matched by slug here as in every other cog (cogkit.is_staff), so
+    restyling the role's name does not put the limits back on staff."""
+    async def go(env):
+        for game in ("minecraft", "wardogs"):
+            i = env.inter(USER_A, staff=False)
+            i.user.roles = [SimpleNamespace(name=role_name)]
+            assert cogmod.is_staff(i.user)
+            await env.cog.gamenight.callback(env.cog, i, choice(game), "9pm", None, None)
+        assert len(await env.rows("SELECT * FROM gamenights WHERE host_id = ?", (USER_A,))) == 2
+        # a role that only looks similar is not staff
+        other = env.inter(USER_A + 1, staff=False)
+        other.user.roles = [SimpleNamespace(name="Keeper of Memes")]
+        assert not cogmod.is_staff(other.user)
     with_env(go, monkeypatch)
 
 

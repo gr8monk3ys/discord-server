@@ -38,8 +38,8 @@ from discord import app_commands
 from discord.ext import commands
 
 import config
+from cogkit import is_staff
 from logic import catchup as C
-from logic import community as community_rules
 from logic import quests
 
 log = logging.getLogger(__name__)
@@ -80,13 +80,6 @@ def esc(text: str) -> str:
     """Model or member text made inert: no markdown, no masked links, no mentions."""
     text = discord.utils.escape_markdown(text or "").replace("[", "\\[").replace("]", "\\]")
     return discord.utils.escape_mentions(text)
-
-
-def is_staff(user) -> bool:
-    guild = getattr(user, "guild", None)
-    if guild is None:
-        return False
-    return community_rules.can_handle(guild.owner_id == user.id, user.guild_permissions.administrator, user.roles)
 
 
 # ---------------------------------------------------------------- network seam

@@ -86,6 +86,11 @@ Rules that make this hold together:
 - Small cross-restart state (message ids of panels, "first run" markers, last-run stamps)
   lives in the `meta` key/value table, namespaced per cog (`selfroles:panel`, `ops:perms`,
   `tourney:<id>:auto`, ...). It has no schema of its own, so grep the cog for its keys.
+- "Is this member staff?" is one function, `cogkit.is_staff` (`bot/cogkit.py`: owner,
+  administrators, Keeper and Moderator matched by slug), imported by name into each cog that
+  asks. Different on purpose: `cogs/helpdesk.py` goes by permission (Moderate Members or
+  Administrator) to decide which commands `/help` lists, and `Games.is_staff`,
+  `Moderation.is_staff` and `Ops.is_staff` are methods of their cogs with the same rule.
 - A few cogs reuse another cog's helpers directly: `cogs.lfg.ping_only`, `cogs.stats`
   (voice presence, used by economy and tempvoice), `cogs.clips` (clip detection, used by
   economy), `cogs.growth.BUMP_DUE_KEY` (votehub), `cogs.tempvoice` (matchmaking registers its

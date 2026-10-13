@@ -42,13 +42,13 @@ from discord.ext import commands, tasks
 import config
 import economy
 import style
+from cogkit import is_staff
 from cogs.clips import thread_key
 from cogs.lfg import ping_only
 from errors import reply_error
 from logic import achievements as A
 from logic import clipcast as L
 from logic import clips as clip_rules
-from logic import community as community_rules
 from logic import quests as Q
 from logic.schedule import plan
 
@@ -78,15 +78,6 @@ def now() -> int:
 
 def esc(text: str) -> str:
     return discord.utils.escape_mentions(discord.utils.escape_markdown(text or ""))
-
-
-def is_staff(user) -> bool:
-    guild = getattr(user, "guild", None)
-    if guild is None:
-        return False
-    perms = getattr(user, "guild_permissions", None)
-    return community_rules.can_handle(guild.owner_id == user.id, bool(getattr(perms, "administrator", False)),
-                                      getattr(user, "roles", None) or [])
 
 
 # ---------------------------------------------------------------- network seam

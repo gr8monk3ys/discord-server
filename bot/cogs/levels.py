@@ -26,8 +26,8 @@ from discord.ext import commands, tasks
 
 import config
 import style
+from cogkit import is_staff
 from cogs.lfg import ping_only
-from logic import community as community_rules
 from logic import levels as L
 from logic import stats as S
 from logic.selfroles import has_dangerous_permissions
@@ -56,15 +56,6 @@ def never_raise(fn):
         except Exception:
             log.exception("levels: %s failed", fn.__name__)
     return wrapper
-
-
-def is_staff(user) -> bool:
-    guild = getattr(user, "guild", None)
-    if guild is None:
-        return False
-    perms = getattr(user, "guild_permissions", None)
-    return community_rules.can_handle(guild.owner_id == user.id, bool(getattr(perms, "administrator", False)),
-                                      getattr(user, "roles", []))
 
 
 def esc(text) -> str:
