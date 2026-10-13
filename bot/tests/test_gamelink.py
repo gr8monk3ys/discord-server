@@ -36,7 +36,7 @@ def profile_xml(steam_id=SID, persona="Cool *Kid*", privacy="public", summary="h
 
 NOT_FOUND = (b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><response><error>'
              b"<![CDATA[The specified profile could not be found.]]></error></response>")
-GAMES = (("Counter-Strike 2", 730, "10.4", "1,234"), ("WARDOGS", 1867240, "3.4", "54"),
+GAMES = (("Risk of Rain 2", 730, "10.4", "1,234"), ("WARDOGS", 1867240, "3.4", "54"),
          ("Escape Simulator 2", 2879840, "0.5", "22"))
 
 
@@ -121,7 +121,7 @@ def test_parse_public_profile():
     assert p.steam_id == SID and p.persona == "Cool *Kid*" and p.privacy == "public" and p.public
     assert p.summary == "Hi all code FD-7K2Q9X & link"
     assert G.code_in("FD-7K2Q9X", [p.summary])
-    assert p.games == (G.Played("Counter-Strike 2", 730, 1234.0, 10.4), G.Played("WARDOGS", 1867240, 54.0, 3.4),
+    assert p.games == (G.Played("Risk of Rain 2", 730, 1234.0, 10.4), G.Played("WARDOGS", 1867240, 54.0, 3.4),
                        G.Played("Escape Simulator 2", 2879840, 22.0, 0.5))
 
 
@@ -180,27 +180,29 @@ def test_match_game_maps_steam_names_to_server_games():
     def role(name):
         return getattr(G.match_game(name), "role", None)
 
-    assert role("Counter-Strike 2") == "Counter-Strike 2"
+    assert role("Risk of Rain 2") == "Risk of Rain 2"
     assert role("Apex Legends") == "Apex Legends"
     assert role("Apex Legends™") == "Apex Legends"
     assert role("WARDOGS") == "Wardogs"
-    assert role("Call of Duty®") == "Call of Duty"
-    assert role("Call of Duty®: Black Ops III") == "Call of Duty"
-    assert role("Grand Theft Auto V Legacy") == "GTA Online"
-    assert role("Grand Theft Auto V Enhanced") == "GTA Online"
-    for other in ("Counter-Strike", "Counter-Strike: Source", "Minecraft Dungeons", "Grand Theft Auto IV", "Apex",
+    assert role("Gears of War: E-Day") == "Gears of War"
+    assert role("Gears of War: Reloaded") == "Gears of War"
+    assert role("Overwatch® 2") == "Overwatch"
+    assert role("Marvel Rivals") == "Marvel Rivals" and role("Tabletop Simulator") == "Tabletop Simulator"
+    # Retired games match nothing, under their own name or another one.
+    for other in ("Counter-Strike 2", "Call of Duty®", "Grand Theft Auto V Legacy", "VALORANT",
+                  "Risk of Rain", "Risk of Rain Returns", "Minecraft Dungeons", "Grand Theft Auto IV", "Apex",
                   "Escape Simulator 2", "", "™"):
         assert role(other) is None, other
-    for target in G.PREFIXES.values():
-        assert any(g.role == target for g in config.GAMES)
+    known = {g.role for g in (*config.GAMES, *config.RETIRED_GAMES)}
+    assert set(G.PREFIXES.values()) <= known
 
 
 def test_server_hours_sums_apps_of_one_game():
-    games = (G.Played("Grand Theft Auto V Legacy", 271590, 100.0, 1.0),
-             G.Played("Grand Theft Auto V Enhanced", 3240220, 20.5, 2.0),
-             G.Played("Counter-Strike 2", 730, 1234.0, 3.0), G.Played("Apex Legends", 1172470, 0.0, 0.0),
+    games = (G.Played("Gears of War: E-Day", 271590, 100.0, 1.0),
+             G.Played("Gears of War: Reloaded", 3240220, 20.5, 2.0),
+             G.Played("Risk of Rain 2", 730, 1234.0, 3.0), G.Played("Apex Legends", 1172470, 0.0, 0.0),
              G.Played("Other", 5, 9.0, 9.0))
-    assert G.server_hours(games) == {"gtaonline": 120.5, "counterstrike2": 1234.0}
+    assert G.server_hours(games) == {"gearsofwar": 120.5, "riskofrain2": 1234.0}
 
 
 # ---------------------------------------------------------------- stored data
@@ -209,19 +211,19 @@ def test_fresh_data_round_trips_and_keeps_known_hours():
     raw = G.fresh_data(first)
     data = G.load_data(raw)
     assert data["persona"] == "Cool *Kid*" and data["privacy"] == "public"
-    assert data["hours"] == {"counterstrike2": 1234.0, "wardogs": 54.0}
-    assert [g["name"] for g in data["recent"]] == ["Counter-Strike 2", "WARDOGS", "Escape Simulator 2"]
-    assert data["recent"][0] == {"name": "Counter-Strike 2", "appid": 730, "hours": 1234.0, "recent": 10.4}
+    assert data["hours"] == {"riskofrain2": 1234.0, "wardogs": 54.0}
+    assert [g["name"] for g in data["recent"]] == ["Risk of Rain 2", "WARDOGS", "Escape Simulator 2"]
+    assert data["recent"][0] == {"name": "Risk of Rain 2", "appid": 730, "hours": 1234.0, "recent": 10.4}
     assert data["fails"] == 0 and data["tried_at"] == 0
     # two weeks later only Apex is listed: the old hours stay, CS2 is not lost
     later = G.parse_profile(profile_xml(persona="New Name", games=(("Apex Legends", 1172470, "5", "60"),)))
     data = G.load_data(G.fresh_data(later, raw))
     assert data["persona"] == "New Name"
-    assert data["hours"] == {"counterstrike2": 1234.0, "wardogs": 54.0, "apexlegends": 60.0}
+    assert data["hours"] == {"riskofrain2": 1234.0, "wardogs": 54.0, "apexlegends": 60.0}
     assert [g["name"] for g in data["recent"]] == ["Apex Legends"]
     # a newer number replaces the old one; without `old` nothing carries over
-    newer = G.parse_profile(profile_xml(games=(("Counter-Strike 2", 730, "1", "1,300"),)))
-    assert G.load_data(G.fresh_data(newer, raw))["hours"]["counterstrike2"] == 1300.0
+    newer = G.parse_profile(profile_xml(games=(("Risk of Rain 2", 730, "1", "1,300"),)))
+    assert G.load_data(G.fresh_data(newer, raw))["hours"]["riskofrain2"] == 1300.0
     assert G.load_data(G.fresh_data(later))["hours"] == {"apexlegends": 60.0}
 
 
@@ -232,11 +234,11 @@ def test_load_data_survives_junk():
         assert G.load_data(raw) == empty
     raw = json.dumps({"persona": 5, "privacy": "evil", "recent": ["x", {"name": ""}, {"name": "ok", "appid": "7",
                       "hours": "lots", "recent": -1}, {"name": "b", "appid": True, "hours": 2, "recent": 1e99}],
-                      "hours": {"counterstrike2": 5, "notagame": 9, "wardogs": "x", "apexlegends": True},
+                      "hours": {"riskofrain2": 5, "notagame": 9, "wardogs": "x", "apexlegends": True},
                       "fails": "3", "tried_at": -5})
     assert G.load_data(raw) == {**empty, "recent": [{"name": "ok", "appid": None, "hours": 0.0, "recent": 0.0},
                                                     {"name": "b", "appid": None, "hours": 2.0, "recent": 0.0}],
-                                "hours": {"counterstrike2": 5.0}}
+                                "hours": {"riskofrain2": 5.0}}
 
 
 def test_refresh_is_daily_and_stops_after_three_failures():
@@ -290,11 +292,11 @@ def test_fmt_hours():
 def test_account_lines():
     raw = G.fresh_data(G.parse_profile(profile_xml(games=GAMES)))
     lines = G.account_lines("steam", SID, raw)
-    cs2, wd = config.game_by_key("counterstrike2"), config.game_by_key("wardogs")
+    cs2, wd = config.game_by_key("riskofrain2"), config.game_by_key("wardogs")
     assert lines == [
         f"**Steam** · Cool \\*Kid\\* · <https://steamcommunity.com/profiles/{SID}>",
-        f"Here: {wd.emoji} Wardogs 54 h · {cs2.emoji} Counter-Strike 2 1,234 h",
-        "Lately: Counter\\-Strike 2 10 h · WARDOGS 3.4 h · Escape Simulator 2 0.5 h",
+        f"Here: {cs2.emoji} Risk of Rain 2 1,234 h · {wd.emoji} Wardogs 54 h",
+        "Lately: Risk of Rain 2 10 h · WARDOGS 3.4 h · Escape Simulator 2 0.5 h",
     ]
     assert G.account_lines("steam", SID, raw, esc=str.upper)[0].startswith("**Steam** · COOL *KID* · <https://")
     private = G.account_lines("steam", SID, G.fresh_data(G.parse_profile(profile_xml(privacy="private"))))

@@ -15,20 +15,38 @@ SLATE = 0x606976
 # ---------------------------------------------------------------- games
 # One ping role + one channel per game. Members pick their games in
 # Onboarding and only see the channels for games they chose, so the sidebar
-# stays short. Top friend-group games of 2026, plus the group's own picks.
+# stays short. The list is what the server actually plays (the bot's weekly
+# owner digest says when it has drifted), in the order it is shown.
 GAMES = [
     # (emoji, channel name, role name)
-    ("🪖", "wardogs", "Wardogs"),
+    ("🌧️", "risk-of-rain-2", "Risk of Rain 2"),
+    ("🪚", "gears-of-war", "Gears of War"),
+    ("🦍", "overwatch", "Overwatch"),
+    ("🦸", "marvel-rivals", "Marvel Rivals"),
     ("⛏️", "minecraft", "Minecraft"),
+    ("🃏", "tabletop-simulator", "Tabletop Simulator"),
+    ("🪖", "wardogs", "Wardogs"),
+    ("🔺", "apex-legends", "Apex Legends"),
+]
+
+# Games the server used to list. Nothing of theirs is deleted: public_mode.py takes them
+# out of the "What do you play?" question, the bot stops offering their roles, and their
+# channels move into the staff-only GAME_ARCHIVE category. The roles stay, so a member who
+# has one keeps it. To retire a game, move its line from GAMES to here; to bring one back,
+# move its line from here to GAMES. Then run public_mode.py (dry run first).
+RETIRED_GAMES = [
     ("🪂", "fortnite", "Fortnite"),
     ("🎯", "valorant", "Valorant"),
     ("💥", "call-of-duty", "Call of Duty"),
     ("🧙", "league-of-legends", "League of Legends"),
     ("💣", "counter-strike", "Counter-Strike 2"),
-    ("🔺", "apex-legends", "Apex Legends"),
     ("🚗", "gta-online", "GTA Online"),
     ("🧱", "roblox", "Roblox"),
 ]
+
+# Where retired game channels are kept: hidden from @everyone, visible to these roles. It is
+# deliberately not in CATEGORIES, so nothing else creates, fills or rearranges it.
+GAME_ARCHIVE = {"name": "99 · archive", "private_to": ["Keeper", "Moderator"]}
 
 # Any role, category or channel can list old names under "was": the existing
 # one is renamed and restyled in place, so members, messages and permissions
@@ -69,6 +87,8 @@ ROLES = [
     *({"name": n} for n in ("NA", "EU", "LATAM", "Asia", "OCE")),
     *({"name": n} for n in ("Early Bird", "Night Owl", "Weekend Warrior")),
     *({"name": role, "mentionable": True} for _, _, role in GAMES),
+    # Retired game roles stay where they are (members keep them); they are just not offered.
+    *({"name": role, "mentionable": True} for _, _, role in RETIRED_GAMES),
     {"name": "Welcome Crew", "mentionable": True},  # opt-in via /crew: pinged when someone new arrives
     # Cosmetic thank-you tier: no colour and no permissions, so it can't pass for staff. Given by
     # Ko-fi's Discord bot or Server Subscriptions (or /supporter grant).
@@ -147,7 +167,7 @@ CATEGORIES = [
                     [
                         "Tips, builds, settings and how-tos that are worth finding again next month.",
                         "One topic per post. Put the game and the point in the title, like "
-                        "\"Valorant: crosshair settings that work\".",
+                        "\"Overwatch: crosshair settings that work\".",
                         "Tag the game. Write it so someone new can follow it: steps, numbers, a screenshot if it helps.",
                         "Your own words, please: no pasted articles, no link-only posts.",
                         "A real guide that stays up for a day earns a few coins (a couple of posts a week at most).",
@@ -352,7 +372,7 @@ REVOKE_PERMANENT_INVITES = False
 # Used by public_mode.py. The server description shows in invites and
 # Discovery; keep it under 120 characters.
 PUBLIC = {
-    "description": "Chill gamers. No tryhards, no toxicity. Squad up for Valorant, CoD, Fortnite, Minecraft and more.",
+    "description": "Chill gamers. No tryhards, no toxicity. Squad up for Risk of Rain 2, Gears of War, Overwatch, Minecraft and more.",
     "invite_channel": "👋・welcome",
 }
 

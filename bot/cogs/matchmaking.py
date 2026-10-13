@@ -49,7 +49,7 @@ def esc(text) -> str:
 
 
 def game_label(key: str) -> str:
-    game = config.game_by_key(key)
+    game = config.known_game_by_key(key)  # a queue row may name a since-retired game
     return f"{game.emoji} {game.role}" if game else esc(key)
 
 

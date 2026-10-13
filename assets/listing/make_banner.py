@@ -21,7 +21,8 @@ ICON = ROOT / "assets" / "server-icon.png"
 NAME = "Lorenzo's Server"
 TAGLINE = ("Chill gamers.", "No tryhards, no toxicity.")
 LABEL = "DISCORD SERVER · PACIFIC TIME"
-GAMES = "Valorant · Call of Duty · Fortnite · Minecraft · Apex · CS2 · League · GTA Online · Roblox"
+GAMES = ("Risk of Rain 2 · Gears of War · Overwatch · Marvel Rivals · Minecraft · Tabletop Simulator · "
+         "Wardogs · Apex")
 INVITE = "discord.gg/C25hy9Ca9W"
 
 # Field Notebook, night side (site/style.css, theme/field-notebook.theme.css)

@@ -205,8 +205,8 @@ class Lfg(commands.Cog):
 
     # ------------------------------------------------------------ rendering
     def render(self, post, roster: Roster, closed: bool = False) -> discord.Embed:
-        game = config.game_by_key(post["game"])
-        name = f"{game.emoji} {game.role}" if game else post["game"]
+        game = config.known_game_by_key(post["game"])  # a post for a since-retired game still renders
+        name = f"{game.emoji} {game.role}" if game else esc(post["game"])
         lines = [f"**When** {esc(post['when_text'])}"]
         if post["mode"]:
             lines.append(f"**Mode** {post['mode']}")
@@ -345,7 +345,11 @@ class Lfg(commands.Cog):
                     (players, mode, when, note, post_id),
                 )
                 post = await tx.fetchone("SELECT * FROM lfg_posts WHERE id = ?", (post_id,))
-        game = config.game_by_key(post["game"])
+        game = config.known_game_by_key(post["game"])  # the post may be for a since-retired game
+        if game is None:
+            await interaction.followup.send("That post is for a game I don't know any more. Close it and "
+                                            "post a new one.", ephemeral=True)
+            return
         if result == "creating":
             await interaction.followup.send("Your post is still being created. Give it a second.", ephemeral=True)
             return

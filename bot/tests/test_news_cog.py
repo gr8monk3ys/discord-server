@@ -18,7 +18,7 @@ GUILD_ID = 999
 OWNER, U1, MOD = 1, 11, 20
 T0 = 1_791_400_000
 HOUR, DAY = 3600, 86400
-CS = N.Source("Counter-Strike 2", "steam", appid=730)
+CS = N.Source("Risk of Rain 2", "steam", appid=730)
 APEX = N.Source("Apex Legends", "steam", appid=1172470)
 MC_URL = "https://www.minecraft.net/en-us/feeds/community-content/rss"
 MC = N.Source("Minecraft", "rss", url=MC_URL, host="www.minecraft.net")
@@ -33,7 +33,7 @@ def game(role):
 
 
 # ---------------------------------------------------------------- feed builders
-def steam_item(gid, title="Counter-Strike 2 Update", age=HOUR, official=True, contents="Fixed [b]stuff[/b]",
+def steam_item(gid, title="Risk of Rain 2 Update", age=HOUR, official=True, contents="Fixed [b]stuff[/b]",
                appid=730):
     return dict(gid=str(gid), title=title, url=f"https://steamstore-a.akamaihd.net/news/externalpost/x/{gid}",
                 contents=contents, feedname="steam_community_announcements" if official else "PC Gamer",
@@ -200,7 +200,7 @@ def test_first_poll_seeds_without_posting(monkeypatch):
         env.http.route(MC_URL, body=rss_body(("A", "a", "Tue, 06 Oct 2026 20:00:00 Z",
                                               "https://www.minecraft.net/en-us/article/a")))
         assert await env.cog.poll() == 0
-        assert env.sent("Counter-Strike 2") == [] and env.sent("Minecraft") == []
+        assert env.sent("Risk of Rain 2") == [] and env.sent("Minecraft") == []
         assert await env.seen(CS) == {"1", "2", N.SEED_MARK}
         assert await env.seen(MC) == {"https://www.minecraft.net/en-us/article/a", N.SEED_MARK}
         assert await env.cog.poll() == 0  # same items again: nothing new
@@ -226,7 +226,7 @@ def test_new_item_after_seed_posts_an_embed(monkeypatch):
                        contents="[p]Big <b>fix</b> https://evil.example/x[/p]"),
             steam_item(1)))
         assert await env.cog.poll() == 1
-        (msg,) = env.sent("Counter-Strike 2")
+        (msg,) = env.sent("Risk of Rain 2")
         assert msg["allowed_mentions"].everyone is False and msg["allowed_mentions"].users is False
         assert msg["allowed_mentions"].roles is False
         assert not msg["content"]
@@ -234,11 +234,11 @@ def test_new_item_after_seed_posts_an_embed(monkeypatch):
         assert embed.url == "https://store.steampowered.com/news/app/730/view/2"
         assert "@​everyone" in embed.title and "\\[free]" in embed.title and "\\*skins\\*" in embed.title
         assert embed.description == "Big fix"
-        assert "COUNTER-STRIKE 2" in embed.footer.text
+        assert "RISK OF RAIN 2" in embed.footer.text
         assert int(embed.timestamp.timestamp()) == T0 - 600
         assert await env.seen(CS) >= {"1", "2"}
         assert await env.cog.poll() == 0  # never reposted
-        assert len(env.sent("Counter-Strike 2")) == 1
+        assert len(env.sent("Risk of Rain 2")) == 1
     with_env(go, monkeypatch, sources=(CS,))
 
 
@@ -250,7 +250,7 @@ def test_at_most_two_per_poll_newest_chosen_posted_oldest_first(monkeypatch):
             steam_item(10, title="newest", age=60), steam_item(11, title="second", age=120),
             steam_item(12, title="third", age=180), steam_item(13, title="press", age=30, official=False)))
         assert await env.cog.poll() == 2
-        assert [m["embed"].title for m in env.sent("Counter-Strike 2")] == ["second", "newest"]
+        assert [m["embed"].title for m in env.sent("Risk of Rain 2")] == ["second", "newest"]
         assert await env.seen(CS) == {N.SEED_MARK, "10", "11", "12"}  # the extra is marked seen quietly
         assert await env.cog.poll() == 0
     with_env(go, monkeypatch, sources=(CS,))
@@ -262,7 +262,7 @@ def test_old_items_are_never_posted(monkeypatch):
         await env.cog.poll()
         env.http.route(STEAM_CS, body=steam_body(steam_item(20, age=8 * DAY)))
         assert await env.cog.poll() == 0
-        assert env.sent("Counter-Strike 2") == []
+        assert env.sent("Risk of Rain 2") == []
     with_env(go, monkeypatch, sources=(CS,))
 
 
@@ -273,7 +273,7 @@ def test_seen_state_survives_a_restart(monkeypatch):
         fresh = News(env.cog.bot, http=env.http, sources=[CS])
         env.http.route(STEAM_CS, body=steam_body(steam_item(2, age=60), steam_item(1)))
         assert await fresh.poll() == 1
-        assert [m["embed"].url.rsplit("/", 1)[1] for m in env.sent("Counter-Strike 2")] == ["2"]
+        assert [m["embed"].url.rsplit("/", 1)[1] for m in env.sent("Risk of Rain 2")] == ["2"]
     with_env(go, monkeypatch, sources=(CS,))
 
 
@@ -330,17 +330,17 @@ def test_send_failure_does_not_raise_or_repost(monkeypatch):
     async def go(env):
         env.http.route(STEAM_CS, body=steam_body())
         await env.cog.poll()
-        env.guild.games["Counter-Strike 2"].fail = discord.HTTPException(SimpleNamespace(status=403, reason="x"), "no")
+        env.guild.games["Risk of Rain 2"].fail = discord.HTTPException(SimpleNamespace(status=403, reason="x"), "no")
         env.http.route(STEAM_CS, body=steam_body(steam_item(3, age=60)))
         assert await env.cog.poll() == 0
-        env.guild.games["Counter-Strike 2"].fail = None
+        env.guild.games["Risk of Rain 2"].fail = None
         assert await env.cog.poll() == 0  # marked before sending: never posted twice
     with_env(go, monkeypatch, sources=(CS,))
 
 
 def test_missing_channel_skips_without_fetching(monkeypatch):
     async def go(env):
-        env.guild.text_channels = [c for c in env.guild.text_channels if c.name != game("Counter-Strike 2").channel_name]
+        env.guild.text_channels = [c for c in env.guild.text_channels if c.name != game("Risk of Rain 2").channel_name]
         assert await env.cog.poll() == 0
         assert await env.cog.poll() == 0
         assert env.http.calls == []
@@ -384,7 +384,7 @@ def test_news_test_is_hidden_from_members_and_staff_gated(monkeypatch):
     assert News.news.guild_only
 
     async def go(env):
-        inter = await env.news_test("Counter-Strike 2", roles=(), uid=U1)
+        inter = await env.news_test("Risk of Rain 2", roles=(), uid=U1)
         reply = inter.reply()
         assert reply["ephemeral"] is True and "Moderators" in reply["content"]
         assert env.http.calls == []
@@ -396,13 +396,13 @@ def test_news_test_shows_latest_item_ephemerally_without_marking_it(monkeypatch)
         env.http.route(STEAM_CS, body=steam_body(steam_item(1, title="older", age=9 * DAY),
                                                  steam_item(2, title="latest", age=8 * DAY),
                                                  steam_item(3, title="press", age=60, official=False)))
-        inter = await env.news_test("counter-strike 2")
+        inter = await env.news_test("risk of rain 2")
         assert inter.calls[0] == ("defer", {"ephemeral": True, "thinking": True})
         reply = inter.reply()
         assert reply["ephemeral"] is True and reply["allowed_mentions"].everyone is False
         assert reply["embed"].title == "latest"
         assert reply["embed"].url == "https://store.steampowered.com/news/app/730/view/2"
-        assert env.sent("Counter-Strike 2") == []
+        assert env.sent("Risk of Rain 2") == []
         assert await env.seen(CS) == set()
     with_env(go, monkeypatch)
 
@@ -418,13 +418,13 @@ def test_news_test_owner_allowed(monkeypatch):
 
 def test_news_test_unknown_game_empty_and_unreachable(monkeypatch):
     async def go(env):
-        reply = (await env.news_test("Valorant")).reply()
+        reply = (await env.news_test("Overwatch")).reply()
         assert reply["ephemeral"] is True and "no news feed" in reply["content"].lower()
         env.http.route(STEAM_CS, body=steam_body(steam_item(1, official=False)))
-        reply = (await env.news_test("Counter-Strike 2")).reply()
+        reply = (await env.news_test("Risk of Rain 2")).reply()
         assert reply["ephemeral"] is True and "nothing" in reply["content"].lower()
         env.http.fail(STEAM_CS, asyncio.TimeoutError())
-        reply = (await env.news_test("Counter-Strike 2")).reply()
+        reply = (await env.news_test("Risk of Rain 2")).reply()
         assert reply["ephemeral"] is True and "couldn't reach" in reply["content"].lower()
     with_env(go, monkeypatch)
 
@@ -433,7 +433,7 @@ def test_news_test_autocomplete_lists_configured_games(monkeypatch):
     async def go(env):
         inter = FakeInteraction(FakeMember(MOD, env.guild, (config.MOD_ROLE,)), env.guild)
         choices = await env.cog.game_autocomplete(inter, "")
-        assert [c.value for c in choices] == ["Counter-Strike 2", "Minecraft"]
+        assert [c.value for c in choices] == ["Risk of Rain 2", "Minecraft"]
         assert all(isinstance(c, app_commands.Choice) for c in choices)
         assert [c.value for c in await env.cog.game_autocomplete(inter, "mine")] == ["Minecraft"]
     with_env(go, monkeypatch)

@@ -458,8 +458,10 @@ def test_public_mode_run_includes_automod_gaps(monkeypatch):
     guild.name = "test"
     guild.me.guild_permissions = NS(**{p: True for p in public_mode.NEEDED})
     ran = []
+    # The games steps: additive ones first, and retire_games (the only step that hides
+    # anything) after the Onboarding question has been brought up to date.
     steps = ("roles", "new_channels", "private", "description", "posts", "invite", "onboarding",
-             "onboarding_prompts", "automod_gaps")
+             "onboarding_prompts", "game_tags", "restore_games", "game_options", "retire_games", "automod_gaps")
     pm = public_mode.PublicMode(guild, apply=False)
     for name in steps:
         async def step(name=name):
@@ -590,7 +592,7 @@ def test_public_mode_forums_and_stage_dry_run_and_missing_category(capsys):
     asyncio.run(public_mode.PublicMode(guild, apply=False).new_channels())
     assert guild.calls == []
     out = capsys.readouterr().out
-    assert "#📚・guides (forum) in 03 · games with 14 tags (layout, sort, reaction, post_slowmode, slowmode)" in out
+    assert "#📚・guides (forum) in 03 · games with 12 tags (layout, sort, reaction, post_slowmode, slowmode)" in out
     assert "🎙・stage (stage) in 05 · voice" in out
 
     bare = FakeGuild()  # no categories at all: skipped with a reason, never created loose
