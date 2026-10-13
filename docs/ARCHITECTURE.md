@@ -2,7 +2,7 @@
 
 A map of the system for the next engineer or AI session. `README.md` is the feature list and
 runbook; this file says how the pieces fit together. Everything here was read from the code
-on 2026-10-12 (schema v23, 48 modules). When this file and the code disagree, the code wins:
+on 2026-10-12 (schema v23, 47 modules). When this file and the code disagree, the code wins:
 fix the file.
 
 ## The four parts
@@ -152,7 +152,6 @@ is set). Loops without a wall-clock time are plain `tasks.loop` intervals.
 | `wrapped` | `/wrapped` cards (Dec 1 to Jan 15), server card, staff `/wrapped-preview` | `achievements` (`wrapped_YEAR`); `meta` only otherwise | 5 min tick: announcement Dec 1 10:00, reminder Dec 20 10:00, level snapshot once in January | 📣・announcements; wherever a member shares a card |
 | `sitedata` | aggregates file for the landing page, staff `/sitedata refresh` | none (writes `bot/data/site/stats.json`) | 1 min tick, rebuilds every 30 min | none |
 | `appeals` | ban appeals from the website: review cards with Accept/Deny, discussion threads, staff `/appeals list/code` | `appeals` | 5 min tick: re-reads the channel for webhook posts missed while down; expiry daily 09:00 (30 days untouched; answers blanked 180 days after a decision) | 🔒・appeals, 📋・mod-log |
-| `focus` | event-driven Onboarding default channels: tournaments while a tournament is in `signup` or `running`, realms while the Minecraft server is online. No commands. Inert until `server/focus_mode.py` has been applied (no ordinary opt-in channel is a default) | none (`meta` only: `focus:added:<channel>` marks a default it added, and it removes only those) | 1 min tick that costs no Discord call; reads Onboarding at start, when a fact changes and hourly; one edit per pass, at most one change per channel per 15 min, retry 15 min after a refusal; never goes below Discord's 7 defaults | 🏆・tournaments, ⛏️・realms (the default list only, never the channel or a permission), 📋・mod-log |
 | `tonight` | one line in general while 2+ non-bot members are in a public voice channel (everyone can view and join; not AFK, not the staff category): counts, the shared game, a channel mention; edited in place, past tense when the rooms empty, never deleted. No commands, no coins | none (`meta` only: `tonight:state`, one JSON value with no member data, and `tonight:fired_at`) | 1 min tick: line after a room has held 3 min, edits at most every 2 min, same message reused for 45 min after a session ends, at most 3 new messages a local day; `TONIGHT=off` runs no tick and closes a standing "right now" line once | 💬・general |
 
 Three of the `logic/` modules have no cog of their own: `linkedroles.py` validates
@@ -167,9 +166,7 @@ Cross-cog reads added with these modules, all by `bot.get_cog(...)` and all opti
 or failing cog just leaves its line out): `recap` asks `Forums.fresh_line` for the weekly recap
 and `Crew.digest_line` for the owner digest, `ops` asks `Realms.health_text` for `/status`,
 `achievements` asks `Supporter.profile_flair`, and `sitedata` and `wrapped` read house standings
-and membership through `logic/houses.py`. `focus` asks `Realms.is_online()` (True, False, or
-None while that is not known, and None changes nothing) and reads the `tournaments` table
-itself, only while the `Tournaments` cog is loaded.
+and membership through `logic/houses.py`.
 
 `vibes` and `tonight` keep out of each other's way through two `meta` keys: `tonight` writes
 `tonight:fired_at` when a session's line appears and `vibes` skips its chat revival for an

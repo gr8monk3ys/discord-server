@@ -270,7 +270,6 @@ class Realms(commands.Cog):
         self.failures = 0
         self.first_failure_at: int | None = None
         self.down_since: int | None = None
-        self.reached_at: int | None = None  # the last poll that got an answer; None until one does
         self.status: R.Status | None = None
         self.names: list[str] = []
         self.last_names: set[str] | None = None  # lower-case names in the last good poll
@@ -330,19 +329,6 @@ class Realms(commands.Cog):
     def channel(self):
         guild = self.guild()
         return config.match_by_name(guild.text_channels, config.REALMS_CHANNEL) if guild is not None else None
-
-    def is_online(self) -> bool | None:
-        """For other modules: True once a poll has reached the server, False once it has been
-        declared down, None while that isn't known (not set up, not polled yet, or a first
-        missed poll that may be a blip)."""
-        if not (self.setup.status_on or self.setup.rcon_on):
-            return None
-        if self.down_since is not None:
-            return False
-        # Only a poll that got an answer says "online". next_poll_at is set when a poll STARTS, so
-        # it says nothing: reading it here called an unreachable server online for the length
-        # of the first poll after every restart.
-        return True if getattr(self, "reached_at", None) is not None and self.failures == 0 else None
 
     def once(self, key: str, level: int, text: str, *args) -> None:
         """Log a condition when it starts, not every time it is seen again."""
@@ -418,7 +404,6 @@ class Realms(commands.Cog):
             if self.down_since is not None:
                 log.info("realms: the server is back")
             self.failures, self.first_failure_at, self.down_since = 0, None, None
-            self.reached_at = t
             self.said.discard("ping")
             self.status, self.names = status, names or []
         else:

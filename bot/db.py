@@ -721,6 +721,15 @@ class Database:
         async with self.lock:
             return await Tx(self.conn).fetchall(sql, params)
 
+    # The meta table is a small key-value store. These two are the shared way in, so a cog
+    # does not write its own pair.
+    async def meta_get(self, key: str) -> str | None:
+        row = await self.fetchone("SELECT value FROM meta WHERE key = ?", (key,))
+        return row["value"] if row else None
+
+    async def meta_set(self, key: str, value) -> None:
+        await self.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", (key, str(value)))
+
     async def tracking_allowed(self, user_id: int) -> bool:
         """The one privacy gate: every stats/coins recorder checks this first."""
         row = await self.fetchone("SELECT 1 FROM privacy_optout WHERE user_id = ?", (user_id,))
