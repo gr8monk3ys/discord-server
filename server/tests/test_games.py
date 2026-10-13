@@ -273,11 +273,31 @@ def test_dry_run_prints_every_channel_it_would_hide_and_changes_nothing(capsys):
     assert f"  create  category {ARCHIVE} (hidden from @everyone; visible to @Keeper, @Moderator)\n" in out
     assert ('  remove  "What do you play?" options: Fortnite, Valorant, Call of Duty, League of Legends, '
             "Counter-Strike 2, GTA Online, Roblox (members who picked one keep the role)\n") in out
-    assert '  add     "What do you play?" options: ' + ", ".join(NEW) + "\n" in out
+    # the new options arrive in the edit that takes the retired ones out (Discord caps a question's options)
+    assert ('  add     "What do you play?" options: ' + ", ".join(NEW) + " (in the same edit, retired options leave: "
+            + ", ".join(r for _, _, r in layout.RETIRED_GAMES)) in out
     for role in NEW:
         assert f"  create  @{role}\n" in out
     assert "tags: " + ", ".join(NEW) in out
     assert "delete" not in out.lower().replace("never deleted", "")
+
+
+def test_the_question_never_holds_more_options_than_discord_allows_in_any_edit():
+    """Discord refused the first live run: the new games were added while the retired ones were
+    still options ("Too many options in onboarding prompt"). Every edit must fit on its own."""
+    guild = old_server()
+    start = len(guild.options())
+    real = guild.edit_onboarding
+    sizes = []
+
+    async def counting(**kw):
+        sizes.append(max(len(p.options) for p in kw["prompts"]))
+        return await real(**kw)
+
+    guild.edit_onboarding = counting
+    apply(guild)
+    assert sizes and max(sizes) <= max(start, len(layout.GAMES) + 1)
+    assert guild.options() == [*(r for _, _, r in layout.GAMES), "Just here to hang"]
 
 
 def test_apply_adds_the_new_games_and_hides_the_retired_ones_without_deleting_anything():

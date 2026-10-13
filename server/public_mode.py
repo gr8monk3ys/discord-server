@@ -566,13 +566,23 @@ class PublicMode:
                 placed = True
         if not placed:
             merged = [*block, *merged]
+        # Discord caps the options of one question, and the cap is checked on every edit: adding
+        # the new games while the retired ones are still there can be refused ("Too many
+        # options"). So the retired games' options leave in this same edit; retire_games()
+        # then finds them gone and only has the channels left to hide.
+        retired = {slug(role) for _, _, role in layout.RETIRED_GAMES} - set(order)
+        swapped = [o.title for o in merged if slug(o.title) in retired]
+        merged = [o for o in merged if slug(o.title) not in retired]
 
         async def edit():
             prompt.options = merged
             # Only the prompts are sent: default channels and the enabled flag are left alone.
             return await self.guild.edit_onboarding(prompts=ob.prompts)
 
-        await self.do("add", f"\"{GAMES_PROMPT}\" options: {', '.join(names)}", edit)
+        what = f"\"{GAMES_PROMPT}\" options: {', '.join(names)}"
+        if swapped:
+            what += f" (in the same edit, retired options leave: {', '.join(swapped)}; members who picked one keep the role)"
+        await self.do("add", what, edit)
 
     async def retire_games(self):
         """THE ONE STEP THAT TAKES SOMETHING AWAY. For each game in layout.RETIRED_GAMES: its
