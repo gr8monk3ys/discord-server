@@ -63,6 +63,10 @@ All notable changes to this project are recorded here. The format follows
 
 ### Changed
 
+- The emoji pack is redrawn in the Field Notebook style of the server icon: every emoji is a
+  night-paper stamp with one mark in pen green, near-white or muted ink, made to read at 22 px
+  on both Discord themes (`assets/expressions/contact-sheet.png`). Names are unchanged.
+  `expressions.py --replace` (dry run by default) swaps redrawn emoji on the server.
 - Requirements are complete and pinned (Pillow and aiohttp were missing); the Docker image installs from them.
 - The bot now asks for the Ban Members and Mute Members permissions (`main.py --invite`): Ban
   Members for `/ban` and for lifting a ban when an appeal is accepted, Mute Members for Stage
