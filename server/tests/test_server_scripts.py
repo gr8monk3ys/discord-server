@@ -538,10 +538,13 @@ def test_layout_forums_and_stage_fit_discords_limits():
     assert {role for _, _, role in layout.GAMES} <= {n for n, _ in guides["tags"]}  # one tag per game
     assert _spec("setups")["layout"] == "gallery"
     assert _spec("stage")["type"] == "stage"
-    # Public channels must be Onboarding defaults, or onboarded members never see them. The
-    # Stage is the exception: Discord may refuse one as a default (see layout.py).
-    defaults = {slug(n) for n in layout.ONBOARDING_DEFAULT_CHANNELS}
-    assert {"guides", "setups"} <= defaults and "stage" not in defaults
+    # Public channels must be reachable through Onboarding: a default or an opt-in answer
+    # (tests/test_focus_mode.py checks every one). The Stage is the exception: Discord may
+    # refuse one as a default (see layout.py).
+    reachable = {slug(n) for n in (*layout.ONBOARDING_DEFAULT_CHANNELS,
+                                   *(n for g in layout.FOCUS_GROUPS for n in g["channels"]))}
+    assert {"guides", "setups"} <= reachable and "stage" not in reachable
+    assert {"guides", "setups"} <= {slug(n) for n in layout.ONBOARDING_EVERYTHING}
 
 
 def test_forum_options_only_pass_what_the_spec_sets():
@@ -723,15 +726,20 @@ def test_onboarding_defaults_are_ordinary_public_channels_only():
         for spec in cat_spec["channels"]:
             specs[slug(spec["name"])] = (spec.get("type", "text"),
                                          bool(spec.get("private_to") or cat_spec.get("private_to")))
-    for name in layout.ONBOARDING_DEFAULT_CHANNELS:
+    # The core, and the full list `focus_mode.py --revert` restores.
+    for name in (*layout.ONBOARDING_DEFAULT_CHANNELS, *layout.ONBOARDING_EVERYTHING):
         kind, private = specs[slug(name)]  # KeyError: a default that is not in the layout
         assert kind in ("text", "forum", "voice") and not private, name
-    defaults = {slug(n) for n in layout.ONBOARDING_DEFAULT_CHANNELS}
-    assert {slug(n) for n in ("📚・guides", "🖥・setups", "⛏️・realms")} <= defaults
-    assert not defaults & {slug(n) for n in ("🎙・stage", "💜・supporters", "🔒・appeals", "📋・mod-log")}
+    everything = {slug(n) for n in layout.ONBOARDING_EVERYTHING}
+    assert {slug(n) for n in layout.ONBOARDING_DEFAULT_CHANNELS} <= everything
+    assert {slug(n) for n in ("📚・guides", "🖥・setups", "⛏️・realms")} <= everything
+    assert not everything & {slug(n) for n in ("🎙・stage", "💜・supporters", "🔒・appeals", "📋・mod-log")}
 
 
-def test_onboarding_step_adds_forums_but_never_the_stage_or_a_private_channel(capsys):
+def test_onboarding_step_adds_forums_but_never_the_stage_or_a_private_channel(capsys, monkeypatch):
+    # public_mode only ever adds what layout.py calls a default; with the full list as the
+    # defaults (the state before focus_mode.py, and after --revert) it adds the wave 9 channels.
+    monkeypatch.setattr(layout, "ONBOARDING_DEFAULT_CHANNELS", layout.ONBOARDING_EVERYTHING)
     guild = _wave9_guild()
     existing = NS(id=500, name="💬・general")
     guild.text_channels += [existing, NS(id=501, name="⛏️・realms"), NS(id=502, name="💜・supporters"),

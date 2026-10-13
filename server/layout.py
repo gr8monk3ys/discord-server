@@ -291,9 +291,19 @@ COMMUNITY = {
     "updates_channel": "🛡️・mod",  # where Discord sends admin-only notices
 }
 
-# Onboarding: what new members see before they land. Channels listed here are
-# the defaults everyone gets; Discord needs at least 7, 5 of them postable.
+# Onboarding: what new members see before they land. Channels listed here are the core: the
+# defaults every newcomer gets. Discord needs at least 7, and 5 of them must let @everyone
+# send messages. Everything else public is opt-in (FOCUS_GROUPS below), so a newcomer lands
+# on a short list of rooms with something in them. focus_mode.py applies this and prints
+# the whole plan first; `focus_mode.py --revert` puts ONBOARDING_EVERYTHING back.
+# #gaming is core because game nights, watch parties and the weekly free games are posted
+# there, and it is a plain text channel that certainly counts towards Discord's five.
 ONBOARDING_DEFAULT_CHANNELS = [
+    "📌・rules", "📣・announcements", "💬・general", "🕹️・gaming", "🎮・lfg", "📸・clips",
+    "🔊 Lobby", "➕ New Squad",
+]
+# The default list before the core was cut down, word for word: what --revert restores.
+ONBOARDING_EVERYTHING = [
     "📌・rules", "📣・announcements", "👋・welcome", "💬・general",
     "🆘・help", "💡・suggestions", "🤣・memes", "📸・clips", "⭐・hall-of-fame", "🔢・counting", "🎲・games", "🕹️・gaming", "🎮・lfg", "🎨・art", "💻・code",
     "👗・fashion", "♟️・chess", "🤖・bot-commands", "📺・creators", "🏆・tournaments", "🎭・roles", "🤝・partners",
@@ -301,11 +311,53 @@ ONBOARDING_DEFAULT_CHANNELS = [
     "📚・guides", "🖥・setups",
     "⛏️・realms",
 ]
-# Anything public that's neither a default channel nor an Onboarding option is
-# hidden from members who went through Onboarding, so keep this list complete.
-# Two kinds never go in it: private ("private_to") channels, and the Stage channel. Discord
-# may refuse a Stage as a default channel, and one refused channel fails the whole
-# Onboarding edit; a Stage shows itself to everyone while an event is live anyway.
+# Opt-in groups: one question under Channels & Roles (asked after joining, so it does not
+# count against Discord's cap on pre-join questions). Every public channel that is not a
+# game channel is in the core, in exactly one group, or in FOCUS_UNLISTED; a test checks it.
+# Nobody loses access: these channels stay visible to @everyone, and members who are already
+# here keep the channel list they have. Only what a newcomer starts with changes.
+FOCUS_PROMPT = "What else do you want to see?"
+FOCUS_GROUPS = [
+    {"title": "Events and tournaments", "emoji": "🏆",
+     "description": "Brackets, sign-ups and results.",
+     "channels": ["🏆・tournaments"]},
+    {"title": "Coins, levels and games", "emoji": "🎲",
+     "description": "Daily word game, counting, coin games and bot commands.",
+     "channels": ["🎲・games", "🔢・counting", "🤖・bot-commands"]},
+    {"title": "Creators and highlights", "emoji": "📺",
+     "description": "Members' streams and uploads, starred messages, partner servers.",
+     "channels": ["📺・creators", "⭐・hall-of-fame", "🤝・partners"]},
+    {"title": "Forums", "emoji": "📚",
+     "description": "Guides, setups and suggestions for the server.",
+     "channels": ["📚・guides", "🖥・setups", "💡・suggestions"]},
+    {"title": "Off topic", "emoji": "🤣",
+     "description": "Memes, art, code, fashion and chess.",
+     "channels": ["🤣・memes", "🎨・art", "💻・code", "👗・fashion", "♟️・chess"]},
+    {"title": "Minecraft", "emoji": "⛏️",
+     "description": "The Realms: server status and chat with whoever is in game.",
+     "channels": ["⛏️・realms"]},
+    {"title": "Help desk, roles and arrivals", "emoji": "🆘",
+     "description": "Open a ticket with the mods, the roles panel, who just joined.",
+     "channels": ["👋・welcome", "🆘・help", "🎭・roles"]},
+    {"title": "More voice rooms", "emoji": "🔊",
+     "description": "The five-seat squad room and the AFK room.",
+     "channels": ["🎮 Squad", "💤 AFK"]},
+]
+# Event-driven: opt-in most of the time, and a default channel for newcomers while the thing
+# is live. Front Desk (bot/cogs/focus.py) adds the channel to the defaults when it starts and
+# takes it out again afterwards. These are the only channels that module may touch.
+FOCUS_EVENT_CHANNELS = {
+    "🏆・tournaments": "a tournament is open or running",
+    "⛏️・realms": "the Minecraft server is online",
+}
+# Public, but never a default and never an answer. Discord may refuse a Stage as a default
+# channel, and one refused channel fails the whole Onboarding edit; a Stage shows itself to
+# everyone while an event is live anyway.
+FOCUS_UNLISTED = {"🎙・stage": "Discord shows a live Stage to everyone by itself"}
+# If Discord says the core does not have five channels @everyone can post in (it may not
+# count a forum or a voice channel), focus_mode.py adds these one at a time until it does.
+FOCUS_RESERVE = ["🤣・memes", "🤖・bot-commands"]
+# Private ("private_to") channels never go in any of these lists.
 ONBOARDING_PROMPTS = [
     {
         "title": "What do you play?",
