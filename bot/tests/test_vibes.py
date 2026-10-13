@@ -5,7 +5,6 @@ from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 import config
-from logic import quests as Q
 from logic import vibes as V
 
 TZ = ZoneInfo("America/Los_Angeles")
@@ -126,14 +125,6 @@ def test_boost_text_mentions_and_coins():
     text = V.boost_text("<@9>", V.BOOST_COINS)
     assert "<@9>" in text and "1,000" in text
     assert "coins" not in V.boost_text("<@9>", 0)
-
-
-def test_old_enough_reuses_quest_minimum():
-    t = ts(2026, 10, 7)
-    assert V.MIN_ACCOUNT_DAYS == Q.MIN_ACCOUNT_DAYS
-    assert V.old_enough(t - Q.MIN_ACCOUNT_DAYS * DAY, t)
-    assert not V.old_enough(t - Q.MIN_ACCOUNT_DAYS * DAY + 1, t)
-    assert not V.old_enough(None, t)
 
 
 def test_staff_roles():

@@ -297,11 +297,6 @@ def drop_ref(run_id: str, drop_id: int) -> str:
     return f"event:{run_id}:drop:{drop_id}"
 
 
-def old_enough(created_at: int | None, now: int) -> bool:
-    """Accounts younger than MIN_ACCOUNT_DAYS (likely alts) earn nothing from an event."""
-    return created_at is not None and now - created_at >= MIN_ACCOUNT_DAYS * DAY
-
-
 # ---------------------------------------------------------------- daily quest
 @dataclass(frozen=True)
 class Quest:

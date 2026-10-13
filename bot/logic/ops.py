@@ -338,6 +338,7 @@ CHANNEL_NEEDS: list[Need] = [
     Need("events", config.GAMING_CHANNEL, POST),
     Need("events", config.SQUAD_VOICE, VIEW + ("connect",), "voice"),  # voice events
     Need("events", config.LOBBY_VOICE, VIEW + ("connect",), "voice"),
+    Need("events", config.ANNOUNCEMENTS_CHANNEL, POST),  # the Town Hall announcement and its reminder
     *_game_channels("events"),
     Need("shop", config.GENERAL_CHANNEL, POST + ("manage_messages",)),  # the Spotlight pin
     Need("shop", config.ANNOUNCEMENTS_CHANNEL, POST),  # season results
@@ -375,6 +376,11 @@ CHANNEL_NEEDS: list[Need] = [
     Need("matchmaking", config.VOICE_CATEGORY, VIEW + ("manage_channels",), "category"),
     *_game_channels("news"),
     Need("staffapps", config.MOD_LOG_CHANNEL, POST),
+    Need("seasonal", config.GENERAL_CHANNEL, POST),  # drops
+    Need("seasonal", config.GAMES_CHANNEL, POST),  # finished daily quests
+    Need("seasonal", config.ANNOUNCEMENTS_CHANNEL, POST),  # an event's opening and its results
+    Need("gamelink", config.MOD_LOG_CHANNEL, POST),  # accounts staff approved or removed
+    Need("votehub", config.GAMES_CHANNEL, POST),  # weekly bump thanks
     Need("vibes", config.GENERAL_CHANNEL, POST + ("read_message_history",)),
     Need("vibes", config.ANNOUNCEMENTS_CHANNEL, POST),  # member of the month
     Need("tonight", config.GENERAL_CHANNEL, POST + ("read_message_history",)),  # the voice line
@@ -393,8 +399,8 @@ CHANNEL_NEEDS: list[Need] = [
          "stage"),
     Need("clipcast", config.CLIPS_CHANNEL, POST + ("read_message_history",)),  # consent fallback, "as seen on"
     Need("clipcast", config.MOD_LOG_CHANNEL, POST),  # picks, upload notes, takedown alerts
-    # status panel (edited in place) and the chat relay; reactions say "not relayed"
-    Need("realms", config.REALMS_CHANNEL, POST + ("read_message_history", "add_reactions")),
+    # status panel (edited in place, pinned: Manage Messages) and the chat relay; reactions say "not relayed"
+    Need("realms", config.REALMS_CHANNEL, POST + ("read_message_history", "add_reactions", "manage_messages")),
     Need("realms", config.MOD_LOG_CHANNEL, POST),  # whitelist changes
     # appeals: delete the raw webhook message, read missed ones after downtime, open a discussion thread
     Need("appeals", config.APPEALS_CHANNEL, POST + ("manage_messages", "read_message_history",
@@ -404,8 +410,24 @@ CHANNEL_NEEDS: list[Need] = [
     Need("houses", config.ANNOUNCEMENTS_CHANNEL, POST),  # House Cup results, the one-time introduction
 ]
 
+# Modules with no row above, and why. A test fails when a module in main.MODULES is in neither,
+# so a new cog either gets its rows or says here why it needs none.
+NO_CHANNEL: dict[str, str] = {
+    "economy": "only replies to its own commands; coins are earned from events, nothing is posted",
+    "games": "replies to its own commands (and edits those replies) wherever they are used",
+    "heartbeat": "writes a file, never talks to Discord",
+    "econstats": "only replies to its own staff command",
+    "helpdesk": "only replies to its own commands; the roles channel is linked, not posted in",
+    "catchup": "reads whichever channel the member names, so there is no fixed channel to check",
+    "sitedata": "writes a file; its one command replies in place",
+}
+
 ROLE_HOLDERS = ("clips", "engagement", "growth", "levels", "selfroles", "shop", "tournaments", "crew", "supporter",
-                "houses")
+                "houses", "seasonal")
+# Cogs that call add_roles/remove_roles and are left out of ROLE_HOLDERS on purpose, and why.
+NO_ROLE_HOLDER: dict[str, str] = {
+    "staffapps": "gives Moderator only if it sits below the bot, and otherwise says to give it by hand",
+}
 EVENT_MAKERS = ("engagement", "events", "tournaments")
 CREATE_EVENTS_HINT = "Server Settings -> Roles -> Front Desk -> turn on Create Events"
 GUILD_NEEDS: list[GuildNeed] = [
@@ -437,6 +459,7 @@ ROLE_NEEDS: list[tuple[str, str]] = [
     (config.BIRTHDAY_ROLE, "engagement"),
     (config.COUNTING_ROLE, "engagement"),
     (config.TOURNEY_ROLE, "tournaments"),
+    (config.EVENT_ROLE, "seasonal"),
     # Supporter is left out on purpose: the bot only reacts to it, and a Server Subscriptions
     # role is managed by Discord and may sit anywhere.
     (config.CREW_ROLE, "crew"),

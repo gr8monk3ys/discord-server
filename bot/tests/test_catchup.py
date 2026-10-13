@@ -3,23 +3,13 @@
 from zoneinfo import ZoneInfo
 
 from logic import catchup as C
-from logic import quests
 
 PT = ZoneInfo("America/Los_Angeles")
 DAY = 86400
 
 
-def snowflake(created: int) -> int:
-    return (created * 1000 - quests.DISCORD_EPOCH_MS) << 22
-
-
 # ---------------------------------------------------------------- gates
-def test_established_follows_min_account_days():
-    t = 1_791_400_000
-    assert C.established(snowflake(t - quests.MIN_ACCOUNT_DAYS * DAY), t)
-    assert not C.established(snowflake(t - quests.MIN_ACCOUNT_DAYS * DAY + 60), t)
-
-
+# (the account-age gate is quests.established, asked by the cog: test_catchup_cog.py)
 def test_valid_hours():
     assert C.valid_hours(1) and C.valid_hours(12) and C.valid_hours(48)
     assert not C.valid_hours(0) and not C.valid_hours(49) and not C.valid_hours(-3)

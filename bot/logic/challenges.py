@@ -12,7 +12,6 @@ from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, tzinfo
 
-from logic.quests import MIN_ACCOUNT_DAYS
 from logic.schedule import Weekly
 from logic.stats import fmt_duration
 
@@ -141,11 +140,6 @@ def total(items: Iterable[tuple[str, int]]) -> int:
 
 def ref(week_key: str, user_id: int, key: str) -> str:
     return f"challenge:{week_key}:{user_id}:{key}"
-
-
-def old_enough(created_at: int | None, now: int) -> bool:
-    """Accounts younger than MIN_ACCOUNT_DAYS (likely alts) can't claim."""
-    return created_at is not None and now - created_at >= MIN_ACCOUNT_DAYS * DAY
 
 
 # ---------------------------------------------------------------- text

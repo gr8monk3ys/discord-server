@@ -203,13 +203,6 @@ def test_chat_gap_expiry_and_refs():
     assert S.quest_claim_key(date(2026, 10, 20)) == "quest:2026-10-20"
 
 
-def test_old_enough():
-    now = 10_000_000
-    assert S.old_enough(now - MIN_ACCOUNT_DAYS * S.DAY, now)
-    assert not S.old_enough(now - MIN_ACCOUNT_DAYS * S.DAY + 1, now)
-    assert not S.old_enough(None, now)
-
-
 # ---------------------------------------------------------------- quests
 def test_quest_for_is_stable_and_cycles_through_the_pool():
     days = list(all_days(RUN))

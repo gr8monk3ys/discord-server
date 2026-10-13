@@ -24,8 +24,8 @@ from discord.ext import commands, tasks
 
 import config
 import style
+from cogkit import is_staff
 from errors import reply_error
-from logic import community as community_rules
 from logic import partners as P
 from logic import textfilter
 from logic.schedule import plan
@@ -47,13 +47,6 @@ def now() -> int:
 
 def esc(text: str) -> str:
     return discord.utils.escape_mentions(discord.utils.escape_markdown(text or ""))
-
-
-def is_staff(user) -> bool:
-    guild = getattr(user, "guild", None)
-    if guild is None:
-        return False
-    return community_rules.can_handle(guild.owner_id == user.id, user.guild_permissions.administrator, user.roles)
 
 
 # ---------------------------------------------------------------- network seam

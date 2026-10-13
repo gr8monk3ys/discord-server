@@ -19,7 +19,7 @@ from datetime import date, datetime, time, timedelta, tzinfo
 from enum import Enum
 from typing import Callable, Iterable, Sequence
 
-from logic.quests import MIN_ACCOUNT_DAYS
+from logic.quests import established
 from logic.schedule import Plan
 
 SIZES = (4, 8, 16, 32)  # signup caps staff can pick
@@ -269,10 +269,10 @@ DAY = 24 * 60 * 60
 HOUR = 60 * 60
 
 
-def can_join(created_at: int | None, now: int) -> bool:
-    """Discord accounts younger than MIN_ACCOUNT_DAYS (from logic/quests.py) can't sign up,
-    so fresh alts can't fill a bracket and hand someone a walkover to the prize."""
-    return created_at is not None and now - created_at >= MIN_ACCOUNT_DAYS * DAY
+def can_join(user_id: int, now: int) -> bool:
+    """Discord accounts that are not established (logic/quests.py) can't sign up, so fresh
+    alts can't fill a bracket and hand someone a walkover to the prize."""
+    return established(user_id, now)
 
 
 # ---------------------------------------------------------------- the monthly auto tournament

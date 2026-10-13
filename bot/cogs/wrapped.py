@@ -34,8 +34,8 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 import config
+from cogkit import is_staff
 from errors import reply_error
-from logic import community as community_rules
 from logic import houses as H
 from logic import matchmaking as M
 from logic import starboard
@@ -58,15 +58,6 @@ QUIET_CHANNELS = (config.COUNTING_CHANNEL, config.RULES_CHANNEL, config.ANNOUNCE
 
 def now() -> int:
     return int(time.time())
-
-
-def is_staff(user) -> bool:
-    guild = getattr(user, "guild", None)
-    if guild is None:
-        return False
-    perms = getattr(user, "guild_permissions", None)
-    return community_rules.can_handle(guild.owner_id == user.id, bool(getattr(perms, "administrator", False)),
-                                      getattr(user, "roles", []))
 
 
 def esc(text) -> str:

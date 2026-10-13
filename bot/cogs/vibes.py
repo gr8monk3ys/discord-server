@@ -283,7 +283,7 @@ class Vibes(commands.Cog):
         if not await self.db.execute("INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)", (key, str(t))):
             return False  # already thanked (the event and the sweep both saw it)
         coins = 0
-        if V.old_enough(ts(getattr(member, "created_at", None)), t):
+        if Q.established(member.id, t):
             result = await economy.apply(self.db, member.id, V.BOOST_COINS, V.BOOST_REASON, t,
                                          ref=V.boost_ref(member.id, shop.month_key(t, self.tz)))
             coins = V.BOOST_COINS if result.ok else 0  # a second boost this month: thanks, no coins
@@ -320,7 +320,7 @@ class Vibes(commands.Cog):
         month = shop.month_key(period.scheduled_at, self.tz)  # the month being paid for
         t, paid = now(), 0
         for m in list(getattr(guild, "premium_subscribers", [])):
-            if m.bot or getattr(m, "premium_since", None) is None or not V.old_enough(ts(m.created_at), t):
+            if m.bot or getattr(m, "premium_since", None) is None or not Q.established(m.id, t):
                 continue
             result = await economy.apply(self.db, m.id, V.STIPEND_COINS, V.STIPEND_REASON, t,
                                          ref=V.stipend_ref(month, m.id))
@@ -355,7 +355,7 @@ class Vibes(commands.Cog):
     def eligible(self, guild, uid: int, t: int) -> bool:
         m = guild.get_member(uid)
         return (m is not None and not m.bot and not V.is_staff(r.name for r in m.roles)
-                and V.old_enough(ts(m.created_at), t))
+                and Q.established(m.id, t))
 
     async def member_of_month(self, period: R.MonthPeriod) -> bool:
         guild = self.guild()

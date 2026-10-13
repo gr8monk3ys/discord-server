@@ -276,7 +276,7 @@ from datetime import date, datetime  # noqa: E402
 from zoneinfo import ZoneInfo  # noqa: E402
 
 import config  # noqa: E402
-from logic.quests import MIN_ACCOUNT_DAYS  # noqa: E402
+from logic.quests import DISCORD_EPOCH_MS, MIN_ACCOUNT_DAYS  # noqa: E402
 
 TZ = ZoneInfo("America/Los_Angeles")
 HOUR, DAY = 3600, 86400
@@ -357,9 +357,13 @@ def test_too_late_to_create():
 
 def test_can_join_needs_an_old_enough_account():
     t = ts(2026, 10, 7)
-    assert T.can_join(t - MIN_ACCOUNT_DAYS * DAY, t)
-    assert not T.can_join(t - MIN_ACCOUNT_DAYS * DAY + 1, t)
-    assert not T.can_join(None, t)
+
+    def made_at(created: int) -> int:  # the id of an account created then
+        return (created * 1000 - DISCORD_EPOCH_MS) << 22
+
+    assert T.can_join(made_at(t - MIN_ACCOUNT_DAYS * DAY), t)
+    assert not T.can_join(made_at(t - MIN_ACCOUNT_DAYS * DAY + 1), t)
+    assert T.can_join(12, t)  # a tiny test id is from 2015
 
 
 def test_auto_start_outcome():

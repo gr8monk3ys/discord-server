@@ -9,7 +9,8 @@
 - Member of the month: voice hours + messages/50 + squads joined*2 over last month (the cog
   counts only joins of other members' posts, and fresh accounts aren't squad hosts or voice company).
 
-Coin rewards skip accounts younger than quests.MIN_ACCOUNT_DAYS (fresh alts can't farm them).
+Coin rewards skip accounts younger than quests.MIN_ACCOUNT_DAYS (fresh alts can't farm them);
+the cog asks quests.established.
 """
 
 from collections.abc import Callable, Iterable, Mapping
@@ -19,7 +20,6 @@ import config
 from logic import engagement as E
 from logic import shop
 from logic.engagement import Daily
-from logic.quests import MIN_ACCOUNT_DAYS
 from logic.recap import Monthly
 from names import slug
 
@@ -116,10 +116,6 @@ def stipend_ref(month: str, user_id: int) -> str:
 def boost_text(mention: str, coins: int) -> str:
     extra = f" **{coins:,} coins** are in your wallet as a thank-you." if coins else ""
     return f"💜 {mention} just boosted the server. Thank you!{extra}"
-
-
-def old_enough(created_at: int | None, now: int) -> bool:
-    return created_at is not None and now - created_at >= MIN_ACCOUNT_DAYS * DAY
 
 
 STAFF_SLUGS = frozenset(slug(n) for n in (config.KEEPER_ROLE, config.MOD_ROLE))

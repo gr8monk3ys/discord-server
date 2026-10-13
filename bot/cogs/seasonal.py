@@ -65,15 +65,9 @@ def never_raise(fn):
     return wrapper
 
 
-def created_ts(member) -> int | None:
-    created = getattr(member, "created_at", None)
-    return int(created.timestamp()) if created is not None else None
-
-
 def can_earn(member, t: int) -> bool:
-    """Not a bot, and the account is old enough by both its join date and its id."""
-    return (member is not None and not getattr(member, "bot", False)
-            and S.old_enough(created_ts(member), t) and Q.established(member.id, t))
+    """Not a bot, and an established account."""
+    return member is not None and not getattr(member, "bot", False) and Q.established(member.id, t)
 
 
 def _in(col: str, ids) -> tuple[str, tuple]:

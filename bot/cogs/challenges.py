@@ -46,7 +46,7 @@ NO_PINGS = discord.AllowedMentions.none()
 SEEN_KEY = f"first_seen:{CH.BOARD_JOB.name}"
 MAX_ANNOUNCE = 5  # claim lines per sweep; the rest are paid quietly
 NOT_YOURS = "These aren't your challenges. Run `/challenges` to see yours."
-TOO_NEW = (f"Your Discord account is under {CH.MIN_ACCOUNT_DAYS} days old, so challenge rewards "
+TOO_NEW = (f"Your Discord account is under {Q.MIN_ACCOUNT_DAYS} days old, so challenge rewards "
            "unlock later. Progress still shows here.")
 
 
@@ -63,11 +63,6 @@ def never_raise(fn):
         except Exception:
             log.exception("challenges: %s failed", fn.__name__)
     return wrapper
-
-
-def created_ts(member) -> int | None:
-    created = getattr(member, "created_at", None)
-    return int(created.timestamp()) if created is not None else None
 
 
 def _in(col: str, ids) -> tuple[str, tuple]:
@@ -313,7 +308,7 @@ class Challenges(commands.Cog):
     async def claim(self, member) -> list[tuple[str, int]]:
         """Claim everything finished for one member (this week, and last week during the grace)."""
         t = now()
-        if getattr(member, "bot", False) or not CH.old_enough(created_ts(member), t):
+        if getattr(member, "bot", False) or not Q.established(member.id, t):
             return []
         tracking = await self.db.tracking_allowed(member.id)
         paid = []
@@ -340,7 +335,7 @@ class Challenges(commands.Cog):
         t = now()
         optouts = await self.optouts()
         members = {m.id: m for m in guild.members
-                   if not m.bot and CH.old_enough(created_ts(m), t)}
+                   if not m.bot and Q.established(m.id, t)}
         paid: dict[int, list[tuple[str, int]]] = {}
         for week in CH.weeks_to_settle(t, self.tz):
             picks = CH.pick(week.key)
@@ -436,7 +431,7 @@ class Challenges(commands.Cog):
         tracking = await self.db.tracking_allowed(member.id)
         mine = (await self.progress(week, {member.id}, t)).get(member.id, {})
         claimed = (await self.claims(week.key, {member.id})).get(member.id, set())
-        old = CH.old_enough(created_ts(member), t)
+        old = Q.established(member.id, t)
         ready = CH.claimable(picks, mine, claimed, tracking)
         lines = [CH.progress_text(picks, mine, claimed, tracking), "", f"Resets <t:{week.end}:R>."]
         if not old:

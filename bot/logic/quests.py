@@ -31,9 +31,10 @@ def account_created(user_id: int) -> int:
 
 
 def established(user_id: int, at: int) -> bool:
-    """The account was at least MIN_ACCOUNT_DAYS old at `at`. Rewards that other people's
-    actions earn someone (joins, stars, voice company) only count established accounts, so
-    fresh alts can't farm them."""
+    """The account was at least MIN_ACCOUNT_DAYS old at `at`. The one age rule: the earner of
+    any reward must be established, and rewards that other people's actions earn someone
+    (joins, stars, voice company) only count established accounts, so fresh alts can't farm
+    them. The age comes from the id, which is where discord.py's `created_at` comes from too."""
     return at - account_created(user_id) >= MIN_ACCOUNT_DAYS * DAY
 
 
@@ -82,20 +83,18 @@ def has_picked_roles(role_names: Iterable[str]) -> bool:
     return any(slug(n) in PICK_ROLE_SLUGS for n in role_names)
 
 
-def eligible_for_reward(joined_at: int | None, started_at: int | None, now: int, *,
-                        created_at: int | None) -> bool:
+def eligible_for_reward(joined_at: int | None, started_at: int | None, now: int, *, user_id: int) -> bool:
     """Joined after the module went live, finished within NEW_MEMBER_DAYS of joining, and the
-    Discord account is at least MIN_ACCOUNT_DAYS old (fresh alts can't farm the reward)."""
-    if joined_at is None or started_at is None or created_at is None:
+    Discord account is established (fresh alts can't farm the reward)."""
+    if joined_at is None or started_at is None:
         return False
     return (joined_at >= started_at and now - joined_at <= NEW_MEMBER_DAYS * DAY
-            and now - created_at >= MIN_ACCOUNT_DAYS * DAY)
+            and established(user_id, now))
 
 
-def no_reward_reason(joined_at: int | None, started_at: int | None, now: int, *,
-                     created_at: int | None) -> str:
+def no_reward_reason(joined_at: int | None, started_at: int | None, now: int, *, user_id: int) -> str:
     """Why eligible_for_reward is False, in words for the member."""
-    if created_at is None or now - created_at < MIN_ACCOUNT_DAYS * DAY:
+    if not established(user_id, now):
         return f"your Discord account must be {MIN_ACCOUNT_DAYS}+ days old"
     if joined_at is None or started_at is None or joined_at < started_at:
         return "you joined before quests started"

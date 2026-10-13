@@ -23,7 +23,7 @@ from discord.ext import commands, tasks
 
 import config
 import style
-from logic import community as community_rules
+from cogkit import is_staff
 from logic import news as N
 
 log = logging.getLogger(__name__)
@@ -50,13 +50,6 @@ def fit(text: str, limit: int) -> str:
     if len(text) <= limit:
         return text
     return text[: limit - 1].rstrip("\\") + "…"
-
-
-def is_staff(user) -> bool:
-    guild = getattr(user, "guild", None)
-    if guild is None:
-        return False
-    return community_rules.can_handle(guild.owner_id == user.id, user.guild_permissions.administrator, user.roles)
 
 
 # ---------------------------------------------------------------- network seam

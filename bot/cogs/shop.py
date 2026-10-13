@@ -35,6 +35,7 @@ import style
 from cogs.lfg import ping_only
 from logic import shop as S
 from logic import textfilter
+from logic.quests import MIN_ACCOUNT_DAYS
 from logic.selfroles import has_dangerous_permissions
 
 log = logging.getLogger(__name__)
@@ -508,7 +509,8 @@ class Shop(commands.Cog):
             return
         if not S.can_enter(user.id, now()):
             await interaction.response.send_message(
-                "Your Discord account is too new for the raffle. Come back when it's a month old.", ephemeral=True)
+                "Your Discord account is too new for the raffle. "
+                f"Come back when it's {MIN_ACCOUNT_DAYS} days old.", ephemeral=True)
             return
         async with self.lock(user.id):
             t = now()

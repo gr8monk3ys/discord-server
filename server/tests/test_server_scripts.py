@@ -344,7 +344,8 @@ def _automod_guild(rules, invites=(), with_channels=True):
     guild = FakeGuild(roles=[keeper, mod])
     if with_channels:
         guild.categories.append(NS(id=40, name=public_mode.AUTOMOD_EXEMPT_CATEGORY))
-        guild.text_channels.append(NS(id=41, name=public_mode.AUTOMOD_ALERTS))
+        guild.text_channels.append(NS(id=41, name=layout.AUTOMOD_ALERTS))
+        guild.text_channels.append(NS(id=42, name="📋・mod-log"))  # not where the alerts go
     created = []
 
     async def fetch_automod_rules():
@@ -379,7 +380,8 @@ def test_automod_gaps_adds_only_the_invite_rule_to_the_live_set():
     types = {a.type for a in kw["actions"]}
     assert types == {discord.AutoModRuleActionType.block_message, discord.AutoModRuleActionType.send_alert_message}
     alert = next(a for a in kw["actions"] if a.type == discord.AutoModRuleActionType.send_alert_message)
-    assert alert.channel_id == 41  # the mod log
+    assert alert.channel_id == 41  # layout.AUTOMOD_ALERTS, the channel polish_server.py's rules alert in
+    assert not hasattr(public_mode, "AUTOMOD_ALERTS")  # one constant, in layout.py
 
 
 def test_automod_invite_patterns_match_invites_not_other_links():

@@ -17,9 +17,9 @@ from discord.ext import commands, tasks
 
 import config
 import style
+from cogkit import is_staff
 from cogs.lfg import ping_only
 from errors import reply_error
-from logic import community as community_rules
 from logic import utility as U
 
 log = logging.getLogger(__name__)
@@ -50,13 +50,6 @@ def never_raise(fn):
 
 def display(user) -> str:
     return discord.utils.escape_markdown(getattr(user, "display_name", None) or getattr(user, "name", "") or "someone")
-
-
-def is_staff(user) -> bool:
-    guild = getattr(user, "guild", None)
-    if guild is None:
-        return False
-    return community_rules.can_handle(guild.owner_id == user.id, user.guild_permissions.administrator, user.roles)
 
 
 # ---------------------------------------------------------------- ticket buttons

@@ -366,6 +366,18 @@ def test_requirements_tables_cover_config():
     assert {"send_messages", "embed_links"} <= announce["houses"]
     assert roles >= set(config.HOUSE_ROLES.values()) | {config.CREW_ROLE} and len(config.HOUSE_ROLES) == 3
     assert "houses" in ops.ROLE_HOLDERS and config.SUPPORTER_ROLE not in roles
+    # cogs that posted or handed out a role without a row until the coverage test below existed
+    channels_of = {}
+    for n in ops.CHANNEL_NEEDS:
+        channels_of.setdefault(n.cog, set()).add(n.channel)
+    assert channels_of["seasonal"] == {config.GENERAL_CHANNEL, config.GAMES_CHANNEL, config.ANNOUNCEMENTS_CHANNEL}
+    assert channels_of["votehub"] == {config.GAMES_CHANNEL} and channels_of["gamelink"] == {config.MOD_LOG_CHANNEL}
+    assert {"send_messages", "embed_links"} <= announce["events"] and {"send_messages", "embed_links"} <= announce[
+        "seasonal"]
+    assert (config.EVENT_ROLE, "seasonal") in ops.ROLE_NEEDS and "seasonal" in ops.ROLE_HOLDERS
+    assert "manage_messages" in by_channel[config.REALMS_CHANNEL]  # the status panel is pinned
+    assert ops.role_problems({}, 5, loaded={"seasonal"}) == [
+        Problem(ops.ROLES, f"{config.EVENT_ROLE}: role not found (seasonal)")]
 
 
 def test_wave9_needs_are_reported_like_the_rest():
@@ -396,6 +408,35 @@ def test_requirements_only_name_real_cogs_and_permissions():
     assert perms <= set(discord.Permissions.VALID_FLAGS)
     # The invite link asks for everything the self-check expects.
     assert all(getattr(main.PERMISSIONS, p) for p in perms)
+
+
+def test_every_module_is_covered_by_the_tables_or_exempt_with_a_reason():
+    """A new cog must get its rows or say why it needs none: this fails for a module that is in
+    neither CHANNEL_NEEDS nor NO_CHANNEL, and for a cog that changes members' roles without
+    being in ROLE_HOLDERS (the Manage Roles check) or NO_ROLE_HOLDER."""
+    import re
+    from pathlib import Path
+
+    import main
+    cogs = [ext.removeprefix("cogs.") for ext, _ in main.MODULES]
+    with_rows = {n.cog for n in ops.CHANNEL_NEEDS}
+    missing = [c for c in cogs if c not in with_rows and c not in ops.NO_CHANNEL]
+    assert missing == [], f"add CHANNEL_NEEDS rows in logic/ops.py, or a NO_CHANNEL reason, for: {missing}"
+    # an exemption is for a real module that has no row, and it says why
+    assert set(ops.NO_CHANNEL) <= set(cogs) and not set(ops.NO_CHANNEL) & with_rows
+    assert all(reason.strip() for reason in ops.NO_CHANNEL.values())
+
+    cogs_dir = Path(main.__file__).parent / "cogs"
+    changes_roles = {c for c in cogs
+                     if re.search(r"\b(?:add|remove)_roles\(", (cogs_dir / f"{c}.py").read_text(encoding="utf-8"))}
+    assert len(changes_roles) >= 10  # the search still finds them
+    holders = set(ops.ROLE_HOLDERS)
+    missing = sorted(changes_roles - holders - set(ops.NO_ROLE_HOLDER))
+    assert missing == [], f"add to ROLE_HOLDERS in logic/ops.py, or a NO_ROLE_HOLDER reason, for: {missing}"
+    assert set(ops.NO_ROLE_HOLDER) <= changes_roles and not set(ops.NO_ROLE_HOLDER) & holders
+    assert all(reason.strip() for reason in ops.NO_ROLE_HOLDER.values())
+    # a role in ROLE_NEEDS is handed out by a cog whose Manage Roles need is checked too
+    assert {cog for _, cog in ops.ROLE_NEEDS} <= holders
 
 
 def test_problems_digest_is_stable_and_order_free():

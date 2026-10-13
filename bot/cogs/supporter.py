@@ -30,9 +30,9 @@ from discord.ext import commands, tasks
 import config
 import economy
 import style
+from cogkit import is_staff
 from cogs.lfg import ping_only
 from cogs.selfroles import assignable
-from logic import community as community_rules
 from logic import quests as Q
 from logic import recap as R
 from logic import shop
@@ -66,15 +66,6 @@ def who(user) -> str:
     """'<@1> (name · `1`)': a mention that still reads right if the user leaves."""
     name = discord.utils.escape_markdown(getattr(user, "name", None) or str(user.id))
     return f"{user.mention} ({name} · `{user.id}`)"
-
-
-def is_staff(user) -> bool:
-    guild = getattr(user, "guild", None)
-    if guild is None:
-        return False
-    perms = getattr(user, "guild_permissions", None)
-    return community_rules.can_handle(guild.owner_id == user.id, bool(getattr(perms, "administrator", False)),
-                                      getattr(user, "roles", []))
 
 
 def is_supporter(member) -> bool:
