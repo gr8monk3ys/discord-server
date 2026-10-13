@@ -239,8 +239,10 @@ time.
 bot compares what the loaded cogs need (`logic/ops.py` tables) with what it actually has:
 channels exist, channel permissions, server permissions, and handed-out roles exist and sit
 below its own top role. One mod-log embed when the set of problems changes, one when it
-clears; the current count shows in `/status`. A test keeps the tables and `MODULES` in step,
-so a new cog that posts somewhere must be added there.
+clears; the current count shows in `/status`. A test fails when a module in `MODULES` has no
+`CHANNEL_NEEDS` row and no reason in `NO_CHANNEL`, or when a cog whose source calls
+`add_roles` / `remove_roles` is in neither `ROLE_HOLDERS` nor `NO_ROLE_HOLDER`. It checks that
+each cog is listed, not that every channel a cog posts in has a row: that part is still by hand.
 
 **Liveness.** `cogs/heartbeat.py` rewrites `bot/data/heartbeat` atomically every 60 s while
 the gateway connection is really up (it tracks disconnect/resume itself). `server/watchdog.py`
