@@ -73,6 +73,7 @@ MODULES = [
     ("cogs.wrapped", {"members"}),  # /wrapped year-in-review cards (Dec 1 - Jan 15), /wrapped-preview (staff)
     ("cogs.sitedata", {"members", "presences"}),  # landing page live data: aggregates file every 30 min, /sitedata refresh
     ("cogs.appeals", {"message_content"}),  # ban appeals from the website: review cards, /appeals list|code
+    ("cogs.tonight", {"members", "presences"}),  # one line in general while people are in voice (TONIGHT=off)
 ]
 
 PERMISSIONS = discord.Permissions(
