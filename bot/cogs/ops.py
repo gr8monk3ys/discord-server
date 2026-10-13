@@ -29,6 +29,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 import config
+import quietgate
 import snapshot_lib  # server/ is on sys.path via config
 import style
 from cogs.lfg import ping_only
@@ -498,6 +499,14 @@ class Ops(commands.Cog):
             log.warning("ops: the realms health line for /status failed", exc_info=True)
             return "check failed, see bot.log"
 
+    async def quiet_text(self) -> str | None:
+        """The prompts that are paused because nobody answers them (bot/quietgate.py), or None."""
+        try:
+            return "\n".join(await quietgate.status_lines(self.db)) or None
+        except Exception:
+            log.warning("ops: the paused prompts line for /status failed", exc_info=True)
+            return "check failed, see bot.log"
+
     # ------------------------------------------------------------ /status
     @staticmethod
     def is_staff(user) -> bool:
@@ -559,6 +568,9 @@ class Ops(commands.Cog):
         realms = self.realms_text()
         if realms is not None:
             embed.add_field(name="Realms bridge", value=realms[:1024], inline=False)
+        quiet = await self.quiet_text()
+        if quiet is not None:
+            embed.add_field(name="Paused prompts", value=quiet[:1024], inline=False)
         embed.add_field(name=f"Modules ({len(modules)})", value=", ".join(modules) or "none", inline=False)
         embed.add_field(name="Errors", value=errors[:1024], inline=False)
         await interaction.response.send_message(embed=embed, ephemeral=True)

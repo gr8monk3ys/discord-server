@@ -11,7 +11,10 @@
   partner applications, and "nothing needs you" when that's true). If the DM fails it goes to
   📋・mod-log instead. One field, "Games list", compares the last 28 days of game time with
   layout.GAMES (logic/gamelist.py): games worth adding or retiring, as counts and game names
-  only. It never changes the list.
+  only. It never changes the list. Another, "Newcomers", says whether the people who join
+  stick (logic/funnel.py): joined, left, picked roles, said something and joined voice for
+  the week and for 28 days, and how many of the week before's joiners came back, as counts
+  only. Members with tracking off count as joined and left and in nothing else.
 - Milestones: the first time the member count reaches 25, 50, 100, 250, 500 or 1000, one
   no-ping celebration in 📣・announcements (meta milestone:N). The very first check only
   records the milestones already passed.
@@ -37,8 +40,10 @@ import economy
 import jobs
 import style
 from cogs.lfg import ping_only
+from logic import funnel as F
 from logic import gamelist as GL
 from logic import growth as G
+from logic import quests as Q
 from logic import recap as R
 from logic import stats as S
 from logic import utility as U
@@ -310,6 +315,43 @@ class Recap(commands.Cog):
             log.exception("recap: games list check failed; left out")
             return None
 
+    async def newcomers_line(self, guild, first) -> str | None:
+        """Whether newcomers are sticking (logic/funnel.py): for the week that starts on `first`
+        and the 28 days that end with it, how many joined, left, picked roles, said something
+        and joined voice, as counts only. None when nobody joined in 28 days, or when it
+        fails: the digest never breaks over this line."""
+        try:
+            w = F.windows(first, self.tz)
+            start, end = w.month
+            who = "user_id IN (SELECT user_id FROM joins WHERE joined_at >= ? AND joined_at < ?)"
+            rows = await self.db.fetchall(
+                f"SELECT user_id, joined_at, left_at FROM joins WHERE joined_at < ? AND {who}", (end, start, end))
+            if not rows:
+                return None
+            joins = [F.Join(r["user_id"], r["joined_at"], r["left_at"]) for r in rows]
+            days = await self.db.fetchall(
+                f"SELECT user_id, day FROM message_counts WHERE count > 0 AND day >= ? AND {who}",
+                (F.day_key(start, self.tz), start, end))
+            voice = await self.db.fetchall(
+                'SELECT user_id, channel_id AS k, start, "end" FROM voice_sessions'
+                f" WHERE start >= ? AND start < ? AND {who}", (start, end, start, end))
+            steps = await self.db.fetchall(
+                f"SELECT user_id, at FROM quest_steps WHERE step = 'pick_roles' AND {who}", (start, end))
+            members = getattr(guild, "members", [])
+            afk = getattr(guild, "afk_channel", None)
+            return F.digest_text(F.review(
+                joins, w,
+                text_days=[(r["user_id"], r["day"]) for r in days],
+                voice=[S.Session(r["user_id"], r["k"], r["start"], r["end"]) for r in voice],
+                role_steps=[(r["user_id"], r["at"]) for r in steps],
+                roles_now={m.id for m in members
+                           if Q.has_picked_roles(getattr(role, "name", "") for role in getattr(m, "roles", ()))},
+                optouts=await self.optouts(), bots={m.id for m in members if m.bot},
+                excluded_channels={afk.id} if afk else set()))
+        except Exception:
+            log.exception("recap: newcomers check failed; left out")
+            return None
+
     async def owner(self, guild):
         if getattr(guild, "owner", None) is not None:
             return guild.owner
@@ -341,6 +383,9 @@ class Recap(commands.Cog):
         games = await self.game_list_line(guild, end)
         if games is not None:
             fields.insert(len(fields) - 1, (GL.FIELD, games))
+        newcomers = await self.newcomers_line(guild, first)
+        if newcomers is not None:
+            fields.insert(len(fields) - 1, (F.FIELD, newcomers))
         for name, value in fields:
             embed.add_field(name=name, value=value[:1024], inline=False)
         owner = await self.owner(guild)

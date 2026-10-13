@@ -4,6 +4,10 @@
   data/qotd.txt with no repeats until the bank runs out (`qotd_used`).
 - "This or that" native poll, 18:00 local in 💬・general, open 24 h, from data/polls.txt
   (`poll_used`).
+  Both stop while nobody answers them (logic/quiet.py through bot/quietgate.py): after three in
+  a row with no vote, reaction, thread message or reply the next ones are skipped (the day is
+  still marked done and nothing is taken from the bank) until a member writes in general, with
+  one try every 7 days. QUIET=off posts every day again.
 - 🔢・counting: only the next plain integer counts and nobody counts twice in a row. ✅ on a
   good count; ❌, a reset and a short note on a bad one. The best run is kept, and the
   Counting Champ role goes to whoever counted most in it.
@@ -30,9 +34,11 @@ from discord.ext import commands, tasks
 import config
 import economy
 import jobs
+import quietgate
 import style
 from cogs.lfg import ping_only
 from logic import engagement as E
+from logic import quiet as Q
 from logic import stats as S
 from logic.engagement import CountState, Daily
 from logic.schedule import Weekly
@@ -162,6 +168,8 @@ class Engagement(commands.Cog):
             log.warning("qotd %s skipped: %s", period.key,
                         "no questions" if channel else f"no {config.GENERAL_CHANNEL} channel")
             return True
+        if not await quietgate.allowed(self.bot, Q.QOTD, channel, period.scheduled_at):
+            return True  # nobody answers them: skipped on purpose, and no question is used up
         picked = await self.pick("qotd_used", "qid", len(self.questions))
         question = self.questions[picked.index]
         day = f"{E.MONTHS[period.day.month - 1][:3]} {period.day.day}"
@@ -169,6 +177,7 @@ class Engagement(commands.Cog):
                             footer=style.label("qotd", period.day.isoformat(), "answer in the thread"))
         message = await channel.send(embed=embed, allowed_mentions=NO_PINGS)
         await self.mark_used("qotd_used", "qid", picked)
+        await quietgate.posted(self.db, Q.QOTD, message, period.scheduled_at)
         try:
             await message.create_thread(name=f"QOTD {day}: answers", auto_archive_duration=1440)
         except discord.HTTPException:
@@ -184,13 +193,16 @@ class Engagement(commands.Cog):
             log.warning("poll %s skipped: %s", period.key,
                         "no pairs" if channel else f"no {config.GENERAL_CHANNEL} channel")
             return True
+        if not await quietgate.allowed(self.bot, Q.POLL, channel, period.scheduled_at):
+            return True  # nobody votes: skipped on purpose, and no pair is used up
         picked = await self.pick("poll_used", "pid", len(self.pairs))
         a, b = self.pairs[picked.index]
         poll = discord.Poll(question=POLL_QUESTION, duration=timedelta(hours=POLL_HOURS))
         poll.add_answer(text=a)
         poll.add_answer(text=b)
-        await channel.send(poll=poll, allowed_mentions=NO_PINGS)
+        message = await channel.send(poll=poll, allowed_mentions=NO_PINGS)
         await self.mark_used("poll_used", "pid", picked)
+        await quietgate.posted(self.db, Q.POLL, message, period.scheduled_at)
         log.info("posted poll %s (#%d)", period.key, picked.index)
         return True
 

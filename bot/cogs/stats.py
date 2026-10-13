@@ -91,6 +91,8 @@ class Stats(commands.Cog):
         self.last_beat: int | None = None
         # When the gateway went away (disconnect or suspend); None while connected.
         self.gone_at: int | None = None
+        # Weeks whose MVP is waiting for somewhere to post (for the log only).
+        self.waiting: set[str] = set()
 
     async def cog_load(self) -> None:
         # Runs in setup_hook, before the gateway connects: no voice/presence event can
@@ -439,23 +441,29 @@ class Stats(commands.Cog):
         await self.bot.wait_until_ready()
 
     async def run_weekly(self) -> None:
-        period = await jobs.due(self.db, MVP_JOB, self.tz, now())
-        if period is not None:
-            # Marked done only after posting: a Discord error retries on the next tick.
-            # Payouts hooked to weekly_mvp use ledger refs, so a retry can't pay twice.
-            await self.post_mvp(period)
-            await jobs.done(self.db, period, now())
+        # Marked done only when post_mvp says the week is handled. Nowhere to post, or a
+        # Discord error, leaves it for the next tick; the planner drops a week once the next
+        # one is due, so a channel that was gone for a month comes back to one post, not four.
+        # Payouts hooked to weekly_mvp use ledger refs, so a retry can't pay twice.
+        await jobs.run_due(self.db, MVP_JOB, self.tz, now, self.post_mvp)
 
-    async def post_mvp(self, period) -> None:
+    async def post_mvp(self, period) -> bool:
+        """True when the week is handled (posted, or a quiet week with nobody to name); False
+        when it couldn't be posted right now. Nothing is sent or paid before the False."""
         # The MVP is paid: fresh accounts (alts) can't win it or pad anyone's voice time.
         boards = await self.boards(period.window_start, period.window_end, established_only=True)
         winner = S.mvp(boards)
+        if winner is None:
+            log.info("weekly MVP %s: quiet week, nothing posted", period.key)
+            return True
         guild = self.guild()
         channel = config.match_by_name(guild.text_channels, config.GENERAL_CHANNEL) if guild else None
-        if winner is None or channel is None:
-            log.info("weekly MVP %s: %s", period.key, "quiet week, nothing posted" if winner is None
-                     else f"no {config.GENERAL_CHANNEL} channel")
-            return
+        if channel is None:
+            if period.key not in self.waiting:  # said once per week, not on every tick
+                self.waiting.add(period.key)
+                log.warning("weekly MVP %s: %s, trying again on the next tick", period.key,
+                            "the server isn't available" if guild is None else f"no {config.GENERAL_CHANNEL} channel")
+            return False
         lines = [f"**MVP**  <@{winner}>", ""]
         for name, scores in boards.items():
             top, _ = S.rank(scores, limit=1)
@@ -468,6 +476,7 @@ class Stats(commands.Cog):
                                                                     users=[discord.Object(winner)]))
         self.bot.dispatch("weekly_mvp", period.key, winner)
         log.info("posted weekly MVP %s: %s", period.key, winner)
+        return True
 
 
 async def setup(bot) -> None:

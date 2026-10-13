@@ -257,6 +257,7 @@ class Tournaments(commands.Cog):
         self.lock = asyncio.Lock()  # one sync at a time, so a match message is never posted twice
         self.event_retry: dict[int, int] = {}  # tournament id -> earliest next try at its event
         self.event_warned: set[int] = set()  # tournaments whose "no event" warning is out
+        self.no_channel_warned: set[str] = set()  # months whose "no tournaments channel" warning is out
 
     @property
     def db(self):
@@ -817,8 +818,13 @@ class Tournaments(commands.Cog):
             return True
         channel = self.channel(guild, config.TOURNAMENTS_CHANNEL)
         if channel is None:
-            log.warning("auto tournament %s: no %s channel", period.key, config.TOURNAMENTS_CHANNEL)
-            return True
+            # Nowhere to post right now is not "done": try again next tick, until it is too
+            # late to open signups (above). Said once per month, not on every tick.
+            if period.key not in self.no_channel_warned:
+                self.no_channel_warned.add(period.key)
+                log.warning("auto tournament %s: no %s channel; waiting for it", period.key,
+                            config.TOURNAMENTS_CHANNEL)
+            return False
         top = await self.top_game(period.window_start, period.window_end)
         game = T.auto_game(top, period.year, period.month, config.GAMES)
         name = T.auto_name(game, monday)

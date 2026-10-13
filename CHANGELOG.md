@@ -53,6 +53,19 @@ All notable changes to this project are recorded here. The format follows
 - `tonight` module: one line in general while two or more people are in a public voice
   channel (counts, the shared game and a channel mention, never names), edited in place and
   kept as a record afterwards. `TONIGHT=off` turns it off.
+- A "Newcomers" field in the Monday owner digest (`bot/logic/funnel.py`): for the week and the
+  last 28 days, how many joined, left since, picked roles, said something and joined voice; of
+  the week before's joiners, how many are still here and how many came back in week 2; and one
+  sentence of reading. Counts only. Members with tracking off count as joined and left and in
+  nothing else, and the field shows how many recent joiners have tracking off.
+- Quiet rooms (`bot/logic/quiet.py`, `bot/quietgate.py`): the question of the day and the
+  daily this-or-that poll stop when the last 3 of their kind went unanswered (no vote,
+  reaction, thread message or reply). The skipped day is marked done and no question is used
+  up. A member message in general lets the next one through, and one goes out anyway after 7
+  quiet days. One mod-log line per pause and resume, a "Paused prompts" field in `/status`,
+  and `QUIET=off` to post every day again. The chat revival (`vibes`) asks the same gate, but
+  its own rule already needs a member message, so the gate never refuses it. State is one
+  `meta` value per prompt (`quiet:<kind>`) with no member ids.
 
 ### Security
 
@@ -97,6 +110,20 @@ All notable changes to this project are recorded here. The format follows
   thanks" before the Supporter tier existed).
 - The site footers say "No tracking · No analytics" instead of "No cookies · No trackers",
   since Linked Roles sign-in sets a cookie.
+- The permission self-check now also expects Read Message History in general for the
+  `engagement` module: quiet rooms re-reads the bot's last prompt and the messages after it.
+
+### Fixed
+
+- Scheduled jobs no longer mark a period done when the server or their channel is missing at
+  the scheduled time. The weekly MVP (`stats`), the clip of the week poll (`clips`) and the
+  clipcast ask, publish and staff hand-over (`clipcast`) retry on each tick until the next
+  period is due. Before, a channel that was missing at that moment lost the week.
+- The daily appeal expiry (`appeals`) waits for the server instead of marking the day done,
+  and the channel sweep and the expiry now fail independently: a sweep that keeps raising no
+  longer stops the expiry from running.
+- The monthly auto tournament (`tournaments`) waits for a missing tournaments channel instead
+  of skipping the month, until it is too late to open sign-ups.
 
 ## [1.0.0] - 2026-10-11
 

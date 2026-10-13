@@ -15,7 +15,9 @@ import economy
 from cogs import vibes as cogmod
 from cogs.vibes import LAST_MSG_KEY, LAST_REVIVAL_KEY, STARTED_KEY, Vibes
 from logic import engagement as E
+from logic import quiet
 from logic import recap as R
+from logic import tonight as T
 from logic import vibes as V
 
 TZ = ZoneInfo("America/Los_Angeles")
@@ -153,6 +155,7 @@ def with_env(fn, monkeypatch):
         cog = Vibes(bot, questions=list(QUESTIONS), rng=random.Random(1))
         env = Env(db, guild, cog)
         monkeypatch.setattr(cogmod, "now", lambda: env.t)
+        monkeypatch.delenv("QUIET", raising=False)
         try:
             await fn(env)
         finally:
@@ -283,6 +286,92 @@ def test_no_questions_no_revival(monkeypatch):
         await env.db.execute("INSERT INTO meta (key, value) VALUES (?, ?)", (LAST_MSG_KEY, str(env.t - 4 * HOUR)))
         assert not await env.cog.revive()
         assert env.guild.general.sent == []
+    with_env(body, monkeypatch)
+
+
+# ---------------------------------------------------------------- chat revival and the quiet rule
+def spy_on_gate(monkeypatch, answer=None):
+    """Record every question to the quiet gate; `answer` replaces its verdict."""
+    asked = []
+    real = cogmod.quietgate.allowed
+
+    async def spy(bot, kind, channel, now, **kwargs):
+        asked.append((kind.key, now, kwargs))
+        return await real(bot, kind, channel, now, **kwargs) if answer is None else answer
+    monkeypatch.setattr(cogmod.quietgate, "allowed", spy)
+    return asked
+
+
+def test_quiet_gate_is_asked_last_and_the_revival_is_recorded(monkeypatch):
+    async def body(env):
+        asked = spy_on_gate(monkeypatch)
+        env.t = ts(2026, 10, 7, 14, 0)
+        said = env.t - 4 * HOUR
+        await env.db.execute("INSERT INTO meta (key, value) VALUES (?, ?)", (LAST_MSG_KEY, str(said)))
+        await env.db.meta_set(T.FIRED_KEY, env.t - 30 * 60)  # the voice line went up half an hour ago
+        assert not await env.cog.revive()
+        assert asked == []  # the one-hour rule said no first: the quiet rule was never consulted
+        env.t += 30 * 60
+        assert await env.cog.revive()
+        assert asked == [("revival", env.t, {"last_member_at": said})]
+        state = quiet.load(await env.meta("quiet:revival"))
+        assert [(p.at, p.message_id, p.answered) for p in state.posts] == [(env.t, None, False)]
+        assert not state.asleep
+    with_env(body, monkeypatch)
+
+
+def test_quiet_gate_can_hold_a_revival_back(monkeypatch):
+    async def body(env):
+        asked = spy_on_gate(monkeypatch, answer=False)
+        await env.db.execute("INSERT INTO meta (key, value) VALUES (?, ?)", (LAST_MSG_KEY, str(env.t - 4 * HOUR)))
+        assert not await env.cog.revive()
+        assert len(asked) == 1 and env.guild.general.sent == []
+        assert await env.meta(LAST_REVIVAL_KEY) is None  # nothing went out: the voice line is not held up
+        assert await env.db.fetchall("SELECT qid FROM qotd_used") == []  # and no question was used
+    with_env(body, monkeypatch)
+
+
+def test_revivals_are_never_paused_while_each_follows_a_member_message(monkeypatch):
+    async def body(env):
+        # The cog's own rule (no second starter until a member wrote) is stricter than the quiet
+        # rule's wake-up, so the gate always lets a due starter through.
+        ch = env.guild.general
+        env.t = ts(2026, 10, 7, 10, 0)
+        await env.db.execute("INSERT INTO meta (key, value) VALUES (?, ?)", (LAST_MSG_KEY, str(env.t - 4 * HOUR)))
+        for n in range(1, 7):
+            assert await env.cog.revive()
+            assert len(ch.sent) == n
+            env.t += 2 * HOUR
+            assert not await env.cog.revive()  # nobody wrote: the cog's own rule holds it
+            env.t += 60
+            await env.cog.on_message(env.say(11))  # one lone message, not an answer to anything
+            env.t = ts(2026, 10, 7 + n, 10, 0)
+        state = quiet.load(await env.meta("quiet:revival"))
+        assert len(state.posts) == quiet.N and not state.asleep
+    with_env(body, monkeypatch)
+
+
+def test_quiet_off_records_nothing_for_revivals(monkeypatch):
+    async def body(env):
+        monkeypatch.setenv("QUIET", "off")
+        await env.db.execute("INSERT INTO meta (key, value) VALUES (?, ?)", (LAST_MSG_KEY, str(env.t - 4 * HOUR)))
+        assert await env.cog.revive()
+        assert await env.meta("quiet:revival") is None
+    with_env(body, monkeypatch)
+
+
+def test_informational_vibes_posts_never_ask_the_quiet_gate(monkeypatch):
+    async def body(env):
+        asked = spy_on_gate(monkeypatch, answer=False)  # even a gate that says no to everything
+        await env.seen(V.ANNIV_JOB, ts(2026, 10, 1))
+        env.t = ts(2026, 10, 7, 11, 0)
+        env.member(1, joined_at=datetime(2025, 10, 7, 20, 0, tzinfo=TZ))
+        await run_anniv(env)
+        booster = env.member(2, premium_since=at(env.t))
+        assert await env.cog.thank_boost(booster)
+        sent = [m["content"] for m in env.guild.general.sent]
+        assert len(sent) == 2 and "anniversary" in sent[0] and "boosted" in sent[1]
+        assert asked == []
     with_env(body, monkeypatch)
 
 

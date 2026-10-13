@@ -41,7 +41,7 @@ The bot and scripts share one virtualenv at `server/.venv` (gitignored); it runs
 - Install: `python -m venv server/.venv`, then `server/.venv/Scripts/pip install -r requirements-dev.txt`
   (the runtime pins in `bot/requirements.txt` plus pytest and ruff; `server/requirements.txt` is a
   subset of the runtime pins). A new third-party import needs a line in `bot/requirements.txt`.
-- Bot tests: `cd bot && ../server/.venv/Scripts/python -m pytest -q -p no:warnings` (~4,100 tests, a few minutes)
+- Bot tests: `cd bot && ../server/.venv/Scripts/python -m pytest -q -p no:warnings` (~4,200 tests, a few minutes)
 - Server tests: `cd server && .venv/Scripts/python -m pytest -q tests` (about 275 tests)
 - Site function tests: `cd site/api && node --test` (34 tests, no network, no `npm install`;
   run from that folder, as CI does, so every Node version finds the test files)
@@ -64,6 +64,8 @@ CI (`.github/workflows/ci.yml`) runs ruff, both Python test suites and the site 
 - Scheduled jobs use Pacific time (`TZ` overrides), catch up once after downtime and never run twice.
 - Scheduled jobs go through `bot/jobs.py` (`due` / `done` / `run_due`), not hand-written `first_seen:` and
   `jobs` rows; the period key strings are live data, so never change their format (`docs/ARCHITECTURE.md`).
+- A recurring prompt that asks members for a response (a question, a poll) goes through
+  `bot/quietgate.py`: `allowed` before picking anything, `posted` after the send.
 - Snapshots use names, not IDs, and sorted output so `git diff server/snapshot` is meaningful.
 - A new module = `logic/` + tests, `cogs/`, then an entry in `MODULES` (README "Adding a module").
 

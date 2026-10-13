@@ -9,12 +9,15 @@ from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
 import discord
+import pytest
 from discord import app_commands
 
 import config
 import db as dbmod
 from cogs import stats as cogmod
+from cogs.economy import Economy
 from cogs.stats import MVP_JOB, Stats
+from logic import coins
 from logic import wrapped as W
 from logic.schedule import occurrence
 
@@ -806,6 +809,104 @@ def test_weekly_quiet_week_posts_nothing_but_marked_done(monkeypatch):
         await env.cog.run_weekly()
         assert env.guild.general.sent == [] and env.bot.dispatched == []
         assert mvp_key(2026, 10, 4) in await env.jobs()
+    with_env(go, monkeypatch)
+
+
+def take_away(env, what):
+    """Make the general channel ("channel") or the whole server ("guild") unavailable.
+    Returns the call that brings it back."""
+    if what == "guild":
+        env.bot.get_guild = lambda guild_id: None
+        return lambda: delattr(env.bot, "get_guild")
+    channels = env.guild.text_channels
+    env.guild.text_channels = [c for c in channels if c is not env.guild.general]
+    return lambda: setattr(env.guild, "text_channels", channels)
+
+
+async def mvp_ledger(env):
+    """The ledger once the economy cog has heard every weekly_mvp event dispatched so far."""
+    economy = Economy(env.bot)
+    for event, args in env.bot.dispatched:
+        if event == "weekly_mvp":
+            await economy.on_weekly_mvp(*args)
+    rows = await env.db.fetchall("SELECT user_id, delta, ref FROM ledger ORDER BY id")
+    return [(r["user_id"], r["delta"], r["ref"]) for r in rows]
+
+
+@pytest.mark.parametrize("missing", ["channel", "guild"])
+def test_weekly_mvp_waits_for_somewhere_to_post_then_posts_and_pays_once(monkeypatch, missing):
+    async def go(env):
+        g = env.guild
+        env.t = T0
+        await env.cog.run_weekly()
+        await busy_week(env)
+        key = mvp_key(2026, 10, 4)
+        bring_back = take_away(env, missing)
+        for minute in (0, 5, 10):  # the Sunday tick and two more: nowhere to post
+            env.t = ts(2026, 10, 4, 18, minute)
+            await env.cog.run_weekly()
+        assert key not in await env.jobs()  # not done: the week is still owed
+        assert env.bot.dispatched == [] and await mvp_ledger(env) == []
+        assert g.general.sent == [] and g.other.sent == [] and g.mod.sent == []
+
+        bring_back()
+        env.t = ts(2026, 10, 4, 18, 15)
+        await env.cog.run_weekly()
+        assert key in await env.jobs() and len(g.general.sent) == 1
+        assert g.general.sent[0]["content"] == f"MVP this week: <@{A}>"
+        assert env.bot.dispatched == [("weekly_mvp", (key, A))]
+        assert await mvp_ledger(env) == [(A, coins.MVP_COINS, coins.mvp_ref(key, A))]
+
+        for at in (ts(2026, 10, 4, 18, 20), ts(2026, 10, 7, 12)):  # later ticks: nothing more
+            env.t = at
+            await env.cog.run_weekly()
+        assert len(g.general.sent) == 1 and len(env.bot.dispatched) == 1
+        assert await mvp_ledger(env) == [(A, coins.MVP_COINS, coins.mvp_ref(key, A))]
+    with_env(go, monkeypatch)
+
+
+def test_weekly_mvp_channel_gone_for_weeks_comes_back_to_one_post(monkeypatch):
+    """A week is retried only while it is the latest one: when the next Sunday comes the
+    planner marks it skipped, so nothing piles up while the channel is missing."""
+    async def go(env):
+        g = env.guild
+        env.t = T0
+        await env.cog.run_weekly()
+        bring_back = take_away(env, "channel")
+        for sunday in (4, 11, 18):
+            thu = ts(2026, 10, sunday - 3, 20)
+            await env.voice(A, None, g.lobby, at=thu)
+            await env.voice(B, None, g.lobby, at=thu)
+            await env.voice(A, g.lobby, None, at=thu + HOUR)
+            await env.voice(B, g.lobby, None, at=thu + HOUR)
+            for at in (ts(2026, 10, sunday, 18, 0), ts(2026, 10, sunday + 2, 12)):
+                env.t = at
+                await env.cog.run_weekly()
+        assert g.general.sent == [] and env.bot.dispatched == []
+        done = await env.jobs()
+        assert {mvp_key(2026, 10, 4), mvp_key(2026, 10, 11)} <= done and mvp_key(2026, 10, 18) not in done
+
+        bring_back()
+        for minute in (5, 10):
+            env.t = ts(2026, 10, 20, 12, minute)
+            await env.cog.run_weekly()
+        assert len(g.general.sent) == 1  # the latest week only, once
+        assert env.bot.dispatched == [("weekly_mvp", (mvp_key(2026, 10, 18), A))]
+        assert mvp_key(2026, 10, 18) in await env.jobs()
+    with_env(go, monkeypatch)
+
+
+@pytest.mark.parametrize("missing", ["channel", "guild"])
+def test_weekly_quiet_week_is_done_even_with_nowhere_to_post(monkeypatch, missing):
+    """Nobody to name is a finished week, not one to keep retrying."""
+    async def go(env):
+        env.t = T0
+        await env.cog.run_weekly()
+        take_away(env, missing)
+        env.t = ts(2026, 10, 4, 18, 1)
+        await env.cog.run_weekly()
+        assert mvp_key(2026, 10, 4) in await env.jobs()
+        assert env.guild.general.sent == [] and env.bot.dispatched == []
     with_env(go, monkeypatch)
 
 
