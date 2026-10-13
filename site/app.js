@@ -1,6 +1,7 @@
 // Landing page behaviour: wire every Join link to the invite in config.js, show
 // live member/online counts from Discord's public invite endpoint (it sends CORS
-// headers, so the browser can read it), and fill the "Live" section from the
+// headers, so the browser can read it), rule the page in as it scrolls, and fill
+// the "Live" section from the
 // aggregates the bot publishes (config.js STATS_URL). Anything that fails just
 // leaves its part hidden; the page never depends on this script.
 (function () {
@@ -27,6 +28,44 @@
 
   var year = document.getElementById("year");
   if (year) year.textContent = String(new Date().getFullYear());
+
+  // Scroll motion: the pen rules the page (style.css, "motion"). Only what is still
+  // below the fold is armed, so nothing on screen ever blinks out, and each piece is
+  // inked once, when it arrives. Skipped when the reader asked for less motion or the
+  // browser has no IntersectionObserver; then the page is simply there.
+  var ink = function () {
+    var calm = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (calm || !("IntersectionObserver" in window)) return;
+    var settle = function (el) {
+      el.classList.add("inked");
+      // Back to the plain page once the ink is dry, so hover and theme changes are untouched.
+      window.setTimeout(function () { el.classList.remove("armed", "inked"); }, 2400);
+    };
+    var seen = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        seen.unobserve(entry.target);
+        settle(entry.target);
+      });
+    }, { rootMargin: "0px 0px -12% 0px" });
+    var fold = window.innerHeight;
+    document.documentElement.classList.add("inks");
+    document.querySelectorAll(
+      "main .ledger, .final-row, .ledger-body > .days, .ledger-body > .rules, .faq, #games .games"
+    ).forEach(function (el) {
+      if (el.closest("[hidden]") || el.getBoundingClientRect().top < fold) return;
+      el.classList.add("armed");
+      seen.observe(el);
+    });
+    // Paper gets the whole page, whatever has been scrolled past or not.
+    window.addEventListener("beforeprint", function () {
+      document.querySelectorAll(".armed").forEach(function (el) {
+        seen.unobserve(el);
+        el.classList.remove("armed", "inked");
+      });
+    });
+  };
+  ink();
 
   if (!window.fetch) return;
 
@@ -209,16 +248,6 @@
     return li;
   };
 
-  // Emoji for a game, read from the page's own games list (generated from layout.py).
-  var gameEmoji = function () {
-    var map = {};
-    document.querySelectorAll("#games .game").forEach(function (chip) {
-      var spans = chip.querySelectorAll("span");
-      if (spans.length === 2) map[spans[1].textContent] = spans[0].textContent;
-    });
-    return map;
-  };
-
   // Fills the live section. True when there is something to show.
   var render = function (stats, now) {
     var events = byId("live-events-list");
@@ -231,7 +260,7 @@
     var rows = 0;
     if (stats.seasonal) {
       var s = stats.seasonal;
-      events.appendChild(dayRow("Now", null, (s.emoji ? s.emoji + " " : "") + s.name,
+      events.appendChild(dayRow("Now", null, s.name,
         "Seasonal event · ends " + shortDate(s.ends)));
       rows += 1;
     }
@@ -265,14 +294,8 @@
     }
 
     if (stats.games.length) {
-      var emoji = gameEmoji();
       stats.games.forEach(function (g) {
         var li = el("li", "game");
-        if (emoji[g.name]) {
-          var icon = el("span", "game-emoji", emoji[g.name]);
-          icon.setAttribute("aria-hidden", "true");
-          li.appendChild(icon);
-        }
         li.appendChild(el("span", null, g.name));
         li.appendChild(el("span", "game-hours", fmt(g.hours) + " h"));
         games.appendChild(li);

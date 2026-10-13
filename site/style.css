@@ -382,7 +382,7 @@ h3.label { font-family: var(--mono); font-size: 0.72rem; font-weight: 500; lette
 
 /* -------------------------------------------------------------------- hero */
 /* The masthead: the Display line with the pen on the promise, a muted thesis,
-   and a square plate with its caption at the right. */
+   and the server's mark on a square plate at the right. */
 .hero { width: 100%; padding: 0 16px; }
 @media (min-width: 640px) { .hero { padding: 0 24px; } }
 @media (min-width: 1024px) { .hero { padding: 0 32px; } }
@@ -409,11 +409,6 @@ h3.label { font-family: var(--mono); font-size: 0.72rem; font-weight: 500; lette
 @media (min-width: 768px) { .plate { width: 100%; max-width: 300px; } }
 .plate-frame { position: relative; aspect-ratio: 1 / 1; border: 1px solid var(--hairline); }
 .plate-frame .icon { width: 100%; height: 100%; object-fit: cover; }
-.sticker { position: absolute; width: 26%; }
-.s1 { top: -9%; right: -9%; transform: rotate(10deg); }
-.s2 { bottom: 14%; left: -8%; transform: rotate(-12deg); }
-.s3 { bottom: -9%; right: 12%; transform: rotate(6deg); }
-.plate figcaption { margin-top: 12px; }
 
 /* ---------------------------------------------------------------- sections */
 /* The ledger: a sticky heading rail on the left (280-360px), the entries on
@@ -460,7 +455,6 @@ main > section[id] { scroll-margin-top: var(--header-h); }
   transition: color var(--default) var(--ease-ui);
 }
 .game:hover { color: var(--pen); }
-.game-emoji { font-size: 0.875rem; line-height: 1; }
 
 /* ------------------------------------------------------------------- rules */
 .rules { counter-reset: rule; border-top: 1px solid var(--hairline); }
@@ -605,3 +599,72 @@ footer { border-top: 1px solid color-mix(in srgb, var(--hairline) 60%, transpare
 .bar { grid-column: 1 / -1; height: 6px; border-radius: 9999px; background: var(--tint); overflow: hidden; }
 .bar-fill { display: block; width: 0; height: 100%; border-radius: inherit; background: color-mix(in srgb, var(--pen) 45%, transparent); }
 .houses li:first-child .bar-fill { background: var(--pen); }
+
+/* ------------------------------------------------------------------ motion */
+/* Scroll: the pen rules the page. app.js puts .inks on <html> (never when the
+   reader asked for less motion), arms whatever is still below the fold, and
+   marks each piece .inked once, as it arrives. Without the script every rule
+   here is inert and the page is simply there.
+
+   A section's opening rule is drawn left to right in Forest Ink and dries to
+   the hairline, and its heading is written in behind the pen. A ledger's rows
+   are ruled one under another. The game chips are set down one at a time.
+   Nothing here moves text that is already on screen. */
+@media (prefers-reduced-motion: no-preference) {
+  /* The rules become drawable: a 1px bar over the (now clear) border, and a
+     1px background line where the element's pseudo-elements are spoken for. */
+  .inks main .ledger, .inks .final-row { position: relative; border-top-color: transparent; }
+  .inks main .ledger::before, .inks .final-row::before {
+    content: "";
+    position: absolute;
+    inset: -1px 0 auto;
+    height: 1px;
+    background: var(--hairline);
+    transform-origin: left center;
+  }
+  .inks .ledger-body > :is(.days, .rules) {
+    border-top-color: transparent;
+    background: linear-gradient(var(--hairline), var(--hairline)) left top / 100% 1px no-repeat border-box;
+  }
+  .inks .ledger-body > :is(.days, .rules) > li, .inks .faq > details {
+    border-bottom-color: transparent;
+    background: linear-gradient(var(--hairline), var(--hairline)) left bottom / 100% 1px no-repeat border-box;
+  }
+  .inks .faq > details:first-child {
+    border-top-color: transparent;
+    background:
+      linear-gradient(var(--hairline), var(--hairline)) left top / 100% 1px no-repeat border-box,
+      linear-gradient(var(--hairline), var(--hairline)) left bottom / 100% 1px no-repeat border-box;
+  }
+
+  /* Armed: the pen has not been here yet. */
+  .inks .armed::before { transform: scaleX(0); background: var(--pen); }
+  .inks .armed h2 { clip-path: inset(-0.2em 100% -0.2em 0); }
+  .inks .armed:is(.days, .rules), .inks .armed:is(.days, .rules) > li, .inks .faq.armed > details { background-size: 0 1px; }
+  .inks .games.armed > .game { opacity: 0; transform: translateY(6px) scale(0.96); }
+
+  /* Inked: each piece arrives once. Rows and chips follow one another, capped
+     at the eighth so a long list never keeps the reader waiting. */
+  .inks .armed > :nth-child(2) { --n: 1; }
+  .inks .armed > :nth-child(3) { --n: 2; }
+  .inks .armed > :nth-child(4) { --n: 3; }
+  .inks .armed > :nth-child(5) { --n: 4; }
+  .inks .armed > :nth-child(6) { --n: 5; }
+  .inks .armed > :nth-child(7) { --n: 6; }
+  .inks .armed > :nth-child(n + 8) { --n: 7; }
+  .inks .armed.inked::before {
+    transform: scaleX(1);
+    background: var(--hairline);
+    transition: transform 900ms var(--ease-ink), background-color 700ms ease 600ms;
+  }
+  .inks .armed.inked h2 { clip-path: inset(-0.2em -0.1em -0.2em 0); transition: clip-path 900ms var(--ease-ink) 120ms; }
+  .inks .armed.inked:is(.days, .rules), .inks .armed.inked:is(.days, .rules) > li, .inks .faq.armed.inked > details {
+    background-size: 100% 1px;
+    transition: background-size 700ms var(--ease-ink) calc(var(--n, 0) * 70ms);
+  }
+  .inks .games.armed.inked > .game {
+    opacity: 1;
+    transform: none;
+    transition: opacity 320ms ease calc(var(--n, 0) * 45ms), transform 560ms var(--ease-ink) calc(var(--n, 0) * 45ms);
+  }
+}
