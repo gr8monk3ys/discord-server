@@ -63,6 +63,7 @@ Discord interaction / gateway event / tasks.loop tick
    logic/<name>.py       pure rules: no discord, no database, no clock of its own
         |                (the cog passes `now`, rows and plain values in)
    db.py / economy.py    one aiosqlite connection; coins only through economy.py
+   jobs.py               (tasks.loop ticks) which period of a scheduled job is due, and marking it done
 ```
 
 Worked example, `/daily`: `cogs/economy.py` checks `db.tracking_allowed(user)`, opens
@@ -101,8 +102,8 @@ Rules that make this hold together:
 ## Module map
 
 Load order is the order in `MODULES`. "Writes" lists tables the cog writes besides `meta`
-and `jobs` (most cogs with scheduled jobs write both). Times are local (Pacific unless `TZ`
-is set). Loops without a wall-clock time are plain `tasks.loop` intervals.
+and `jobs` (most cogs with scheduled jobs write both, through `bot/jobs.py`: see Scheduled
+jobs below). Times are local (Pacific unless `TZ` is set). Loops without a wall-clock time are plain `tasks.loop` intervals.
 
 | Module | Owns | Writes | Scheduled work | Channels and roles |
 |---|---|---|---|---|
@@ -230,16 +231,38 @@ posts it, and every outbound link is rebuilt from validated parts (invite code, 
 channel id) rather than copied. Purchased colour roles are name-prefixed so they cannot look
 like staff roles.
 
-**Scheduled jobs (`logic/schedule.py`).** A job is a `Weekly(name, weekday, hour, minute)`;
+**Scheduled jobs (`logic/schedule.py`, `bot/jobs.py`).** A job is a `Weekly(name, weekday, hour, minute)`;
 `plan()` returns the one `Period` to run now and any older ones to mark done. Semantics:
 only the latest due period can ever run; the very first sighting of a job only marks it done
 (turning a module on never replays history); missed periods since first sight are marked
 done, not run; a finished period's key (`name:YYYY-Www`) goes into `jobs` after the work
 succeeded, so a failure retries on the next tick and a success never repeats. `first_seen:<job>`
-lives in `meta`. `Daily` (`logic/ops.py`, `logic/engagement.py`) and `Monthly`
-(`logic/recap.py`, `logic/tournaments.py`) follow the same rules with day and month keys. Cogs
-poll with a 1 to 5 minute `tasks.loop` and ask the planner; nothing sleeps until a wall-clock
+lives in `meta`. `Daily` (`logic/ops.py`, `logic/engagement.py`), `Monthly`
+(`logic/recap.py`, `logic/tournaments.py`) and `Annual` (`logic/wrapped.py`) follow the same
+rules with day, month and year keys; each has its own planner with the same signature. Cogs
+poll with a 1 to 10 minute `tasks.loop` and ask the planner; nothing sleeps until a wall-clock
 time.
+
+The planners are pure; the database half is `bot/jobs.py`, a plain module with no Discord
+imports and no clock of its own. `due(db, job, tz, now, planner=schedule.plan)` reads
+`first_seen:<job>` and the job's finished keys (`key LIKE '<job>:%'`), asks the planner, writes
+first_seen and the skipped periods in one transaction and returns the period to run, unmarked.
+`done(db, period, now)` marks it after the work succeeded. `run_due(db, job, tz, clock, action,
+planner)` is both: it marks the period only when `action(period)` returns truthy, and an
+exception goes to the caller with nothing marked. Fifteen cogs run their jobs through it:
+`appeals`, `challenges`, `clipcast`, `clips`, `engagement`, `events`, `houses`, `partners`,
+`recap`, `stats`, `supporter`, `tournaments`, `vibes`, `votehub` and `wrapped`. What differs
+stays in the cog: `events` catches its action's errors and gives up a day after the scheduled
+time, and `clips`, `stats`, `clipcast` and `appeals` mark the period done whenever the work
+returns without raising. Because the keys are read with `LIKE`, a job name must not differ from
+another only by `_`, `%` or letter case.
+
+Three drivers are still their own, on purpose: `ops` (backup, drift, permission check: it reads
+the keys with `substr`, writes first_seen in a statement of its own and stamps skipped periods
+with a second clock read), the `shop` raffle (its periods come from ticket rows in the ledger
+and there is no first_seen) and the `seasonal` drops (a slot's key is claimed before the post
+goes out, so a crash loses a drop rather than repeating one). Their `jobs` keys never collide
+with the ones above.
 
 **Permission self-check (`cogs/ops.py`).** About a minute after ready and daily at 09:00 the
 bot compares what the loaded cogs need (`logic/ops.py` tables) with what it actually has:
@@ -406,7 +429,7 @@ Never run the bot on two machines with the same token: the lock is per machine. 
 | Add a feature | `bot/logic/<name>.py` + `tests/test_<name>.py`, then `bot/cogs/<name>.py` + `tests/test_<name>_cog.py`, then an entry in `MODULES` with the privileged intents it needs |
 | Store something new | Append a **new** list to `MIGRATIONS`; never edit an existing one. Update `PRIVACY.md` if it is about members, and the data-model table above |
 | Pay or charge coins | `economy.apply_tx` / `transfer_tx` with a `reason` and, for anything retryable, a `ref`. Put amounts and caps in `logic/`. Gate rewards on `quests.established`. Add the source or sink to `docs/ECONOMY.md` |
-| Run something on a schedule | Define a `Weekly` / `Daily` / `Monthly` job in `logic/`, poll it from a `tasks.loop`, record the period key in `jobs` only after the work succeeded |
+| Run something on a schedule | Define a `Weekly` / `Daily` / `Monthly` job in `logic/` with a name no other job has, poll it from a `tasks.loop` with `jobs.run_due(self.db, JOB, self.tz, now, action, planner)` (`bot/jobs.py`), and have the action return True only when the period is handled. Don't write `first_seen:` or `jobs` rows by hand |
 | Post in a channel or hand out a role | Add the name to `bot/config.py` (and to `server/layout.py` if it does not exist yet, created with `public_mode.py`), then add a `Need` / `ROLE_NEEDS` entry in `bot/logic/ops.py` so the self-check covers it |
 | Repost member text | Run it through `logic/textfilter`, escape markdown, send with `ping_only(...)` or `AllowedMentions.none()` |
 | Record member activity | Check `db.tracking_allowed` first; make opt-out delete it (`cogs/stats.py` `/privacy`) |
