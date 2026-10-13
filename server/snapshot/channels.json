@@ -362,7 +362,7 @@
         },
         {
           "bitrate": 64000,
-          "name": "👥 Members: 15",
+          "name": "👥 Members: 16",
           "nsfw": false,
           "overwrites": {
             "member:Front Desk": {
@@ -389,7 +389,7 @@
         },
         {
           "bitrate": 64000,
-          "name": "🟢 Online: 4",
+          "name": "🟢 Online: 5",
           "nsfw": false,
           "overwrites": {
             "member:Front Desk": {
@@ -595,6 +595,11 @@
               "name": "Fortnite"
             },
             {
+              "emoji": "🪚",
+              "moderated": false,
+              "name": "Gears of War"
+            },
+            {
               "emoji": "🚗",
               "moderated": false,
               "name": "GTA Online"
@@ -605,9 +610,19 @@
               "name": "League of Legends"
             },
             {
+              "emoji": "🦸",
+              "moderated": false,
+              "name": "Marvel Rivals"
+            },
+            {
               "emoji": "⛏️",
               "moderated": false,
               "name": "Minecraft"
+            },
+            {
+              "emoji": "🦍",
+              "moderated": false,
+              "name": "Overwatch"
             },
             {
               "emoji": "🏆",
@@ -615,9 +630,19 @@
               "name": "Ranked"
             },
             {
+              "emoji": "🌧️",
+              "moderated": false,
+              "name": "Risk of Rain 2"
+            },
+            {
               "emoji": "🧱",
               "moderated": false,
               "name": "Roblox"
+            },
+            {
+              "emoji": "🃏",
+              "moderated": false,
+              "name": "Tabletop Simulator"
             },
             {
               "emoji": "🎯",
@@ -694,6 +719,11 @@
               "name": "Fortnite"
             },
             {
+              "emoji": "🪚",
+              "moderated": false,
+              "name": "Gears of War"
+            },
+            {
               "emoji": "🚗",
               "moderated": false,
               "name": "GTA Online"
@@ -704,14 +734,29 @@
               "name": "League of Legends"
             },
             {
+              "emoji": "🦸",
+              "moderated": false,
+              "name": "Marvel Rivals"
+            },
+            {
               "emoji": "⛏️",
               "moderated": false,
               "name": "Minecraft"
             },
             {
+              "emoji": "🦍",
+              "moderated": false,
+              "name": "Overwatch"
+            },
+            {
               "emoji": "❓",
               "moderated": false,
               "name": "Question"
+            },
+            {
+              "emoji": "🌧️",
+              "moderated": false,
+              "name": "Risk of Rain 2"
             },
             {
               "emoji": "🧱",
@@ -722,6 +767,11 @@
               "emoji": "⚙️",
               "moderated": false,
               "name": "Settings"
+            },
+            {
+              "emoji": "🃏",
+              "moderated": false,
+              "name": "Tabletop Simulator"
             },
             {
               "emoji": "🎯",
@@ -739,75 +789,12 @@
           "type": "forum"
         },
         {
-          "name": "🪂・fortnite",
-          "nsfw": false,
-          "overwrites": {},
-          "slowmode": 0,
-          "synced": true,
-          "topic": "Fortnite talk, squads, and strats. Ping @Fortnite.",
-          "type": "text"
-        },
-        {
-          "name": "🎯・valorant",
-          "nsfw": false,
-          "overwrites": {},
-          "slowmode": 0,
-          "synced": true,
-          "topic": "Valorant talk, squads, and strats. Ping @Valorant.",
-          "type": "text"
-        },
-        {
-          "name": "💥・call-of-duty",
-          "nsfw": false,
-          "overwrites": {},
-          "slowmode": 0,
-          "synced": true,
-          "topic": "Call of Duty talk, squads, and strats. Ping @Call of Duty.",
-          "type": "text"
-        },
-        {
-          "name": "🧙・league-of-legends",
-          "nsfw": false,
-          "overwrites": {},
-          "slowmode": 0,
-          "synced": true,
-          "topic": "League of Legends talk, squads, and strats. Ping @League of Legends.",
-          "type": "text"
-        },
-        {
-          "name": "💣・counter-strike",
-          "nsfw": false,
-          "overwrites": {},
-          "slowmode": 0,
-          "synced": true,
-          "topic": "Counter-Strike 2 talk, squads, and strats. Ping @Counter-Strike 2.",
-          "type": "text"
-        },
-        {
           "name": "🔺・apex-legends",
           "nsfw": false,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
           "topic": "Apex Legends talk, squads, and strats. Ping @Apex Legends.",
-          "type": "text"
-        },
-        {
-          "name": "🚗・gta-online",
-          "nsfw": false,
-          "overwrites": {},
-          "slowmode": 0,
-          "synced": true,
-          "topic": "GTA Online talk, squads, and strats. Ping @GTA Online.",
-          "type": "text"
-        },
-        {
-          "name": "🧱・roblox",
-          "nsfw": false,
-          "overwrites": {},
-          "slowmode": 0,
-          "synced": true,
-          "topic": "Roblox talk, squads, and strats. Ping @Roblox.",
           "type": "text"
         },
         {
@@ -850,6 +837,51 @@
           "slowmode": 2,
           "synced": true,
           "topic": "The Realms, our Minecraft server. Status is pinned; chat here reaches the game, and linked players' chat comes back. /realms link gets you on the whitelist.",
+          "type": "text"
+        },
+        {
+          "name": "🌧️・risk-of-rain-2",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "topic": "Risk of Rain 2 talk, squads, and strats. Ping @Risk of Rain 2.",
+          "type": "text"
+        },
+        {
+          "name": "🪚・gears-of-war",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "topic": "Gears of War talk, squads, and strats. Ping @Gears of War.",
+          "type": "text"
+        },
+        {
+          "name": "🦍・overwatch",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "topic": "Overwatch talk, squads, and strats. Ping @Overwatch.",
+          "type": "text"
+        },
+        {
+          "name": "🦸・marvel-rivals",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "topic": "Marvel Rivals talk, squads, and strats. Ping @Marvel Rivals.",
+          "type": "text"
+        },
+        {
+          "name": "🃏・tabletop-simulator",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "topic": "Tabletop Simulator talk, squads, and strats. Ping @Tabletop Simulator.",
           "type": "text"
         }
       ],
@@ -1180,6 +1212,300 @@
           "deny": []
         },
         "role:Squad": {
+          "allow": [
+            "read_messages"
+          ],
+          "deny": []
+        }
+      },
+      "type": "category"
+    },
+    {
+      "channels": [
+        {
+          "name": "🪂・fortnite",
+          "nsfw": false,
+          "overwrites": {
+            "member:Front Desk": {
+              "allow": [
+                "connect",
+                "embed_links",
+                "read_messages",
+                "send_messages"
+              ],
+              "deny": []
+            },
+            "role:@everyone": {
+              "allow": [],
+              "deny": [
+                "read_messages"
+              ]
+            },
+            "role:Keeper": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            },
+            "role:Moderator": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            }
+          },
+          "slowmode": 0,
+          "synced": true,
+          "topic": "Fortnite talk, squads, and strats. Ping @Fortnite.",
+          "type": "text"
+        },
+        {
+          "name": "🎯・valorant",
+          "nsfw": false,
+          "overwrites": {
+            "member:Front Desk": {
+              "allow": [
+                "connect",
+                "embed_links",
+                "read_messages",
+                "send_messages"
+              ],
+              "deny": []
+            },
+            "role:@everyone": {
+              "allow": [],
+              "deny": [
+                "read_messages"
+              ]
+            },
+            "role:Keeper": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            },
+            "role:Moderator": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            }
+          },
+          "slowmode": 0,
+          "synced": true,
+          "topic": "Valorant talk, squads, and strats. Ping @Valorant.",
+          "type": "text"
+        },
+        {
+          "name": "💥・call-of-duty",
+          "nsfw": false,
+          "overwrites": {
+            "member:Front Desk": {
+              "allow": [
+                "connect",
+                "embed_links",
+                "read_messages",
+                "send_messages"
+              ],
+              "deny": []
+            },
+            "role:@everyone": {
+              "allow": [],
+              "deny": [
+                "read_messages"
+              ]
+            },
+            "role:Keeper": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            },
+            "role:Moderator": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            }
+          },
+          "slowmode": 0,
+          "synced": true,
+          "topic": "Call of Duty talk, squads, and strats. Ping @Call of Duty.",
+          "type": "text"
+        },
+        {
+          "name": "🧙・league-of-legends",
+          "nsfw": false,
+          "overwrites": {
+            "member:Front Desk": {
+              "allow": [
+                "connect",
+                "embed_links",
+                "read_messages",
+                "send_messages"
+              ],
+              "deny": []
+            },
+            "role:@everyone": {
+              "allow": [],
+              "deny": [
+                "read_messages"
+              ]
+            },
+            "role:Keeper": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            },
+            "role:Moderator": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            }
+          },
+          "slowmode": 0,
+          "synced": true,
+          "topic": "League of Legends talk, squads, and strats. Ping @League of Legends.",
+          "type": "text"
+        },
+        {
+          "name": "💣・counter-strike",
+          "nsfw": false,
+          "overwrites": {
+            "member:Front Desk": {
+              "allow": [
+                "connect",
+                "embed_links",
+                "read_messages",
+                "send_messages"
+              ],
+              "deny": []
+            },
+            "role:@everyone": {
+              "allow": [],
+              "deny": [
+                "read_messages"
+              ]
+            },
+            "role:Keeper": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            },
+            "role:Moderator": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            }
+          },
+          "slowmode": 0,
+          "synced": true,
+          "topic": "Counter-Strike 2 talk, squads, and strats. Ping @Counter-Strike 2.",
+          "type": "text"
+        },
+        {
+          "name": "🚗・gta-online",
+          "nsfw": false,
+          "overwrites": {
+            "member:Front Desk": {
+              "allow": [
+                "connect",
+                "embed_links",
+                "read_messages",
+                "send_messages"
+              ],
+              "deny": []
+            },
+            "role:@everyone": {
+              "allow": [],
+              "deny": [
+                "read_messages"
+              ]
+            },
+            "role:Keeper": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            },
+            "role:Moderator": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            }
+          },
+          "slowmode": 0,
+          "synced": true,
+          "topic": "GTA Online talk, squads, and strats. Ping @GTA Online.",
+          "type": "text"
+        },
+        {
+          "name": "🧱・roblox",
+          "nsfw": false,
+          "overwrites": {
+            "member:Front Desk": {
+              "allow": [
+                "connect",
+                "embed_links",
+                "read_messages",
+                "send_messages"
+              ],
+              "deny": []
+            },
+            "role:@everyone": {
+              "allow": [],
+              "deny": [
+                "read_messages"
+              ]
+            },
+            "role:Keeper": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            },
+            "role:Moderator": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            }
+          },
+          "slowmode": 0,
+          "synced": true,
+          "topic": "Roblox talk, squads, and strats. Ping @Roblox.",
+          "type": "text"
+        }
+      ],
+      "name": "99 · archive",
+      "overwrites": {
+        "member:Front Desk": {
+          "allow": [
+            "connect",
+            "embed_links",
+            "read_messages",
+            "send_messages"
+          ],
+          "deny": []
+        },
+        "role:@everyone": {
+          "allow": [],
+          "deny": [
+            "read_messages"
+          ]
+        },
+        "role:Keeper": {
+          "allow": [
+            "read_messages"
+          ],
+          "deny": []
+        },
+        "role:Moderator": {
           "allow": [
             "read_messages"
           ],

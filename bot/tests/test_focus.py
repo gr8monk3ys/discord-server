@@ -104,8 +104,9 @@ def test_realms_is_online_is_none_until_it_knows():
         return c
     assert cog(status_on=False).is_online() is None  # not set up
     assert cog().is_online() is None  # not polled yet
-    assert cog(next_poll_at=T0).is_online() is True
-    assert cog(next_poll_at=T0, failures=1).is_online() is None  # one missed poll may be a blip
+    assert cog(next_poll_at=T0).is_online() is None  # the first poll has started, not answered
+    assert cog(next_poll_at=T0, reached_at=T0).is_online() is True
+    assert cog(next_poll_at=T0, reached_at=T0, failures=1).is_online() is None  # one missed poll may be a blip
     assert cog(next_poll_at=T0, failures=3, down_since=T0 - 60).is_online() is False
 
 

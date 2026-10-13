@@ -1,34 +1,15 @@
 {
   "default_channels": [
-    "♟️・chess",
     "⛏️・realms",
     "➕ New Squad",
-    "⭐・hall-of-fame",
     "🆘・help",
-    "🎨・art",
-    "🎭・roles",
-    "🎮 Squad",
     "🎮・lfg",
-    "🎲・games",
-    "🏆・tournaments",
-    "👋・welcome",
-    "👗・fashion",
-    "💡・suggestions",
-    "💤 AFK",
     "💬・general",
-    "💻・code",
     "📌・rules",
-    "📚・guides",
     "📣・announcements",
     "📸・clips",
-    "📺・creators",
     "🔊 Lobby",
-    "🔢・counting",
-    "🕹️・gaming",
-    "🖥・setups",
-    "🤖・bot-commands",
-    "🤝・partners",
-    "🤣・memes"
+    "🕹️・gaming"
   ],
   "enabled": true,
   "mode": "default",
@@ -38,14 +19,47 @@
       "options": [
         {
           "channels": [
-            "🪖・wardogs"
+            "🌧️・risk-of-rain-2"
           ],
-          "description": "Get @Wardogs pings and the #wardogs channel.",
-          "emoji": "🪖",
+          "description": "Get @Risk of Rain 2 pings and the #risk-of-rain-2 channel.",
+          "emoji": "🌧️",
           "roles": [
-            "Wardogs"
+            "Risk of Rain 2"
           ],
-          "title": "Wardogs"
+          "title": "Risk of Rain 2"
+        },
+        {
+          "channels": [
+            "🪚・gears-of-war"
+          ],
+          "description": "Get @Gears of War pings and the #gears-of-war channel.",
+          "emoji": "🪚",
+          "roles": [
+            "Gears of War"
+          ],
+          "title": "Gears of War"
+        },
+        {
+          "channels": [
+            "🦍・overwatch"
+          ],
+          "description": "Get @Overwatch pings and the #overwatch channel.",
+          "emoji": "🦍",
+          "roles": [
+            "Overwatch"
+          ],
+          "title": "Overwatch"
+        },
+        {
+          "channels": [
+            "🦸・marvel-rivals"
+          ],
+          "description": "Get @Marvel Rivals pings and the #marvel-rivals channel.",
+          "emoji": "🦸",
+          "roles": [
+            "Marvel Rivals"
+          ],
+          "title": "Marvel Rivals"
         },
         {
           "channels": [
@@ -60,58 +74,25 @@
         },
         {
           "channels": [
-            "🪂・fortnite"
+            "🃏・tabletop-simulator"
           ],
-          "description": "Get @Fortnite pings and the #fortnite channel.",
-          "emoji": "🪂",
+          "description": "Get @Tabletop Simulator pings and the #tabletop-simulator channel.",
+          "emoji": "🃏",
           "roles": [
-            "Fortnite"
+            "Tabletop Simulator"
           ],
-          "title": "Fortnite"
+          "title": "Tabletop Simulator"
         },
         {
           "channels": [
-            "🎯・valorant"
+            "🪖・wardogs"
           ],
-          "description": "Get @Valorant pings and the #valorant channel.",
-          "emoji": "🎯",
+          "description": "Get @Wardogs pings and the #wardogs channel.",
+          "emoji": "🪖",
           "roles": [
-            "Valorant"
+            "Wardogs"
           ],
-          "title": "Valorant"
-        },
-        {
-          "channels": [
-            "💥・call-of-duty"
-          ],
-          "description": "Get @Call of Duty pings and the #call-of-duty channel.",
-          "emoji": "💥",
-          "roles": [
-            "Call of Duty"
-          ],
-          "title": "Call of Duty"
-        },
-        {
-          "channels": [
-            "🧙・league-of-legends"
-          ],
-          "description": "Get @League of Legends pings and the #league-of-legends channel.",
-          "emoji": "🧙",
-          "roles": [
-            "League of Legends"
-          ],
-          "title": "League of Legends"
-        },
-        {
-          "channels": [
-            "💣・counter-strike"
-          ],
-          "description": "Get @Counter-Strike 2 pings and the #counter-strike channel.",
-          "emoji": "💣",
-          "roles": [
-            "Counter-Strike 2"
-          ],
-          "title": "Counter-Strike 2"
+          "title": "Wardogs"
         },
         {
           "channels": [
@@ -123,28 +104,6 @@
             "Apex Legends"
           ],
           "title": "Apex Legends"
-        },
-        {
-          "channels": [
-            "🚗・gta-online"
-          ],
-          "description": "Get @GTA Online pings and the #gta-online channel.",
-          "emoji": "🚗",
-          "roles": [
-            "GTA Online"
-          ],
-          "title": "GTA Online"
-        },
-        {
-          "channels": [
-            "🧱・roblox"
-          ],
-          "description": "Get @Roblox pings and the #roblox channel.",
-          "emoji": "🧱",
-          "roles": [
-            "Roblox"
-          ],
-          "title": "Roblox"
         },
         {
           "channels": [],
@@ -303,6 +262,99 @@
       "required": false,
       "single_select": false,
       "title": "Want pings?",
+      "type": "multiple_choice"
+    },
+    {
+      "in_onboarding": false,
+      "options": [
+        {
+          "channels": [
+            "🏆・tournaments"
+          ],
+          "description": "Brackets, sign-ups and results.",
+          "emoji": "🏆",
+          "roles": [],
+          "title": "Events and tournaments"
+        },
+        {
+          "channels": [
+            "🎲・games",
+            "🔢・counting",
+            "🤖・bot-commands"
+          ],
+          "description": "Daily word game, counting, coin games and bot commands.",
+          "emoji": "🎲",
+          "roles": [],
+          "title": "Coins, levels and games"
+        },
+        {
+          "channels": [
+            "⭐・hall-of-fame",
+            "📺・creators",
+            "🤝・partners"
+          ],
+          "description": "Members' streams and uploads, starred messages, partner servers.",
+          "emoji": "📺",
+          "roles": [],
+          "title": "Creators and highlights"
+        },
+        {
+          "channels": [
+            "💡・suggestions",
+            "📚・guides",
+            "🖥・setups"
+          ],
+          "description": "Guides, setups and suggestions for the server.",
+          "emoji": "📚",
+          "roles": [],
+          "title": "Forums"
+        },
+        {
+          "channels": [
+            "♟️・chess",
+            "🎨・art",
+            "👗・fashion",
+            "💻・code",
+            "🤣・memes"
+          ],
+          "description": "Memes, art, code, fashion and chess.",
+          "emoji": "🤣",
+          "roles": [],
+          "title": "Off topic"
+        },
+        {
+          "channels": [
+            "⛏️・realms"
+          ],
+          "description": "The Realms: server status and chat with whoever is in game.",
+          "emoji": "⛏️",
+          "roles": [],
+          "title": "Minecraft"
+        },
+        {
+          "channels": [
+            "🎭・roles",
+            "👋・welcome"
+          ],
+          "description": "The roles panel, and who just joined.",
+          "emoji": "🎭",
+          "roles": [],
+          "title": "Roles and arrivals"
+        },
+        {
+          "channels": [
+            "🎮 Squad",
+            "💤 AFK"
+          ],
+          "description": "The five-seat squad room and the AFK room.",
+          "emoji": "🔊",
+          "roles": [],
+          "title": "More voice rooms"
+        }
+      ],
+      "required": false,
+      "single_select": false,
+      "title": "What else do you want to see?",
       "type": "multiple_choice"
     }
   ]
