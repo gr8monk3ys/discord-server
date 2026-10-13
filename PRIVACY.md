@@ -125,9 +125,21 @@ landing page reads it. It holds no names, avatars or IDs. A number that describe
 three members is left out, the rest are rounded, and members with tracking off are left out of
 every total that comes from a per-member record. House scores appear only when every house
 has at least three members who scored that week. Event titles are only Front Desk's own
-wording ("Valorant game night", "Watch party", "Town Hall", "Valorant tournament"): what a
+wording ("Overwatch game night", "Watch party", "Town Hall", "Overwatch tournament"): what a
 host typed, a tournament's name or the title of an event made by hand is never published. The
 branch keeps only the latest file.
+
+**The voice line in general.** While two or more people are in a public voice channel, Front
+Desk keeps one line in the general channel that says how many are there, which channel, and
+the game most of them have in common if there is one. Nobody is named, and nothing about
+members is stored for it. Members with tracking off are counted as people in the room, but
+Front Desk does not read which game they are playing. When the room empties the line changes
+to how long the session ran and how many people it reached, and stays in the channel.
+
+**The weekly games-list check.** Each Monday the server owner's digest, a private message to
+the owner only, compares the last 28 days of game time with the server's games list. It shows
+game names with a player count and hours, never who played. A game that fewer than three
+members played is never named, and members with tracking off are not counted.
 
 **Bans and appeals.** A ban is stored as a moderation case, with the time. If appeals are on,
 Front Desk DMs you an appeal code before the ban. The appeal form is on the website, which

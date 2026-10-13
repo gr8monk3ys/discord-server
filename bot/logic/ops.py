@@ -377,6 +377,7 @@ CHANNEL_NEEDS: list[Need] = [
     Need("staffapps", config.MOD_LOG_CHANNEL, POST),
     Need("vibes", config.GENERAL_CHANNEL, POST + ("read_message_history",)),
     Need("vibes", config.ANNOUNCEMENTS_CHANNEL, POST),  # member of the month
+    Need("tonight", config.GENERAL_CHANNEL, POST + ("read_message_history",)),  # the voice line
     Need("growth", config.BOT_COMMANDS_CHANNEL, POST),  # bump reminders
     Need("stats", config.GENERAL_CHANNEL, POST),  # weekly MVP
     Need("crew", config.GENERAL_CHANNEL, POST),  # the crew ping

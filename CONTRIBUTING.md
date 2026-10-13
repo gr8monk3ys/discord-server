@@ -38,8 +38,8 @@ click.
 ## Checks to run before pushing
 
 ```bash
-cd bot && ../server/.venv/Scripts/python -m pytest -q          # about 3,940 tests, a few minutes
-cd server && .venv/Scripts/python -m pytest -q tests           # 216 tests, seconds
+cd bot && ../server/.venv/Scripts/python -m pytest -q          # about 4,100 tests, a few minutes
+cd server && .venv/Scripts/python -m pytest -q tests           # 255 tests, seconds
 cd site/api && node --test                                     # 34 tests, the site functions
 server/.venv/Scripts/python -m ruff check .                    # from the repo root
 ```
@@ -66,8 +66,8 @@ since `bot/` imports `server/layout.py` and a layout change can break bot tests 
 - **Scheduled jobs** follow `logic/schedule.py`: local time, catch up once after downtime,
   never run twice.
 - **Server scripts** dry-run by default and change Discord only with `--apply`. Later
-  changes to the live server go through `public_mode.py` (additive); do not add anything
-  that reorders or deletes roles or channels.
+  changes to the live server go through `public_mode.py` (additive, apart from archiving the
+  channels of retired games); do not add anything that reorders or deletes roles or channels.
 - **Snapshots** use names, not IDs, and sorted output.
 - **Docs travel with the change.** Update `README.md` when behaviour, commands or schedules
   change, `PRIVACY.md` when what is stored about members changes, `docs/ECONOMY.md` for a

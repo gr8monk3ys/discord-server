@@ -50,7 +50,9 @@ python -m venv .venv
 ```
 
 Edit `layout.py` first. `GAMES` at the top holds your group's actual games, and
-each one gets a ping role plus a channel. The script is safe to re-run: it
+each one gets a ping role plus a channel. `RETIRED_GAMES` under it holds games the
+server used to list: their roles stay, they are no longer offered, and
+`public_mode.py` archives their channels. The script is safe to re-run: it
 matches existing channels and roles by plain name, so `#general` becomes
 `#💬・general` instead of a duplicate.
 
@@ -90,8 +92,17 @@ in `layout.ROLES`, and every bot gets `@Bots` so they're grouped in the member l
 - Give yourself **@Keeper** and your friends **@Squad**.
 - Take Administrator back off the bot's role. Front Desk now stays as the server's
   permanent bot (section 3) with only the permissions it needs.
-- For later changes use `public_mode.py`: it only adds things and never reorders or deletes,
-  so it works with Front Desk sitting below the staff roles.
+- For later changes use `public_mode.py`: it never reorders or deletes, so it works with
+  Front Desk sitting below the staff roles. It adds what is missing, with one exception: a
+  game in `RETIRED_GAMES` leaves the "What do you play?" question and its channel moves into
+  the staff-only `99 · archive` category (messages and the role are kept; the dry run lists
+  every channel it would hide).
+- To give newcomers a short channel list, run `focus_mode.py` (`--plan` prints the plan from
+  `layout.py` alone, no arguments is a dry run against the server, then `--apply`). The
+  Onboarding default channels become the nine in `ONBOARDING_DEFAULT_CHANNELS`, and the other
+  public channels become answers to one optional question, "What else do you want to see?".
+  No permission changes and nothing is deleted: every channel stays open to @everyone and
+  current members keep the list they have. `--revert` makes every channel a default again.
 - Reset the bot token in the portal if you shared `.env` anywhere.
 - Optional: set `ICON_PATH` in `layout.py` to a square image for the server icon.
 
@@ -162,7 +173,7 @@ day-to-day attention. Design and history:
 | Achievements | 23 badges, `/profile`, `/badges`; checked on activity and hourly; Founding Member is granted without a post |
 | Creators | `/creator link/verify/unlink/list` (members prove ownership with a code in their channel description), staff `/creator approve/remove`; YouTube uploads and Twitch go-live in 📺・creators |
 | Levels | XP from chat (60 s cooldown) and voice; Regular/Veteran/Elite/Legend/Mythic at levels 5/10/20/30/50; `/rank` card, `/levels`, staff `/xp`; level-ups are announced from level 5 (the first reward role) |
-| Recap | weekly recap in 📣・announcements Mondays 10:00, owner digest by DM 10:05, member milestones, monthly invite contest (1500/750/300 coins) on the 1st |
+| Recap | weekly recap in 📣・announcements Mondays 10:00, owner digest by DM 10:05, member milestones, monthly invite contest (1500/750/300 coins) on the 1st. The digest has a "Games list" field that compares the last 28 days of play with `GAMES`: worth adding (an unlisted game that 3+ members played for 5+ hours combined, a retired one included) and worth retiring (a listed game nobody played); game names, player counts and hours only, and it never changes the list |
 | Self roles | button panel in 🎭・roles (platform, region, play time, pings, games), `/roles`; Game Night role pinged when a game night starts |
 | Partners | `/partner apply` → staff review card in 📋・mod-log → 🤝・partners; weekly dead-invite sweep; staff `/partner remove` |
 | Starter quest | `/quest`: pick roles, say hi, join a squad, claim `/daily`, join voice; the Settled In badge, plus 500 coins for new members (account 30+ days old, finished within 30 days of joining); one nudge DM after a day |
@@ -170,7 +181,7 @@ day-to-day attention. Design and history:
 | Auto tournaments | first Monday of the month: a 16-player bracket for the most-played game, Discord event, Saturday 19:00 auto-start (4+ entrants), 1 h reminder, nudges for unreported matches; matches still undecided after 48 h (including a report the opponent never confirmed) go to staff in mod-log |
 | Weekly challenges | 3 rotating goals each week (150/250/400 coins + 300 bonus), board in 🎲・games Mondays 09:00, `/challenges` with Claim button, hourly auto-claim; squads and voice company only count from accounts 30+ days old, a game night counts once it starts (not if cancelled), a tournament entry once it starts |
 | Daily Word | `/word guess/today/stats/leaderboard`: one 5-letter word a day (order salted with a private secret kept in the database), spoiler-free results in 🎲・games, coins for wins, streaks |
-| Vibes | conversation starter when 💬・general is quiet for 3 h, join anniversaries, booster thanks + 1000 coins and a monthly stipend, member of the month (squads = joining someone else's post) |
+| Vibes | conversation starter when 💬・general is quiet for 3 h (not within an hour of the Tonight voice line), join anniversaries, booster thanks + 1000 coins and a monthly stipend, member of the month (squads = joining someone else's post) |
 | Matchmaking | `/queue join/leave/status`: pick a game, mode and size; when the queue fills, a voice channel is made and the players are pinged in 🎲・games; entries expire after 60 min |
 | Economy extras | `/raffle buy/info` (weekly draw Sundays 20:00, 80% of the pot to the winner, 20% burned), Gift Hype, Spotlight (pinned shoutout for 24 h); staff `/economy` for supply and minted vs burned. Audit: `docs/ECONOMY.md` |
 | Help | `/help` (categories built from the live command list, staff commands hidden from members, "Start here" button), `/about`; the bot's status rotates every 5 min |
@@ -191,6 +202,8 @@ day-to-day attention. Design and history:
 | Live site data | every 30 min the bot writes `bot/data/site/stats.json`: server-wide aggregates only (no names or IDs, nothing about fewer than 3 members, rounded numbers; house standings only when every house has 3+ members who scored that week; event titles are only the bot's own templates, never a tournament name or a hand-made title); `server/publish_site_data.py` pushes it to the `site-data` branch and the landing page shows it; staff `/sitedata refresh`; `SITE_DATA=off` stops it |
 | Ban appeals | a banned member appeals at discord.lscaturchio.xyz/appeal with the code from their ban DM; a review card appears in 🔒・appeals with Accept (unbans) and Deny buttons for staff with Ban Members, plus a discussion thread; read 7 days after the ban at the earliest, 90 days between a denial and the next appeal, open appeals close after 30 days; staff `/appeals list`, `/appeals code`; off until `APPEAL_SECRET` is set |
 | Linked Roles | Discord's own Linked Roles for verified Steam, Xbox, PlayStation and Epic Games connections, served by `site/api/linked-role/` on Vercel; the bot is not involved and nothing is stored. Setup: `docs/LINKED_ROLES.md` |
+| Focus | once `server/focus_mode.py` has cut the Onboarding default channels to the core, the bot adds 🏆・tournaments to the defaults while a tournament is open for sign-ups or running and ⛏️・realms while the Minecraft server is online, and takes each out again afterwards (only if it added it): checked every minute, at most one change per channel per 15 min, one line in 📋・mod-log per change. It only edits the default list, never a channel or a permission, and does nothing while every channel is still a default. No commands |
+| Tonight | one line in 💬・general while 2+ people are in a public voice channel: how many, the game most of them share if there is one, and the channel as a mention; never names, no pings. Posted once a room has held for 3 min, edited in place at most every 2 min, and turned into a past-tense line (how long, how many at most) when the rooms empty; it is kept as a record, never deleted. At most 3 new lines a day; a new session reuses the previous line when nobody has written since; not within an hour of the Vibes conversation starter. `TONIGHT=off` turns it off |
 
 Turning the newest features on (permissions, secrets, outside accounts): `docs/WAVE9_SETUP.md`.
 
@@ -230,8 +243,10 @@ All times are Pacific. Every scheduled job catches up once after downtime and ne
 | A role won't be given out | The role must sit **below Front Desk** in Server Settings → Roles. Only the owner can move roles above the bot |
 | Run by hand (debugging) | `python server\watchdog.py --pause 60` first (or it restarts the task), stop the task, then `bot\run_bot.bat`; `--resume` afterwards |
 | Watchdog status | `python server\watchdog.py --check` |
-| Tests | `cd bot`, then `..\server\.venv\Scripts\python -m pytest -q` (about 3,940 tests); `cd server`, then `.venv\Scripts\python -m pytest -q tests` (216); `cd site\api`, then `node --test` (34, the site functions). CI runs all three |
-| New roles or channels in `layout.py` | `cd server`, then `.venv\Scripts\python public_mode.py` (dry run) and `--apply`. It only adds; the permission self-check lists what is still missing in 📋・mod-log |
+| Tests | `cd bot`, then `..\server\.venv\Scripts\python -m pytest -q` (about 4,100 tests); `cd server`, then `.venv\Scripts\python -m pytest -q tests` (255); `cd site\api`, then `node --test` (34, the site functions). CI runs all three |
+| New roles or channels in `layout.py` | `cd server`, then `.venv\Scripts\python public_mode.py` (dry run) and `--apply`. It adds what is missing and never deletes; the one thing it takes away is a retired game's channel, which it moves to the staff-only archive (next row). The permission self-check lists what is still missing in 📋・mod-log |
+| Add or retire a game | In `server\layout.py`, move the game's tuple line between `GAMES` and `RETIRED_GAMES` (a brand-new game is a new line in `GAMES`). Then `cd bot` and `..\server\.venv\Scripts\python -m logic.sitegen` (the site's games block), `cd server` and `.venv\Scripts\python public_mode.py` (dry run: read what it would hide) then `--apply`, and restart the bot. Retiring keeps the role and every member's copy of it and moves the channel, messages included, into `99 · archive`; moving the line back and re-running undoes it |
+| Shorten or restore the newcomer channel list | `cd server`, then `.venv\Scripts\python focus_mode.py --plan` (the plan from `layout.py`), `focus_mode.py` (dry run against the server) and `focus_mode.py --apply`; `--revert` (dry run) and `--revert --apply` make every channel a default again. Afterwards run `snapshot_server.py` and commit `server/snapshot/onboarding.json` |
 | Turn on a new feature | `docs/WAVE9_SETUP.md`: one checklist, cheapest steps first. Secrets go in `server\.env` (bot; restart it afterwards) or the Vercel project (site functions; redeploy afterwards) |
 | Landing page live section is gone | It hides itself when the published data is 48 h old. Run `python server\publish_site_data.py` (dry run) to see why nothing is pushed; `/sitedata refresh` rebuilds the file |
 | Someone was banned without an appeal code | `/appeals code` shows it so you can pass it on. `/ban` sends it by DM before the ban; a ban from Discord's own menu usually can't |

@@ -40,6 +40,22 @@ All notable changes to this project are recorded here. The format follows
 - Two badges, Welcoming Committee and On the Channel (23 in the catalogue), and a per-year
   Wrapped badge outside it.
 - `docs/WAVE9_SETUP.md`: the owner checklist for turning these on.
+- `RETIRED_GAMES` in `server/layout.py`: games the server used to list. Retiring a game is
+  moving its line there from `GAMES`, and moving it back lists it again. `public_mode.py`
+  gained the steps that follow the two lists (game roles and channels, forum tags, the "What
+  do you play?" options, archive and restore).
+- A "Games list" field in the Monday owner digest (`bot/logic/gamelist.py`): games worth
+  adding and worth retiring, from the last 28 days of play. Game names, player counts and
+  hours only, never a game fewer than three members played, and it never edits the list.
+- `server/focus_mode.py` (`--plan`, dry run by default, `--apply`, `--revert`): cuts the
+  Onboarding default channels to a core of nine and puts the other public channels behind one
+  optional question, "What else do you want to see?". No permission changes, nothing deleted.
+- `focus` module: adds the tournaments channel to the Onboarding defaults while a tournament
+  is open or running and the realms channel while the Minecraft server is online, and removes
+  them again afterwards.
+- `tonight` module: one line in general while two or more people are in a public voice
+  channel (counts, the shared game and a channel mention, never names), edited in place and
+  kept as a record afterwards. `TONIGHT=off` turns it off.
 
 ### Security
 
@@ -55,7 +71,22 @@ All notable changes to this project are recorded here. The format follows
   `/api/appeal`) and `https://raw.githubusercontent.com` (the live data).
 - The site sets one short-lived cookie during Linked Roles sign-in (`__Host-fd_linked_role`,
   HttpOnly, 10 minutes, deleted when the member comes back). It had no cookies before.
-- The schema is at version 23 (eight new migrations) and the bot loads 46 modules.
+- The schema is at version 23 (eight new migrations) and the bot loads 48 modules.
+- The games list is now Risk of Rain 2, Gears of War, Overwatch, Marvel Rivals, Minecraft,
+  Tabletop Simulator, Wardogs and Apex Legends. Fortnite, Valorant, Call of Duty, League of
+  Legends, Counter-Strike 2, GTA Online and Roblox are retired: their roles stay (members keep
+  them) but are no longer offered, and old squad posts and queue rows that name one still
+  show its name.
+- `public_mode.py` is no longer purely additive. Its `retire_games` step removes a retired
+  game from the "What do you play?" question and moves the game's channel into a staff-only
+  `99 · archive` category. It still never deletes anything: messages, roles and forum tags are
+  kept, the dry run lists every channel it would hide, and listing the game again moves the
+  channel back.
+- The chat revival in general (`vibes`) and the new voice line (`tonight`) never both post
+  within the same hour.
+- The site, `docs/LISTING.md`, the banner images, the server description, the welcome screen
+  and the welcome post now describe a small co-op and PvE server that is mostly on in the
+  evenings, US Pacific time.
 - CI also runs the site function tests (`node --test` in `site/api`).
 - `/privacy tracking:off` also deletes a member's Minecraft playtime, forum post records and
   Welcome Crew greetings at once, removes them from the level snapshots and withdraws clipcast

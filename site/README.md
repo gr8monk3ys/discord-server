@@ -60,8 +60,8 @@ server-wide aggregates, with no member names, avatars or IDs:
 1. The bot (`bot/cogs/sitedata.py`, rules in `bot/logic/sitedata.py`) writes
    `bot/data/site/stats.json` every 30 minutes, or on `/sitedata refresh` (staff). Anything that
    describes fewer than 3 members is left out, numbers are rounded, game names come from
-   `layout.py` only, and event titles are always one of the bot's own templates ("Valorant game
-   night", "Town Hall", "Watch party", "Valorant tournament"); an event with any other title is
+   `layout.py` only, and event titles are always one of the bot's own templates ("Overwatch game
+   night", "Town Hall", "Watch party", "Overwatch tournament"); an event with any other title is
    left out, so a tournament's name, a watch party's subject and a hand-made event's title
    never reach the page. House standings are whole-number points per member, published only
    when every house has 3 or more members who scored that week.
