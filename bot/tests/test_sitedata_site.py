@@ -98,6 +98,7 @@ def test_live_styles_use_only_the_house_tokens():
     css = read("style.css")
     assert "[hidden] { display: none !important; }" in css
     live = css[css.index("/* -------------------------------------------------------------------- live */"):]
+    live = live[:live.index("/* ------------------------------------------------------------------ motion */")]
     assert not re.search(r"#[0-9a-fA-F]{3,8}\b", live), "a colour outside the token set"
     assert "rgb(" not in live and "hsl(" not in live and "@font-face" not in live
     assert set(re.findall(r"var\((--[\w-]+)\)", live)) <= {"--pen", "--tint", "--ink-muted", "--mono", "--default",

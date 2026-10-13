@@ -15,7 +15,7 @@ def test_render_games_lists_each_game_in_order():
     html = sitegen.render_games([("🎯", "valorant", "Valorant"), ("🧱", "roblox", "Roblox")])
     assert html.index("Valorant") < html.index("Roblox")
     assert html.count("<li") == 2
-    assert "🎯" in html and 'aria-hidden="true"' in html
+    assert "🎯" not in html and "game-emoji" not in html  # names only; emoji stay in Discord
 
 
 def test_render_games_escapes_html():
@@ -219,8 +219,8 @@ def test_site_week_strip_and_faq_promise_only_what_happens():
     assert week, "the weekly schedule strip"
     week = week.group(0)
     assert "<h2>A normal week</h2>" in week
-    # the Friday game night is the bot's calendar entry, not a promise that people come
-    assert "if people come" in week and "Tournament night" not in week
+    # the Friday game night is the bot's calendar entry, not a promise of a crowd
+    assert "puts a 9 PM game night on the calendar" in week and "Tournament night" not in week
     faq = re.search(r'<section id="faq".*?</section>', page, re.S).group(0)
     assert 5 <= faq.count("<details>") <= 8
     for want in ("How busy is it?", "/realms link", "US Pacific"):

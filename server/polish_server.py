@@ -101,8 +101,11 @@ class Polish:
     # ------------------------------------------------------------ onboarding
     async def onboarding(self):
         print("\nOnboarding")
-        defaults = [self.channel(n) for n in layout.ONBOARDING_DEFAULT_CHANNELS]
-        missing = [n for n, c in zip(layout.ONBOARDING_DEFAULT_CHANNELS, defaults) if c is None]
+        # A first build starts with every public channel as a default. The short list in
+        # ONBOARDING_DEFAULT_CHANNELS only makes sense together with the opt-in question, and
+        # focus_mode.py is what sets both (in one edit).
+        defaults = [self.channel(n) for n in layout.ONBOARDING_EVERYTHING]
+        missing = [n for n, c in zip(layout.ONBOARDING_EVERYTHING, defaults) if c is None]
         if missing:
             print(f"! missing default channels: {', '.join(missing)}")
             return

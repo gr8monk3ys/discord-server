@@ -416,7 +416,7 @@ GUILD_NEEDS: list[GuildNeed] = [
     GuildNeed("create_events", EVENT_MAKERS, CREATE_EVENTS_HINT),
     GuildNeed("moderate_members", ("moderation",)),
     GuildNeed("manage_messages", ("moderation",)),
-    GuildNeed("manage_guild", ("growth", "focus")),  # reading invites; editing Onboarding's default channels
+    GuildNeed("manage_guild", ("growth",)),  # reading invites
     GuildNeed("move_members", ("tempvoice",)),
     GuildNeed("ban_members", ("appeals", "moderation"),  # /ban, checking a ban, unbanning on Accept
               "Server Settings -> Roles -> Front Desk -> turn on Ban Members"),

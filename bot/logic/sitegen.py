@@ -18,12 +18,10 @@ OG_SIZE = (1200, 630)
 
 
 def render_games(games) -> str:
-    """games: iterable of (emoji, channel, role) tuples, as in layout.GAMES."""
-    items = [
-        f'<li class="game"><span class="game-emoji" aria-hidden="true">{html.escape(emoji)}</span>'
-        f"<span>{html.escape(role)}</span></li>"
-        for emoji, _channel, role in games
-    ]
+    """games: iterable of (emoji, channel, role) tuples, as in layout.GAMES. The page shows the
+    names only: the emoji belong to Discord's channel list, and on a web page they render
+    differently on every system."""
+    items = [f"<li class=\"game\"><span>{html.escape(role)}</span></li>" for _emoji, _channel, role in games]
     return "\n".join(items)
 
 
