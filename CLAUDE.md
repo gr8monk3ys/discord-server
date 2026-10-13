@@ -40,7 +40,7 @@ The bot and scripts share one virtualenv at `server/.venv` (gitignored); it runs
   (the runtime pins in `bot/requirements.txt` plus pytest and ruff; `server/requirements.txt` is a
   subset of the runtime pins). A new third-party import needs a line in `bot/requirements.txt`.
 - Bot tests: `cd bot && ../server/.venv/Scripts/python -m pytest -q -p no:warnings` (~4,100 tests, a few minutes)
-- Server tests: `cd server && .venv/Scripts/python -m pytest -q tests` (255 tests)
+- Server tests: `cd server && .venv/Scripts/python -m pytest -q tests` (about 275 tests)
 - Site function tests: `cd site/api && node --test` (34 tests, no network, no `npm install`;
   run from that folder, as CI does, so every Node version finds the test files)
 - Lint: `server/.venv/Scripts/ruff check .` from the repo root (`ruff.toml`: bug-catching rules only,
