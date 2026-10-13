@@ -32,6 +32,11 @@ def at(ts):
     return datetime.fromtimestamp(ts, tz=timezone.utc)
 
 
+def made_at(ts) -> int:
+    """The id of an account created at that time."""
+    return discord.utils.time_snowflake(at(ts))
+
+
 class FakeText:
     _next = 300
 
@@ -59,10 +64,11 @@ class FakeRole:
 
 
 class FakeMember:
-    def __init__(self, uid, guild, bot=False, joined_at=None, roles=(), created_at=None):
+    def __init__(self, uid, guild, bot=False, joined_at=None, roles=()):
         self.id = uid
-        # An established account by default; young accounts aren't paid (alt farming).
-        self.created_at = created_at or datetime(2020, 1, 1, tzinfo=timezone.utc)
+        # As discord.py does: the age is in the id. A small test id is from 2015, so it is an
+        # established account; young accounts aren't paid (alt farming) and need made_at().
+        self.created_at = discord.utils.snowflake_time(uid)
         self.bot = bot
         self.guild = guild
         self.name = f"user{uid}"
@@ -506,11 +512,12 @@ def test_quest_command_for_old_member_mentions_no_reward(monkeypatch):
 def test_young_account_finishes_but_is_not_paid(monkeypatch):
     async def go(env):
         await env.start()
-        env.member(U1, created_at=at(env.t - 3 * DAY), roles=[config.PLATFORM_ROLES[0]])
-        await env.voice(U1)
-        await finish_all_but_voice(env, U1)
-        assert await env.done(U1) == {s.key for s in Q.STEPS}
-        assert await economy.balance(env.db, U1) == 0
+        young = made_at(env.t - 3 * DAY)
+        env.member(young, roles=[config.PLATFORM_ROLES[0]])
+        await env.voice(young)
+        await finish_all_but_voice(env, young)
+        assert await env.done(young) == {s.key for s in Q.STEPS}
+        assert await economy.balance(env.db, young) == 0
     with_env(go, monkeypatch)
 
 
@@ -568,7 +575,7 @@ def test_sweep_with_nothing_new_opens_no_transactions(monkeypatch):
 def test_quest_footer_explains_a_young_account(monkeypatch):
     async def go(env):
         await env.start()
-        m = env.member(U1, created_at=at(env.t - 2 * DAY))
+        m = env.member(made_at(env.t - 2 * DAY))
         inter = FakeInteraction(m, env.guild)
         await Quests.quest.callback(env.cog, inter)
         assert "30+ DAYS OLD" in inter.of("send_message")[0]["embed"].footer.text.upper()

@@ -86,9 +86,15 @@ Rules that make this hold together:
 - Small cross-restart state (message ids of panels, "first run" markers, last-run stamps)
   lives in the `meta` key/value table, namespaced per cog (`selfroles:panel`, `ops:perms`,
   `tourney:<id>:auto`, ...). It has no schema of its own, so grep the cog for its keys.
+- "Is this member staff?" is one function, `cogkit.is_staff` (`bot/cogkit.py`: owner,
+  administrators, Keeper and Moderator matched by slug), imported by name into each cog that
+  asks. Different on purpose: `cogs/helpdesk.py` goes by permission (Moderate Members or
+  Administrator) to decide which commands `/help` lists, and `Games.is_staff`,
+  `Moderation.is_staff` and `Ops.is_staff` are methods of their cogs with the same rule.
 - A few cogs reuse another cog's helpers directly: `cogs.lfg.ping_only`, `cogs.stats`
   (voice presence, used by economy and tempvoice), `cogs.clips` (clip detection, used by
-  economy), `cogs.growth.BUMP_DUE_KEY` (votehub), `cogs.tempvoice` (matchmaking registers its
+  economy), `cogs.growth.BUMP_DUE_KEY` (votehub), `cogs.tournaments.ACTIVE` (sitedata: the statuses of
+  a tournament that is on), `cogs.tempvoice` (matchmaking registers its
   match channels there), `cogs.stats.Stats.in_staff` and `playing` plus
   `cogs.vibes.LAST_REVIVAL_KEY` (tonight). Many cogs read other cogs' tables; only the owner writes them.
 
@@ -185,7 +191,10 @@ the daily caps. Amounts, caps and refs are decided in `logic/` (`coins.py`, `sho
 
 **Account age for anything rewardable.** `logic/quests.py` defines `MIN_ACCOUNT_DAYS = 30`,
 `established(user_id, at)` (age read from the snowflake id, so it works for members who left)
-and `established_sql(...)` for use inside queries. Two uses: the earner must be established to
+and `established_sql(...)` for use inside queries. These are the only place the rule is written:
+a module with its own named gate (`tournaments.can_join`, `wordgame.payable`, `shop.can_enter`,
+`quests.eligible_for_reward`) calls `established` for the age part and takes the user id, not a
+`created_at`. Two uses: the earner must be established to
 be paid (quest, challenges, tournaments, seasonal, Daily Word, `/give`, vote thanks, MVP,
 `/catchup`), and where other people's actions earn someone progress (stars, poll votes, squad
 joins, voice company) only established accounts count, so alts cannot hand out rewards.
@@ -236,8 +245,10 @@ time.
 bot compares what the loaded cogs need (`logic/ops.py` tables) with what it actually has:
 channels exist, channel permissions, server permissions, and handed-out roles exist and sit
 below its own top role. One mod-log embed when the set of problems changes, one when it
-clears; the current count shows in `/status`. A test keeps the tables and `MODULES` in step,
-so a new cog that posts somewhere must be added there.
+clears; the current count shows in `/status`. A test fails when a module in `MODULES` has no
+`CHANNEL_NEEDS` row and no reason in `NO_CHANNEL`, or when a cog whose source calls
+`add_roles` / `remove_roles` is in neither `ROLE_HOLDERS` nor `NO_ROLE_HOLDER`. It checks that
+each cog is listed, not that every channel a cog posts in has a row: that part is still by hand.
 
 **Liveness.** `cogs/heartbeat.py` rewrites `bot/data/heartbeat` atomically every 60 s while
 the gateway connection is really up (it tracks disconnect/resume itself). `server/watchdog.py`
@@ -315,7 +326,7 @@ written by `sitedata`), and the two tracked banks `qotd.txt` and `polls.txt`.
 | `names.py` | `slug()`: name matching that ignores emoji, case and separators | no |
 | `setup_server.py` | First build: create or restyle roles and channels, **reorder roles**, post rules and welcome | with `--apply` |
 | `polish_server.py` | Second pass: Community, Onboarding, welcome screen, AutoMod, media lock, trim empty channels | with `--apply` |
-| `public_mode.py` | Later changes: missing roles and channels, private categories, description, invite, Onboarding prompts, AutoMod gaps, and the games (role, channel, forum tag and "What do you play?" option for each game in `GAMES`; `restore_games` moves a re-listed game's channel back). Additive except for `retire_games`: a game in `RETIRED_GAMES` loses its Onboarding option and its channel moves into the staff-only `GAME_ARCHIVE` category (`99 · archive`). Never deletes: messages, roles and forum tags stay | with `--apply` |
+| `public_mode.py` | Later changes: missing roles and channels, private categories, description, invite, Onboarding prompts, AutoMod gaps, and the games (role, channel, forum tag and "What do you play?" option for each game in `GAMES`; `restore_games` moves a re-listed game's channel back). Additive except for retired games: a game in `RETIRED_GAMES` loses its Onboarding option (in `game_options`, in the same edit that adds a newly listed game, or else in `retire_games`) and its channel moves into the staff-only `GAME_ARCHIVE` category (`99 · archive`; `retire_games` only). Never deletes: messages, roles and forum tags stay | with `--apply` |
 | `focus_mode.py` | The short newcomer channel list, in one Onboarding edit: default channels become `ONBOARDING_DEFAULT_CHANNELS` (the core of 9) and one question, `FOCUS_PROMPT`, offers the `FOCUS_GROUPS`. `--plan` prints the plan from `layout.py` without connecting and fails when a public channel is in no list or in two; `--revert` restores `ONBOARDING_EVERYTHING` as the defaults and leaves the question. Never touches permissions, channels, roles or the other questions | with `--apply` |
 | `expressions.py` | Upload emoji and soundboard sounds from `assets/expressions/` (skips existing names) | with `--apply` |
 | `snapshot_server.py` + `snapshot_lib.py` | Read-only dump of live config to `server/snapshot/*.json` (names not IDs, sorted); `--compare` lists drift from `layout.py` | never |
@@ -326,10 +337,12 @@ written by `sitedata`), and the two tracked banks `qotd.txt` and `polls.txt`.
 | `register_linked_roles.py` | Writes the Linked Roles metadata records and the verification URL to the Discord application (`docs/LINKED_ROLES.md`) | the application, not the server; with `--apply` |
 
 Every script dry-runs by default. None deletes roles or channels that are missing from
-`layout.py`; they are listed for a human. The one step that takes something away from members
-is `public_mode.py`'s `retire_games`, which hides a retired game's channel in the archive; it
-runs after the option is removed from Onboarding, and `restore_games` runs before a re-listed
-game becomes an option again. Because Front Desk now sits below Keeper and
+`layout.py`; they are listed for a human. Retiring a game is the one thing that takes something
+away from members, and `public_mode.py` does it in two steps: `game_options` drops the retired
+games' options from "What do you play?" in the same Onboarding edit that adds a newly listed
+game (Discord caps the options of one question), and `retire_games` removes any option that is
+still there and then hides the game's channel in the archive. The channel is only hidden after
+its option is gone, and `restore_games` runs before a re-listed game becomes an option again. Because Front Desk now sits below Keeper and
 Moderator, `setup_server.py` (which calls `edit_role_positions`) must not be run against the
 live server again: use `public_mode.py`.
 

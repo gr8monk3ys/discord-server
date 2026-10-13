@@ -54,10 +54,10 @@ class FakeText:
 
 
 class FakeMember:
-    def __init__(self, uid, bot=False, created_at=None):
+    def __init__(self, uid, bot=False):
         self.id = uid
         self.bot = bot
-        self.created_at = created_at or datetime(2020, 1, 1, tzinfo=timezone.utc)
+        self.created_at = discord.utils.snowflake_time(uid)  # as discord.py does: the age is in the id
         self.mention = f"<@{uid}>"
         self.display_name = f"user_{uid}*"
 
@@ -176,7 +176,7 @@ class Env:
                               (uid, channel, start, end))
 
     async def star(self, uid, at=None, board=777, mid=None):
-        mid = mid or (uid * 1000 + (at or self.t) % 1000)
+        mid = mid or (uid % 1_000_000 * 1000 + (at or self.t) % 1000)  # a real-sized id would overflow
         await self.db.execute("INSERT INTO starboard (message_id, channel_id, author_id, board_message_id, stars, at)"
                               " VALUES (?, 1, ?, ?, 5, ?)", (mid, uid, board, self.t if at is None else at))
 
@@ -436,14 +436,14 @@ def test_claim_records_claim_row_when_ref_already_paid(monkeypatch):
 
 def test_young_accounts_and_bots_cannot_claim(monkeypatch):
     async def body(env):
-        young = env.member(U1, created_at=datetime.fromtimestamp(env.t - 5 * DAY, timezone.utc))
+        young = env.member(young_id(env.t))
         robot = env.member(BOTUSER, bot=True)
-        await env.complete_all(U1)
+        await env.complete_all(young.id)
         await env.complete_all(BOTUSER)
         assert await env.cog.claim(young) == []
         assert await env.cog.claim(robot) == []
         assert await env.cog.run_sweep() == 0
-        assert await env.balance(U1) == 0
+        assert await env.balance(young.id) == 0
     with_env(body, monkeypatch)
 
 
@@ -589,8 +589,8 @@ def test_show_is_ephemeral_with_live_claim_button(monkeypatch):
 
 def test_show_young_account_explains_and_disables(monkeypatch):
     async def body(env):
-        m = env.member(U1, created_at=datetime.fromtimestamp(env.t - DAY, timezone.utc))
-        await env.star(U1)
+        m = env.member(young_id(env.t))
+        await env.star(m.id)
         inter = FakeInteraction(env.bot, m)
         await env.cog.show(inter)
         (sent,) = inter.of("send_message")

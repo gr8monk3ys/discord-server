@@ -27,7 +27,8 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 import config
-from logic import community as community_rules
+from cogkit import is_staff
+from cogs.tournaments import ACTIVE as ACTIVE_TOURNAMENTS  # the statuses of a tournament that is on
 from logic import houses as H
 from logic import matchmaking as M
 from logic import seasonal as S
@@ -36,20 +37,10 @@ from logic import sitedata as SD
 log = logging.getLogger(__name__)
 
 OPTED_IN = "NOT IN (SELECT user_id FROM privacy_optout)"
-ACTIVE_TOURNAMENTS = ("signup", "running")
 
 
 def now() -> int:
     return int(time.time())
-
-
-def is_staff(user) -> bool:
-    guild = getattr(user, "guild", None)
-    if guild is None:
-        return False
-    perms = getattr(user, "guild_permissions", None)
-    return community_rules.can_handle(guild.owner_id == user.id, bool(getattr(perms, "administrator", False)),
-                                      getattr(user, "roles", []))
 
 
 def write_atomic(path: Path, text: str) -> None:

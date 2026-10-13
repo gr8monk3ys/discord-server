@@ -33,6 +33,7 @@ from discord.ext import commands, tasks
 
 import config
 import style
+from cogkit import is_staff
 from cogs.lfg import GAME_CHOICES, ping_only
 from logic import events as E
 from logic import quests as Q
@@ -81,17 +82,6 @@ async def http_get_json(url: str):
 # one upcoming game night at a time and one creation per hour. Mods are exempt.
 MAX_UPCOMING_PER_HOST = 1
 CREATE_COOLDOWN = 60 * 60
-
-
-def is_staff(member) -> bool:
-    guild = getattr(member, "guild", None)
-    if guild is not None and getattr(guild, "owner_id", None) == member.id:
-        return True
-    perms = getattr(member, "guild_permissions", None)
-    if perms is not None and getattr(perms, "administrator", False):
-        return True
-    names = {getattr(r, "name", "") for r in getattr(member, "roles", [])}
-    return bool(names & {config.KEEPER_ROLE, config.MOD_ROLE})
 
 
 # Game nights live in `gamenights`; watch parties and the Town Hall in `hosted_events`. The

@@ -36,11 +36,6 @@ def now() -> int:
     return int(time.time())
 
 
-def created_ts(member) -> int | None:
-    created = getattr(member, "created_at", None)
-    return int(created.timestamp()) if created is not None else None
-
-
 def never_raise(fn):
     @functools.wraps(fn)
     async def wrapper(*args, **kwargs):
@@ -136,7 +131,7 @@ class WordGame(commands.Cog):
                 " solved = excluded.solved, finished_at = excluded.finished_at",
                 (day.isoformat(), uid, W.join_guesses(out.guesses), int(out.won), t if out.done else None))
             if out.won:
-                if W.payable(created_ts(member), t):
+                if W.payable(uid, t):
                     amount = W.reward(True, len(out.guesses))
                     result = await economy.apply_tx(tx, uid, amount, W.REASON, t, ref=W.ref(day, uid))
                     out.coins = amount if result.ok else 0

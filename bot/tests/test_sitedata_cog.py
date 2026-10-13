@@ -375,3 +375,9 @@ def test_tick_runs_once_per_interval(monkeypatch, tmp_path):
 def test_registered_in_modules():
     import main
     assert ("cogs.sitedata", {"members", "presences"}) in main.MODULES
+
+
+def test_the_statuses_of_a_live_tournament_come_from_the_tournaments_cog():
+    from cogs import tournaments
+    assert cogmod.ACTIVE_TOURNAMENTS is tournaments.ACTIVE
+    assert tournaments.ACTIVE == (tournaments.SIGNUP, tournaments.RUNNING) == ("signup", "running")

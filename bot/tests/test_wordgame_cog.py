@@ -45,10 +45,10 @@ class FakeText:
 
 
 class FakeMember:
-    def __init__(self, uid, created_at=None):
+    def __init__(self, uid):
         self.id = uid
         self.bot = False
-        self.created_at = created_at or datetime(2020, 1, 1, tzinfo=timezone.utc)
+        self.created_at = discord.utils.snowflake_time(uid)  # as discord.py does: the age is in the id
         self.name = f"user{uid}"
         self.display_name = f"**user_{uid}**"
         self.mention = f"<@{uid}>"
@@ -287,11 +287,11 @@ def test_loss_reveals_word_privately_and_pays_nothing(monkeypatch):
 
 def test_young_account_plays_but_is_not_paid(monkeypatch):
     async def go(env):
-        young = datetime.fromtimestamp(T0 - (Q.MIN_ACCOUNT_DAYS - 1) * DAY, tz=timezone.utc)
-        env.member(U2, created_at=young)
-        reply = await env.guess(U2, "stair")
+        young = discord.utils.time_snowflake(
+            datetime.fromtimestamp(T0 - (Q.MIN_ACCOUNT_DAYS - 1) * DAY, tz=timezone.utc))
+        reply = await env.guess(young, "stair")
         assert "older than a month" in reply["embed"].description
-        assert await economy.balance(env.db, U2) == 0
+        assert await economy.balance(env.db, young) == 0
         assert len(env.guild.games.sent) == 1
     with_env(go, monkeypatch)
 

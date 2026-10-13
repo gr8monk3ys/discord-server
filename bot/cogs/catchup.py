@@ -38,8 +38,8 @@ from discord import app_commands
 from discord.ext import commands
 
 import config
+from cogkit import is_staff
 from logic import catchup as C
-from logic import community as community_rules
 from logic import quests
 
 log = logging.getLogger(__name__)
@@ -80,13 +80,6 @@ def esc(text: str) -> str:
     """Model or member text made inert: no markdown, no masked links, no mentions."""
     text = discord.utils.escape_markdown(text or "").replace("[", "\\[").replace("]", "\\]")
     return discord.utils.escape_mentions(text)
-
-
-def is_staff(user) -> bool:
-    guild = getattr(user, "guild", None)
-    if guild is None:
-        return False
-    return community_rules.can_handle(guild.owner_id == user.id, user.guild_permissions.administrator, user.roles)
 
 
 # ---------------------------------------------------------------- network seam
@@ -258,8 +251,9 @@ class Catchup(commands.Cog):
             return "kind"
         everyone = channel.permissions_for(guild.default_role)
         category = getattr(channel, "category", None)
-        if (not (everyone.view_channel and everyone.read_message_history)
-                or getattr(category, "name", None) == config.STAFF_CATEGORY):
+        # By slug, as everywhere else: the staff category stays off limits if its name is restyled.
+        in_staff = category is not None and config.match_by_name([category], config.STAFF_CATEGORY) is not None
+        if not (everyone.view_channel and everyone.read_message_history) or in_staff:
             return "private"
         mine = channel.permissions_for(member)
         if not (mine.view_channel and mine.read_message_history):
@@ -374,7 +368,7 @@ class Catchup(commands.Cog):
         member = interaction.user
         if interaction.guild is None or getattr(member, "guild", None) is None:
             return await self.say(interaction, MESSAGES["guild"])
-        if not C.established(member.id, now()):
+        if not quests.established(member.id, now()):  # fresh alts can't burn the server's daily budget
             return await self.say(interaction, MESSAGES["young"])
         if not C.valid_hours(hours):
             return await self.say(interaction, MESSAGES["hours"])

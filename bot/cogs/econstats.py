@@ -10,7 +10,7 @@ from discord import app_commands
 from discord.ext import commands
 
 import style
-from logic import community as community_rules
+from cogkit import is_staff
 from logic import econstats as ES
 
 log = logging.getLogger(__name__)
@@ -18,15 +18,6 @@ log = logging.getLogger(__name__)
 
 def now() -> int:
     return int(time.time())
-
-
-def is_staff(user) -> bool:
-    guild = getattr(user, "guild", None)
-    if guild is None:
-        return False
-    perms = getattr(user, "guild_permissions", None)
-    return community_rules.can_handle(guild.owner_id == user.id, bool(getattr(perms, "administrator", False)),
-                                      getattr(user, "roles", []))
 
 
 class EconStats(commands.Cog):

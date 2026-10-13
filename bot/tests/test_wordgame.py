@@ -216,9 +216,13 @@ def test_reward():
 def test_young_accounts_are_not_paid():
     now = 1_790_000_000
     day = 86400
-    assert W.payable(now - Q.MIN_ACCOUNT_DAYS * day, now)
-    assert not W.payable(now - Q.MIN_ACCOUNT_DAYS * day + 1, now)
-    assert not W.payable(None, now)
+
+    def made_at(created: int) -> int:  # the id of an account created then
+        return (created * 1000 - Q.DISCORD_EPOCH_MS) << 22
+
+    assert W.payable(made_at(now - Q.MIN_ACCOUNT_DAYS * day), now)
+    assert not W.payable(made_at(now - Q.MIN_ACCOUNT_DAYS * day + 1), now)
+    assert W.payable(42, now)  # a tiny test id is from 2015
 
 
 # ---------------------------------------------------------------- streaks and stats

@@ -6,7 +6,6 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from logic import challenges as CH
-from logic import quests as Q
 from logic import schedule
 
 TZ = ZoneInfo("America/Los_Angeles")
@@ -41,8 +40,9 @@ def test_tracking_flags():
     assert tracked == {"messages", "post_clip", "daily", "voice_3h", "voice_8h"}
 
 
-def test_reuses_quest_account_age():
-    assert CH.MIN_ACCOUNT_DAYS == Q.MIN_ACCOUNT_DAYS
+def test_the_account_age_rule_is_the_shared_one():
+    # no twin here any more: the cog asks quests.established (see test_challenges_cog.py)
+    assert not hasattr(CH, "old_enough") and not hasattr(CH, "MIN_ACCOUNT_DAYS")
 
 
 # ---------------------------------------------------------------- weeks
@@ -139,13 +139,6 @@ def test_claimable_opted_out_skips_tracking_and_bonus_needs_the_rest():
 def test_total_and_ref():
     assert CH.total([("a", 150), ("bonus", 300)]) == 450
     assert CH.ref("2026-W41", 11, "voice_3h") == "challenge:2026-W41:11:voice_3h"
-
-
-def test_old_enough():
-    now = 1_790_000_000
-    assert CH.old_enough(now - CH.MIN_ACCOUNT_DAYS * DAY, now)
-    assert not CH.old_enough(now - CH.MIN_ACCOUNT_DAYS * DAY + 1, now)
-    assert not CH.old_enough(None, now)
 
 
 # ---------------------------------------------------------------- text

@@ -24,7 +24,6 @@ OWNER, MOD, KEEPER = 1, 20, 21
 PLAYERS = list(range(101, 133))
 TZ = ZoneInfo("America/Los_Angeles")
 T0 = int(datetime(2026, 10, 7, 12, 0, tzinfo=TZ).timestamp())  # a Wednesday noon
-OLD_ACCOUNT = datetime(2020, 1, 1, tzinfo=timezone.utc)
 BOTUSER = 50
 
 
@@ -109,11 +108,11 @@ class FakeText:
 
 
 class FakeMember:
-    def __init__(self, uid, guild, roles=(), admin=False, created_at=OLD_ACCOUNT):
+    def __init__(self, uid, guild, roles=(), admin=False):
         self.id = uid
         self.guild = guild
         self.bot = False
-        self.created_at = created_at
+        self.created_at = discord.utils.snowflake_time(uid)  # as discord.py does: the age is in the id
         self.name = f"user{uid}"
         self.display_name = f"player{uid}"
         self.mention = f"<@{uid}>"
@@ -1013,8 +1012,8 @@ def test_too_late_after_downtime_skips_the_month(monkeypatch):
 def test_fresh_accounts_cant_sign_up(monkeypatch):
     async def go(env):
         await env.create()
-        fresh = 999_001
-        env.member(fresh, created_at=datetime.fromtimestamp(env.t - 5 * DAY, timezone.utc))
+        fresh = discord.utils.time_snowflake(datetime.fromtimestamp(env.t - 5 * DAY, timezone.utc))
+        env.member(fresh)
         inter = await env.join(fresh)
         assert "days old" in inter.replies()[0]
         assert await env.cog.entrants(1) == []

@@ -40,7 +40,7 @@ from discord.ext import commands, tasks
 import config
 import economy
 import style
-from logic import community as community_rules
+from cogkit import is_staff
 from logic import houses as H
 from logic import quests as Q
 from logic import recap as R
@@ -74,15 +74,6 @@ def never_raise(fn):
         except Exception:
             log.exception("houses: %s failed", fn.__name__)
     return wrapper
-
-
-def is_staff(user) -> bool:
-    guild = getattr(user, "guild", None)
-    if guild is None:
-        return False
-    perms = getattr(user, "guild_permissions", None)
-    return community_rules.can_handle(guild.owner_id == user.id, bool(getattr(perms, "administrator", False)),
-                                      getattr(user, "roles", []))
 
 
 class Houses(commands.Cog):

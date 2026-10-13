@@ -37,7 +37,9 @@ def at(t):
     return datetime.fromtimestamp(t, tz=timezone.utc)
 
 
-OLD = datetime(2020, 1, 1, tzinfo=timezone.utc)
+def made_at(t) -> int:
+    """The id of an account created at that time (small test ids are from 2015: established)."""
+    return discord.utils.time_snowflake(at(t))
 
 
 class FakeText:
@@ -75,13 +77,13 @@ class FakeRole:
 
 
 class FakeMember:
-    def __init__(self, uid, guild, bot=False, joined_at=None, created_at=OLD, roles=(), premium_since=None):
+    def __init__(self, uid, guild, bot=False, joined_at=None, roles=(), premium_since=None):
         self.id = uid
         self.guild = guild
         self.bot = bot
         self.mention = f"<@{uid}>"
         self.joined_at = joined_at
-        self.created_at = created_at
+        self.created_at = discord.utils.snowflake_time(uid)  # as discord.py does: the age is in the id
         self.roles = [FakeRole("@everyone"), *(FakeRole(r) for r in roles)]
         self.premium_since = premium_since
 
@@ -389,10 +391,10 @@ def test_boost_thanks_and_pays_once(monkeypatch):
 
 def test_young_account_booster_is_thanked_without_coins(monkeypatch):
     async def body(env):
-        m = env.member(7, created_at=at(env.t - 5 * DAY))
+        m = env.member(made_at(env.t - 5 * DAY))
         await env.cog.on_member_update(*boost(m, at(env.t)))
         assert len(env.guild.general.sent) == 1 and "coins" not in env.guild.general.sent[0]["content"]
-        assert await env.balance(7) == 0
+        assert await env.balance(m.id) == 0
     with_env(body, monkeypatch)
 
 
@@ -426,7 +428,7 @@ def test_monthly_stipend(monkeypatch):
     async def body(env):
         await env.seen(V.STIPEND_JOB, ts(2026, 10, 2))
         env.member(7, premium_since=at(env.t))
-        env.member(8, premium_since=at(env.t), created_at=at(env.t - DAY))  # fresh alt
+        env.member(made_at(env.t - DAY), premium_since=at(env.t))  # fresh alt: 26 days old on the 1st
         env.member(9)
         env.member(10, premium_since=at(env.t), bot=True)
         env.t = ts(2026, 11, 1, 11, 59)
@@ -465,10 +467,10 @@ async def run_motm(env):
 def test_member_of_the_month(monkeypatch):
     async def body(env):
         await env.seen(V.MOTM_JOB, ts(2026, 10, 1))
-        for uid in (1, 2, 3, 4, 5, 6):
+        fresh = made_at(ts(2026, 10, 20))  # an account made on Oct 20: not established on Nov 1
+        for uid in (1, 2, 3, 4, fresh, 6):
             env.member(uid)
         env.guild.members[2].roles.append(FakeRole(config.MOD_ROLE))  # uid 3 is staff
-        env.guild.members[4].created_at = at(ts(2026, 10, 20))  # uid 5 is a fresh account
         oct10 = ts(2026, 10, 10, 20)
         await voice(env, 1, 2, oct10, 3)  # 1 and 2: 3 h each
         await messages(env, 1, "2026-10-11", 100)  # 1: +2
@@ -476,7 +478,7 @@ def test_member_of_the_month(monkeypatch):
         await messages(env, 3, "2026-10-12", 5000)  # staff: excluded
         await messages(env, 4, "2026-10-12", 4000)  # opted out: excluded
         await env.db.execute("INSERT INTO privacy_optout (user_id, at) VALUES (4, 0)")
-        await messages(env, 5, "2026-10-12", 3000)  # fresh account: excluded
+        await messages(env, fresh, "2026-10-12", 3000)  # fresh account: excluded
         await messages(env, 6, "2026-11-01", 3000)  # November: not counted
         await messages(env, 6, "2026-09-30", 3000)  # September: not counted
         await messages(env, 77, "2026-10-12", 3000)  # left the server

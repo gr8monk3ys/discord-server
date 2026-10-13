@@ -612,7 +612,7 @@ def test_permission_check_reports_once_then_all_clear_once(monkeypatch, tmp_path
         text = post["embed"].description
         assert post["embed"].title == "Front Desk is missing permissions" and no_pings(post)
         assert "missing Send Messages (cards)" in text and "missing Attach Files (cards)" in text
-        assert "missing Send Messages (recap)" in text
+        assert "missing Send Messages (events, recap)" in text  # the Town Hall is announced there too
         # grouped: one heading per channel
         assert text.count("**") == 4
         await env.cog.check_permissions()
