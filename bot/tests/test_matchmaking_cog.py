@@ -184,7 +184,7 @@ class Env:
             self.guild.members[uid] = FakeMember(uid, self.guild)
         return self.guild.members[uid]
 
-    async def join(self, uid, game="valorant", mode="Ranked", size=2):
+    async def join(self, uid, game="overwatch", mode="Ranked", size=2):
         inter = FakeInteraction(self.bot, self.member(uid))
         await Matchmaking.join.callback(self.cog, inter, game, mode, size)
         return inter
@@ -231,15 +231,15 @@ def test_join_queues_and_reports(monkeypatch):
         assert "You're in the" in inter.text and "3 players" in inter.text
         assert inter.calls[0]["ephemeral"] is True
         rows = await env.rows("SELECT * FROM mm_queue")
-        assert rows == [dict(user_id=101, game="valorant", mode="Ranked", size=3, joined_at=T0)]
+        assert rows == [dict(user_id=101, game="overwatch", mode="Ranked", size=3, joined_at=T0)]
         assert env.guild.games.sent == []
     with_env(body, monkeypatch)
 
 
 def test_size_defaults_by_game(monkeypatch):
     async def body(env):
-        await env.join(101, game="valorant", size=None)
-        await env.join(102, game="fortnite", size=None)
+        await env.join(101, game="overwatch", size=None)
+        await env.join(102, game="apexlegends", size=None)
         await env.join(103, game="minecraft", size=None)
         sizes = {r["user_id"]: r["size"] for r in await env.rows("SELECT * FROM mm_queue")}
         assert sizes == {101: 5, 102: 4, 103: 2}
@@ -258,8 +258,8 @@ def test_unknown_game_and_mode_are_refused(monkeypatch):
 
 def test_typed_game_name_works(monkeypatch):
     async def body(env):
-        await env.join(101, game="Counter-Strike 2", size=2)
-        assert (await env.rows("SELECT game FROM mm_queue"))[0]["game"] == "counterstrike2"
+        await env.join(101, game="Risk of Rain 2", size=2)
+        assert (await env.rows("SELECT game FROM mm_queue"))[0]["game"] == "riskofrain2"
     with_env(body, monkeypatch)
 
 
@@ -277,10 +277,10 @@ def test_one_entry_per_member_join_moves(monkeypatch):
     async def body(env):
         await env.join(101, size=3)
         env.t += 10
-        inter = await env.join(101, game="fortnite", mode="Casual", size=4)
+        inter = await env.join(101, game="apexlegends", mode="Casual", size=4)
         assert "Moved you out" in inter.text
         rows = await env.rows("SELECT * FROM mm_queue")
-        assert rows == [dict(user_id=101, game="fortnite", mode="Casual", size=4, joined_at=T0 + 10)]
+        assert rows == [dict(user_id=101, game="apexlegends", mode="Casual", size=4, joined_at=T0 + 10)]
     with_env(body, monkeypatch)
 
 
@@ -289,17 +289,17 @@ def test_full_bucket_pops_creates_channel_and_pings(monkeypatch):
     async def body(env):
         await env.join(101, size=3)
         await env.join(102, size=3)
-        await env.join(150 + 0, game="fortnite", size=3)  # other bucket, untouched
+        await env.join(150 + 0, game="apexlegends", size=3)  # other bucket, untouched
         inter = await env.join(103, size=3)
         assert "Match found" in inter.text
         assert await env.queued() == {150}
         [match] = await env.rows("SELECT * FROM mm_matches")
-        assert match["game"] == "valorant" and match["mode"] == "Ranked"
+        assert match["game"] == "overwatch" and match["mode"] == "Ranked"
         assert M.decode_members(match["members"]) == [101, 102, 103]
         [ch] = env.guild.category.created
         assert match["channel_id"] == ch.id
-        val = config.game_by_key("valorant")
-        assert ch.name == f"{val.emoji} Valorant match"
+        val = config.game_by_key("overwatch")
+        assert ch.name == f"{val.emoji} Overwatch match"
         assert ch.kwargs["user_limit"] == 3
         assert ch.kwargs["overwrites"] == env.guild.category.overwrites
         [post] = env.guild.games.sent
@@ -436,7 +436,7 @@ def test_status_counts_only_and_names_in_my_bucket(monkeypatch):
         env.member(101).display_name = "*bold*"
         await env.join(101, size=4)
         await env.join(102, size=4)
-        await env.join(103, game="fortnite", size=4)
+        await env.join(103, game="apexlegends", size=4)
         inter = await env.status(102)
         text = inter.text
         assert "**2**/4 waiting" in text and "**1**/4 waiting" in text
@@ -462,7 +462,7 @@ def test_sweep_expires_and_notes_once(monkeypatch):
     async def body(env):
         await env.join(101)
         env.t += 30
-        await env.join(102, game="fortnite")
+        await env.join(102, game="apexlegends")
         env.t = T0 + M.QUEUE_TTL
         assert await env.cog.expire(env.t) == [101]
         assert await env.queued() == {102}
@@ -503,7 +503,7 @@ def test_member_remove_drops_entry(monkeypatch):
         await env.cog.on_member_remove(env.member(101))
         assert await env.queued() == set()
         other = SimpleNamespace(id=102, guild=SimpleNamespace(id=1))
-        await env.join(102, game="fortnite")
+        await env.join(102, game="apexlegends")
         await env.cog.on_member_remove(other)  # another guild: ignored
         assert await env.queued() == {102}
         await env.cog.on_member_remove(None)  # never raises
@@ -605,8 +605,9 @@ def test_deleted_channel_is_forgotten(monkeypatch):
 
 def test_autocomplete(monkeypatch):
     async def body(env):
-        out = await env.cog.game_choices(None, "val")
-        assert [c.value for c in out] == ["valorant"]
+        out = await env.cog.game_choices(None, "over")
+        assert [c.value for c in out] == ["overwatch"]
+        assert await env.cog.game_choices(None, "valo") == []  # a retired game is not offered
         assert len(await env.cog.game_choices(None, "")) == len(config.GAMES)
     with_env(body, monkeypatch)
 
@@ -636,4 +637,23 @@ def test_no_post_channel_dms_the_players(monkeypatch):
         [ch] = env.guild.category.created
         assert sorted(u for u, _ in dms) == [101, 102]
         assert all(ch.mention in text for _, text in dms)
+    with_env(body, monkeypatch)
+
+
+def test_a_queue_row_for_a_retired_game_still_shows_and_can_be_left(monkeypatch):
+    """Rows written while Valorant was listed: /queue status and /queue leave keep working."""
+    async def body(env):
+        env.member(101)
+        await env.cog.bot.db.execute(
+            "INSERT INTO mm_queue (user_id, game, mode, size, joined_at) VALUES (101, 'valorant', 'Ranked', 5, ?)",
+            (env.t,))
+        assert cogmod.game_label("valorant") == "🎯 Valorant"
+        assert cogmod.game_label("tetris*") == "tetris\\*"  # a key nobody knows is shown escaped, never raises
+        inter = await env.status(101)
+        assert "🎯 Valorant · Ranked · 5 players" in inter.text
+        inter = await env.leave(101)
+        assert "You left the **🎯 Valorant · Ranked · 5 players** queue." in inter.text
+        assert await env.queued() == set()
+        inter = await env.join(102, game="valorant")  # but nobody can queue for it any more
+        assert "Pick a game" in inter.text and await env.queued() == set()
     with_env(body, monkeypatch)

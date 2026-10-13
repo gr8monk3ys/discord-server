@@ -19,10 +19,10 @@ Reddit templates live in [growth/listing.md](growth/listing.md); this file is th
 
 Regenerate the images with `python assets/listing/make_banner.py` (needs Pillow).
 
-## Short description (97 characters, fits every site's 120 limit)
+## Short description (113 characters, fits every site's 120 limit)
 
 ```
-Chill gamers. No tryhards, no toxicity. Squad up for Valorant, CoD, Fortnite, Minecraft and more.
+Chill gamers. No tryhards, no toxicity. Squad up for Risk of Rain 2, Gears of War, Overwatch, Minecraft and more.
 ```
 
 ## Long description
@@ -40,7 +40,7 @@ Tired of servers full of kids and sweats? Lorenzo's Server is a laid-back gaming
 🪙 Coins, shop and seasons: earn coins for hanging out, spend them on colours and perks, climb the monthly season.
 💭 Daily question, polls, counting, levels and badges so chat stays alive even when nobody's queueing.
 
-Games: Valorant, Call of Duty, Fortnite, Minecraft, Apex Legends, Counter-Strike 2, League of Legends, GTA Online, Roblox, Wardogs, plus whatever you're playing (suggest it and it can get its own channel).
+Games: Risk of Rain 2, Gears of War, Overwatch, Marvel Rivals, Minecraft, Tabletop Simulator, Wardogs, Apex Legends, plus whatever you're playing (suggest it and it can get its own channel).
 
 Rules are short: be decent, no cheats, no spam, no NSFW, 18+ only. A quick captcha keeps bots out, then you pick your games and land in general. Say hi.
 

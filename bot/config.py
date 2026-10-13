@@ -101,10 +101,19 @@ class Game:
 
 
 GAMES = [Game(*g) for g in layout.GAMES]
+# Games the server used to list (layout.RETIRED_GAMES). Never offered: no choice, role panel
+# entry, news feed or queue. Kept so old rows that name one still show its emoji and name.
+RETIRED_GAMES = [Game(*g) for g in layout.RETIRED_GAMES]
 
 
 def game_by_key(key: str) -> Game | None:
+    """A game the server lists today. Use this for anything a member can start."""
     return next((g for g in GAMES if g.key == key), None)
+
+
+def known_game_by_key(key: str) -> Game | None:
+    """A listed or retired game, for showing rows written while the game was still listed."""
+    return game_by_key(key) or next((g for g in RETIRED_GAMES if g.key == key), None)
 
 
 def match_by_name(items, name: str):

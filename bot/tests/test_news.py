@@ -16,14 +16,19 @@ DAY = 86400
 def test_shipped_sources_file_is_valid_and_matches_games():
     data = json.loads(N.SOURCES_FILE.read_text(encoding="utf-8"))
     roles = {g.role for g in config.GAMES}
-    sources = N.load_sources(data, roles)
+    retired = {g.role for g in config.RETIRED_GAMES}
     named = [k for k in data if not k.startswith("_")]
-    assert len(sources) == len(named) and named  # every entry is a real game and valid
+    assert named and set(named) <= roles | retired  # every entry is a game the server lists or listed
+    assert len(N.load_sources(data, roles | retired)) == len(named)  # and every one is valid
     for key in named:
         assert data[key].get("comment"), key  # each says how it was verified
+    sources = N.load_sources(data, roles)  # what the bot loads: listed games only
     by_game = {s.game: s for s in sources}
-    assert by_game["Counter-Strike 2"].appid == 730
+    assert set(by_game) == set(named) & roles and not set(by_game) & retired
+    assert by_game["Apex Legends"].appid == 1172470 and by_game["Wardogs"].appid == 1867240
     assert by_game["Minecraft"].host == "www.minecraft.net"
+    # A retired game's feed is kept in the file, so it is back the moment the game is listed again.
+    assert {s.game: s for s in N.load_sources(data, retired)}["Counter-Strike 2"].appid == 730
 
 
 def test_load_sources_skips_unknown_games_and_bad_entries():
@@ -40,7 +45,7 @@ def test_load_sources_skips_unknown_games_and_bad_entries():
         "Wardogs": "nope",
         "League of Legends": {"rss": "https://news.example.com/feed.xml", "comment": "ok"},
     }
-    roles = {g.role for g in config.GAMES}
+    roles = {g.role for g in (*config.GAMES, *config.RETIRED_GAMES)}
     sources = N.load_sources(data, roles)
     assert [(s.game, s.kind) for s in sources] == [("Valorant", "steam"), ("League of Legends", "rss")]
     assert sources[0].key == "steam:5"

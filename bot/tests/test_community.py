@@ -8,10 +8,10 @@ import config
 from logic import community as C
 
 GUILD = 999
-VALORANT = config.game_by_key("valorant")
+OVERWATCH = config.game_by_key("overwatch")
 MINECRAFT = config.game_by_key("minecraft")
-FORTNITE = config.game_by_key("fortnite")
-ROBLOX = config.game_by_key("roblox")
+APEX = config.game_by_key("apexlegends")
+WARDOGS = config.game_by_key("wardogs")
 DAY = 24 * 60 * 60
 
 
@@ -21,12 +21,12 @@ def roles(*names):
 
 # ---------------------------------------------------------------- welcome: games
 def test_picked_games_follow_config_order_and_cap_at_three():
-    member_roles = roles("@everyone", "Roblox", "Valorant", "LFG", "Fortnite", "Minecraft")
-    assert C.picked_games(member_roles, config.GAMES) == [MINECRAFT, FORTNITE, VALORANT]
+    member_roles = roles("@everyone", "Wardogs", "Overwatch", "LFG", "Apex Legends", "Minecraft")
+    assert C.picked_games(member_roles, config.GAMES) == [OVERWATCH, MINECRAFT, WARDOGS]
 
 
 def test_picked_games_match_ignoring_emoji_and_case():
-    assert C.picked_games(roles("🎯 VALORANT"), config.GAMES) == [VALORANT]
+    assert C.picked_games(roles("🦍 OVERWATCH"), config.GAMES) == [OVERWATCH]
 
 
 def test_picked_games_none():
@@ -34,10 +34,10 @@ def test_picked_games_none():
 
 
 def test_pick_open_post_uses_first_game_with_an_open_post():
-    games = [MINECRAFT, FORTNITE, VALORANT]
-    assert C.pick_open_post(games, {"valorant": 70, "fortnite": 71}) == (FORTNITE, 71)
-    assert C.pick_open_post(games, {"roblox": 5}) is None
-    assert C.pick_open_post([], {"valorant": 70}) is None
+    games = [MINECRAFT, APEX, OVERWATCH]
+    assert C.pick_open_post(games, {"overwatch": 70, "apexlegends": 71}) == (APEX, 71)
+    assert C.pick_open_post(games, {"wardogs": 5}) is None
+    assert C.pick_open_post([], {"overwatch": 70}) is None
 
 
 def test_thread_link():
@@ -54,34 +54,34 @@ def test_opener_is_deterministic_and_varies_by_user():
 
 
 def test_welcome_with_games_and_open_post_links_the_squad():
-    text = C.welcome_text(7, "<@7>", [MINECRAFT, VALORANT], {"valorant": 555}, GUILD, "<#42>")
+    text = C.welcome_text(7, "<@7>", [MINECRAFT, OVERWATCH], {"overwatch": 555}, GUILD, "<#42>")
     assert text.startswith(C.opener(7, "<@7>"))
-    assert "Minecraft and Valorant" in text
-    assert "Valorant squad looking for people right now: https://discord.com/channels/999/555" in text
+    assert "Minecraft and Overwatch" in text
+    assert "Overwatch squad looking for people right now: https://discord.com/channels/999/555" in text
     assert "<#42>" not in text
 
 
 def test_welcome_with_games_but_no_post_points_at_forum():
-    text = C.welcome_text(7, "<@7>", [VALORANT], {}, GUILD, "<#42>")
-    assert "Valorant" in text
+    text = C.welcome_text(7, "<@7>", [OVERWATCH], {}, GUILD, "<#42>")
+    assert "Overwatch" in text
     assert "<#42>" in text and "/lfg" in text
     assert "discord.com/channels" not in text
 
 
 def test_welcome_without_games_points_at_forum_only():
-    text = C.welcome_text(8, "<@8>", [], {"valorant": 555}, GUILD, "<#42>")
+    text = C.welcome_text(8, "<@8>", [], {"overwatch": 555}, GUILD, "<#42>")
     assert "<#42>" in text and "/lfg" in text
     assert "discord.com/channels" not in text  # the post isn't for any game they picked
     assert "into" not in text
 
 
 def test_welcome_lists_three_games_with_commas():
-    text = C.welcome_text(1, "<@1>", [MINECRAFT, FORTNITE, VALORANT], {}, GUILD, "#lfg")
-    assert "Minecraft, Fortnite and Valorant" in text
+    text = C.welcome_text(1, "<@1>", [MINECRAFT, APEX, OVERWATCH], {}, GUILD, "#lfg")
+    assert "Minecraft, Apex Legends and Overwatch" in text
 
 
 def test_welcome_is_short_and_has_one_mention():
-    text = C.welcome_text(3, "<@3>", [MINECRAFT, FORTNITE, VALORANT], {"fortnite": 9}, GUILD, "<#42>")
+    text = C.welcome_text(3, "<@3>", [MINECRAFT, APEX, OVERWATCH], {"apexlegends": 9}, GUILD, "<#42>")
     assert text.count("<@3>") == 1
     assert len(text) < 400
     assert "@everyone" not in text and "@here" not in text
@@ -158,7 +158,7 @@ def test_quote_truncates_and_blockquotes():
     (False, True, [], True),
     (False, False, ["Moderator"], True),
     (False, False, ["🛡️ keeper"], True),
-    (False, False, ["Valorant", "LFG"], False),
+    (False, False, ["Overwatch", "LFG"], False),
 ])
 def test_can_handle(owner, admin, names, expected):
     assert C.can_handle(owner, admin, roles(*names)) is expected

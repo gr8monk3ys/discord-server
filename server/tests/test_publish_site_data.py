@@ -24,9 +24,9 @@ def git(*args, cwd=None) -> str:
 def document(now=T, **over) -> dict:
     doc = {"v": 1, "generated_at": schema.iso(now), "members": {"total": 15, "online": 6},
            "week": {"messages": 1240, "voice_hours": 34},
-           "events": [{"title": "Valorant game night", "game": "Valorant", "kind": "gamenight",
+           "events": [{"title": "Overwatch game night", "game": "Overwatch", "kind": "gamenight",
                        "start": schema.iso(now + 86400)}],
-           "games": [{"name": "Valorant", "hours": 12}],
+           "games": [{"name": "Overwatch", "hours": 12}],
            "seasonal": {"name": "Spooky Season", "emoji": "🎃", "ends": schema.iso(now + 9 * 86400)}}
     doc.update(over)
     return doc

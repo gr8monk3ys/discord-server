@@ -306,7 +306,7 @@ class Env:
     async def rows(self, sql, params=()):
         return [dict(r) for r in await self.db.fetchall(sql, params)]
 
-    async def create(self, uid=MOD, name="Friday Cup", game="Valorant", size=8, starts_at=None):
+    async def create(self, uid=MOD, name="Friday Cup", game="Overwatch", size=8, starts_at=None):
         inter = self.inter(uid)
         await Tournaments.create.callback(self.cog, inter, name, game, size, starts_at)
         return inter
@@ -413,10 +413,10 @@ def test_custom_ids_match_templates():
 # ---------------------------------------------------------------- create
 def test_create_posts_signup_card(monkeypatch):
     async def go(env):
-        inter = await env.create(name="Friday  Cup", game="valorant", size=8)
+        inter = await env.create(name="Friday  Cup", game="overwatch", size=8)
         (t,) = await env.rows("SELECT * FROM tournaments")
         assert (t["name"], t["game"], t["size"], t["status"], t["created_by"]) == (
-            "Friday Cup", "Valorant", 8, "signup", MOD)
+            "Friday Cup", "Overwatch", 8, "signup", MOD)
         card = env.card()
         assert (t["channel_id"], t["message_id"]) == (env.guild.tourney.id, card.id)
         assert "Entrants 0/8" in card.embed.description
@@ -1219,3 +1219,15 @@ def test_create_refuses_blocked_names_before_posting(monkeypatch, caplog, kw, re
     with_env(go, monkeypatch)
     line = caplog.records[-1].getMessage()
     assert str(MOD) in line and reason in line
+
+
+def test_a_tournament_for_a_retired_game_still_renders_and_is_not_offered(monkeypatch):
+    async def go(env):
+        await env.create(name="Old Cup", game="Valorant", size=8)  # staff may still type any game
+        (t,) = await env.rows("SELECT * FROM tournaments")
+        assert t["game"] == "Valorant" and "**Game** Valorant" in env.card().embed.description
+        offered = [c.value for c in await env.cog.game_choices(None, "")]
+        assert offered == [g.role for g in config.GAMES] and "Valorant" not in offered
+        # "Most played game": time in a retired game never picks the monthly cup's game.
+        assert cogmod.EG.top_game({"VALORANT": 99 * 3600, "WARDOGS": 3600}).role == "Wardogs"
+    with_env(go, monkeypatch)

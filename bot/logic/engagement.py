@@ -241,8 +241,9 @@ def friday_evening(friday: date, tz: tzinfo) -> tuple[int, int, int]:
 
 
 def game_for(name: str, games: Iterable[config.Game] = config.GAMES) -> config.Game | None:
-    """The server game a presence name belongs to: 'VALORANT' -> Valorant,
-    'Call of Duty® HQ' -> Call of Duty. None for games the server has no channel for."""
+    """The server game a presence name belongs to: 'WARDOGS' -> Wardogs, 'Gears of War: E-Day'
+    -> Gears of War, 'Apex Legends with Medal' -> Apex Legends. None for games the server
+    doesn't list (a retired game included, unless `games` is config.RETIRED_GAMES)."""
     s = config.slug(name)
     if not s:
         return None

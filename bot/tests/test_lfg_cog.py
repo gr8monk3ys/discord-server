@@ -19,14 +19,14 @@ from logic import lfg as rules
 
 GUILD_ID = 999
 OWNER, HOST, A, B, C, KEEPER = 1, 10, 11, 12, 13, 20
-VALORANT = config.game_by_key("valorant")
+OVERWATCH = config.game_by_key("overwatch")
 
 
 def run(coro):
     return asyncio.run(coro)
 
 
-def game_choice(key="valorant"):
+def game_choice(key="overwatch"):
     g = config.game_by_key(key)
     return app_commands.Choice(name=g.role, value=g.key)
 
@@ -237,7 +237,7 @@ class Env:
     def thread(self, post):
         return self.guild.threads[post["thread_id"]]
 
-    async def create(self, host=HOST, game="valorant", players=3, mode=None, when="now", note=None):
+    async def create(self, host=HOST, game="overwatch", players=3, mode=None, when="now", note=None):
         inter = self.inter(host)
         await Lfg.lfg.callback(self.cog, inter, game_choice(game), players,
                                mode_choice(mode) if mode else None, when, note)
@@ -308,20 +308,20 @@ def test_button_custom_id_round_trips_through_template():
 def test_create_post_writes_rows_and_thread():
     async def go(env):
         inter, post = await env.create(players=3, mode="Ranked", when="9pm", note="mic pls")
-        assert post["game"] == "valorant" and post["host_id"] == HOST and post["size"] == 3
+        assert post["game"] == "overwatch" and post["host_id"] == HOST and post["size"] == 3
         assert post["mode"] == "Ranked" and post["when_text"] == "9pm" and post["note"] == "mic pls"
         assert post["closed_at"] is None and post["thread_id"] and post["message_id"]
         assert await env.members(post["id"]) == [HOST]
 
         (made,) = env.guild.forum.created
-        assert made["name"] == "Valorant · Ranked"
-        assert [t.name for t in made["applied_tags"]] == ["Valorant", "Ranked"]
+        assert made["name"] == "Overwatch · Ranked"
+        assert [t.name for t in made["applied_tags"]] == ["Overwatch", "Ranked"]
         content = made["content"]
-        assert env.guild.role("Valorant").mention in content
+        assert env.guild.role("Overwatch").mention in content
         assert env.guild.role("LFG").mention in content
         assert "needs 2 more" in content and "9pm" in content
         am = made["allowed_mentions"]
-        assert [r.name for r in am.roles] == ["Valorant", config.LFG_ROLE]  # only these two, never any role
+        assert [r.name for r in am.roles] == ["Overwatch", config.LFG_ROLE]  # only these two, never any role
         assert am.users is False and am.everyone is False
         pid = post["id"]
         assert custom_ids(made["view"]) == [f"lfg:join:{pid}", f"lfg:leave:{pid}", f"lfg:close:{pid}"]
@@ -339,8 +339,8 @@ def test_create_without_mode_has_plain_title_and_game_tag_only():
     async def go(env):
         _, post = await env.create(players=2)
         made = env.guild.forum.created[0]
-        assert made["name"] == "Valorant"
-        assert [t.name for t in made["applied_tags"]] == ["Valorant"]
+        assert made["name"] == "Overwatch"
+        assert [t.name for t in made["applied_tags"]] == ["Overwatch"]
         assert post["mode"] is None
     with_env(go)
 
@@ -396,10 +396,10 @@ def test_missing_forum_replies_ephemerally():
 
 def test_resolve_drops_deleted_tags():
     async def go(env):
-        env.guild.forum.available_tags = [t for t in env.guild.forum.available_tags if t.name != "Valorant"]
+        env.guild.forum.available_tags = [t for t in env.guild.forum.available_tags if t.name != "Overwatch"]
         env.cog.resolve()
-        assert "valorant" not in env.cog.game_tags
-        _, post = await env.create(game="valorant")
+        assert "overwatch" not in env.cog.game_tags
+        _, post = await env.create(game="overwatch")
         assert [t.name for t in env.guild.forum.created[-1]["applied_tags"]] == []
     with_env(go)
 
@@ -612,7 +612,7 @@ def test_host_close_disables_buttons_then_archives_once():
         assert "CLOSED" in msg_edit["embed"].footer.text
         edit = thread.calls[1][1]
         assert edit["locked"] is True and edit["archived"] is True
-        assert edit["name"].startswith("✓ ") and edit["name"] == "✓ Valorant · Casual"
+        assert edit["name"].startswith("✓ ") and edit["name"] == "✓ Overwatch · Casual"
 
         # Double close is a no-op (the post is closed, nothing else touches Discord).
         again = await env.press(HOST, "close", post)
@@ -693,9 +693,9 @@ def test_join_after_close_is_refused():
 # ---------------------------------------------------------------- expiry
 def test_expiry_closes_posts_older_than_three_hours():
     async def go(env):
-        _, old = await env.create(host=HOST, game="valorant")
+        _, old = await env.create(host=HOST, game="overwatch")
         _, fresh = await env.create(host=A, game="minecraft")
-        _, edge = await env.create(host=B, game="fortnite")
+        _, edge = await env.create(host=B, game="apexlegends")
         current = cogmod.now()
         await env.db.execute("UPDATE lfg_posts SET created_at = ? WHERE id = ?",
                              (current - rules.EXPIRY_SECONDS - 60, old["id"]))
@@ -712,7 +712,7 @@ def test_expiry_closes_posts_older_than_three_hours():
 
 def test_expiry_continues_after_a_deleted_thread():
     async def go(env):
-        _, gone = await env.create(host=HOST, game="valorant")
+        _, gone = await env.create(host=HOST, game="overwatch")
         _, ok = await env.create(host=A, game="minecraft")
         await env.db.execute("UPDATE lfg_posts SET created_at = 0")
         del env.guild.threads[gone["thread_id"]]
@@ -761,8 +761,8 @@ def test_rerun_mode_change_renames_and_retags():
         _, post = await env.create(players=3, mode="Casual")
         thread = env.thread(post)
         await env.create(players=3, mode="Ranked")
-        assert thread.name == "Valorant · Ranked"
-        assert [t.name for t in thread.applied_tags] == ["Valorant", "Ranked"]
+        assert thread.name == "Overwatch · Ranked"
+        assert [t.name for t in thread.applied_tags] == ["Overwatch", "Ranked"]
         renames = [kw for k, kw in thread.calls if k == "edit"]
         assert len(renames) == 1
     with_env(go)
@@ -854,7 +854,7 @@ def test_user_text_cannot_widen_role_pings():
         kw = env.guild.forum.created[-1]
         assert "<@&999>" in kw["content"]  # text is shown as typed...
         am = kw["allowed_mentions"]
-        assert [r.name for r in am.roles] == ["Valorant", config.LFG_ROLE]  # ...but can't ping
+        assert [r.name for r in am.roles] == ["Overwatch", config.LFG_ROLE]  # ...but can't ping
         assert am.everyone is False and am.users is False
     with_env(go)
 
@@ -865,17 +865,17 @@ def test_role_pings_have_a_per_host_cooldown(monkeypatch):
     monkeypatch.setattr(cogmod, "now", lambda: clock["t"])
 
     async def go(env):
-        _, first = await env.create(game="valorant")
+        _, first = await env.create(game="overwatch")
         assert env.guild.forum.created[-1]["allowed_mentions"].roles
         await env.press(HOST, "close", first)
         clock["t"] += 60
-        _, again = await env.create(game="valorant")  # close and re-post: still posted, no pings
+        _, again = await env.create(game="overwatch")  # close and re-post: still posted, no pings
         quiet = env.guild.forum.created[-1]
         assert again["id"] != first["id"] and again["thread_id"]
-        assert env.guild.role("Valorant").mention not in quiet["content"]
+        assert env.guild.role("Overwatch").mention not in quiet["content"]
         am = quiet["allowed_mentions"]
         assert am.roles is False and am.users is False and am.everyone is False
-        await env.create(game="fortnite")  # another game inside the cooldown: quiet too
+        await env.create(game="apexlegends")  # another game inside the cooldown: quiet too
         assert env.guild.forum.created[-1]["allowed_mentions"].roles is False
         await env.create(host=A, game="minecraft")  # someone else: pings as usual
         assert env.guild.forum.created[-1]["allowed_mentions"].roles
@@ -923,4 +923,27 @@ def test_blocked_text_on_update_leaves_the_post_alone():
         assert after["note"] == "mic pls" and len(env.guild.forum.created) == 1
         assert not env.thread(post).calls
         assert inter.of("send_message")[0]["ephemeral"] is True
+    with_env(go)
+
+
+# ---------------------------------------------------------------- retired games
+def test_a_post_for_a_retired_game_still_renders_joins_and_closes():
+    """An LFG post made while Valorant was listed: the buttons keep working and the embed
+    keeps the game's emoji and name."""
+    async def go(env):
+        assert "valorant" not in {c.value for c in cogmod.GAME_CHOICES}  # /lfg no longer offers it
+        assert config.game_by_key("valorant") is None and config.known_game_by_key("valorant").role == "Valorant"
+        _, post = await env.create(players=3)
+        await env.db.execute("UPDATE lfg_posts SET game = 'valorant' WHERE id = ?", (post["id"],))
+        post = await env.post(post["id"])
+        inter = await env.press(A, "join", post)
+        (edit,) = inter.of("edit_message")
+        assert edit["embed"].title == "🎯 Valorant" and "2 / 3" in edit["embed"].description
+        assert "VALORANT" in edit["embed"].footer.text
+        inter = await env.press(HOST, "close", post)
+        assert (await env.post(post["id"]))["closed_at"] is not None
+        # A key no list knows at all (a game removed outright) falls back to the stored text.
+        await env.db.execute("UPDATE lfg_posts SET game = 'te*tris', closed_at = NULL WHERE id = ?", (post["id"],))
+        embed = env.cog.render(await env.post(post["id"]), await env.cog.load_roster(env.db, await env.post(post["id"])))
+        assert embed.title == "te\\*tris"
     with_env(go)

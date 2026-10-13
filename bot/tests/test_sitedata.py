@@ -19,11 +19,11 @@ def full_inputs(**over) -> SD.Inputs:
     base = dict(
         now=T, member_count=15, online=6,
         messages=1243, message_people=9, voice_seconds=34 * HOUR + 200, voice_people=5,
-        events=[SD.EventIn("Valorant game night", T + 2 * DAY), SD.EventIn("October Cup", T + 5 * DAY),
+        events=[SD.EventIn("Overwatch game night", T + 2 * DAY), SD.EventIn("October Cup", T + 5 * DAY),
                 SD.EventIn("Watch party: Movie night", T + 3 * DAY), SD.EventIn("Town Hall", T + 6 * DAY),
                 SD.EventIn("Movie night", T + 4 * DAY)],  # made by hand: never published
-        active_tournaments={"october cup": "Valorant"},
-        games=[("Valorant", 12 * HOUR, 4), ("Minecraft", 30 * HOUR, 3), ("Roblox", 50 * HOUR, 2)],
+        active_tournaments={"october cup": "Overwatch"},
+        games=[("Overwatch", 12 * HOUR, 4), ("Minecraft", 30 * HOUR, 3), ("Wardogs", 50 * HOUR, 2)],
         tournaments={"signup": 1, "done": 3, "cancelled": 2},
         matches=4, match_people=6, queued=3,
         seasonal=("Spooky Season", "🎃", T + 10 * DAY),
@@ -54,30 +54,39 @@ def test_session_total_clips_to_the_window_and_counts_people():
 
 
 def test_match_game_only_knows_layout_games():
-    assert SD.match_game("VALORANT").role == "Valorant"
-    assert SD.match_game("Counter-Strike 2").role == "Counter-Strike 2"
+    assert SD.match_game("OVERWATCH").role == "Overwatch"
+    assert SD.match_game("Risk of Rain 2").role == "Risk of Rain 2"
     assert SD.match_game("Minecraft Launcher").role == "Minecraft"
+    assert SD.match_game("Gears of War: E-Day").role == "Gears of War"
+    assert SD.match_game("Apex Legends with Medal").role == "Apex Legends"
+    assert SD.match_game("WARDOGS").role == "Wardogs"
+    for retired in ("VALORANT", "Counter-Strike 2", "Fortnite", "Roblox"):  # never published again
+        assert SD.match_game(retired) is None
+    # An old tournament or game night that names a retired game: no error, and no game name.
+    assert SD.classify_event("Old Cup", {"old cup": "Valorant"}) == {"title": "Tournament", "kind": "tournament"}
+    assert SD.classify_event("Valorant game night", {}) is None
+    assert SD.build(SD.Inputs(now=T, games=[("Valorant", 90 * HOUR, 9)])).get("games") is None
     assert SD.match_game("Some Obscure Game") is None
     assert SD.match_game("") is None and SD.match_game(None) is None
 
 
 def test_game_table_drops_unknown_games_and_counts_players():
     lo = T - SD.WINDOW
-    rows = SD.game_table([(1, "VALORANT", T - 7200, T - 3600), (2, "Valorant", T - 3600, None),
-                          (1, "valorant", T - 100, T), (9, "Visual Studio Code", T - 9000, T)], lo, T, T)
-    assert rows == [("Valorant", 3600 + 3600 + 100, 2)]
+    rows = SD.game_table([(1, "OVERWATCH", T - 7200, T - 3600), (2, "Overwatch", T - 3600, None),
+                          (1, "overwatch", T - 100, T), (9, "Visual Studio Code", T - 9000, T)], lo, T, T)
+    assert rows == [("Overwatch", 3600 + 3600 + 100, 2)]
 
 
 # ---------------------------------------------------------------- event titles
 def test_bot_templated_game_nights_are_rebuilt_from_the_game_name():
-    assert SD.classify_event("  valorant GAME night ", {}) == {
-        "title": "Valorant game night", "kind": "gamenight", "game": "Valorant"}
+    assert SD.classify_event("  overwatch GAME night ", {}) == {
+        "title": "Overwatch game night", "kind": "gamenight", "game": "Overwatch"}
     assert SD.classify_event("Game night", {}) == {"title": "Game night", "kind": "gamenight"}
 
 
 def test_a_tournament_is_named_by_its_game_never_by_its_own_name():
-    assert SD.classify_event("October Cup", {"october cup": "Valorant"}) == {
-        "title": "Valorant tournament", "kind": "tournament", "game": "Valorant"}
+    assert SD.classify_event("October Cup", {"october cup": "Overwatch"}) == {
+        "title": "Overwatch tournament", "kind": "tournament", "game": "Overwatch"}
     assert SD.classify_event("October Cup", {"october cup": None}) == {"title": "Tournament", "kind": "tournament"}
     assert SD.classify_event("October Cup", {"october cup": "Some Hobby Game"}) == {
         "title": "Tournament", "kind": "tournament"}
@@ -96,7 +105,7 @@ def test_watch_parties_and_the_town_hall_get_the_bot_s_own_words():
     assert SD.classify_event("Watch party", {}) is None  # not the template: someone typed it
 
 
-@pytest.mark.parametrize("title", ["Movie night", "Alex's birthday", "Game night at mine", "Valorant", "Karaoke"])
+@pytest.mark.parametrize("title", ["Movie night", "Alex's birthday", "Game night at mine", "Overwatch", "Karaoke"])
 def test_a_hand_made_title_is_never_published_however_harmless(title):
     assert SD.classify_event(title, {}) is None
     assert SD.clean_title(title) == title  # it would pass the text checks; it is still not ours
@@ -142,14 +151,14 @@ def test_build_full_document():
     assert doc["v"] == 1 and doc["generated_at"] == schema.iso(T)
     assert doc["members"] == {"total": 15, "online": 6}
     assert doc["week"] == {"messages": 1240, "voice_hours": 34}
-    assert [e["title"] for e in doc["events"]] == ["Valorant game night", "Watch party", "Valorant tournament",
+    assert [e["title"] for e in doc["events"]] == ["Overwatch game night", "Watch party", "Overwatch tournament",
                                                    "Town Hall"]
-    assert doc["events"][0] == {"title": "Valorant game night", "kind": "gamenight", "game": "Valorant",
+    assert doc["events"][0] == {"title": "Overwatch game night", "kind": "gamenight", "game": "Overwatch",
                                 "start": schema.iso(T + 2 * DAY)}
     assert doc["events"][1] == {"title": "Watch party", "kind": "event", "start": schema.iso(T + 3 * DAY)}
     assert doc["events"][2]["kind"] == "tournament" and doc["events"][3]["kind"] == "event"
     assert "Movie" not in SD.render(doc) and "October" not in SD.render(doc)
-    assert doc["games"] == [{"name": "Minecraft", "hours": 30}, {"name": "Valorant", "hours": 12}]  # Roblox: 2 players
+    assert doc["games"] == [{"name": "Minecraft", "hours": 30}, {"name": "Overwatch", "hours": 12}]  # Wardogs: 2 players
     assert doc["tournaments"] == {"open": 1, "running": 0, "finished": 3}
     assert doc["matchmaking"] == {"matches_week": 4, "queued": 3}
     assert doc["seasonal"] == {"name": "Spooky Season", "emoji": "🎃", "ends": schema.iso(T + 10 * DAY)}
@@ -170,7 +179,7 @@ def test_empty_server_gives_only_the_envelope():
 def test_small_groups_are_suppressed():
     """Nothing that describes fewer than MIN_GROUP people is published."""
     doc = SD.build(full_inputs(
-        online=2, message_people=2, voice_people=1, games=[("Valorant", 90 * HOUR, 2)],
+        online=2, message_people=2, voice_people=1, games=[("Overwatch", 90 * HOUR, 2)],
         match_people=2, queued=2, starred_people=2, clip_people=1, badge_people=2))
     assert doc["members"] == {"total": 15}
     for key in ("week", "games", "matchmaking", "hall"):
@@ -242,9 +251,9 @@ def test_no_value_looks_like_a_snowflake_or_a_mention():
     the inputs are hostile."""
     hostile = full_inputs(
         events=[SD.EventIn(f"<@{SNOWFLAKE}> birthday", T + DAY), SD.EventIn(f"{SNOWFLAKE}", T + DAY),
-                SD.EventIn("@here game night", T + DAY), SD.EventIn("Valorant game night", T + DAY)],
-        active_tournaments={f"<@{SNOWFLAKE}> birthday": "Valorant"},
-        games=[("Valorant", 12 * HOUR, 4), (f"{SNOWFLAKE}", 99 * HOUR, 9), ("Not A Layout Game", 99 * HOUR, 9)],
+                SD.EventIn("@here game night", T + DAY), SD.EventIn("Overwatch game night", T + DAY)],
+        active_tournaments={f"<@{SNOWFLAKE}> birthday": "Overwatch"},
+        games=[("Overwatch", 12 * HOUR, 4), (f"{SNOWFLAKE}", 99 * HOUR, 9), ("Not A Layout Game", 99 * HOUR, 9)],
         houses=[(f"{SNOWFLAKE}", 1, 9), ("Tide", 2, 9)],
     )
     for inputs in (full_inputs(), hostile):
@@ -260,8 +269,8 @@ def test_no_value_looks_like_a_snowflake_or_a_mention():
                 assert isinstance(value, str)
                 assert not re.search(r"\d{15,20}", value) and "@" not in value and "<" not in value
     # the tournament with the hostile name is still a tournament: it shows under the bot's words
-    assert [e["title"] for e in SD.build(hostile)["events"]] == ["Valorant tournament", "Valorant game night"]
-    assert SD.build(hostile)["games"] == [{"name": "Valorant", "hours": 12}]
+    assert [e["title"] for e in SD.build(hostile)["events"]] == ["Overwatch tournament", "Overwatch game night"]
+    assert SD.build(hostile)["games"] == [{"name": "Overwatch", "hours": 12}]
 
 
 def test_game_names_in_the_document_come_from_layout_only():

@@ -21,6 +21,10 @@ CHANNEL_WATCH = 7 * 24 * 60 * 60  # match channels older than this are left to t
 
 # Usual team size per game key (config.Game.key, the role slug).
 DEFAULT_SIZES: dict[str, int] = {
+    "riskofrain2": 4,
+    "overwatch": 5,
+    "marvelrivals": MAX_SIZE,  # teams of 6; the queue tops out at 5
+    # Retired games keep their size: harmless, and right again if one is listed again.
     "valorant": 5,
     "counterstrike2": 5,
     "leagueoflegends": 5,

@@ -55,7 +55,9 @@ HTML_TAG = re.compile(r"</?[a-zA-Z][^<>]*>")
 
 # Steam app names (as slugs) that are one of the server's games under another name:
 # a slug that starts with the key counts toward the role on the right.
-PREFIXES = {"callofduty": "Call of Duty", "grandtheftautov": "GTA Online"}
+# A role that is not in config.GAMES (a retired game) simply matches nothing.
+PREFIXES = {"gearsofwar": "Gears of War", "overwatch": "Overwatch",
+            "callofduty": "Call of Duty", "grandtheftautov": "GTA Online"}
 
 # Claim codes work exactly like /creator's: FD-XXXXXX, good for 24 hours, one check a minute.
 CODE_TTL = _claims.CODE_TTL
@@ -316,7 +318,8 @@ def load_data(raw) -> dict:
         recent.append({"name": name,
                        "appid": appid if isinstance(appid, int) and not isinstance(appid, bool) and appid > 0 else None,
                        "hours": number(g.get("hours"), 1e7), "recent": number(g.get("recent"), 1e7)})
-    known = {g.key for g in config.GAMES}
+    # Hours for a retired game are kept (not shown), so they are still there if it comes back.
+    known = {g.key for g in (*config.GAMES, *config.RETIRED_GAMES)}
     raw_hours = data.get("hours")
     hours = {k: number(v, 1e7) for k, v in (raw_hours if isinstance(raw_hours, dict) else {}).items()
              if k in known and number(v, 1e7) > 0}

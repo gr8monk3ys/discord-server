@@ -15,6 +15,7 @@ import db as dbmod
 import economy
 from cogs import recap as cogmod
 from cogs.recap import Recap
+from logic import gamelist as GL
 from logic import recap as R
 
 TZ = ZoneInfo("America/Los_Angeles")
@@ -457,6 +458,92 @@ def test_digest_with_no_owner_found_uses_mod_log_and_retries_if_that_fails(monke
         env.guild.modlog.fail = None
         await env.cog.run_weekly(R.DIGEST_JOB, env.cog.send_digest)
         assert len(env.guild.modlog.sent) == 1 and await env.done("ownerdigest:2026-W42")
+    with_env(go, monkeypatch)
+
+
+# ---------------------------------------------------------------- owner digest: the games list
+async def play(env, uid, game, hours, days_before_monday=2.0, open_=False):
+    end = WEEK_START + 7 * DAY - int(days_before_monday * DAY)
+    await env.ex('INSERT INTO game_sessions (user_id, game, start, "end") VALUES (?, ?, ?, ?)',
+                 (uid, game, end - int(hours * HOUR), None if open_ else end))
+
+
+def test_digest_has_no_games_field_when_nobody_played_anything(monkeypatch):
+    async def go(env):
+        env.guild.owner = env.member(OWNER)
+        env.t = MON + 5 * 60
+        assert await env.cog.send_digest(period_for(R.DIGEST_JOB, env.t)) is True
+        assert GL.FIELD not in fields(env.guild.owner.dms[-1]["embed"])
+    with_env(go, monkeypatch)
+
+
+def test_digest_games_field_compares_28_days_of_play_with_the_list(monkeypatch):
+    async def go(env):
+        env.guild.owner = env.member(OWNER)
+        env.member(BOTUSER, bot=True)
+        env.t = MON + 5 * 60
+        for uid in (U1, U2, U3):
+            await play(env, uid, "Helldivers 2", 2, days_before_monday=20)  # three weeks back: inside 28 days
+        await play(env, U4, "Helldivers 2", 3, days_before_monday=40)  # outside the window
+        for uid in (U1, U2, U3, U4):
+            await play(env, uid, "[click](https://evil.example)", 4)  # a hostile presence name
+        for uid in (U1, U2):
+            await play(env, uid, "Two Player Game", 30)  # below three players: never named
+        for g in config.GAMES:
+            if g.role != "Wardogs":
+                await play(env, U1, g.role.upper(), 1, days_before_monday=3)
+        await play(env, BOTUSER, "WARDOGS", 9)  # a bot's presence does not count as play
+        await play(env, U2, "Valorant", 50, days_before_monday=100)  # history for a retired game: harmless
+        assert await env.cog.send_digest(period_for(R.DIGEST_JOB, env.t)) is True
+        f = fields(env.guild.owner.dms[-1]["embed"])
+        assert list(f)[-2:] == [GL.FIELD, "Needs you"]
+        assert f[GL.FIELD].splitlines() == [
+            "Worth adding: **Helldivers 2** (3 players, 6 h) · 1 more not shown",
+            "Worth retiring: Wardogs (nobody played in 28 days)",
+            "Nothing changes by itself: edit GAMES in server/layout.py.",
+        ]
+        assert "evil" not in f[GL.FIELD] and "Two Player" not in f[GL.FIELD]
+        assert not any(f"{uid}" in f[GL.FIELD].replace("28", "") for uid in (U1, U2, U3, U4))  # no member, no id
+        # The list itself is untouched: the check only reports.
+        assert [g.role for g in config.GAMES] == [role for _, _, role in config.layout.GAMES]
+    with_env(go, monkeypatch)
+
+
+def test_digest_games_field_leaves_out_members_who_opted_out(monkeypatch):
+    async def go(env):
+        env.guild.owner = env.member(OWNER)
+        env.t = MON + 5 * 60
+        for g in config.GAMES:
+            await play(env, U4, g.role, 1)
+        for uid in (U1, U2, U3):
+            await play(env, uid, "Helldivers 2", 2)
+        period = period_for(R.DIGEST_JOB, env.t)
+        assert await env.cog.send_digest(period) is True
+        assert "Helldivers 2" in fields(env.guild.owner.dms[-1]["embed"])[GL.FIELD]
+        await env.optout(U3)  # two tracking-allowed players left: below the bar
+        assert await env.cog.send_digest(period) is True
+        assert fields(env.guild.owner.dms[-1]["embed"])[GL.FIELD] == (
+            "No changes suggested. The list matches the last 28 days of play.")
+    with_env(go, monkeypatch)
+
+
+def test_digest_survives_a_broken_games_check_and_comes_after_the_crew_line(monkeypatch, caplog):
+    async def go(env):
+        env.guild.owner = env.member(OWNER)
+        env.t = MON + 5 * 60
+        env.bot.cogs["Crew"] = FakeLineCog("digest_line", "crew line")
+        for g in config.GAMES:
+            await play(env, U1, g.role, 1)
+        period = period_for(R.DIGEST_JOB, env.t)
+        assert await env.cog.send_digest(period) is True
+        assert list(fields(env.guild.owner.dms[-1]["embed"]))[-3:] == [config.CREW_ROLE, GL.FIELD, "Needs you"]
+
+        def boom(*_, **__):
+            raise RuntimeError("boom")
+        monkeypatch.setattr(GL, "review", boom)
+        assert await env.cog.send_digest(period) is True
+        f = fields(env.guild.owner.dms[-1]["embed"])
+        assert GL.FIELD not in f and "Needs you" in f and "games list check failed" in caplog.text
     with_env(go, monkeypatch)
 
 
