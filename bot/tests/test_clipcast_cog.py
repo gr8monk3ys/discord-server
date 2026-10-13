@@ -12,6 +12,7 @@ from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
 import discord
+import pytest
 from discord import app_commands
 
 import config
@@ -557,6 +558,82 @@ def test_no_clips_channel_means_nothing_happens(monkeypatch, tmp_path):
         await env.clip(A)
         await env.tick(ASK_AT)
         assert await env.db.fetchall("SELECT 1 FROM clipcast") == [] and env.member(A).dms == []
+    with_env(go, monkeypatch, tmp_path)
+
+
+ASK_KEY, PUB_KEY = "clipcast-ask:2026-W40", "clipcast:2026-W41"  # the runs at ASK_AT and PUB_AT
+
+
+def take_away(env, what):
+    """Make a channel ("clips", "mod_log") or the whole server ("guild") unavailable.
+    Returns the call that brings it back."""
+    if what == "guild":
+        env.bot.get_guild = lambda gid: None
+        return lambda: delattr(env.bot, "get_guild")
+    channels = env.guild.text_channels
+    env.guild.text_channels = [c for c in channels if c is not getattr(env.guild, what)]
+    return lambda: setattr(env.guild, "text_channels", channels)
+
+
+async def job_keys(env):
+    return {r["key"] for r in await env.db.fetchall("SELECT key FROM jobs")}
+
+
+@pytest.mark.parametrize("missing", ["clips", "guild"])
+def test_the_ask_waits_for_the_clips_channel_then_asks_once(monkeypatch, tmp_path, missing):
+    async def go(env):
+        await env.start()
+        a1 = await env.clip(A, reactors=[B])
+        bring_back = take_away(env, missing)
+        for late in (0, 300):  # the Sunday tick and the next: nowhere to look
+            await env.tick(ASK_AT + late)
+        assert ASK_KEY not in await job_keys(env)  # not done: the week's shortlist is still owed
+        assert await env.db.fetchall("SELECT 1 FROM clipcast") == [] and env.member(A).dms == []
+
+        bring_back()
+        await env.tick(ASK_AT + 600)
+        assert ASK_KEY in await job_keys(env)
+        (dm,) = env.member(A).dms
+        assert f"/channels/{GUILD_ID}/300/{a1}" in dm["content"]
+        row = await env.row(a1)
+        assert (row["status"], row["asked_at"], row["asked_via"], row["week"]) == \
+               (L.ASKED, ASK_AT + 600, "dm", "2026-W40")
+        for late in (900, DAY):  # later ticks: nobody is asked twice
+            await env.tick(ASK_AT + late)
+        assert len(env.member(A).dms) == 1 and env.guild.clips.sent == []
+    with_env(go, monkeypatch, tmp_path)
+
+
+def test_an_ask_that_is_no_longer_the_latest_week_is_dropped(monkeypatch, tmp_path):
+    """A week is retried only while it is the latest one, so a channel that was gone for
+    weeks comes back to one round of questions, about the latest week."""
+    async def go(env):
+        await env.start()
+        old = await env.clip(A)
+        bring_back = take_away(env, "clips")
+        await env.tick(ASK_AT)
+        new = await env.clip(B, at=ASK_AT + DAY)
+        await env.tick(ASK_AT + WEEK)  # the next Sunday: still gone, and last week is given up
+        keys = await job_keys(env)
+        assert ASK_KEY in keys and "clipcast-ask:2026-W41" not in keys
+        bring_back()
+        await env.tick(ASK_AT + WEEK + 300)
+        assert "clipcast-ask:2026-W41" in await job_keys(env)
+        assert env.member(A).dms == [] and len(env.member(B).dms) == 1
+        assert await env.status(old) is None and await env.status(new) == L.ASKED
+    with_env(go, monkeypatch, tmp_path)
+
+
+def test_a_week_with_nothing_to_ask_or_post_is_done(monkeypatch, tmp_path):
+    """Nothing to do is a finished week, not one to keep retrying."""
+    async def go(env):
+        await env.start()
+        await env.tick(ASK_AT)
+        assert ASK_KEY in await job_keys(env)
+        await env.tick(PUB_AT)
+        assert PUB_KEY in await job_keys(env)
+        assert (await env.meta(cogmod.RUN_KEY)) == {"at": PUB_AT, "text": "no approved clips"}
+        assert env.guild.mod_log.sent == [] and env.guild.clips.sent == [] and env.http.calls == []
     with_env(go, monkeypatch, tmp_path)
 
 
@@ -1413,6 +1490,60 @@ def test_without_a_mod_log_the_picks_wait(monkeypatch, tmp_path):
         await env.tick(PUB_AT + WEEK)
         assert await env.status(a1) == L.HANDED and len(env.guild.mod_log.sent) == 1
     with_env(go, monkeypatch, tmp_path, environ={})
+
+
+@pytest.mark.parametrize("missing", ["mod_log", "forbidden"])
+def test_picks_that_could_not_be_listed_are_listed_once_the_mod_log_is_back(monkeypatch, tmp_path, missing):
+    async def go(env):
+        await env.start()
+        a1 = await env.approved(A)
+        if missing == "forbidden":  # the channel is there but Discord refuses the message
+            env.guild.mod_log.fail = http_error(discord.Forbidden, 403)
+        else:
+            bring_back = take_away(env, "mod_log")
+        for late in (0, 300):  # the Tuesday tick and the next: nowhere to list them
+            await env.tick(PUB_AT + late)
+        assert PUB_KEY not in await job_keys(env)  # not done: the list is still owed
+        assert await env.status(a1) == L.APPROVED and env.guild.mod_log.sent == []
+        assert (await env.meta(cogmod.RUN_KEY))["text"] == "picks not listed: no mod log"
+
+        if missing == "forbidden":
+            env.guild.mod_log.fail = None
+        else:
+            bring_back()
+        await env.tick(PUB_AT + 600)
+        assert PUB_KEY in await job_keys(env) and await env.status(a1) == L.HANDED
+        (post,) = env.guild.mod_log.sent
+        assert f"/channels/{GUILD_ID}/300/{a1}" in post["embed"].description
+        for late in (900, WEEK):  # later ticks, and next week's run: listed once
+            await env.tick(PUB_AT + late)
+        assert len(env.guild.mod_log.sent) == 1 and env.http.calls == []
+    with_env(go, monkeypatch, tmp_path, environ={})
+
+
+def test_the_posting_run_waits_for_the_server_then_uploads_and_pays_once(monkeypatch, tmp_path):
+    async def go(env):
+        await env.start()
+        a1 = await env.approved(A)
+        bring_back = take_away(env, "guild")
+        for late in (0, 300):  # the Tuesday tick and the next: no server to look at
+            await env.tick(PUB_AT + late)
+        assert PUB_KEY not in await job_keys(env)  # not done: the week's run is still owed
+        assert await env.status(a1) == L.APPROVED and env.http.calls == [] and env.http.downloads == []
+
+        bring_back()
+        await env.tick(PUB_AT + 600)
+        row = await env.row(a1)
+        assert (row["status"], row["video_id"], row["published_at"], row["attempts"]) == \
+               (L.PUBLISHED, "vid00000001", PUB_AT + 600, 1)
+        assert PUB_KEY in await job_keys(env) and env.http.kinds() == ["token", "init", "put"]
+        assert len(env.guild.clips.sent) == 1  # the "as seen on" reply
+        # Later ticks upload nothing more, and the week it stays up pays once.
+        for late in (900, DAY, 600 + 7 * DAY, 900 + 7 * DAY, 5 * WEEK):
+            await env.tick(PUB_AT + late)
+        assert len(env.http.of("put")) == 1 and len(env.http.downloads) == 1 and len(env.guild.clips.sent) == 1
+        assert await clip_ledger(env, A) == [(L.COINS, L.REASON, f"clipcast:{a1}")]
+    with_env(go, monkeypatch, tmp_path)
 
 
 # ---------------------------------------------------------------- /clipcast remove

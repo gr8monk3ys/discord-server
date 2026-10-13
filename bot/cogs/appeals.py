@@ -539,14 +539,13 @@ class Appeals(commands.Cog):
     # ------------------------------------------------------------ scheduled work
     @tasks.loop(minutes=5)
     async def tick(self) -> None:
-        try:
-            await self.sweep()
-            period = await self.due()
-            if period is not None:
-                await self.expire(now())
-                await jobs.done(self.db, period, now())
-        except Exception:
-            log.exception("appeals: tick failed")
+        # Two steps that fail on their own: a sweep that keeps raising (it reads Discord) must
+        # not keep the daily expiry from running.
+        for name, step in (("sweep", self.sweep), ("expiry", self.run_expiry)):
+            try:
+                await step()
+            except Exception:
+                log.exception("appeals: %s failed", name)
 
     @tick.before_loop
     async def before_tick(self) -> None:
@@ -555,6 +554,16 @@ class Appeals(commands.Cog):
     async def due(self):
         """logic/schedule.py semantics: the latest due day only; the first run just marks it done."""
         return await jobs.due(self.db, A.EXPIRE_JOB, self.bot.settings.tz, now(), plan_daily)
+
+    async def run_expiry(self) -> None:
+        """The daily expiry, marked done only after it ran. Without the server a card can't be
+        closed and staff can't be told, so the day waits for the next tick instead (`expire`
+        goes by how long an appeal has been open, so a day that is skipped loses nothing)."""
+        period = await self.due()
+        if period is None or self.guild() is None:
+            return
+        await self.expire(now())
+        await jobs.done(self.db, period, now())
 
     async def expire(self, t: int) -> int:
         """Close open appeals nobody touched for 30 days, and blank old answers."""

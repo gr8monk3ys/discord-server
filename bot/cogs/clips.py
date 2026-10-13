@@ -46,6 +46,8 @@ def thread_key(message_id: int) -> str:
 class Clips(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        # Weeks whose poll is waiting for somewhere to post (for the log only).
+        self.waiting: set[str] = set()
 
     async def cog_load(self) -> None:
         self.weekly.start()
@@ -177,11 +179,10 @@ class Clips(commands.Cog):
         await self.bot.wait_until_ready()
 
     async def run_weekly(self) -> None:
-        period = await jobs.due(self.db, CLIP_JOB, self.tz, now())
-        if period is not None:
-            # Marked done only after posting: a Discord error retries on the next tick.
-            await self.post_poll(period)
-            await jobs.done(self.db, period, now())
+        # Marked done only when post_poll says the week is handled. No clips channel, or a
+        # Discord error, leaves it for the next tick; the planner drops a week once the next
+        # one is due. The clip_polls row keeps a retry from posting a second poll.
+        await jobs.run_due(self.db, CLIP_JOB, self.tz, now, self.post_poll)
 
     async def clip_channel_id(self, message_id: int, default: int) -> int:
         row = await self.db.fetchone("SELECT value FROM meta WHERE key = ?", (thread_key(message_id),))
@@ -201,19 +202,26 @@ class Clips(commands.Cog):
             return 0
         return sum(r.count for r in msg.reactions)
 
-    async def post_poll(self, period) -> None:
+    async def post_poll(self, period) -> bool:
+        """True when the week is handled (poll posted, or too few clips for one); False when
+        it couldn't be posted right now. Nothing is sent or stored before the False."""
         week = L.week_of(period.key)
         if await self.db.fetchone("SELECT 1 FROM clip_polls WHERE week = ?", (week,)):
-            return  # posted before a crash/restart: don't post twice
+            return True  # posted before a crash/restart: don't post twice
         rows = await self.db.fetchall(
             "SELECT message_id, user_id, posted_at FROM clips WHERE posted_at >= ? AND posted_at < ?"
             " ORDER BY posted_at, message_id", (period.window_start, period.window_end))
+        if len(rows) < 2:
+            log.info("clip poll %s: %d clip(s), no poll", week, len(rows))
+            return True
         guild = self.guild()
         channel = self.clips_channel(guild)
-        if len(rows) < 2 or channel is None:
-            log.info("clip poll %s: %s", week, f"{len(rows)} clip(s), no poll" if len(rows) < 2
-                     else f"no {config.CLIPS_CHANNEL} channel")
-            return
+        if channel is None:
+            if week not in self.waiting:  # said once per week, not on every tick
+                self.waiting.add(week)
+                log.warning("clip poll %s: %s, trying again on the next tick", week,
+                            "the server isn't available" if guild is None else f"no {config.CLIPS_CHANNEL} channel")
+            return False
         where = {r["message_id"]: await self.clip_channel_id(r["message_id"], channel.id) for r in rows}
         clips = []
         for r in rows:
@@ -227,7 +235,7 @@ class Clips(commands.Cog):
         entries = L.poll_entries(clips)
         if len(entries) < 2:
             log.info("clip poll %s: fewer than 2 clips left, no poll", week)
-            return
+            return True
 
         poll = discord.Poll(question=QUESTION, duration=timedelta(hours=POLL_HOURS))
         lines = [f"**Clip of the week** · {week}", "Vote below. The poll closes in 24 hours.", ""]
@@ -245,6 +253,7 @@ class Clips(commands.Cog):
             await tx.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
                              (entries_key(week), json.dumps(stored)))
         log.info("posted clip poll %s with %d clips", week, len(entries))
+        return True
 
     # ------------------------------------------------------------ winner
     @tasks.loop(minutes=5)
