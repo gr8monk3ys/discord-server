@@ -552,6 +552,46 @@
     "color": null,
     "hoist": false,
     "managed": false,
+    "mentionable": true,
+    "name": "Risk of Rain 2",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": true,
+    "name": "Gears of War",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": true,
+    "name": "Overwatch",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": true,
+    "name": "Marvel Rivals",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": true,
+    "name": "Tabletop Simulator",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
     "mentionable": false,
     "name": "@everyone",
     "permissions": [
