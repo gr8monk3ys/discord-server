@@ -331,6 +331,8 @@ class Clipcast(commands.Cog):
         # Clips whose consent was withdrawn while their upload was in flight: taken down
         # the moment the upload returns.
         self.late: set[int] = set()
+        # Weeks of a job that are waiting for the server or a channel (for the log only).
+        self.waiting: set[str] = set()
 
     async def cog_load(self) -> None:
         self.bot.add_dynamic_items(ConsentButton)
@@ -499,12 +501,18 @@ class Clipcast(commands.Cog):
         await self.run_job(L.PUBLISH_JOB, self.publish_week)
 
     async def run_job(self, job, work) -> None:
-        period = await jobs.due(self.db, job, self.tz, now())
-        if period is not None:
-            # Marked done only after the work returned: a Discord error retries on the next
-            # tick, and the clipcast rows keep a retry from asking or uploading twice.
-            await work(period)
-            await jobs.done(self.db, period, now())
+        # Marked done only when the work says the week is handled. No server or channel, or
+        # a Discord error, leaves it for the next tick; the planner drops a week once the
+        # next one is due. The clipcast rows keep a retry from asking or uploading twice.
+        await jobs.run_due(self.db, job, self.tz, now, work)
+
+    def wait(self, period, why: str) -> bool:
+        """A week that can't be handled right now: logged once, not on every tick. Returns
+        False, which is what tells `run_job` to leave the week for the next tick."""
+        if period.key not in self.waiting:
+            self.waiting.add(period.key)
+            log.warning("clipcast %s: %s, trying again on the next tick", period.key, why)
+        return False
 
     # ------------------------------------------------------------ looking at a clip
     async def clip_channel_id(self, message_id: int, default: int) -> int:
@@ -560,12 +568,14 @@ class Clipcast(commands.Cog):
         return len(seen)
 
     # ------------------------------------------------------------ Sunday: shortlist and ask
-    async def ask_week(self, period) -> None:
+    async def ask_week(self, period) -> bool:
+        """True when the week's shortlist is handled (authors asked, or nothing to ask about);
+        False when it couldn't be looked at right now. Nothing is written before the False."""
         guild = self.guild()
         channel = config.match_by_name(guild.text_channels, config.CLIPS_CHANNEL) if guild is not None else None
         if channel is None:
-            log.info("clipcast: no %s channel, nothing shortlisted", config.CLIPS_CHANNEL)
-            return
+            return self.wait(period, "the server isn't available" if guild is None
+                             else f"no {config.CLIPS_CHANNEL} channel, nothing shortlisted")
         t = now()
         week = clip_rules.week_of(period.key)
         await self.sweep()
@@ -622,6 +632,7 @@ class Clipcast(commands.Cog):
             await self.db.execute("UPDATE clipcast SET asked_via = ? WHERE message_id = ?", (via, c.message_id))
             asked += 1
         log.info("clipcast %s: asked %d author(s), %d approved by standing consent", week, asked, approved)
+        return True
 
     async def send_ask(self, guild, member, seen: Seen, message_id: int, name: str | None) -> str:
         """DM the question, or reply under the clip when DMs are closed. Returns how it went."""
@@ -715,11 +726,15 @@ class Clipcast(commands.Cog):
             return None
         return seen
 
-    async def publish_week(self, period) -> None:
+    async def publish_week(self, period) -> bool:
+        """True when the week's run is handled: nothing approved, the picks listed for the
+        owner, or the uploads tried (a clip that failed stays in line for next week's run and
+        staff are told, so that is handled too). False when there is no server to look at, or
+        the picks couldn't be listed: nothing has been uploaded or handed over by then."""
         async with self.publishing:
             guild = self.guild()
             if guild is None:
-                return
+                return self.wait(period, "the server isn't available")
             t = now()
             await self.sweep()
             ready = {}
@@ -735,10 +750,10 @@ class Clipcast(commands.Cog):
             chosen = [ready[c.message_id] for c in L.top(pool, L.TOP_N)]
             if not chosen:
                 await self.set_meta(RUN_KEY, t, "no approved clips")
-                return
+                return True
             if not self.setup.configured:
-                await self.hand_over(guild, clip_rules.week_of(period.key), chosen, t)
-                return
+                listed = await self.hand_over(guild, clip_rules.week_of(period.key), chosen, t)
+                return listed or self.wait(period, f"couldn't list the picks in {config.MOD_LOG_CHANNEL}")
 
             self.clear_tmp()
             counts: dict[str, int] = {}
@@ -756,9 +771,11 @@ class Clipcast(commands.Cog):
                                           f"Last error: {esc((error or {}).get('text', 'unknown'))}. "
                                           "Clips that failed cleanly are tried again next week; "
                                           "`/clipcast status` has the details.")
+            return True
 
-    async def hand_over(self, guild, week: str, chosen, t: int) -> None:
-        """No YouTube credentials: list the approved clips for the owner to post by hand."""
+    async def hand_over(self, guild, week: str, chosen, t: int) -> bool:
+        """No YouTube credentials: list the approved clips for the owner to post by hand.
+        False when the list couldn't be posted; the clips are then still approved."""
         lines = ["YouTube isn't connected, so these are yours to post by hand. Each author said yes "
                  "to this clip; anything else stays in Discord.", ""]
         for n, (row, _) in enumerate(chosen, start=1):
@@ -770,10 +787,11 @@ class Clipcast(commands.Cog):
                             footer=style.label("clipcast", "post by hand"))
         if not await self.mod_log(guild, embed=embed):
             await self.set_meta(RUN_KEY, t, "picks not listed: no mod log")
-            return  # still approved: listed on the next run
+            return False  # still approved: listed on the next tick that can reach the mod log
         for row, _ in chosen:
             await self.move(row["message_id"], [L.APPROVED], L.HANDED)
         await self.set_meta(RUN_KEY, t, f"{len(chosen)} listed for posting by hand")
+        return True
 
     def clear_tmp(self) -> None:
         """Remove files a crashed run left behind. The folder holds nothing else."""

@@ -15,6 +15,7 @@ import db as dbmod
 from cogs import appeals as cogmod
 from cogs.appeals import AppealButton, Appeals, DenyModal, build_view
 from logic import appeals as A
+from logic.ops import latest_due_daily
 
 TZ = ZoneInfo("America/Los_Angeles")
 GUILD_ID = 999
@@ -893,6 +894,103 @@ def test_daily_job_follows_the_schedule_rules(monkeypatch):
         assert period is not None and period.key.startswith("appeals_expire:")
         await env.db.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (period.key, env.t))
         assert await env.cog.due() is None  # never twice
+    with_env(go, monkeypatch)
+
+
+async def day_done(env) -> bool:
+    """Whether the expiry day that is due at env.t is marked finished."""
+    key = latest_due_daily(A.EXPIRE_JOB, env.t, TZ).key
+    return await env.db.fetchone("SELECT 1 FROM jobs WHERE key = ?", (key,)) is not None
+
+
+def test_a_failing_sweep_does_not_stop_the_daily_expiry(monkeypatch):
+    async def go(env):
+        await env.submit(U1)
+        await Appeals.tick.coro(env.cog)  # first sighting: the day is marked, nothing runs
+        assert await day_done(env) and (await env.rows())[0]["status"] == A.OPEN
+
+        calls = []
+
+        async def boom():
+            calls.append(env.t)
+            raise RuntimeError("sweep is broken")
+        monkeypatch.setattr(env.cog, "sweep", boom)
+        env.t = T0 + 31 * DAY
+        await Appeals.tick.coro(env.cog)  # logged, not raised
+        assert calls == [env.t]  # the sweep was still tried, first
+        (row,) = await env.rows()
+        assert row["status"] == A.EXPIRED and row["decided_at"] == env.t
+        card = env.cards()[0]
+        assert len(card.edits) == 1 and card.edits[0]["embed"].fields[-1].name == "Closed"
+        assert len(env.logs()) == 1 and "nobody decided" in env.logs()[0]
+        assert await day_done(env)
+
+        env.t += 300
+        await Appeals.tick.coro(env.cog)  # the same day again: nothing more
+        assert len(card.edits) == 1 and len(env.logs()) == 1 and len(calls) == 2
+    with_env(go, monkeypatch)
+
+
+def test_a_failing_expiry_does_not_stop_the_sweep_and_is_retried(monkeypatch):
+    async def go(env):
+        await Appeals.tick.coro(env.cog)  # first sighting
+        real_expire = env.cog.expire
+
+        async def boom(t):
+            raise RuntimeError("expiry is broken")
+        monkeypatch.setattr(env.cog, "expire", boom)
+        env.post(body(U1))  # arrived while the bot was off
+        env.t = T0 + DAY
+        await Appeals.tick.coro(env.cog)  # logged, not raised
+        assert [r["user_id"] for r in await env.rows()] == [U1]  # the sweep did its work
+        assert not await day_done(env)  # the day is not marked: it is tried again
+
+        monkeypatch.setattr(env.cog, "expire", real_expire)
+        env.t += 300
+        await Appeals.tick.coro(env.cog)
+        assert await day_done(env)
+    with_env(go, monkeypatch)
+
+
+def test_the_expiry_waits_for_the_server_then_closes_each_appeal_once(monkeypatch):
+    """Without the server the card can't be closed and staff can't be told, so the day is
+    not marked done and the next tick does it."""
+    async def go(env):
+        await env.submit(U1)
+        await Appeals.tick.coro(env.cog)  # first sighting
+
+        env.bot.get_guild = lambda gid: None  # the server is unavailable at the daily tick
+        env.t = T0 + 31 * DAY
+        for _ in range(2):
+            await Appeals.tick.coro(env.cog)
+            env.t += 300
+        assert not await day_done(env)  # not done: the day is still owed
+        assert (await env.rows())[0]["status"] == A.OPEN
+        card = env.cards()[0]
+        assert card.edits == [] and env.logs() == []
+
+        del env.bot.get_guild  # back
+        await Appeals.tick.coro(env.cog)
+        assert await day_done(env)
+        (row,) = await env.rows()
+        assert row["status"] == A.EXPIRED and row["decided_at"] == env.t
+        assert len(card.edits) == 1 and all(c.item.disabled for c in card.edits[0]["view"].children)
+        assert len(env.logs()) == 1 and f"<@{U1}>" in env.logs()[0]
+
+        for later in (300, DAY):  # later ticks, and the next day's run: nothing twice
+            env.t += later
+            await Appeals.tick.coro(env.cog)
+        assert len(card.edits) == 1 and len(env.logs()) == 1
+    with_env(go, monkeypatch)
+
+
+def test_a_day_with_nothing_to_expire_is_done(monkeypatch):
+    async def go(env):
+        await Appeals.tick.coro(env.cog)  # first sighting
+        env.t = T0 + DAY
+        assert not await day_done(env)
+        await Appeals.tick.coro(env.cog)
+        assert await day_done(env) and env.logs() == []
     with_env(go, monkeypatch)
 
 

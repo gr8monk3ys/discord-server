@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
 import discord
+import pytest
 
 import config
 import db as dbmod
@@ -443,6 +444,95 @@ def test_poll_send_failure_retries_next_tick(monkeypatch):
         env.t = POLL_AT + 300
         await env.cog.run_weekly()
         assert len(env.guild.clips.sent) == 1 and clip_key(2026, 10, 4) in await env.jobs()
+    with_env(go, monkeypatch)
+
+
+def take_away(env, what):
+    """Make the clips channel ("channel") or the whole server ("guild") unavailable.
+    Returns the call that brings it back."""
+    if what == "guild":
+        env.bot.get_guild = lambda guild_id: None
+        return lambda: delattr(env.bot, "get_guild")
+    channels = env.guild.text_channels
+    env.guild.text_channels = [c for c in channels if c is not env.guild.clips]
+    return lambda: setattr(env.guild, "text_channels", channels)
+
+
+@pytest.mark.parametrize("missing", ["channel", "guild"])
+def test_poll_waits_for_somewhere_to_post_then_runs_once(monkeypatch, missing):
+    async def go(env):
+        await env.first_run()
+        await week_of_clips(env, [A, B, C])
+        key = clip_key(2026, 10, 4)
+        bring_back = take_away(env, missing)
+        for late in (0, 300, 600):  # the Sunday tick and two more: nowhere to post
+            env.t = POLL_AT + late
+            await env.cog.run_weekly()
+        assert key not in await env.jobs()  # not done: the week's poll is still owed
+        assert await env.polls() == [] and env.guild.clips.sent == []
+        assert len(await env.clips()) == 3  # and nothing was forgotten meanwhile
+
+        bring_back()
+        env.t = POLL_AT + 900
+        await env.cog.run_weekly()
+        (sent,) = env.guild.clips.sent
+        assert len(sent["poll"].answers) == 3 and key in await env.jobs()
+        assert await env.polls() == [dict(week=WEEK, message_id=sent["id"], ends_at=POLL_AT + 900 + 24 * HOUR,
+                                          winner_id=None, done=0)]
+        for late in (1200, 3 * DAY):  # later ticks: no second poll
+            env.t = POLL_AT + late
+            await env.cog.run_weekly()
+        assert len(env.guild.clips.sent) == 1 and len(await env.polls()) == 1
+
+        # The late poll still ends in one winner, announced (and so paid for) once.
+        env.poll_id = sent["id"]
+        env.guild.clips.sent.clear()
+        env.set_votes({1: 0, 2: 3, 3: 1})
+        for late in (0, 300):
+            env.t = POLL_AT + 900 + 24 * HOUR + late
+            await env.cog.check_polls()
+        assert len(env.guild.clips.sent) == 1
+        assert env.bot.dispatched == [("clip_of_the_week", (WEEK, B))]
+    with_env(go, monkeypatch)
+
+
+def test_poll_channel_gone_for_weeks_comes_back_to_one_poll(monkeypatch):
+    """A week is retried only while it is the latest one: when the next Sunday comes the
+    planner marks it skipped, so nothing piles up while the channel is missing."""
+    async def go(env):
+        await env.first_run()
+        bring_back = take_away(env, "channel")
+        for sunday in (4, 11, 18):
+            for i, uid in enumerate((A, B)):
+                await env.post(uid, f"https://youtu.be/w{sunday}c{i}", at=ts(2026, 10, sunday - 3, 10 + i))
+            for at in (ts(2026, 10, sunday, 18, 5), ts(2026, 10, sunday + 2, 12)):
+                env.t = at
+                await env.cog.run_weekly()
+        assert env.guild.clips.sent == [] and await env.polls() == []
+        done = await env.jobs()
+        assert {clip_key(2026, 10, 4), clip_key(2026, 10, 11)} <= done and clip_key(2026, 10, 18) not in done
+
+        bring_back()
+        for minute in (5, 10):
+            env.t = ts(2026, 10, 20, 12, minute)
+            await env.cog.run_weekly()
+        (sent,) = env.guild.clips.sent  # the latest week only, once
+        assert "2026-W42" in sent["content"] and sent["content"].count("/channels/") == 2
+        assert [p["week"] for p in await env.polls()] == ["2026-W42"]
+        assert clip_key(2026, 10, 18) in await env.jobs()
+    with_env(go, monkeypatch)
+
+
+@pytest.mark.parametrize("missing", ["channel", "guild"])
+def test_too_few_clips_is_done_even_with_nowhere_to_post(monkeypatch, missing):
+    """No poll to run is a finished week, not one to keep retrying."""
+    async def go(env):
+        await env.first_run()
+        await week_of_clips(env, [A])
+        take_away(env, missing)
+        env.t = POLL_AT
+        await env.cog.run_weekly()
+        assert clip_key(2026, 10, 4) in await env.jobs() and await env.polls() == []
     with_env(go, monkeypatch)
 
 
