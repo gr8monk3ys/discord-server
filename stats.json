@@ -1,0 +1,20 @@
+{
+ "games": [
+  {
+   "hours": 30,
+   "name": "Risk of Rain 2"
+  }
+ ],
+ "generated_at": "2026-10-13T23:16:37Z",
+ "hall": {
+  "badges": 20
+ },
+ "members": {
+  "online": 4,
+  "total": 22
+ },
+ "v": 1,
+ "week": {
+  "voice_hours": 40
+ }
+}
