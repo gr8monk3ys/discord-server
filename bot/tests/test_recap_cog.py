@@ -15,6 +15,7 @@ import db as dbmod
 import economy
 from cogs import recap as cogmod
 from cogs.recap import Recap
+from logic import funnel as F
 from logic import gamelist as GL
 from logic import recap as R
 
@@ -544,6 +545,123 @@ def test_digest_survives_a_broken_games_check_and_comes_after_the_crew_line(monk
         assert await env.cog.send_digest(period) is True
         f = fields(env.guild.owner.dms[-1]["embed"])
         assert GL.FIELD not in f and "Needs you" in f and "games list check failed" in caplog.text
+    with_env(go, monkeypatch)
+
+
+# ---------------------------------------------------------------- owner digest: newcomers
+async def wrote(env, uid, day):
+    await env.ex("INSERT INTO message_counts (user_id, day, count) VALUES (?, ?, 1)", (uid, day))
+
+
+async def in_voice(env, uid, start, hours=1):
+    await env.ex('INSERT INTO voice_sessions (user_id, channel_id, start, "end") VALUES (?, 77, ?, ?)',
+                 (uid, start, start + hours * HOUR))
+
+
+async def newcomers(env):
+    """Three joined this week (one left again), two the week before, one long ago."""
+    s = WEEK_START
+    await env.join(U1, s + DAY)  # wrote, and the quest saw them pick a role
+    await env.join(U2, s + 2 * DAY)  # joined voice, holds a game role the quest has not recorded yet
+    await env.join(U3, s + 3 * DAY, left=s + 4 * DAY)
+    await env.join(U4, s - 6 * DAY)  # the week before: came back this week
+    await env.join(21, s - 5 * DAY, left=s - 3 * DAY)  # the week before: gone
+    await env.join(22, s - 60 * DAY)  # an old member: not a newcomer, whatever they do
+    await wrote(env, U1, "2026-10-06")
+    await wrote(env, U4, "2026-10-08")
+    await wrote(env, 22, "2026-10-08")
+    await in_voice(env, U2, s + 2 * DAY + HOUR)
+    await in_voice(env, 22, s + 2 * DAY)
+    await env.ex("INSERT INTO quest_steps (user_id, step, at) VALUES (?, 'pick_roles', ?), (?, 'say_hi', ?)",
+                 (U1, s + DAY + 60, U3, s + 3 * DAY + 60))  # say_hi is not the source for "said something"
+    env.member(U2).roles = [SimpleNamespace(name="@everyone"), SimpleNamespace(name=config.GAMES[0].role)]
+    env.member(U1).roles = [SimpleNamespace(name="@everyone")]
+
+
+def test_digest_has_no_newcomers_field_when_nobody_joined_in_28_days(monkeypatch):
+    async def go(env):
+        env.guild.owner = env.member(OWNER)
+        env.t = MON + 5 * 60
+        await env.join(U1, WEEK_START - 22 * DAY)  # more than 28 days before the week ended
+        await env.join(U2, MON - HOUR)  # after the week: next Monday's digest
+        await wrote(env, U1, "2026-10-06")
+        assert await env.cog.send_digest(period_for(R.DIGEST_JOB, env.t)) is True
+        f = fields(env.guild.owner.dms[-1]["embed"])
+        assert F.FIELD not in f and list(f)[-1] == "Needs you"
+    with_env(go, monkeypatch)
+
+
+def test_digest_newcomers_field_counts_the_week_and_28_days_before_needs_you(monkeypatch):
+    async def go(env):
+        env.guild.owner = env.member(OWNER)
+        env.member(BOTUSER, bot=True)
+        env.t = MON + 5 * 60
+        await newcomers(env)
+        await env.join(BOTUSER, WEEK_START + DAY)  # the join recorder skips bots; a stray row still never counts
+        for g in config.GAMES:
+            await play(env, U4, g.role, 1)
+        assert await env.cog.send_digest(period_for(R.DIGEST_JOB, env.t)) is True
+        f = fields(env.guild.owner.dms[-1]["embed"])
+        assert list(f)[-3:] == [GL.FIELD, F.FIELD, "Needs you"]
+        assert f[F.FIELD].splitlines() == [
+            "2 of the 3 who joined this week said something or joined voice.",
+            "This week: **3** joined (1 left since) · picked roles 2 · said something 1 · joined voice 1",
+            "Last 28 days: **5** joined (2 left since) · picked roles 2 · said something 2 · joined voice 1",
+            "Joined Sep 28 to Oct 4: **2** · still here 1 · came back in week 2 (a message or voice): 1",
+        ]
+        assert "<@" not in f[F.FIELD]  # counts only
+        assert f["Members"].startswith("**10** now · **4** joined")  # the Members field still counts the stray row
+    with_env(go, monkeypatch)
+
+
+def test_digest_newcomers_field_keeps_a_member_with_tracking_off_out_of_the_steps(monkeypatch):
+    async def go(env):
+        env.guild.owner = env.member(OWNER)
+        env.t = MON + 5 * 60
+        await env.join(U1, WEEK_START + DAY)
+        await env.join(U2, WEEK_START + DAY)
+        period = period_for(R.DIGEST_JOB, env.t)
+        await env.optout(U2)
+        assert await env.cog.send_digest(period) is True
+        before = fields(env.guild.owner.dms[-1]["embed"])[F.FIELD]
+        assert before.splitlines()[:2] == [
+            "2 joined this week; of the 1 with stats on, none said anything or joined voice.",
+            "This week: **2** joined (0 left since) · of the 1 with stats on: "
+            "picked roles 0 · said something 0 · joined voice 0",
+        ]
+        # whatever U2 does, and whatever rows exist for them, the field reads the same
+        env.member(U2).roles = [SimpleNamespace(name=config.GAMES[0].role)]
+        await env.ex("INSERT INTO quest_steps (user_id, step, at) VALUES (?, 'pick_roles', ?)", (U2, WEEK_START + 2 * DAY))
+        await wrote(env, U2, "2026-10-08")
+        await in_voice(env, U2, WEEK_START + 3 * DAY)
+        assert await env.cog.send_digest(period) is True
+        assert fields(env.guild.owner.dms[-1]["embed"])[F.FIELD] == before
+    with_env(go, monkeypatch)
+
+
+def test_digest_survives_a_broken_newcomers_check(monkeypatch, caplog):
+    async def go(env):
+        env.guild.owner = env.member(OWNER)
+        env.t = MON + 5 * 60
+        await newcomers(env)
+        period = period_for(R.DIGEST_JOB, env.t)
+
+        def boom(*_, **__):
+            raise RuntimeError("boom")
+        real = F.review
+        monkeypatch.setattr(F, "review", boom)
+        assert await env.cog.send_digest(period) is True
+        f = fields(env.guild.owner.dms[-1]["embed"])
+        assert F.FIELD not in f and f["Needs you"] == "Nothing needs you this week."
+        assert caplog.text.count("newcomers check failed") == 1
+        monkeypatch.setattr(F, "review", real)
+        assert await env.cog.send_digest(period) is True
+        assert F.FIELD in fields(env.guild.owner.dms[-1]["embed"])
+        await env.ex("DROP TABLE quest_steps")  # a table gone missing is the same story
+        assert await env.cog.send_digest(period) is True
+        f = fields(env.guild.owner.dms[-1]["embed"])
+        assert F.FIELD not in f and "Needs you" in f and "Members" in f
+        assert caplog.text.count("newcomers check failed") == 2
     with_env(go, monkeypatch)
 
 
