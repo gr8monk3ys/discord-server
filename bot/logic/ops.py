@@ -345,7 +345,8 @@ CHANNEL_NEEDS: list[Need] = [
     Need("shop", config.GENERAL_CHANNEL, POST + ("pin_messages",)),
     Need("shop", config.ANNOUNCEMENTS_CHANNEL, POST),  # season results
     # QOTD answers thread, daily poll
-    Need("engagement", config.GENERAL_CHANNEL, POST + ("create_public_threads", "send_polls")),
+    Need("engagement", config.GENERAL_CHANNEL, POST + ("create_public_threads", "send_polls",
+                                                        "read_message_history")),  # who answered: logic/quiet.py
     Need("engagement", config.COUNTING_CHANNEL, POST + ("add_reactions", "read_message_history")),
     Need("engagement", config.GAMING_CHANNEL, POST),
     Need("engagement", config.SQUAD_VOICE, VIEW + ("connect",), "voice"),
