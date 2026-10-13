@@ -420,7 +420,6 @@ NO_CHANNEL: dict[str, str] = {
     "helpdesk": "only replies to its own commands; the roles channel is linked, not posted in",
     "catchup": "reads whichever channel the member names, so there is no fixed channel to check",
     "sitedata": "writes a file; its one command replies in place",
-    "focus": "module being removed",
 }
 
 ROLE_HOLDERS = ("clips", "engagement", "growth", "levels", "selfroles", "shop", "tournaments", "crew", "supporter",
