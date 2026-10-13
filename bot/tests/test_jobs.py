@@ -164,6 +164,18 @@ def test_an_existing_first_seen_row_is_used_as_is():
     with_db(go)
 
 
+@pytest.mark.parametrize("bad", ["", None, "soon"])
+def test_a_first_seen_row_that_is_not_a_number_is_an_error_not_a_first_run(bad):
+    """Nothing writes such a row (only due() writes the key, as str(now)); if one is put there
+    by hand the job stops loudly, with nothing marked, rather than skipping periods quietly."""
+    async def go(db):
+        await db.execute("INSERT INTO meta (key, value) VALUES (?, ?)", ("first_seen:mvp", bad))
+        with pytest.raises((ValueError, TypeError)):
+            await jobs.due(db, MVP, TZ, SUN)
+        assert await job_rows(db) == {} and await meta_rows(db) == {"first_seen:mvp": bad}
+    with_db(go)
+
+
 # ---------------------------------------------------------------- similar names
 @pytest.mark.parametrize("a,b", [("clipcast", "clipcast-ask"), ("wrapped", "wrappedreminder"),
                                  ("support", "supporterstipend"), ("recap", "recap2")])

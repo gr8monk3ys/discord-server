@@ -31,6 +31,7 @@ from discord.ext import commands, tasks
 
 import config
 import economy
+import jobs
 from cogs.lfg import ping_only
 from logic import engagement as E
 from logic import quests as Q
@@ -128,16 +129,16 @@ class Vibes(commands.Cog):
     # ------------------------------------------------------------ scheduling
     @tasks.loop(minutes=1)
     async def tick(self) -> None:
-        jobs = (
+        steps = (
             ("chat revival", self.revive),
             ("boost sweep", self.sweep_boosts),
             ("anniversaries", lambda: self.run(V.ANNIV_JOB, E.plan_daily, self.anniversaries)),
             ("booster stipend", lambda: self.run(V.STIPEND_JOB, R.plan_monthly, self.stipend)),
             ("member of the month", lambda: self.run(V.MOTM_JOB, R.plan_monthly, self.member_of_month)),
         )
-        for name, job in jobs:
+        for name, step in steps:
             try:
-                await job()
+                await step()
             except Exception:
                 log.exception("vibes: %s failed", name)
 
@@ -145,26 +146,9 @@ class Vibes(commands.Cog):
     async def before_tick(self) -> None:
         await self.bot.wait_until_ready()
 
-    async def due(self, name: str, make_plan):
-        """Record first_seen and skipped periods; return the period to run now, if any."""
-        seen_key = f"first_seen:{name}"
-        first_seen = await self.meta(seen_key)
-        first_seen = int(first_seen) if first_seen else None
-        done = {r["key"] for r in await self.db.fetchall("SELECT key FROM jobs WHERE key LIKE ?", (f"{name}:%",))}
-        t = now()
-        todo = make_plan(t, done, first_seen)
-        async with self.db.transaction() as tx:
-            if first_seen is None:
-                await tx.execute("INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)", (seen_key, str(t)))
-            for period in todo.mark_done:
-                await tx.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (period.key, t))
-        return todo.run
-
     async def run(self, job, planner, action) -> None:
-        period = await self.due(job.name, lambda t, done, seen: planner(job, t, self.tz, done, seen))
-        # Marked done only after it worked: a failure retries on the next tick.
-        if period is not None and await action(period):
-            await self.db.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (period.key, now()))
+        # Marked done only after it worked (the action returned True): a failure retries on the next tick.
+        await jobs.run_due(self.db, job, self.tz, now, action, planner)
 
     # ------------------------------------------------------------ chat revival
     def is_general(self, channel) -> bool:

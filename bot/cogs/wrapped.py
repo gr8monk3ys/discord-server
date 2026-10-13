@@ -34,6 +34,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 import config
+import jobs
 from cogkit import is_staff
 from errors import reply_error
 from logic import houses as H
@@ -509,14 +510,14 @@ class Wrapped(commands.Cog):
     # ------------------------------------------------------------ the two posts
     @tasks.loop(minutes=5)
     async def tick(self) -> None:
-        jobs = (
+        steps = (
             ("announcement", lambda: self.run_job(W.ANNOUNCE_JOB, self.post_announcement)),
             ("reminder", lambda: self.run_job(W.REMINDER_JOB, self.post_reminder)),
             ("level snapshot", self.snapshot_levels),
         )
-        for name, job in jobs:
+        for name, step in steps:
             try:
-                await job()
+                await step()
             except Exception:
                 log.exception("wrapped: %s failed", name)
 
@@ -524,26 +525,9 @@ class Wrapped(commands.Cog):
     async def before_tick(self) -> None:
         await self.bot.wait_until_ready()
 
-    async def due(self, job: W.Annual):
-        """Record first_seen and skipped periods; return the period to run now, if any."""
-        seen_key = f"first_seen:{job.name}"
-        first_seen = await self.meta(seen_key)
-        first_seen = int(first_seen) if first_seen else None
-        done = {r["key"] for r in await self.db.fetchall("SELECT key FROM jobs WHERE key LIKE ?", (f"{job.name}:%",))}
-        t = now()
-        todo = W.plan_annual(job, t, self.tz, done, first_seen)
-        async with self.db.transaction() as tx:
-            if first_seen is None:
-                await tx.execute("INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)", (seen_key, str(t)))
-            for period in todo.mark_done:
-                await tx.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (period.key, t))
-        return todo.run
-
     async def run_job(self, job: W.Annual, action) -> None:
-        period = await self.due(job)
-        # Marked done only after it worked: a failure retries on the next tick.
-        if period is not None and await action(period):
-            await self.db.execute("INSERT OR IGNORE INTO jobs (key, done_at) VALUES (?, ?)", (period.key, now()))
+        # Marked done only after it worked (the action returned True): a failure retries on the next tick.
+        await jobs.run_due(self.db, job, self.tz, now, action, W.plan_annual)
 
     def announcements(self, guild, period):
         channel = config.match_by_name(guild.text_channels, config.ANNOUNCEMENTS_CHANNEL)

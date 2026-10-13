@@ -36,7 +36,10 @@ async def due(db, job, tz, now: int, planner=schedule.plan):
     `planner(job, now, tz, done_keys, first_seen)` returns an object with `run` (a period or
     None) and `mark_done` (periods to record without running). The first_seen row and the
     skipped periods are written in one transaction, stamped `now`. The returned period is
-    NOT marked: call `done()` once its work succeeded."""
+    NOT marked: call `done()` once its work succeeded.
+
+    A first_seen row that is not a number (nothing writes one) raises instead of counting as
+    a first run, so nothing is skipped on the strength of a damaged row."""
     key = seen_key(job.name)
     row = await db.fetchone("SELECT value FROM meta WHERE key = ?", (key,))
     first_seen = int(row["value"]) if row else None
