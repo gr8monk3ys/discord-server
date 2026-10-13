@@ -89,21 +89,14 @@ class Tonight(commands.Cog):
     def presence_ok(self) -> bool:
         return bool(getattr(getattr(self.bot, "intents", None), "presences", False))
 
-    async def meta(self, key: str) -> str | None:
-        row = await self.db.fetchone("SELECT value FROM meta WHERE key = ?", (key,))
-        return row["value"] if row else None
-
-    async def set_meta(self, key: str, value) -> None:
-        await self.db.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", (key, str(value)))
-
     async def load(self) -> L.State:
         if self.state is None:
-            self.state = L.load(await self.meta(L.STATE_KEY))
+            self.state = L.load(await self.db.meta_get(L.STATE_KEY))
         return self.state
 
     async def save(self, state: L.State) -> None:
         if state != self.state:
-            await self.set_meta(L.STATE_KEY, L.dump(state))
+            await self.db.meta_set(L.STATE_KEY, L.dump(state))
             self.state = state
 
     # ------------------------------------------------------------ what is true now
@@ -163,7 +156,7 @@ class Tonight(commands.Cog):
         return message_id
 
     async def quiet_until(self) -> int:
-        raw = await self.meta(LAST_REVIVAL_KEY)
+        raw = await self.db.meta_get(LAST_REVIVAL_KEY)
         return int(raw) + L.REVIVAL_GAP if raw and raw.isdigit() else 0
 
     # ------------------------------------------------------------ the tick
@@ -220,7 +213,7 @@ class Tonight(commands.Cog):
             return L.failed(state, t)
         self.write_failed = False
         if L.fired(before, state):
-            await self.set_meta(L.FIRED_KEY, t)
+            await self.db.meta_set(L.FIRED_KEY, t)
             log.info("tonight: line %s", "posted" if isinstance(action, L.Post) else "reused")
         return state
 

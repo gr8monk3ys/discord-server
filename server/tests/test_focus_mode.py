@@ -128,7 +128,7 @@ def test_plan_has_one_line_per_channel_in_the_words_the_owner_asked_for():
     by = {line.split("  ")[0].strip(): line for line in lines}
     assert by["💬・general"].endswith("core")
     assert by["🤣・memes"].endswith('opt-in group "Off topic"')
-    assert "event-driven" in by["🏆・tournaments"] and "a tournament is open or running" in by["🏆・tournaments"]
+    assert by["🏆・tournaments"].endswith('opt-in group "Events and tournaments"')  # plain opt-in, never event-driven
     assert by["📋・mod-log"].endswith("private (unchanged)")
     assert "What do you play?" in by["⛏️・minecraft"]
 
