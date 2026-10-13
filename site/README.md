@@ -173,7 +173,20 @@ from `bot/`:
 
     ../server/.venv/Scripts/python -m logic.sitegen --og
 
-The "This week on the server" strip is static copy; update it by hand if the schedule changes.
+## Copy
+
+The page describes a small co-op and PvE server and nothing bigger. The headline is fixed
+("Chill gamers. No tryhards, no toxicity."); the two paragraphs under it say what gets played,
+when people are on, how small it is and how to join. "Your first week" holds four entries and
+one short "Also here" list: add a system there only if a new member would use it in week one.
+No member counts, hours or activity claims in the static text (the live section shows real
+numbers when there are any), and no retired games outside the generated games block
+(`bot/tests/test_sitegen.py` checks both).
+
+The "A normal week" strip is static copy and lists only what happens without anyone hosting it:
+people in voice, and what Front Desk posts on a timer (`bot/cogs/houses.py`, `events.py`,
+`engagement.py`). Update it by hand if those schedules change, and word anything that depends
+on members showing up as exactly that.
 
 ## Deploy on Vercel (once)
 

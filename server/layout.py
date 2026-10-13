@@ -265,12 +265,19 @@ POSTS = {
         "title": "Welcome in",
         "description": "\n".join(
             [
-                "Chill gamers. No tryhards, no toxicity. Read {#rules}, then say hi in {#general}.",
+                "This is a small co-op and PvE server. People are mostly in voice in the evenings, "
+                "US Pacific time. Read {#rules}, then say hi in {#general}.",
+                "",
+                "**Start here**",
+                "`VOICE`  If someone is in the Lobby, join them. That is how most games here start.",
+                "`GAMES`  Pick yours under **Channels & Roles** at the top of the channel list.",
+                "`HOUSE`  Front Desk sorts you into Fern, Kestrel or Otter. `/house me` shows yours.",
+                "`MINECRAFT`  The Realms is the owner's modded server. After two weeks here, "
+                "`/realms link` puts you on its whitelist.",
                 "",
                 "**Roles**",
                 "{@Keeper}  runs the place",
                 "{@Squad}  the regulars",
-                "`GAME ROLES`  pick yours under **Channels & Roles** at the top of the channel list",
             ]
         ),
         "footer": "FRONT DESK · 03",
@@ -334,7 +341,8 @@ ONBOARDING_PROMPTS = [
 
 # Welcome Screen: the card new members see, with up to 5 channels.
 WELCOME_SCREEN = {
-    "description": "Chill gamers. No tryhards, no toxicity. Pick your games and find a squad tonight.",
+    "description": "A small co-op and PvE server. Pick your games, then join the Lobby voice room when someone "
+                   "is in it. Evenings, Pacific time.",
     "channels": [
         ("📌・rules", "📌", "Short and worth reading"),
         ("💬・general", "💬", "Say hi"),
@@ -352,7 +360,8 @@ REVOKE_PERMANENT_INVITES = False
 # Used by public_mode.py. The server description shows in invites and
 # Discovery; keep it under 120 characters.
 PUBLIC = {
-    "description": "Chill gamers. No tryhards, no toxicity. Squad up for Valorant, CoD, Fortnite, Minecraft and more.",
+    "description": "A small, friendly co-op and PvE server. Risk of Rain 2, Gears of War, Overwatch, Minecraft. "
+                   "Evenings, Pacific time.",
     "invite_channel": "👋・welcome",
 }
 

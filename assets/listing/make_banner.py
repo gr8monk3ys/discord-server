@@ -20,9 +20,11 @@ ICON = ROOT / "assets" / "server-icon.png"
 
 NAME = "Lorenzo's Server"
 TAGLINE = ("Chill gamers.", "No tryhards, no toxicity.")
-LABEL = "DISCORD SERVER · PACIFIC TIME"
-GAMES = "Valorant · Call of Duty · Fortnite · Minecraft · Apex · CS2 · League · GTA Online · Roblox"
+LABEL = "CO-OP AND PVE · PACIFIC TIME"
+# The games played here (server/layout.py GAMES), shortened to fit two lines.
+GAMES = "Risk of Rain 2 · Gears of War · Overwatch · Marvel Rivals · Minecraft · Tabletop Simulator · Wardogs · Apex"
 INVITE = "discord.gg/C25hy9Ca9W"
+ASIDE = "A small server. Evenings, mostly in voice."  # the quiet line beside the invite pill
 
 # Field Notebook, night side (site/style.css, theme/field-notebook.theme.css)
 PAGE = (17, 19, 23)
@@ -139,8 +141,7 @@ def render(w: int, h: int) -> Image.Image:
     pill_w = round(pill_font.getlength(INVITE)) + 2 * pad_x
     d.rounded_rectangle((left, top, left + pill_w, top + pill_h), radius=pill_h // 2, fill=PEN)
     d.text((left + pad_x, top + pill_h / 2), INVITE, font=pill_font, fill=PEN_TEXT, anchor="lm")
-    d.text((left + pill_w + s(18), top + pill_h / 2), "Squad up tonight.", font=font(16 * u), fill=INK_FAINT,
-           anchor="lm")
+    d.text((left + pill_w + s(18), top + pill_h / 2), ASIDE, font=font(16 * u), fill=INK_FAINT, anchor="lm")
 
     # the icon on the right
     paste_icon(img, round(w * 0.79), round(h * 0.47), s(250), max(3, s(5)))

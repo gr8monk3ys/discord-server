@@ -180,23 +180,53 @@ def test_site_json_ld_is_minimal_organization_and_website():
     assert (SITE / types["Organization"]["logo"][len(CANONICAL):]).is_file()
 
 
-def test_site_feature_cards_cover_the_current_server():
+def test_site_leads_with_what_a_new_member_does():
+    """A small server listing a dozen systems reads as empty machinery: four first-week
+    entries with a title each, then one short untitled list for the rest."""
     features = re.search(r'<section id="features".*?</section>', _page(), re.S).group(0)
-    cards = re.findall(r"<li\b", features)
-    assert 9 <= len(cards) <= 12
-    for want in ("Levels", "rank card", "tournament", "Weekly challenges", "Daily Word",
-                 "Starter quest", "Creator spotlight", "Houses", "Guides and setups"):
-        assert want.lower() in features.lower(), want
+    assert len(re.findall(r'<li><h3 class="card-title">', features)) == 4
+    assert len(re.findall(r"<li\b", features)) <= 8
+    for want in ("Lobby", "/lfg", "Fern, Kestrel or Otter", "The Realms", "/realms link"):
+        assert want in features, want
 
 
-def test_site_has_this_week_strip_and_updated_faq():
+def test_site_headline_is_fixed_and_the_first_screen_says_what_this_is():
+    page = _page()
+    assert "<h1>Chill gamers. <em>No tryhards, no toxicity.</em></h1>" in page
+    hero = re.search(r'<section class="hero".*?</section>', page, re.S).group(0)
+    for want in ("co-op and PvE", "Risk of Rain 2", "Gears of War", "Minecraft", "evenings", "US Pacific",
+                 "data-join"):
+        assert want in hero, want
+
+
+def test_site_copy_names_no_retired_game_and_no_house_style_slip():
+    """Outside the generated games block (python -m logic.sitegen owns that one)."""
+    page = _page()
+    start, end = page.index("<!-- games:start -->"), page.index("<!-- games:end -->")
+    copy = page[:start] + page[end:]
+    for gone in ("Valorant", "Call of Duty", "CoD", "Fortnite", "League of Legends", "Counter-Strike",
+                 "GTA", "Roblox"):
+        assert gone not in copy, gone
+    assert "—" not in copy  # no em dashes
+    assert "18+" not in sitegen.meta_tags(page)["description"] + sitegen.meta_tags(page)["og:description"]
+    meta = sitegen.meta_tags(page)
+    assert meta["og:description"] == meta["twitter:description"]
+
+
+def test_site_week_strip_and_faq_promise_only_what_happens():
     page = _page()
     week = re.search(r'<section id="week".*?</section>', page, re.S)
     assert week, "the weekly schedule strip"
-    assert "<h2>A normal week</h2>" in week.group(0)
-    faq = re.search(r'<section id="faq".*?</section>', page, re.S).group(0).lower()
-    for want in ("level", "roles", "partner"):
+    week = week.group(0)
+    assert "<h2>A normal week</h2>" in week
+    # the Friday game night is the bot's calendar entry, not a promise that people come
+    assert "if people come" in week and "Tournament night" not in week
+    faq = re.search(r'<section id="faq".*?</section>', page, re.S).group(0)
+    assert 5 <= faq.count("<details>") <= 8
+    for want in ("How busy is it?", "/realms link", "US Pacific"):
         assert want in faq, want
+    for machinery in ("/partner", "Mythic", "/shop"):
+        assert machinery not in faq, machinery
     assert '<p class="counts label" id="counts"' in page  # live counts stay, as a wall label
 
 
