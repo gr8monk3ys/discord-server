@@ -63,6 +63,13 @@ class FakeMessage:
         self.reactions = []
         self.threads = []
         self.thread_fail = None
+        self.thread = None  # the answers thread, once opened
+        self.reference = None
+        self.votes = 0  # votes on its poll, if it carries one
+
+    @property
+    def poll(self):
+        return SimpleNamespace(total_votes=self.votes) if self.kwargs.get("poll") else None
 
     async def add_reaction(self, emoji):
         self.reactions.append(emoji)
@@ -71,6 +78,7 @@ class FakeMessage:
         if self.thread_fail is not None:
             raise self.thread_fail
         self.threads.append(kwargs)
+        self.thread = SimpleNamespace(message_count=0)
 
 
 class FakeText:
@@ -83,16 +91,34 @@ class FakeText:
         self.guild = guild
         self.mention = f"<#{self.id}>"
         self.sent: list[FakeMessage] = []
+        self.heard: list[FakeMessage] = []  # what members wrote here
         self.fail = None
         self.thread_fail = None
+        self.reads = []  # fetch_message / history calls
 
     async def send(self, content=None, **kwargs):
         if self.fail is not None:
             raise self.fail
-        msg = FakeMessage(self, content, **kwargs)
+        msg = FakeMessage(self, content, author=SimpleNamespace(id=BOTUSER, bot=True), **kwargs)
         msg.thread_fail = self.thread_fail
         self.sent.append(msg)
         return msg
+
+    async def fetch_message(self, mid):
+        self.reads.append(("fetch", mid))
+        for m in self.sent:
+            if m.id == mid:
+                return m
+        raise http_error(404, discord.NotFound)
+
+    def history(self, limit=100, after=None):
+        self.reads.append(("history", limit))
+        rows = sorted((m for m in self.sent + self.heard if m.id > after.id), key=lambda m: m.id)[:limit]
+
+        async def gen():
+            for m in rows:
+                yield m
+        return gen()
 
 
 class FakeMember:
@@ -136,7 +162,8 @@ class FakeGuild:
         self.general = FakeText(config.GENERAL_CHANNEL, self)
         self.counting = FakeText(config.COUNTING_CHANNEL, self)
         self.gaming = FakeText(config.GAMING_CHANNEL, self)
-        self.text_channels = [self.general, self.counting, self.gaming]
+        self.mod_log = FakeText(config.MOD_LOG_CHANNEL, self)
+        self.text_channels = [self.general, self.counting, self.gaming, self.mod_log]
         self.squad = SimpleNamespace(id=101, name=config.SQUAD_VOICE, mention="<#101>")
         self.voice_channels = [self.squad]
         self.roles = [FakeRole(config.BIRTHDAY_ROLE), FakeRole(config.COUNTING_ROLE)]
@@ -223,6 +250,23 @@ class Env:
         await self.cog.on_message(msg)
         return msg
 
+    def chat(self, uid, reply_to=None):
+        """A member writes in general (not the counting channel: nothing is dispatched)."""
+        msg = FakeMessage(self.guild.general, "hello", author=self.member(uid))
+        if reply_to is not None:
+            msg.reference = SimpleNamespace(message_id=reply_to.id)
+        self.guild.general.heard.append(msg)
+        return msg
+
+    def questions(self):
+        return [m for m in self.guild.general.sent if m.kwargs.get("embed")]
+
+    def polls(self):
+        return [m for m in self.guild.general.sent if m.kwargs.get("poll")]
+
+    def notes(self):
+        return [m.kwargs["embed"].description for m in self.guild.mod_log.sent]
+
     async def jobs(self):
         return {r["key"] for r in await self.db.fetchall("SELECT key FROM jobs")}
 
@@ -252,6 +296,7 @@ def with_env(fn, monkeypatch, questions=QUESTIONS, pairs=PAIRS):
         cog = Engagement(bot, questions=list(questions), pairs=list(pairs), rng=random.Random(5))
         env = Env(db, guild, bot, cog)
         monkeypatch.setattr(cogmod, "now", lambda: env.t)
+        monkeypatch.delenv("QUIET", raising=False)
         try:
             await fn(env)
         finally:
@@ -294,6 +339,7 @@ def test_qotd_no_repeats_until_exhausted_then_reshuffles(monkeypatch):
             await env.tick(ts(2026, 10, d, 12, 1))
             seen.append([m.kwargs["embed"].description for m in env.guild.general.sent
                          if m.kwargs.get("embed")][-1])
+            env.questions()[-1].thread.message_count += 1  # someone answers: the room is awake
         assert sorted(seen[:3]) == sorted(QUESTIONS)
         assert sorted(seen[3:6]) == sorted(QUESTIONS)
         for a, b in zip(seen, seen[1:]):
@@ -348,6 +394,174 @@ def test_poll_posts_native_poll_for_24h(monkeypatch):
         polls = [m.kwargs["poll"] for m in env.guild.general.sent if m.kwargs.get("poll")]
         assert len(polls) == 2
         assert {tuple(a.text for a in p.answers) for p in polls} == set(PAIRS)
+    with_env(go, monkeypatch)
+
+
+# ---------------------------------------------------------------- quiet rooms (logic/quiet.py)
+QOTD_PAUSED = ("Question of the day is paused: the last 3 went unanswered. It resumes when someone posts "
+               "in the channel, and tries again in 6 days.")
+MANY = [f"Question {i}?" for i in range(12)]  # a bank that does not run out mid-test
+# The question tests run with no poll pairs and the poll test with no questions, so each
+# sees only its own kind in the room and in the mod log.
+
+
+async def used(env, table):
+    return len(await env.db.fetchall(f"SELECT * FROM {table}"))
+
+
+def test_qotd_stops_after_three_unanswered_and_the_skipped_day_is_done(monkeypatch):
+    async def go(env):
+        await env.tick(ts(2026, 10, 1, 13))
+        for d in (2, 3, 4):
+            await env.tick(ts(2026, 10, d, 12, 0))
+        assert len(env.questions()) == 3 and await used(env, "qotd_used") == 3
+        assert env.notes() == []
+
+        await env.tick(ts(2026, 10, 5, 12, 0))  # the room never answered: skipped
+        assert len(env.questions()) == 3
+        assert "qotd:2026-10-05" in await env.jobs()  # done on purpose: no catch-up burst later
+        assert await used(env, "qotd_used") == 3  # the bank did not move
+        assert env.notes() == [QOTD_PAUSED]
+        assert env.guild.mod_log.sent[0].kwargs["allowed_mentions"].everyone is False
+        reads = len(env.guild.general.reads)
+        await env.tick(ts(2026, 10, 5, 12, 1))  # asked once per day, not once a minute
+        assert len(env.guild.general.reads) == reads
+
+        for d in (6, 7, 8):
+            await env.tick(ts(2026, 10, d, 12, 0))
+        assert len(env.questions()) == 3 and await used(env, "qotd_used") == 3
+        assert env.notes() == [QOTD_PAUSED]  # said once
+        assert {f"qotd:2026-10-0{d}" for d in (5, 6, 7, 8)} <= await env.jobs()
+        # one message fetch and one bounded history read per decision
+        assert env.guild.general.reads[-2:] == [("fetch", env.questions()[-1].id), ("history", 50)]
+    with_env(go, monkeypatch, pairs=[])
+
+
+def test_qotd_wakes_when_a_member_writes_in_general(monkeypatch):
+    async def go(env):
+        await env.tick(ts(2026, 10, 1, 13))
+        for d in (2, 3, 4, 5, 6):
+            await env.tick(ts(2026, 10, d, 12, 0))
+        assert len(env.questions()) == 3
+        env.chat(A)  # not an answer, but someone is there
+        await env.tick(ts(2026, 10, 7, 12, 0))
+        assert len(env.questions()) == 4 and await used(env, "qotd_used") == 4
+        assert env.notes()[-1] == "Question of the day is back: someone posted in the channel."
+        assert env.questions()[-1].kwargs["embed"].description != env.questions()[-2].kwargs["embed"].description
+        await env.tick(ts(2026, 10, 8, 12, 0))  # nobody answered that one either: asleep again
+        assert len(env.questions()) == 4 and len(env.notes()) == 3
+    with_env(go, monkeypatch, questions=MANY, pairs=[])
+
+
+@pytest.mark.parametrize("how", ["thread", "reaction", "reply"])
+def test_qotd_keeps_going_while_someone_answers(monkeypatch, how):
+    async def go(env):
+        await env.tick(ts(2026, 10, 1, 13))
+        for d in range(2, 12):
+            await env.tick(ts(2026, 10, d, 12, 0))
+            q = env.questions()[-1]
+            if d % 3 == 0:  # one answer in three is enough
+                if how == "thread":
+                    q.thread.message_count += 1
+                elif how == "reaction":
+                    q.reactions.append(SimpleNamespace(count=1, me=False))
+                else:
+                    env.chat(B, reply_to=q)
+        assert len(env.questions()) == 10 and env.notes() == []
+    with_env(go, monkeypatch, pairs=[])
+
+
+def test_qotd_probes_once_after_seven_quiet_days(monkeypatch):
+    async def go(env):
+        await env.tick(ts(2026, 10, 1, 13))
+        for d in range(2, 11):
+            await env.tick(ts(2026, 10, d, 12, 0))
+        assert len(env.questions()) == 3  # the 2nd, 3rd and 4th; quiet through the 10th
+        await env.tick(ts(2026, 10, 11, 12, 0))  # 7 days after the last one
+        assert len(env.questions()) == 4 and await used(env, "qotd_used") == 4
+        for d in range(12, 18):
+            await env.tick(ts(2026, 10, d, 12, 0))
+        assert len(env.questions()) == 4  # the probe was ignored: another 7 days
+        await env.tick(ts(2026, 10, 18, 12, 0))
+        assert len(env.questions()) == 5
+        assert env.notes() == [QOTD_PAUSED]  # probes are not news
+    with_env(go, monkeypatch, questions=MANY, pairs=[])
+
+
+def test_poll_stops_without_votes_and_keeps_going_with_them(monkeypatch):
+    async def go(env):
+        await env.tick(ts(2026, 10, 1, 19))
+        for d in (2, 3, 4):
+            await env.tick(ts(2026, 10, d, 18, 0))
+        assert len(env.polls()) == 3
+
+        async def bank():
+            return [tuple(r) for r in await env.db.fetchall("SELECT pid, used_at FROM poll_used")]
+        before = await bank()
+        for d in (5, 6):
+            await env.tick(ts(2026, 10, d, 18, 0))
+            assert len(env.polls()) == 3 and f"thisorthat:2026-10-0{d}" in await env.jobs()
+        assert await bank() == before  # the pair bank did not move
+        assert len(env.notes()) == 1
+        assert env.notes()[0].startswith("This or that poll is paused: the last 3 went unanswered.")
+
+        env.polls()[-1].votes = 2  # a late vote on the last poll
+        await env.tick(ts(2026, 10, 7, 18, 0))
+        assert len(env.polls()) == 4
+        assert env.notes()[-1] == "This or that poll is back: the last one got a response."
+        for d in (8, 9):
+            env.polls()[-1].votes = 1
+            await env.tick(ts(2026, 10, d, 18, 0))
+        assert len(env.polls()) == 6
+    with_env(go, monkeypatch, questions=[])
+
+
+def test_quiet_off_posts_every_day_into_a_silent_room(monkeypatch):
+    async def go(env):
+        monkeypatch.setenv("QUIET", "off")
+        await env.tick(ts(2026, 10, 1, 19))
+        for d in range(2, 10):
+            await env.tick(ts(2026, 10, d, 12, 0))
+            await env.tick(ts(2026, 10, d, 18, 0))
+        assert len(env.questions()) == 8 and len(env.polls()) == 8
+        assert env.notes() == [] and env.guild.general.reads == []
+        assert await env.meta("quiet:qotd") is None and await env.meta("quiet:thisorthat") is None
+    with_env(go, monkeypatch)
+
+
+def test_unreadable_room_keeps_posting(monkeypatch):
+    async def go(env):
+        async def refuse(mid):
+            raise http_error(403, discord.Forbidden)
+        env.guild.general.fetch_message = refuse  # no Read Message History: could not tell
+        await env.tick(ts(2026, 10, 1, 13))
+        for d in range(2, 10):
+            await env.tick(ts(2026, 10, d, 12, 0))
+        assert len(env.questions()) == 8 and env.notes() == []
+    with_env(go, monkeypatch)
+
+
+def test_informational_posts_ignore_the_quiet_rule(monkeypatch):
+    async def go(env):
+        asked = []
+        real = cogmod.quietgate.allowed
+
+        async def spy(bot, kind, *args, **kwargs):
+            asked.append(kind.key)
+            return await real(bot, kind, *args, **kwargs)
+        monkeypatch.setattr(cogmod.quietgate, "allowed", spy)
+        await env.cog.set_birthday(env.inter(A), 10, 9)
+        await env.tick(ts(2026, 10, 3, 19))
+        for d in range(4, 9):  # nobody answers: the question and the poll go to sleep
+            await env.tick(ts(2026, 10, d, 18, 0))
+        general = len(env.guild.general.sent)
+        assert len(env.notes()) == 2 and set(asked) == {"qotd", "thisorthat"}
+
+        await env.tick(ts(2026, 10, 9, 12, 0))  # a Friday: the birthday and the auto game night
+        new = env.guild.general.sent[general:]
+        assert len(new) == 1 and "Happy birthday" in new[0].content
+        assert len(env.guild.created) == 1 and len(env.guild.gaming.sent) == 1
+        assert set(asked) == {"qotd", "thisorthat"}  # nothing else ever asks the gate
     with_env(go, monkeypatch)
 
 

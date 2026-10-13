@@ -4,7 +4,8 @@
   23:00 local, one conversation starter from the QOTD bank (data/qotd.txt, shared no-repeat
   table `qotd_used`), at most once per 6 hours and never twice without a member message in
   between. The last member message time lives in meta, and a history scan on startup covers
-  messages sent while the bot was down.
+  messages sent while the bot was down. The shared quiet rule (logic/quiet.py, QUIET=off) is
+  one more gate on top; with the rule above it can never be the one that says no.
 - Join anniversaries: 11:00 local, one shout-out in general for members whose server
   anniversary (Discord's joined_at) is today, up to 10 a day, once per member per year
   (meta anniv_last:USER).
@@ -32,9 +33,11 @@ from discord.ext import commands, tasks
 import config
 import economy
 import jobs
+import quietgate
 from cogs.lfg import ping_only
 from logic import engagement as E
 from logic import quests as Q
+from logic import quiet
 from logic import recap as R
 from logic import shop
 from logic import stats as S
@@ -201,16 +204,21 @@ class Vibes(commands.Cog):
         voice_line = await self.meta(T.FIRED_KEY)  # cogs/tonight.py just posted its line: not both in an hour
         if voice_line and voice_line.isdigit() and 0 <= t - int(voice_line) < T.REVIVAL_GAP:
             return False
+        # One more gate, after the two above: the shared quiet rule (logic/quiet.py). The cog
+        # already knows when a member last wrote here, so nothing is read from Discord.
+        if not await quietgate.allowed(self.bot, quiet.REVIVAL, channel, t, last_member_at=self.last_member_at):
+            return False
         used = {r["qid"] for r in await self.db.fetchall("SELECT qid FROM qotd_used")}
         last = await self.db.fetchone("SELECT qid FROM qotd_used ORDER BY used_at DESC, rowid DESC LIMIT 1")
         picked = E.pick_next(len(self.questions), used, self.rng, last["qid"] if last else None)
         # Claimed before sending: a failing channel waits out the 6-hour gap, not one try a minute.
         await self.set_meta(LAST_REVIVAL_KEY, t)
         try:
-            await channel.send(V.revival_text(self.questions[picked.index]), allowed_mentions=NO_PINGS)
+            message = await channel.send(V.revival_text(self.questions[picked.index]), allowed_mentions=NO_PINGS)
         except discord.HTTPException:
             log.warning("vibes: couldn't post the conversation starter", exc_info=True)
             return False
+        await quietgate.posted(self.db, quiet.REVIVAL, message, t)
         async with self.db.transaction() as tx:
             if picked.reset:
                 await tx.execute("DELETE FROM qotd_used")

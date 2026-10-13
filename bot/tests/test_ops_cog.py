@@ -523,6 +523,32 @@ def test_status_without_errors_or_backups(monkeypatch, tmp_path):
     with_env(go, monkeypatch, tmp_path)
 
 
+def test_status_lists_prompts_paused_by_the_quiet_rule(monkeypatch, tmp_path):
+    from logic import quiet
+
+    async def go(env):
+        async def fields():
+            inter = FakeInteraction(FakeMember(OWNER, env.guild))
+            await Ops.status.callback(env.cog, inter)
+            return {f.name: f.value for f in inter.calls[0]["embed"].fields}
+        monkeypatch.delenv("QUIET", raising=False)
+        assert "Paused prompts" not in await fields()  # nothing is asleep: no empty field
+        posts = tuple(quiet.Post(T0 + i * quiet.DAY, 10 + i) for i in range(3))
+        await env.db.meta_set("quiet:qotd", quiet.dump(quiet.State(posts, asleep=True)))
+        await env.db.meta_set("quiet:thisorthat", quiet.dump(quiet.State(posts)))  # awake: not listed
+        assert (await fields())["Paused prompts"] == f"Question of the day: paused, tries again <t:{T0 + 9 * quiet.DAY}:R>"
+        monkeypatch.setenv("QUIET", "off")
+        assert "Paused prompts" not in await fields()
+
+        async def boom(key):
+            raise RuntimeError("x")
+        monkeypatch.delenv("QUIET")
+        monkeypatch.setattr(env.db, "meta_get", boom)
+        shown = await fields()
+        assert shown["Paused prompts"] == "check failed, see bot.log" and shown["Uptime"]  # the rest still shows
+    with_env(go, monkeypatch, tmp_path)
+
+
 def test_status_shows_the_realms_bridge_when_that_module_is_loaded(monkeypatch, tmp_path):
     from cogs import realms
 
