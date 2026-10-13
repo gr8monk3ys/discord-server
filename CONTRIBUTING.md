@@ -38,8 +38,8 @@ click.
 ## Checks to run before pushing
 
 ```bash
-cd bot && ../server/.venv/Scripts/python -m pytest -q          # about 4,100 tests, a few minutes
-cd server && .venv/Scripts/python -m pytest -q tests           # 255 tests, seconds
+cd bot && ../server/.venv/Scripts/python -m pytest -q          # about 4,200 tests, a few minutes
+cd server && .venv/Scripts/python -m pytest -q tests           # 275 tests, seconds
 cd site/api && node --test                                     # 34 tests, the site functions
 server/.venv/Scripts/python -m ruff check .                    # from the repo root
 ```

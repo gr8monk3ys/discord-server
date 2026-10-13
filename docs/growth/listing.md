@@ -1,7 +1,7 @@
 # Growing the server
 
-Positioning: **chill gamers, no tryhards, no toxicity.** Every listing and post says the
-same three things: laid-back, any game, someone to play with tonight. The server is 18+ by rule;
+Positioning: **a small, friendly co-op and PvE server, evenings US Pacific.** The tagline is
+"Chill gamers. No tryhards, no toxicity." Say what is true: who plays what, when, and that it is small. The server is 18+ by rule;
 the copy implies it ("for adults") and states it once, in the rules line.
 
 Use the permanent invite that `server/public_mode.py --apply` prints. It's one link, so the
@@ -13,27 +13,10 @@ invite tracker can tell listing traffic from friend invites.
    Lorenzo's Server. That invites the DISBOARD bot; leave its permissions as they are.
 2. Fill in the listing:
 
-**Short description** (shown in search results):
-
-> Chill gamers. No tryhards, no toxicity. Squad up for Risk of Rain 2, Gears of War, Overwatch, Minecraft and more.
-
-**Long description:**
-
-> Tired of servers full of kids and sweats? This is a laid-back gaming hangout for adults.
->
-> 🎮 **Find a squad fast.** `/lfg` posts a "need 2 more" card with a Join button, and people get
-> pinged only for the games they picked.
-> 🔊 **Voice every night.** Drop into the Lobby; someone's usually on.
-> 📸 **Clips and memes.** Post your best (and worst) plays.
-> 📊 **Weekly MVP and leaderboards.** Bragging rights, nothing more.
-> 🎵 **Music bot** in voice.
->
-> Games: Risk of Rain 2, Gears of War, Overwatch, Marvel Rivals, Minecraft, Tabletop Simulator, Wardogs, Apex,
-> plus whatever you're playing.
->
-> Rules are short: be decent, no cheats, no spam, no NSFW, 18+ only.
-
-**Tags** (Disboard allows 5): `gaming`, `adults`, `chill`, `lfg`, `valorant`
+Use the short description, the long description and the first five tags from
+[`docs/LISTING.md`](../LISTING.md). That file is the one place the listing text lives, so
+every site says the same thing. Disboard shows the first paragraph of the long description
+as its summary.
 
 **Language:** English · **Category:** Gaming
 
@@ -57,22 +40,31 @@ each sub allows, and lead with what people can do there, not with the server.
 Places: r/DiscordAdvertising, r/discordservers, r/LFG, r/MinecraftBuddies, and the LFG thread of
 each game's own subreddit where it has one. Read each sub's rules first.
 
+An LFG post is one person looking for people to play with, so write it as yourself. Before
+posting, change the game and the time in the LFG template to what you are actually about to
+play, and only post it on a night you will be there. Update the member count if it has moved.
+
 **Template (LFG subs):**
 
-> **[NA West] Chill squad for Risk of Rain 2 / Gears / Overwatch tonight**
-> Adult gamers, any rank, no rage. We run games most nights around 8 to 11 PM PT and have a
-> small Discord with a squad-finder bot so you're never solo-queuing. DM me or grab the invite:
-> <invite>
+> **[NA West] Risk of Rain 2 tonight around 8 PM Pacific, looking for 1 or 2 more**
+> I'm starting a Risk of Rain 2 run tonight around 8 PM Pacific and I'd like one or two more
+> people. I'm an adult and I play for fun: any skill level is fine, new players too, and
+> nobody gets yelled at over a bad run. I play with a few people from a small co-op Discord
+> (about 20 of us, all adults), and I'll be in voice there. Reply or DM me, or join and say
+> hi: <invite>
 
 **Template (r/DiscordAdvertising / r/discordservers):**
 
-> **Chill Gamers**: laid-back gaming hangout for adults
-> No tryhards, no toxicity. LFG bot with Join buttons, voice every night, weekly MVP, music.
-> Risk of Rain 2, Gears of War, Overwatch, Minecraft, Apex and more. <invite>
+> **Lorenzo's Server: a small co-op and PvE server for adults**
+> Chill gamers. No tryhards, no toxicity. We're a small, friendly server of about 20 adults
+> who play co-op and PvE games. We play Risk of Rain 2, Gears of War, Overwatch, Marvel
+> Rivals, Apex Legends, Tabletop Simulator, Wardogs and Minecraft, and the owner runs a modded
+> Minecraft server. A few of us are in voice in the evenings, US Pacific time, and some nights
+> are quiet. Any skill level is welcome. <invite>
 
 ## Partner swap (with servers your size)
 
-> Hey! I run a chill gaming server for adults (~N members) with an LFG bot and weekly game nights.
+> Hey! I run a chill gaming server for adults (~N members) that plays co-op and PvE games in the evenings, US Pacific time.
 > Want to swap partner posts? I'll post yours in our #📣・announcements and you post ours.
 > Happy to do a joint game night too.
 

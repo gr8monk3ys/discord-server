@@ -141,6 +141,20 @@ the owner only, compares the last 28 days of game time with the server's games l
 game names with a player count and hours, never who played. A game that fewer than three
 members played is never named, and members with tracking off are not counted.
 
+**The weekly newcomers check.** The same digest has a "Newcomers" field. For the last week and
+the last 28 days it says how many people joined, how many of them have left since, and how many
+picked roles, said something or joined voice; for the people who joined the week before, how
+many are still here and how many came back. It is counts only, never a name or an ID, and it
+is worked out from the records above: nothing new is stored. Members with tracking off are
+counted as joined and left, which the server shows everyone anyway, and in nothing else. The
+field does say how many recent joiners have tracking off, so when only one person joined, the
+owner can tell that this person turned it off.
+
+**Questions nobody answers.** Before it posts the next question of the day or daily poll, Front
+Desk re-reads its own last one (votes, reactions, how many messages its answers thread has)
+and, if those show nothing, checks whether a member replied or wrote in the channel after it;
+it keeps only whether that question was answered, nothing about who answered or what was said.
+
 **Bans and appeals.** A ban is stored as a moderation case, with the time. If appeals are on,
 Front Desk DMs you an appeal code before the ban. The appeal form is on the website, which
 Vercel hosts: your user ID, the code and your answers go to a small function there, which

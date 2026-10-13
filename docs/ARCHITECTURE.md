@@ -36,7 +36,9 @@ looked up by name at run time, never by a stored ID.
    `YOUTUBE_CLIENT_SECRET`, `YOUTUBE_REFRESH_TOKEN`, `YOUTUBE_PRIVACY` (clipcast),
    `REALMS_ADDRESS`, `REALMS_RCON_HOST`, `REALMS_RCON_PORT`, `REALMS_RCON_PASSWORD`,
    `REALMS_LOG_PATH` (realms), `SITE_DATA` (sitedata), `TONIGHT` (tonight; `off` stops the
-   voice line, anything else or unset leaves it on), and `APPEAL_SECRET`,
+   voice line, anything else or unset leaves it on), `QUIET` (`bot/quietgate.py`; `off` posts
+   every question and poll whether or not anyone answers, anything else or unset leaves the
+   quiet rule on), and `APPEAL_SECRET`,
    `APPEAL_COOLING_DAYS`, `APPEAL_REAPPEAL_DAYS`, `SITE_URL` (appeals, and `/ban`'s DM).
    All are optional; `docs/WAVE9_SETUP.md` says what each turns on.
 2. `single_instance_lock()` takes an exclusive lock on `bot/data/bot.lock` for the life of the
@@ -86,7 +88,8 @@ Rules that make this hold together:
   `custom_id` carries a row id or a list index; the row is re-read on every click.
 - Small cross-restart state (message ids of panels, "first run" markers, last-run stamps)
   lives in the `meta` key/value table, namespaced per cog (`selfroles:panel`, `ops:perms`,
-  `tourney:<id>:auto`, ...). It has no schema of its own, so grep the cog for its keys.
+  `tourney:<id>:auto`, ...) or per shared module (`quiet:<kind>`, written by
+  `bot/quietgate.py`). It has no schema of its own, so grep the cog for its keys.
 - "Is this member staff?" is one function, `cogkit.is_staff` (`bot/cogkit.py`: owner,
   administrators, Keeper and Moderator matched by slug), imported by name into each cog that
   asks. Different on purpose: `cogs/helpdesk.py` goes by permission (Moderate Members or
@@ -118,7 +121,7 @@ jobs below). Times are local (Pacific unless `TZ` is set). Loops without a wall-
 | `economy` | earning (voice, chat, clips, squads, MVP, clip of the week), `/daily`, `/balance`, `/give`, `/coinflip`, `/richest` | `wallets` streak columns; coins via `economy.py` | voice coins 5 min | none of its own |
 | `games` | `/slots`, `/blackjack`, `/trivia`, `/predict` | `predictions`, `prediction_bets`, `blackjack_open` | none (open blackjack bets refunded at start) | none of its own |
 | `shop` | `/shop`, `/buy`, `/season`, `/raffle`, Spotlight | `perks`, `seasons` | raffle draw Sun 20:00; month-end season results; perk expiry 5 min | 💬・general, 📣・announcements; Hype, Season Champ, colour roles |
-| `engagement` | QOTD, this-or-that poll, counting, auto game night, `/birthday` | `qotd_used`, `poll_used`, `counting`, `counting_run`, `birthdays`, `gamenights` | birthdays 09:00, QOTD 12:00, poll 18:00 daily; auto game night Fri 12:00 | 💬・general, 🔢・counting, 🕹️・gaming; Birthday, Counting Champ |
+| `engagement` | QOTD, this-or-that poll, counting, auto game night, `/birthday` | `qotd_used`, `poll_used`, `counting`, `counting_run`, `birthdays`, `gamenights` | birthdays 09:00, QOTD 12:00, poll 18:00 daily (QOTD and poll ask `quietgate` first: see Quiet rooms); auto game night Fri 12:00 | 💬・general, 🔢・counting, 🕹️・gaming; Birthday, Counting Champ |
 | `moderation` | `/warn`, `/timeout`, `/untimeout`, `/ban`, `/cases`, `/purge`, auto-escalation, anti-spam, anti-raid, the ban DM with the appeal code | `cases`, `appeal_bans` | raid restore check 30 s | 📋・mod-log, 🛡️・mod |
 | `ops` | backups, error alerts, back-online note, drift check, permission self-check, `/status` | none | backup 04:00 daily; drift Sun 03:00; permission check 60 s after ready and 09:00 daily | 📋・mod-log |
 | `utility` | `/remind`, `/reminders`, `/afk`, suggestion votes and tags, stat channels, tickets | `reminders`, `afk`, `tickets` | reminders 30 s; stat channels 10 min | 🆘・help, 💡・suggestions forum, 01 · front desk category |
@@ -127,7 +130,7 @@ jobs below). Times are local (Pacific unless `TZ` is set). Loops without a wall-
 | `achievements` | badges, `/profile` (asks `supporter` for the flair), `/badges` | `achievements` | hourly sweep | 💬・general |
 | `creators` | `/creator` linking and verification, upload and go-live posts | `creators`, `creator_pending`, `creator_seen` | YouTube 15 min; Twitch 3 min; pending cleanup hourly | 📺・creators, 📋・mod-log |
 | `levels` | XP from chat and voice, level roles, `/rank`, `/levels`, `/xp` | `xp` | voice XP sweep 10 min | 🤖・bot-commands, 📋・mod-log; Regular, Veteran, Elite, Legend, Mythic |
-| `recap` | weekly recap, owner digest (with the "Games list" field from `logic/gamelist.py`), member milestones, invite contest | none | recap Mon 10:00; digest Mon 10:05; contest on the 1st 12:00 | 📣・announcements, 📋・mod-log |
+| `recap` | weekly recap, owner digest (with the "Games list" field from `logic/gamelist.py` and the "Newcomers" field from `logic/funnel.py`), member milestones, invite contest | none | recap Mon 10:00; digest Mon 10:05; contest on the 1st 12:00 | 📣・announcements, 📋・mod-log |
 | `selfroles` | role panel and `/roles` | none | none (panel edited in place at start) | 🎭・roles; platform, region, play-time, ping and game roles |
 | `partners` | `/partner apply/remove`, review cards | `partners` | dead-invite sweep Mon 12:00 | 🤝・partners, 📋・mod-log |
 | `quests` | starter quest, `/quest`, nudge DM | `quest_steps`, `achievements` (Settled In) | hourly sweep | 💬・general |
@@ -143,7 +146,7 @@ jobs below). Times are local (Pacific unless `TZ` is set). Loops without a wall-
 | `gamelink` | `/link`, `/unlink`, `/accounts`, Steam section on `/profile` | `game_accounts`, `game_account_pending` | upkeep 30 min (each account re-read at most daily) | 📋・mod-log |
 | `votehub` | `/vote`, weekly bump thanks (the job, ledger reason and refs still say `support`) | none (reads `bumps`) | thanks Sun 17:00 | 🎲・games, 🤖・bot-commands |
 | `catchup` | `/catchup` AI summary, staff `/catchup-usage` | `catchup_usage` | none | any public text channel (never the staff category) |
-| `vibes` | chat revival (skipped within an hour of the `tonight` line), join anniversaries, booster thanks and stipend, member of the month | `qotd_used` | 1 min tick: anniversaries 11:00 daily; stipend on the 1st 12:00; member of the month on the 1st 12:30 | 💬・general, 📣・announcements |
+| `vibes` | chat revival (skipped within an hour of the `tonight` line; it also asks `quietgate`, which never refuses it), join anniversaries, booster thanks and stipend, member of the month | `qotd_used` | 1 min tick: anniversaries 11:00 daily; stipend on the 1st 12:00; member of the month on the 1st 12:30 | 💬・general, 📣・announcements |
 | `houses` | three houses, `/house`, staff `/house-admin move`, weekly House Cup, quarterly trophy | `house_members`, `house_results` | placement and role sweep 10 min (one role change a second; a one-time introduction post when the first members are sorted); 1 min tick: House Cup Mon 10:10, season close on the 1st 10:20 (acts when a quarter ended) | 📣・announcements; House Fern, House Kestrel, House Otter |
 | `crew` | Welcome Crew: `/crew` with Join/Leave buttons, the crew ping, greeting reward, staff `/crew-stats` | `crew_arrivals`, `crew_greetings`, `achievements` (Welcoming Committee) | 1 min tick (crew ping, first-time joins only; hourly upkeep: opt-out cleanup, role taken back after a case) | 💬・general, 📋・mod-log; Welcome Crew |
 | `supporter` | Supporter tier: thank-you, `/profile` flair, stipend, `/support`, staff `/supporter grant/revoke` | `supporters` | reconcile 5 min; stipend on the 1st 12:15 | 💬・general, 📋・mod-log; Supporter (only read, unless staff grant it by hand) |
@@ -155,13 +158,24 @@ jobs below). Times are local (Pacific unless `TZ` is set). Loops without a wall-
 | `appeals` | ban appeals from the website: review cards with Accept/Deny, discussion threads, staff `/appeals list/code` | `appeals` | 5 min tick: re-reads the channel for webhook posts missed while down; expiry daily 09:00 (30 days untouched; answers blanked 180 days after a decision) | 🔒・appeals, 📋・mod-log |
 | `tonight` | one line in general while 2+ non-bot members are in a public voice channel (everyone can view and join; not AFK, not the staff category): counts, the shared game, a channel mention; edited in place, past tense when the rooms empty, never deleted. No commands, no coins | none (`meta` only: `tonight:state`, one JSON value with no member data, and `tonight:fired_at`) | 1 min tick: line after a room has held 3 min, edits at most every 2 min, same message reused for 45 min after a session ends, at most 3 new messages a local day; `TONIGHT=off` runs no tick and closes a standing "right now" line once | 💬・general |
 
-Three of the `logic/` modules have no cog of their own: `linkedroles.py` validates
+Four of the `logic/` modules have no cog of their own: `linkedroles.py` validates
 `site/api/linked-role/metadata.json` and plans the registration diff for
 `server/register_linked_roles.py`, `wrappedcard.py` draws the Wrapped cards, and `gamelist.py`
 compares 28 days of `game_sessions` with `config.GAMES` and `config.RETIRED_GAMES` for the
 owner digest (`Recap.game_list_line`): an unlisted game needs 3 distinct players and 5 hours
 combined to be named, presence names go through the text filter and are markdown-escaped,
 bots and opted-out members are excluded, and there is no field at all when nobody played.
+`funnel.py` is the digest's "Newcomers" field (`Recap.newcomers_line`). It stores nothing: the
+cog hands it rows the other modules already keep (`joins`, `message_counts`,
+`voice_sessions`, the `pick_roles` step in `quest_steps`, and who holds a platform, region or
+game role right now). For the digest's week and the 28 local days that end with it, it counts
+how many joined, left since, picked roles, said something and joined voice; for the week
+before's joiners, how many are still here and how many came back in week 2; `reading` picks
+one sentence about the week. Counts only, never a member or an id. Bots never count.
+Opted-out members count as joined and left and are left out of every later step, numerator
+and denominator, so the steps read "of the N with stats on". There is no field when nobody
+joined in 28 days, and a failure leaves the field out without breaking the digest.
+(`logic/quiet.py` has no cog either; its driver is `bot/quietgate.py`: see Quiet rooms.)
 `logic/sitedata.py` shares its schema with the publisher through `server/site_schema.py`.
 Cross-cog reads added with these modules, all by `bot.get_cog(...)` and all optional (a missing
 or failing cog just leaves its line out): `recap` asks `Forums.fresh_line` for the weekly recap
@@ -253,9 +267,23 @@ exception goes to the caller with nothing marked. Fifteen cogs run their jobs th
 `appeals`, `challenges`, `clipcast`, `clips`, `engagement`, `events`, `houses`, `partners`,
 `recap`, `stats`, `supporter`, `tournaments`, `vibes`, `votehub` and `wrapped`. What differs
 stays in the cog: `events` catches its action's errors and gives up a day after the scheduled
-time, and `clips`, `stats`, `clipcast` and `appeals` mark the period done whenever the work
-returns without raising. Because the keys are read with `LIKE`, a job name must not differ from
-another only by `_`, `%` or letter case.
+time, and `appeals` calls `due` and `done` itself (`run_expiry`), from a tick that runs the
+channel sweep and the daily expiry as two steps that fail on their own. Because the keys are
+read with `LIKE`, a job name must not differ from another only by `_`, `%` or letter case.
+
+A period is marked done only when its work could happen. In `stats` (weekly MVP), `clips`
+(clip poll) and `clipcast` (the ask, the publish, and the staff hand-over when YouTube is not
+connected) the action returns False when the server, its channel or, for the hand-over, the
+mod log is missing, before anything is sent, paid, uploaded or handed over. `appeals` leaves
+the day unmarked while the server is unavailable. The period is then tried again on every
+tick until the next period is due, when the planner marks the old one done without running
+it; `stats`, `clips` and `clipcast` log the wait once per period, not on every tick. Handled
+with nothing to post
+still returns True: a quiet week with no MVP, fewer than two clips, no approved clips.
+`tournaments` does the same when the tournaments channel is missing: the monthly auto
+tournament waits for it, until it is too late to open sign-ups for that month. What keeps a
+retry from doing anything twice is unchanged: ledger refs, the `clip_polls` row and the
+`clipcast` rows.
 
 Three drivers are still their own, on purpose: `ops` (backup, drift, permission check: it reads
 the keys with `substr`, writes first_seen in a statement of its own and stamps skipped periods
@@ -263,6 +291,39 @@ with a second clock read), the `shop` raffle (its periods come from ticket rows 
 and there is no first_seen) and the `seasonal` drops (a slot's key is claimed before the post
 goes out, so a crash loses a drop rather than repeating one). Their `jobs` keys never collide
 with the ones above.
+
+**Quiet rooms (`logic/quiet.py`, `bot/quietgate.py`).** A recurring prompt that asks members
+for a response is a "kind": the question of the day (`QOTD`), the daily poll (`POLL`) and the
+chat revival (`REVIVAL`). The rule is pure and lives in `logic/quiet.py`: post unless the last
+3 prompts of the kind were all ignored; a sleeping kind wakes when a member writes in the
+channel after its last prompt, and if nobody does, one probe goes out 7 days after that
+prompt (a probe nobody answers leaves the kind asleep for another 7 days).
+`bot/quietgate.py` is the driver, a plain module like `jobs.py`. A cog calls
+`quietgate.allowed(bot, kind, channel, now)` before it picks anything and
+`quietgate.posted(db, kind, message, at)` after the send. Who calls them:
+
+- `cogs/engagement.py`, for the question of the day and the poll. It passes the period's
+  scheduled time to both calls. A refusal returns True to `run_due`, so the day is marked done
+  and nothing is taken from the question or poll bank.
+- `cogs/vibes.py`, for the chat revival. It passes `last_member_at`, so nothing is read from
+  Discord. Its own rule already needs a member message since the last revival, so the gate
+  never refuses it.
+- `cogs/ops.py` reads `quietgate.status_lines` for the "Paused prompts" field of `/status`.
+
+Without `last_member_at`, `allowed` fetches the newest prompt once (poll votes, a reaction
+the bot did not add, the message count of the answers thread, and the voter list when a poll
+shows no votes) and, only when that shows nothing, reads at most 50 channel messages after it
+(a member's reply is an answer; any member message wakes a sleeping kind). This is why
+`engagement` needs Read Message History in general (`CHANNEL_NEEDS`). State is one JSON value
+per kind in `meta` under `quiet:<kind>` (`quiet:qotd`, `quiet:thisorthat`, `quiet:revival`):
+the last 3 prompts as time, message id and answered, and whether the kind is asleep. No member
+ids. The keys are live data, so never rename a kind's key. The gate fails open: whatever
+cannot be read (a deleted prompt, a missing permission, an outage) never counts against a
+prompt, an exception in `allowed` posts the prompt, and `posted` never raises. Staff get one mod-log
+line when a kind pauses and one when it resumes, none for a probe. `QUIET=off` in
+`server/.env` turns the rule off: `allowed` returns True without reading anything, `posted`
+records nothing and `/status` shows no field. Informational posts (free games, recaps,
+results, welcomes, the voice line) are not kinds and do not go through the gate.
 
 **Permission self-check (`cogs/ops.py`).** About a minute after ready and daily at 09:00 the
 bot compares what the loaded cogs need (`logic/ops.py` tables) with what it actually has:
@@ -328,7 +389,9 @@ SQLite at `bot/data/front_desk.db` (gitignored). `MIGRATIONS` in `bot/db.py` is 
 | Ban appeals | `appeals` (unique index "one open appeal per user"), `appeal_bans` (when a ban happened; written by `moderation`) | 21 |
 
 Wrapped, sitedata, Linked Roles, focus and tonight add no tables. Wrapped keeps its share cooldown and the
-January level snapshot in `meta` (`wrapped:shared:YEAR:USER`, `wrapped:levels:YEAR`).
+January level snapshot in `meta` (`wrapped:shared:YEAR:USER`, `wrapped:levels:YEAR`). Quiet
+rooms and the digest's Newcomers field add none either: quiet rooms keeps one `meta` value per
+prompt kind (`quiet:<kind>`), and the Newcomers field stores nothing.
 
 Derived, not stored: badges, challenge progress, quest steps, event points, recap numbers,
 season standings, the running week's house points and everything on a Wrapped card are
@@ -430,6 +493,7 @@ Never run the bot on two machines with the same token: the lock is per machine. 
 | Store something new | Append a **new** list to `MIGRATIONS`; never edit an existing one. Update `PRIVACY.md` if it is about members, and the data-model table above |
 | Pay or charge coins | `economy.apply_tx` / `transfer_tx` with a `reason` and, for anything retryable, a `ref`. Put amounts and caps in `logic/`. Gate rewards on `quests.established`. Add the source or sink to `docs/ECONOMY.md` |
 | Run something on a schedule | Define a `Weekly` / `Daily` / `Monthly` job in `logic/` with a name no other job has, poll it from a `tasks.loop` with `jobs.run_due(self.db, JOB, self.tz, now, action, planner)` (`bot/jobs.py`), and have the action return True only when the period is handled. Don't write `first_seen:` or `jobs` rows by hand |
+| Post a recurring prompt that asks for a response | Add a `Kind` to `logic/quiet.py` (`KINDS` too), call `quietgate.allowed` before picking anything and `quietgate.posted` after the send, and treat a refusal as handled |
 | Post in a channel or hand out a role | Add the name to `bot/config.py` (and to `server/layout.py` if it does not exist yet, created with `public_mode.py`), then add a `Need` / `ROLE_NEEDS` entry in `bot/logic/ops.py` so the self-check covers it |
 | Repost member text | Run it through `logic/textfilter`, escape markdown, send with `ping_only(...)` or `AllowedMentions.none()` |
 | Record member activity | Check `db.tracking_allowed` first; make opt-out delete it (`cogs/stats.py` `/privacy`) |
