@@ -193,7 +193,10 @@ the daily caps. Amounts, caps and refs are decided in `logic/` (`coins.py`, `sho
 
 **Account age for anything rewardable.** `logic/quests.py` defines `MIN_ACCOUNT_DAYS = 30`,
 `established(user_id, at)` (age read from the snowflake id, so it works for members who left)
-and `established_sql(...)` for use inside queries. Two uses: the earner must be established to
+and `established_sql(...)` for use inside queries. These are the only place the rule is written:
+a module with its own named gate (`tournaments.can_join`, `wordgame.payable`, `shop.can_enter`,
+`quests.eligible_for_reward`) calls `established` for the age part and takes the user id, not a
+`created_at`. Two uses: the earner must be established to
 be paid (quest, challenges, tournaments, seasonal, Daily Word, `/give`, vote thanks, MVP,
 `/catchup`), and where other people's actions earn someone progress (stars, poll votes, squad
 joins, voice company) only established accounts count, so alts cannot hand out rewards.

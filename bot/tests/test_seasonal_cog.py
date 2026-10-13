@@ -99,10 +99,10 @@ class FakeRole:
 
 
 class FakeMember:
-    def __init__(self, uid, bot=False, created_at=None):
+    def __init__(self, uid, bot=False):
         self.id = uid
         self.bot = bot
-        self.created_at = created_at or discord.utils.snowflake_time(uid)
+        self.created_at = discord.utils.snowflake_time(uid)
         self.mention = f"<@{uid}>"
         self.display_name = f"user*{uid}"
         self.roles = []
@@ -536,9 +536,6 @@ def test_fresh_accounts_and_bots_cannot_grab(monkeypatch):
         alt = young_id(env.t)
         i = await env.grab(alt, d)
         assert i.of("send_message")[0]["content"] == cogmod.TOO_NEW and i.of("send_message")[0]["ephemeral"]
-        # an old-looking id whose created_at says otherwise is refused too
-        j = await env.grab(U2, d, created_at=datetime.fromtimestamp(env.t - DAY, timezone.utc))
-        assert j.of("send_message")[0]["content"] == cogmod.TOO_NEW
         k = await env.grab(BOTUSER, d, bot=True)
         assert k.calls == []
         assert (await env.row(d))["claimed_by"] is None

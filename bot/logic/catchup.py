@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from datetime import datetime, tzinfo
 from urllib.parse import urlsplit
 
-from logic import quests, textfilter
+from logic import textfilter
 
 API_URL = "https://api.anthropic.com/v1/messages"
 API_VERSION = "2023-06-01"
@@ -79,12 +79,6 @@ SYSTEM_PROMPT = (
     "No links, no invites, no markdown formatting, no headings, no preamble. "
     "Leave out insults, slurs and personal details; do not quote messages at length."
 )
-
-
-def established(user_id: int, at: int) -> bool:
-    """Only accounts at least quests.MIN_ACCOUNT_DAYS old may spend summaries (fresh alts
-    can't burn the server's daily budget)."""
-    return quests.established(user_id, at)
 
 
 def valid_hours(hours: int) -> bool:

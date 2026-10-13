@@ -183,9 +183,9 @@ def ref(day: date, user_id: int) -> str:
     return f"word:{day.isoformat()}:{user_id}"
 
 
-def payable(created_at: int | None, now: int) -> bool:
-    """Fresh alt accounts aren't paid (same rule as the starter quest)."""
-    return created_at is not None and now - created_at >= Q.MIN_ACCOUNT_DAYS * DAY
+def payable(user_id: int, now: int) -> bool:
+    """Fresh alt accounts aren't paid (the same age rule as every other reward)."""
+    return Q.established(user_id, now)
 
 
 # ---------------------------------------------------------------- streaks and stats

@@ -128,11 +128,6 @@ EVENT_RETRY = 30 * 60  # an auto tournament without its event: try to create it 
 EVENT_LOCATION = f"#{config.TOURNAMENTS_CHANNEL}"
 
 
-def created_ts(user) -> int | None:
-    created = getattr(user, "created_at", None)
-    return int(created.timestamp()) if created is not None else None
-
-
 def pack(channel_id: int, message_id: int) -> str:
     return f"{channel_id}:{message_id}"
 
@@ -455,7 +450,7 @@ class Tournaments(commands.Cog):
                 if action == "join":
                     if user.id in entrants:
                         reply = "You're already signed up."
-                    elif not T.can_join(created_ts(user), now()):
+                    elif not T.can_join(user.id, now()):
                         reply = (f"Your Discord account has to be at least {MIN_ACCOUNT_DAYS} days old "
                                  "to enter tournaments.")
                     elif len(entrants) >= t["size"]:

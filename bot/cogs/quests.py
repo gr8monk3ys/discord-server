@@ -57,11 +57,6 @@ def joined_ts(member) -> int | None:
     return int(joined.timestamp()) if joined is not None else None
 
 
-def created_ts(member) -> int | None:
-    created = getattr(member, "created_at", None)
-    return int(created.timestamp()) if created is not None else None
-
-
 class Quests(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -167,7 +162,7 @@ class Quests(commands.Cog):
         if Q.BADGE_KEY in A.BY_KEY:
             badge = bool(await self.db.execute(
                 "INSERT OR IGNORE INTO achievements (user_id, key, at) VALUES (?, ?, ?)", (uid, Q.BADGE_KEY, t)))
-        if not Q.eligible_for_reward(joined_ts(member), await self.started_at(), t, created_at=created_ts(member)):
+        if not Q.eligible_for_reward(joined_ts(member), await self.started_at(), t, user_id=uid):
             if badge:
                 log.info("quests: %s finished the starter quest (badge only, no coin reward)", uid)
             return False
@@ -318,7 +313,7 @@ class Quests(commands.Cog):
                                      (NUDGE_KEY.format(member.id), str(t))):
             return False
         try:
-            await member.send(Q.nudge_text(done, tracking, rewarded=Q.eligible_for_reward(joined, started, t, created_at=created_ts(member))),
+            await member.send(Q.nudge_text(done, tracking, rewarded=Q.eligible_for_reward(joined, started, t, user_id=member.id)),
                               allowed_mentions=discord.AllowedMentions.none())
         except Exception as e:  # DMs closed: fine, they can still run /quest
             log.info("quests: nudge DM to %s failed (%s)", member.id, type(e).__name__)
@@ -335,10 +330,10 @@ class Quests(commands.Cog):
             status = "reward paid"
         else:
             args = (joined_ts(member), await self.started_at(), now())
-            if Q.eligible_for_reward(*args, created_at=created_ts(member)):
+            if Q.eligible_for_reward(*args, user_id=uid):
                 status = f"{Q.REWARD:,} coins when you finish"
             else:
-                status = f"no coin reward ({Q.no_reward_reason(*args, created_at=created_ts(member))})"
+                status = f"no coin reward ({Q.no_reward_reason(*args, user_id=uid)})"
         title = "Starter quest · done!" if got == total else f"Starter quest · {got}/{total}"
         return style.embed(title=title, description=Q.checklist(done, tracking),
                            footer=style.label("quest", status))

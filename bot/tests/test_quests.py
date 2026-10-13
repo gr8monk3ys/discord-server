@@ -5,8 +5,15 @@ from logic import quests as Q
 
 DAY = 24 * 3600
 T0 = 1_790_000_000
-OLD = T0 - 365 * DAY  # an established account
 ALL = {s.key for s in Q.STEPS}
+
+
+def made_at(created: int) -> int:
+    """The id of an account created at that time."""
+    return (created * 1000 - Q.DISCORD_EPOCH_MS) << 22
+
+
+OLD = made_at(T0 - 365 * DAY)  # an established account
 
 
 def test_five_steps_in_order_two_need_tracking():
@@ -42,17 +49,16 @@ def test_has_picked_roles_platform_region_or_game():
 
 def test_reward_only_for_members_who_joined_after_start_and_recently():
     start = T0
-    assert Q.eligible_for_reward(start + 10, start, start + 20, created_at=OLD)
-    assert Q.eligible_for_reward(start, start, start + Q.NEW_MEMBER_DAYS * DAY, created_at=OLD)
-    assert not Q.eligible_for_reward(start - 1, start, start + 10, created_at=OLD)  # joined before the module
-    assert not Q.eligible_for_reward(start + 10, start, start + 10 + Q.NEW_MEMBER_DAYS * DAY + 1, created_at=OLD)  # too late
-    assert not Q.eligible_for_reward(None, start, start + 10, created_at=OLD)
-    assert not Q.eligible_for_reward(start + 10, None, start + 20, created_at=OLD)
-    # Young accounts (likely alts) are never paid; unknown age isn't either.
+    assert Q.eligible_for_reward(start + 10, start, start + 20, user_id=OLD)
+    assert Q.eligible_for_reward(start, start, start + Q.NEW_MEMBER_DAYS * DAY, user_id=OLD)
+    assert not Q.eligible_for_reward(start - 1, start, start + 10, user_id=OLD)  # joined before the module
+    assert not Q.eligible_for_reward(start + 10, start, start + 10 + Q.NEW_MEMBER_DAYS * DAY + 1, user_id=OLD)  # too late
+    assert not Q.eligible_for_reward(None, start, start + 10, user_id=OLD)
+    assert not Q.eligible_for_reward(start + 10, None, start + 20, user_id=OLD)
+    # Young accounts (likely alts) are never paid: the same second-exact rule as established().
     young = start + 20 - (Q.MIN_ACCOUNT_DAYS * DAY - 1)
-    assert not Q.eligible_for_reward(start + 10, start, start + 20, created_at=young)
-    assert Q.eligible_for_reward(start + 10, start, start + 20, created_at=young - 1)
-    assert not Q.eligible_for_reward(start + 10, start, start + 20, created_at=None)
+    assert not Q.eligible_for_reward(start + 10, start, start + 20, user_id=made_at(young))
+    assert Q.eligible_for_reward(start + 10, start, start + 20, user_id=made_at(young - 1))
 
 
 def test_nudge_window():
@@ -139,8 +145,12 @@ def test_congrats_names_the_real_badge():
 
 def test_no_reward_reason_says_why():
     now = 1_800_000_000
-    young = now - 5 * DAY
-    old = now - 400 * DAY
-    assert "30+ days old" in Q.no_reward_reason(now - DAY, now - 2 * DAY, now, created_at=young)
-    assert "before quests started" in Q.no_reward_reason(now - 3 * DAY, now - 2 * DAY, now, created_at=old)
-    assert "first 30 days" in Q.no_reward_reason(now - 40 * DAY, now - 50 * DAY, now, created_at=old)
+    young = made_at(now - 5 * DAY)
+    old = made_at(now - 400 * DAY)
+    assert "30+ days old" in Q.no_reward_reason(now - DAY, now - 2 * DAY, now, user_id=young)
+    assert "before quests started" in Q.no_reward_reason(now - 3 * DAY, now - 2 * DAY, now, user_id=old)
+    assert "first 30 days" in Q.no_reward_reason(now - 40 * DAY, now - 50 * DAY, now, user_id=old)
+    # the reason and the gate use the same boundary
+    edge = made_at(now - Q.MIN_ACCOUNT_DAYS * DAY)
+    assert "30+ days old" not in Q.no_reward_reason(now - DAY, now - 2 * DAY, now, user_id=edge)
+    assert "30+ days old" in Q.no_reward_reason(now - DAY, now - 2 * DAY, now, user_id=edge + (1000 << 22))

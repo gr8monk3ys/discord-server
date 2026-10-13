@@ -367,7 +367,7 @@ class Catchup(commands.Cog):
         member = interaction.user
         if interaction.guild is None or getattr(member, "guild", None) is None:
             return await self.say(interaction, MESSAGES["guild"])
-        if not C.established(member.id, now()):
+        if not quests.established(member.id, now()):  # fresh alts can't burn the server's daily budget
             return await self.say(interaction, MESSAGES["young"])
         if not C.valid_hours(hours):
             return await self.say(interaction, MESSAGES["hours"])
