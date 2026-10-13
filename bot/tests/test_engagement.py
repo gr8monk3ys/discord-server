@@ -245,8 +245,14 @@ def test_friday_evening_window():
 
 
 @pytest.mark.parametrize("name,role", [
-    ("VALORANT", "Valorant"), ("Call of Duty® HQ", "Call of Duty"), ("Counter-Strike 2", "Counter-Strike 2"),
-    ("Minecraft Launcher", "Minecraft"), ("League of Legends", "League of Legends"),
+    # presence names exactly as Discord reported them in the last ten days
+    ("Risk of Rain 2", "Risk of Rain 2"), ("Gears of War: E-Day", "Gears of War"), ("Overwatch", "Overwatch"),
+    ("Overwatch® 2", "Overwatch"), ("Marvel Rivals", "Marvel Rivals"), ("Tabletop Simulator", "Tabletop Simulator"),
+    ("WARDOGS", "Wardogs"), ("Apex Legends with Medal", "Apex Legends"), ("Apex Legends", "Apex Legends"),
+    ("Minecraft Launcher", "Minecraft"),
+    # retired games are not server games any more; a different game with a similar name never was
+    ("VALORANT", None), ("Call of Duty® HQ", None), ("Counter-Strike 2", None), ("League of Legends", None),
+    ("Risk of Rain Returns", None), ("Apex", None),
     ("Some Indie Game", None), ("", None), ("®", None),
 ])
 def test_game_for(name, role):
@@ -255,9 +261,10 @@ def test_game_for(name, role):
 
 
 def test_top_game_folds_names_and_ignores_unknown():
-    secs = {"VALORANT": 3 * HOUR, "Call of Duty®: Black Ops": 2 * HOUR, "Call of Duty HQ": 2 * HOUR,
-            "Some Huge Indie Game": 50 * HOUR}
-    assert E.top_game(secs).role == "Call of Duty"
+    secs = {"Overwatch": 3 * HOUR, "Gears of War: E-Day": 2 * HOUR, "Gears of War: Reloaded": 2 * HOUR,
+            "Some Huge Indie Game": 50 * HOUR, "VALORANT": 40 * HOUR}  # a retired game never wins the cup
+    assert E.top_game(secs).role == "Gears of War"
+    assert E.game_for("VALORANT", config.RETIRED_GAMES).role == "Valorant"  # still foldable when asked
     assert E.top_game({"Unlisted": HOUR}) is None
     assert E.top_game({}) is None
 

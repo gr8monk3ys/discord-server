@@ -35,7 +35,7 @@ def ts(y, m, d, h=0, mi=0):
 
 
 T0 = ts(2026, 10, 7, 12)  # Wednesday, local noon
-VALORANT = config.game_by_key("valorant")
+OVERWATCH = config.game_by_key("overwatch")
 
 
 def choice(value, name=None):
@@ -103,10 +103,10 @@ class FakeGuild:
         self.lobby = FakeVoice(100, config.LOBBY_VOICE)
         self.voice_channels = [self.lobby, self.squad]
         self.gaming = FakeText(300, config.GAMING_CHANNEL)
-        self.valorant = FakeText(301, VALORANT.channel_name)
-        self.text_channels = [self.gaming, self.valorant]
-        self.valorant_role = FakeRole(700, VALORANT.role)
-        self.roles = [self.valorant_role]
+        self.overwatch = FakeText(301, OVERWATCH.channel_name)
+        self.text_channels = [self.gaming, self.overwatch]
+        self.overwatch_role = FakeRole(700, OVERWATCH.role)
+        self.roles = [self.overwatch_role]
         self.events: dict[int, FakeEvent] = {}
         self.cached: set[int] = set()  # event ids in the gateway cache
         self.next_id = 5000
@@ -225,7 +225,7 @@ class Env:
         self.guild.members[uid] = user
         return FakeInteraction(user, self.guild)
 
-    async def gamenight(self, game="valorant", when="9pm", size=None, note=None, uid=HOST, staff=True):
+    async def gamenight(self, game="overwatch", when="9pm", size=None, note=None, uid=HOST, staff=True):
         i = self.inter(uid, staff)
         await self.cog.gamenight.callback(self.cog, i, choice(game), when, size, note)
         return i
@@ -263,7 +263,7 @@ def test_gamenight_creates_event_row_and_announcement(monkeypatch):
         assert len(g.events) == 1
         ev = next(iter(g.events.values()))
         kw = ev.kwargs
-        assert kw["name"] == "Valorant game night"
+        assert kw["name"] == "Overwatch game night"
         assert kw["entity_type"] is discord.EntityType.voice
         assert kw["channel"] is g.squad
         assert kw["privacy_level"] is discord.PrivacyLevel.guild_only
@@ -272,15 +272,15 @@ def test_gamenight_creates_event_row_and_announcement(monkeypatch):
         assert "user1" in kw["description"] and "bring comms" in kw["description"]
 
         rows = await env.rows("SELECT * FROM gamenights")
-        assert rows == [dict(event_id=ev.id, host_id=HOST, game="valorant",
+        assert rows == [dict(event_id=ev.id, host_id=HOST, game="overwatch",
                              starts_at=ts(2026, 10, 7, 21), reminded=0)]
 
-        [post] = g.valorant.sent
-        assert g.valorant_role.mention in post["content"]
+        [post] = g.overwatch.sent
+        assert g.overwatch_role.mention in post["content"]
         assert ev.url in post["content"]
         am = post["allowed_mentions"]
         assert am.everyone is False and am.users is False
-        assert [r.id for r in am.roles] == [g.valorant_role.id]
+        assert [r.id for r in am.roles] == [g.overwatch_role.id]
         assert any(ev.url in t for t in i.texts())
         assert g.gaming.sent == []
     with_env(go, monkeypatch)
@@ -315,8 +315,8 @@ def test_note_with_role_mention_cannot_ping(monkeypatch):
         am = post["allowed_mentions"]
         assert am.roles is False and am.users is False and am.everyone is False
         await env.gamenight(note="<@&123> @everyone")
-        [post] = env.guild.valorant.sent
-        assert [r.id for r in post["allowed_mentions"].roles] == [env.guild.valorant_role.id]
+        [post] = env.guild.overwatch.sent
+        assert [r.id for r in post["allowed_mentions"].roles] == [env.guild.overwatch_role.id]
     with_env(go, monkeypatch)
 
 
@@ -333,7 +333,7 @@ def test_gamenight_bad_when(monkeypatch, when, word):
         assert "tomorrow 8pm" in msg["content"]
         assert env.guild.events == {}
         assert await env.rows("SELECT * FROM gamenights") == []
-        assert env.guild.valorant.sent == []
+        assert env.guild.overwatch.sent == []
     with_env(go, monkeypatch)
 
 
@@ -355,7 +355,7 @@ def test_gamenight_without_create_events(monkeypatch, caplog):
 
 def test_gamenight_announcement_failure_still_replies(monkeypatch):
     async def go(env):
-        env.guild.valorant.fail = True
+        env.guild.overwatch.fail = True
         i = await env.gamenight()
         ev = next(iter(env.guild.events.values()))
         assert any(ev.url in t for t in i.texts())
@@ -373,11 +373,11 @@ def test_gamenight_missing_voice_channel(monkeypatch):
 
 
 # ---------------------------------------------------------------- reminders
-async def make_night(env, interested=(), when="9pm", game="valorant"):
+async def make_night(env, interested=(), when="9pm", game="overwatch"):
     await env.gamenight(game=game, when=when)
     ev = env.guild.events[env.guild.next_id]
     ev.interested = [FakeUser(u) for u in interested]
-    env.guild.valorant.sent.clear()
+    env.guild.overwatch.sent.clear()
     env.guild.gaming.sent.clear()
     return ev
 
@@ -389,10 +389,10 @@ def test_reminder_window_and_once_only(monkeypatch):
         start = ts(2026, 10, 7, 21)
         env.t = start - 16 * MIN
         await env.cog.run_reminders()
-        assert env.guild.valorant.sent == []
+        assert env.guild.overwatch.sent == []
         env.t = start - 14 * MIN
         await env.cog.run_reminders()
-        [post] = env.guild.valorant.sent
+        [post] = env.guild.overwatch.sent
         assert "<@2>" in post["content"] and "<@3>" in post["content"] and "<@50>" not in post["content"]
         assert env.guild.squad.mention in post["content"]
         am = post["allowed_mentions"]
@@ -401,7 +401,7 @@ def test_reminder_window_and_once_only(monkeypatch):
         assert (await env.rows("SELECT reminded FROM gamenights"))[0]["reminded"] == 1
         env.t += MIN
         await env.cog.run_reminders()
-        assert len(env.guild.valorant.sent) == 1
+        assert len(env.guild.overwatch.sent) == 1
     with_env(go, monkeypatch)
 
 
@@ -420,7 +420,7 @@ def test_reminder_in_memory_guard_when_db_write_fails(monkeypatch):
         monkeypatch.setattr(env.cog, "mark_reminded", flaky)
         await env.cog.run_reminders()  # sends, then the write fails (logged, not raised)
         await env.cog.run_reminders()  # guard: no second send, the write is retried
-        assert len(env.guild.valorant.sent) == 1
+        assert len(env.guild.overwatch.sent) == 1
         assert (await env.rows("SELECT reminded FROM gamenights"))[0]["reminded"] == 1
     with_env(go, monkeypatch)
 
@@ -429,13 +429,13 @@ def test_reminder_send_failure_retries(monkeypatch):
     async def go(env):
         await make_night(env, interested=[A])
         env.t = ts(2026, 10, 7, 21) - 5 * MIN
-        env.guild.valorant.fail = True
+        env.guild.overwatch.fail = True
         await env.cog.run_reminders()
         assert (await env.rows("SELECT reminded FROM gamenights"))[0]["reminded"] == 0
-        env.guild.valorant.fail = False
+        env.guild.overwatch.fail = False
         env.t += MIN
         await env.cog.run_reminders()
-        assert len(env.guild.valorant.sent) == 1
+        assert len(env.guild.overwatch.sent) == 1
     with_env(go, monkeypatch)
 
 
@@ -456,7 +456,7 @@ def test_reminder_event_name_with_role_mention_cannot_ping(monkeypatch):
         ev.name = "<@&700> @everyone"
         env.t = ts(2026, 10, 7, 21) - 10 * MIN
         await env.cog.run_reminders()
-        am = env.guild.valorant.sent[0]["allowed_mentions"]
+        am = env.guild.overwatch.sent[0]["allowed_mentions"]
         assert am.roles is False and am.everyone is False and [u.id for u in am.users] == [A]
     with_env(go, monkeypatch)
 
@@ -469,7 +469,7 @@ def test_reminder_pings_game_night_role_when_it_exists(monkeypatch):
         ev.name = "<@&700> @everyone"
         env.t = ts(2026, 10, 7, 21) - 10 * MIN
         await env.cog.run_reminders()
-        [post] = env.guild.valorant.sent
+        [post] = env.guild.overwatch.sent
         assert post["content"].startswith(gn.mention)
         am = post["allowed_mentions"]
         assert [r.id for r in am.roles] == [gn.id]  # never the game role named in the title
@@ -486,7 +486,7 @@ def test_reminder_cancelled_and_deleted_events(monkeypatch):
         env.guild.cached.discard(ev2.id)
         env.t = ts(2026, 10, 7, 21) - 2 * MIN  # both inside their reminder windows
         await env.cog.run_reminders()
-        assert env.guild.valorant.sent == []
+        assert env.guild.overwatch.sent == []
         rows = await env.rows("SELECT reminded FROM gamenights")
         assert [r["reminded"] for r in rows] == [1, 1]
     with_env(go, monkeypatch)
@@ -497,7 +497,7 @@ def test_reminder_too_late_is_marked_not_sent(monkeypatch):
         await make_night(env, interested=[A])
         env.t = ts(2026, 10, 7, 21) + 11 * MIN
         await env.cog.run_reminders()
-        assert env.guild.valorant.sent == []
+        assert env.guild.overwatch.sent == []
         assert (await env.rows("SELECT reminded FROM gamenights"))[0]["reminded"] == 1
     with_env(go, monkeypatch)
 
@@ -508,11 +508,11 @@ def test_reminder_follows_rescheduled_event(monkeypatch):
         ev.start_time = datetime.fromtimestamp(ts(2026, 10, 7, 22), timezone.utc)
         env.t = ts(2026, 10, 7, 21) - 5 * MIN
         await env.cog.run_reminders()
-        assert env.guild.valorant.sent == []  # moved to 10pm: not yet
+        assert env.guild.overwatch.sent == []  # moved to 10pm: not yet
         assert (await env.rows("SELECT starts_at FROM gamenights"))[0]["starts_at"] == ts(2026, 10, 7, 22)
         env.t = ts(2026, 10, 7, 22) - 5 * MIN
         await env.cog.run_reminders()
-        assert len(env.guild.valorant.sent) == 1
+        assert len(env.guild.overwatch.sent) == 1
     with_env(go, monkeypatch)
 
 
@@ -525,7 +525,7 @@ def test_reminder_uncached_far_event_is_not_fetched(monkeypatch):
         assert env.guild.fetches == 0
         env.t = ts(2026, 10, 7, 21) - 5 * MIN
         await env.cog.run_reminders()
-        assert env.guild.fetches == 1 and len(env.guild.valorant.sent) == 1
+        assert env.guild.fetches == 1 and len(env.guild.overwatch.sent) == 1
     with_env(go, monkeypatch)
 
 
@@ -740,7 +740,7 @@ def test_members_get_one_upcoming_gamenight_and_an_hourly_cooldown(monkeypatch):
         assert len(rows) == 1
         # Staff aren't limited.
         await env.gamenight(game="minecraft", uid=USER_A + 1, staff=True)
-        await env.gamenight(game="roblox", uid=USER_A + 1, staff=True)
+        await env.gamenight(game="wardogs", uid=USER_A + 1, staff=True)
         assert len(await env.rows("SELECT * FROM gamenights WHERE host_id = ?", (USER_A + 1,))) == 2
     with_env(go, monkeypatch)
 
@@ -816,7 +816,7 @@ def test_discord_error_creating_event_replies_and_gives_the_cooldown_back(monkey
 def test_gamenight_note_markdown_is_escaped(monkeypatch):
     async def go(env):
         await env.gamenight(note="[Claim Nitro](phish)")  # a real URL is refused by textfilter
-        [post] = env.guild.valorant.sent
+        [post] = env.guild.overwatch.sent
         assert r"> \[Claim Nitro]" in post["content"]
         ev = next(iter(env.guild.events.values()))
         assert r"\[Claim Nitro]" in ev.kwargs["description"]
@@ -836,7 +836,7 @@ def test_gamenight_blocked_note_is_refused_before_anything_is_made(monkeypatch, 
         (reply,) = i.of("send_message")
         assert reply["ephemeral"] is True and reply["content"] == textfilter.MESSAGES[reason]
         assert note not in reply["content"]
-        assert not env.guild.events and not env.guild.valorant.sent
+        assert not env.guild.events and not env.guild.overwatch.sent
         assert await env.rows("SELECT * FROM gamenights") == []
     with_env(go, monkeypatch)
     line = caplog.records[-1].getMessage()

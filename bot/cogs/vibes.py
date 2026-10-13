@@ -37,6 +37,7 @@ from logic import quests as Q
 from logic import recap as R
 from logic import shop
 from logic import stats as S
+from logic import tonight as T
 from logic import vibes as V
 
 log = logging.getLogger(__name__)
@@ -212,6 +213,9 @@ class Vibes(commands.Cog):
         t = now()
         if not self.questions or not V.should_revive(t, self.tz, self.last_member_at,
                                                      int(last_revival) if last_revival else None):
+            return False
+        voice_line = await self.meta(T.FIRED_KEY)  # cogs/tonight.py just posted its line: not both in an hour
+        if voice_line and voice_line.isdigit() and 0 <= t - int(voice_line) < T.REVIVAL_GAP:
             return False
         used = {r["qid"] for r in await self.db.fetchall("SELECT qid FROM qotd_used")}
         last = await self.db.fetchone("SELECT qid FROM qotd_used ORDER BY used_at DESC, rowid DESC LIMIT 1")

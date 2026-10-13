@@ -111,7 +111,7 @@ async def seed_busy_week(db):
                          (uid(n), uid(700), T - 5 * HOUR, T - HOUR))
     for n in (1, 2, 3):
         await db.execute('INSERT INTO game_sessions (user_id, game, start, "end") VALUES (?, ?, ?, ?)',
-                         (uid(n), "VALORANT", T - 6 * HOUR, T - 2 * HOUR))
+                         (uid(n), "OVERWATCH", T - 6 * HOUR, T - 2 * HOUR))
     for n in (1, 2):  # only two players: below the small-group limit
         await db.execute('INSERT INTO game_sessions (user_id, game, start, "end") VALUES (?, ?, ?, ?)',
                          (uid(n), "Minecraft", T - 30 * HOUR, T - 10 * HOUR))
@@ -119,12 +119,12 @@ async def seed_busy_week(db):
                      (uid(3), "Some Private Hobby Game", T - 30 * HOUR, T - 10 * HOUR))
     await db.execute("INSERT INTO privacy_optout (user_id, at) VALUES (?, ?)", (uid(5), T))
     await db.execute("INSERT INTO tournaments (name, game, size, status, created_by, created_at)"
-                     " VALUES ('October Cup', 'Valorant', 16, 'signup', ?, ?)", (uid(1), T))
+                     " VALUES ('October Cup', 'Overwatch', 16, 'signup', ?, ?)", (uid(1), T))
     await db.execute("INSERT INTO tournaments (name, game, size, status, created_by, created_at)"
                      " VALUES ('Old Cup', NULL, 16, 'done', ?, ?)", (uid(1), T))
-    await db.execute("INSERT INTO mm_matches (game, mode, members, created_at) VALUES ('valorant', 'Casual', ?, ?)",
+    await db.execute("INSERT INTO mm_matches (game, mode, members, created_at) VALUES ('overwatch', 'Casual', ?, ?)",
                      (f"{uid(1)},{uid(2)}", T - HOUR))
-    await db.execute("INSERT INTO mm_matches (game, mode, members, created_at) VALUES ('valorant', 'Casual', ?, ?)",
+    await db.execute("INSERT INTO mm_matches (game, mode, members, created_at) VALUES ('overwatch', 'Casual', ?, ?)",
                      (f"{uid(3)},{uid(4)}", T - 2 * HOUR))
     for i, n in enumerate((1, 2, 3, 3)):
         await db.execute("INSERT INTO starboard (message_id, channel_id, author_id, board_message_id, stars, at)"
@@ -141,7 +141,7 @@ async def seed_busy_week(db):
 def busy_guild():
     members = [member(1), member(2), member(3, discord.Status.idle), member(4, discord.Status.offline),
                member(5), member(50, bot=True)]
-    events = [event("Valorant game night", T + DAY, channel=Channel()),
+    events = [event("Overwatch game night", T + DAY, channel=Channel()),
               event("October Cup", T + 3 * DAY),
               event("Watch party: Member Name 3 picks the film", T + 4 * DAY, channel=Channel()),
               event("Town Hall", T + 5 * DAY, channel=Channel()),
@@ -163,10 +163,10 @@ def test_refresh_writes_aggregates_only(monkeypatch, tmp_path):
         assert doc["generated_at"] == schema.iso(T)
         assert doc["members"] == {"total": 6, "online": 4}
         assert doc["week"] == {"messages": 1150, "voice_hours": 12}  # member 5 opted out
-        assert doc["games"] == [{"name": "Valorant", "hours": 12}]
+        assert doc["games"] == [{"name": "Overwatch", "hours": 12}]
         assert doc["events"] == [
-            {"title": "Valorant game night", "kind": "gamenight", "game": "Valorant", "start": schema.iso(T + DAY)},
-            {"title": "Valorant tournament", "kind": "tournament", "game": "Valorant", "start": schema.iso(T + 3 * DAY)},
+            {"title": "Overwatch game night", "kind": "gamenight", "game": "Overwatch", "start": schema.iso(T + DAY)},
+            {"title": "Overwatch tournament", "kind": "tournament", "game": "Overwatch", "start": schema.iso(T + 3 * DAY)},
             {"title": "Watch party", "kind": "event", "start": schema.iso(T + 4 * DAY)},
             {"title": "Town Hall", "kind": "event", "start": schema.iso(T + 5 * DAY)}]
         assert "October" not in text and "film" not in text and "birthday" not in text
@@ -288,7 +288,7 @@ def test_a_broken_source_only_loses_its_own_section(monkeypatch, tmp_path):
         assert "matchmaking" not in doc
         assert doc["week"]["messages"] == 1150
         # without the tournaments table nothing says "October Cup" is the bot's: it is dropped
-        assert [e["title"] for e in doc["events"]] == ["Valorant game night", "Watch party", "Town Hall"]
+        assert [e["title"] for e in doc["events"]] == ["Overwatch game night", "Watch party", "Town Hall"]
     with_cog(go, monkeypatch, tmp_path, guild=busy_guild())
 
 

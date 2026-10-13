@@ -377,6 +377,7 @@ CHANNEL_NEEDS: list[Need] = [
     Need("staffapps", config.MOD_LOG_CHANNEL, POST),
     Need("vibes", config.GENERAL_CHANNEL, POST + ("read_message_history",)),
     Need("vibes", config.ANNOUNCEMENTS_CHANNEL, POST),  # member of the month
+    Need("tonight", config.GENERAL_CHANNEL, POST + ("read_message_history",)),  # the voice line
     Need("growth", config.BOT_COMMANDS_CHANNEL, POST),  # bump reminders
     Need("stats", config.GENERAL_CHANNEL, POST),  # weekly MVP
     Need("crew", config.GENERAL_CHANNEL, POST),  # the crew ping
@@ -415,7 +416,7 @@ GUILD_NEEDS: list[GuildNeed] = [
     GuildNeed("create_events", EVENT_MAKERS, CREATE_EVENTS_HINT),
     GuildNeed("moderate_members", ("moderation",)),
     GuildNeed("manage_messages", ("moderation",)),
-    GuildNeed("manage_guild", ("growth",)),  # reading invites
+    GuildNeed("manage_guild", ("growth", "focus")),  # reading invites; editing Onboarding's default channels
     GuildNeed("move_members", ("tempvoice",)),
     GuildNeed("ban_members", ("appeals", "moderation"),  # /ban, checking a ban, unbanning on Accept
               "Server Settings -> Roles -> Front Desk -> turn on Ban Members"),

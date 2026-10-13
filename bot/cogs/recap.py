@@ -9,7 +9,9 @@
 - Owner digest, Mondays 10:05 local: a DM to the server owner (member growth with a 7-day
   trend, open tickets/reports/suggestions, mod cases, errors counted by cogs/ops.py, pending
   partner applications, and "nothing needs you" when that's true). If the DM fails it goes to
-  📋・mod-log instead.
+  📋・mod-log instead. One field, "Games list", compares the last 28 days of game time with
+  layout.GAMES (logic/gamelist.py): games worth adding or retiring, as counts and game names
+  only. It never changes the list.
 - Milestones: the first time the member count reaches 25, 50, 100, 250, 500 or 1000, one
   no-ping celebration in 📣・announcements (meta milestone:N). The very first check only
   records the milestones already passed.
@@ -34,6 +36,7 @@ import config
 import economy
 import style
 from cogs.lfg import ping_only
+from logic import gamelist as GL
 from logic import growth as G
 from logic import recap as R
 from logic import stats as S
@@ -315,6 +318,22 @@ class Recap(commands.Cog):
             pending_partners=await self.count("SELECT COUNT(*) AS n FROM partners WHERE status = 'pending'"),
         )
 
+    async def game_list_line(self, guild, end: int) -> str | None:
+        """How the games list compares with the 28 days of play before `end` (logic/gamelist.py):
+        games worth adding or retiring, as counts and game names only. None when there is
+        nothing to compare, or when it fails: the digest never breaks over this line."""
+        try:
+            start = end - GL.WINDOW
+            rows = await self.db.fetchall(
+                'SELECT user_id, game AS k, start, "end" FROM game_sessions WHERE start < ? AND ("end" IS NULL OR "end" > ?)',
+                (end, start))
+            skip = await self.optouts() | {m.id for m in getattr(guild, "members", []) if m.bot}
+            sessions = [S.Session(r["user_id"], r["k"], r["start"], r["end"]) for r in rows]
+            return GL.digest_text(GL.review(sessions, start, end, now(), exclude=skip))
+        except Exception:
+            log.exception("recap: games list check failed; left out")
+            return None
+
     async def owner(self, guild):
         if getattr(guild, "owner", None) is not None:
             return guild.owner
@@ -343,6 +362,9 @@ class Recap(commands.Cog):
         crew = await self.line_from("Crew", "digest_line", start, end)
         if crew is not None:
             fields.insert(len(fields) - 1, (config.CREW_ROLE, crew))  # "Needs you" stays last
+        games = await self.game_list_line(guild, end)
+        if games is not None:
+            fields.insert(len(fields) - 1, (GL.FIELD, games))
         for name, value in fields:
             embed.add_field(name=name, value=value[:1024], inline=False)
         owner = await self.owner(guild)

@@ -2,7 +2,7 @@
 
 A map of the system for the next engineer or AI session. `README.md` is the feature list and
 runbook; this file says how the pieces fit together. Everything here was read from the code
-on 2026-10-12 (schema v23, 46 modules). When this file and the code disagree, the code wins:
+on 2026-10-12 (schema v23, 48 modules). When this file and the code disagree, the code wins:
 fix the file.
 
 ## The four parts
@@ -16,7 +16,11 @@ fix the file.
 
 `server/layout.py` is the shared source of truth. `bot/config.py` puts `server/` on `sys.path`
 and imports `layout` and `names.slug`, so the bot's games list (`config.GAMES`) and the setup
-scripts can never disagree. Channel and role names the bot needs are constants in
+scripts can never disagree. `config.RETIRED_GAMES` mirrors `layout.RETIRED_GAMES`: a retired
+game is never offered (no choice, role panel entry, news feed or queue), and
+`config.known_game_by_key` exists only so rows written while it was listed (an old squad post,
+a queue row) still show its emoji and name. Linked Steam accounts keep a retired game's hours
+without showing them. Channel and role names the bot needs are constants in
 `bot/config.py`, written exactly as they appear in `layout.py` (emoji included); objects are
 looked up by name at run time, never by a stored ID.
 
@@ -31,7 +35,8 @@ looked up by name at run time, never by a stored ID.
    (crew), `SUPPORT_URL` (supporter), `TOWNHALL_TIME` (events), `YOUTUBE_CLIENT_ID`,
    `YOUTUBE_CLIENT_SECRET`, `YOUTUBE_REFRESH_TOKEN`, `YOUTUBE_PRIVACY` (clipcast),
    `REALMS_ADDRESS`, `REALMS_RCON_HOST`, `REALMS_RCON_PORT`, `REALMS_RCON_PASSWORD`,
-   `REALMS_LOG_PATH` (realms), `SITE_DATA` (sitedata), and `APPEAL_SECRET`,
+   `REALMS_LOG_PATH` (realms), `SITE_DATA` (sitedata), `TONIGHT` (tonight; `off` stops the
+   voice line, anything else or unset leaves it on), and `APPEAL_SECRET`,
    `APPEAL_COOLING_DAYS`, `APPEAL_REAPPEAL_DAYS`, `SITE_URL` (appeals, and `/ban`'s DM).
    All are optional; `docs/WAVE9_SETUP.md` says what each turns on.
 2. `single_instance_lock()` takes an exclusive lock on `bot/data/bot.lock` for the life of the
@@ -69,8 +74,8 @@ replies. A second click finds the ref already in the ledger and gets `Status.DUP
 Rules that make this hold together:
 
 - `logic/` modules do no Discord I/O and never touch the database: they import the standard
-  library, `config` and each other (plus Pillow for the card images; `events`, `levels` and
-  `recap` import `discord` only for `utils.escape_markdown`). They are what the
+  library, `config` and each other (plus Pillow for the card images; `events`, `levels`,
+  `recap` and `tonight` import `discord` only for `utils.escape_markdown`). They are what the
   tests exercise most; `tests/test_<name>.py` covers the rules, `tests/test_<name>_cog.py`
   drives the cog with fakes.
 - `Database` (`bot/db.py`) holds one connection in WAL mode with `foreign_keys = ON` and one
@@ -84,7 +89,8 @@ Rules that make this hold together:
 - A few cogs reuse another cog's helpers directly: `cogs.lfg.ping_only`, `cogs.stats`
   (voice presence, used by economy and tempvoice), `cogs.clips` (clip detection, used by
   economy), `cogs.growth.BUMP_DUE_KEY` (votehub), `cogs.tempvoice` (matchmaking registers its
-  match channels there). Many cogs read other cogs' tables; only the owner writes them.
+  match channels there), `cogs.stats.Stats.in_staff` and `playing` plus
+  `cogs.vibes.LAST_REVIVAL_KEY` (tonight). Many cogs read other cogs' tables; only the owner writes them.
 
 ## Module map
 
@@ -114,7 +120,7 @@ is set). Loops without a wall-clock time are plain `tasks.loop` intervals.
 | `achievements` | badges, `/profile` (asks `supporter` for the flair), `/badges` | `achievements` | hourly sweep | 💬・general |
 | `creators` | `/creator` linking and verification, upload and go-live posts | `creators`, `creator_pending`, `creator_seen` | YouTube 15 min; Twitch 3 min; pending cleanup hourly | 📺・creators, 📋・mod-log |
 | `levels` | XP from chat and voice, level roles, `/rank`, `/levels`, `/xp` | `xp` | voice XP sweep 10 min | 🤖・bot-commands, 📋・mod-log; Regular, Veteran, Elite, Legend, Mythic |
-| `recap` | weekly recap, owner digest, member milestones, invite contest | none | recap Mon 10:00; digest Mon 10:05; contest on the 1st 12:00 | 📣・announcements, 📋・mod-log |
+| `recap` | weekly recap, owner digest (with the "Games list" field from `logic/gamelist.py`), member milestones, invite contest | none | recap Mon 10:00; digest Mon 10:05; contest on the 1st 12:00 | 📣・announcements, 📋・mod-log |
 | `selfroles` | role panel and `/roles` | none | none (panel edited in place at start) | 🎭・roles; platform, region, play-time, ping and game roles |
 | `partners` | `/partner apply/remove`, review cards | `partners` | dead-invite sweep Mon 12:00 | 🤝・partners, 📋・mod-log |
 | `quests` | starter quest, `/quest`, nudge DM | `quest_steps`, `achievements` (Settled In) | hourly sweep | 💬・general |
@@ -130,7 +136,7 @@ is set). Loops without a wall-clock time are plain `tasks.loop` intervals.
 | `gamelink` | `/link`, `/unlink`, `/accounts`, Steam section on `/profile` | `game_accounts`, `game_account_pending` | upkeep 30 min (each account re-read at most daily) | 📋・mod-log |
 | `votehub` | `/vote`, weekly bump thanks (the job, ledger reason and refs still say `support`) | none (reads `bumps`) | thanks Sun 17:00 | 🎲・games, 🤖・bot-commands |
 | `catchup` | `/catchup` AI summary, staff `/catchup-usage` | `catchup_usage` | none | any public text channel (never the staff category) |
-| `vibes` | chat revival, join anniversaries, booster thanks and stipend, member of the month | `qotd_used` | 1 min tick: anniversaries 11:00 daily; stipend on the 1st 12:00; member of the month on the 1st 12:30 | 💬・general, 📣・announcements |
+| `vibes` | chat revival (skipped within an hour of the `tonight` line), join anniversaries, booster thanks and stipend, member of the month | `qotd_used` | 1 min tick: anniversaries 11:00 daily; stipend on the 1st 12:00; member of the month on the 1st 12:30 | 💬・general, 📣・announcements |
 | `houses` | three houses, `/house`, staff `/house-admin move`, weekly House Cup, quarterly trophy | `house_members`, `house_results` | placement and role sweep 10 min (one role change a second; a one-time introduction post when the first members are sorted); 1 min tick: House Cup Mon 10:10, season close on the 1st 10:20 (acts when a quarter ended) | 📣・announcements; House Fern, House Kestrel, House Otter |
 | `crew` | Welcome Crew: `/crew` with Join/Leave buttons, the crew ping, greeting reward, staff `/crew-stats` | `crew_arrivals`, `crew_greetings`, `achievements` (Welcoming Committee) | 1 min tick (crew ping, first-time joins only; hourly upkeep: opt-out cleanup, role taken back after a case) | 💬・general, 📋・mod-log; Welcome Crew |
 | `supporter` | Supporter tier: thank-you, `/profile` flair, stipend, `/support`, staff `/supporter grant/revoke` | `supporters` | reconcile 5 min; stipend on the 1st 12:15 | 💬・general, 📋・mod-log; Supporter (only read, unless staff grant it by hand) |
@@ -140,16 +146,29 @@ is set). Loops without a wall-clock time are plain `tasks.loop` intervals.
 | `wrapped` | `/wrapped` cards (Dec 1 to Jan 15), server card, staff `/wrapped-preview` | `achievements` (`wrapped_YEAR`); `meta` only otherwise | 5 min tick: announcement Dec 1 10:00, reminder Dec 20 10:00, level snapshot once in January | 📣・announcements; wherever a member shares a card |
 | `sitedata` | aggregates file for the landing page, staff `/sitedata refresh` | none (writes `bot/data/site/stats.json`) | 1 min tick, rebuilds every 30 min | none |
 | `appeals` | ban appeals from the website: review cards with Accept/Deny, discussion threads, staff `/appeals list/code` | `appeals` | 5 min tick: re-reads the channel for webhook posts missed while down; expiry daily 09:00 (30 days untouched; answers blanked 180 days after a decision) | 🔒・appeals, 📋・mod-log |
+| `focus` | event-driven Onboarding default channels: tournaments while a tournament is in `signup` or `running`, realms while the Minecraft server is online. No commands. Inert until `server/focus_mode.py` has been applied (no ordinary opt-in channel is a default) | none (`meta` only: `focus:added:<channel>` marks a default it added, and it removes only those) | 1 min tick that costs no Discord call; reads Onboarding at start, when a fact changes and hourly; one edit per pass, at most one change per channel per 15 min, retry 15 min after a refusal; never goes below Discord's 7 defaults | 🏆・tournaments, ⛏️・realms (the default list only, never the channel or a permission), 📋・mod-log |
+| `tonight` | one line in general while 2+ non-bot members are in a public voice channel (everyone can view and join; not AFK, not the staff category): counts, the shared game, a channel mention; edited in place, past tense when the rooms empty, never deleted. No commands, no coins | none (`meta` only: `tonight:state`, one JSON value with no member data, and `tonight:fired_at`) | 1 min tick: line after a room has held 3 min, edits at most every 2 min, same message reused for 45 min after a session ends, at most 3 new messages a local day; `TONIGHT=off` runs no tick and closes a standing "right now" line once | 💬・general |
 
-Two of the new `logic/` modules have no cog of their own: `linkedroles.py` validates
+Three of the `logic/` modules have no cog of their own: `linkedroles.py` validates
 `site/api/linked-role/metadata.json` and plans the registration diff for
-`server/register_linked_roles.py`, and `wrappedcard.py` draws the Wrapped cards.
+`server/register_linked_roles.py`, `wrappedcard.py` draws the Wrapped cards, and `gamelist.py`
+compares 28 days of `game_sessions` with `config.GAMES` and `config.RETIRED_GAMES` for the
+owner digest (`Recap.game_list_line`): an unlisted game needs 3 distinct players and 5 hours
+combined to be named, presence names go through the text filter and are markdown-escaped,
+bots and opted-out members are excluded, and there is no field at all when nobody played.
 `logic/sitedata.py` shares its schema with the publisher through `server/site_schema.py`.
 Cross-cog reads added with these modules, all by `bot.get_cog(...)` and all optional (a missing
 or failing cog just leaves its line out): `recap` asks `Forums.fresh_line` for the weekly recap
 and `Crew.digest_line` for the owner digest, `ops` asks `Realms.health_text` for `/status`,
 `achievements` asks `Supporter.profile_flair`, and `sitedata` and `wrapped` read house standings
-and membership through `logic/houses.py`.
+and membership through `logic/houses.py`. `focus` asks `Realms.is_online()` (True, False, or
+None while that is not known, and None changes nothing) and reads the `tournaments` table
+itself, only while the `Tournaments` cog is loaded.
+
+`vibes` and `tonight` keep out of each other's way through two `meta` keys: `tonight` writes
+`tonight:fired_at` when a session's line appears and `vibes` skips its chat revival for an
+hour after it; `vibes` writes `vibes:last_revival` and `tonight` holds a new session's line
+until an hour after that. Each only reads the other's key (`logic/tonight.py` `REVIVAL_GAP`).
 
 The exact channel permissions and roles each cog needs are data, not prose: `CHANNEL_NEEDS`,
 `GUILD_NEEDS` and `ROLE_NEEDS` in `bot/logic/ops.py`. The permission self-check and `/status`
@@ -277,7 +296,7 @@ SQLite at `bot/data/front_desk.db` (gitignored). `MIGRATIONS` in `bot/db.py` is 
 | The Realms | `realms_links` (state: add, ok, remove; unique index "one name per member"), `realms_playtime` (seconds per member per local day); `realms_links.managed` (1 = the bot added the name or staff adopted it; only such a name is ever sent `whitelist remove`) | 20; 22 |
 | Ban appeals | `appeals` (unique index "one open appeal per user"), `appeal_bans` (when a ban happened; written by `moderation`) | 21 |
 
-Wrapped, sitedata and Linked Roles add no tables. Wrapped keeps its share cooldown and the
+Wrapped, sitedata, Linked Roles, focus and tonight add no tables. Wrapped keeps its share cooldown and the
 January level snapshot in `meta` (`wrapped:shared:YEAR:USER`, `wrapped:levels:YEAR`).
 
 Derived, not stored: badges, challenge progress, quest steps, event points, recap numbers,
@@ -295,11 +314,12 @@ written by `sitedata`), and the two tracked banks `qotd.txt` and `polls.txt`.
 
 | Script | Role | Changes Discord? |
 |---|---|---|
-| `layout.py` | Source of truth: `GAMES`, roles, categories and channels, Onboarding, AutoMod, `PUBLIC` text, `TRIM` | no (data) |
+| `layout.py` | Source of truth: `GAMES` and `RETIRED_GAMES`, roles, categories and channels, Onboarding (the core default channels, `FOCUS_GROUPS` and the other `FOCUS_*` lists), AutoMod, `PUBLIC` text, `TRIM` | no (data) |
 | `names.py` | `slug()`: name matching that ignores emoji, case and separators | no |
 | `setup_server.py` | First build: create or restyle roles and channels, **reorder roles**, post rules and welcome | with `--apply` |
 | `polish_server.py` | Second pass: Community, Onboarding, welcome screen, AutoMod, media lock, trim empty channels | with `--apply` |
-| `public_mode.py` | Later changes, additive only: missing roles and channels, private categories, description, invite, Onboarding prompts, AutoMod gaps | with `--apply` |
+| `public_mode.py` | Later changes: missing roles and channels, private categories, description, invite, Onboarding prompts, AutoMod gaps, and the games (role, channel, forum tag and "What do you play?" option for each game in `GAMES`; `restore_games` moves a re-listed game's channel back). Additive except for `retire_games`: a game in `RETIRED_GAMES` loses its Onboarding option and its channel moves into the staff-only `GAME_ARCHIVE` category (`99 · archive`). Never deletes: messages, roles and forum tags stay | with `--apply` |
+| `focus_mode.py` | The short newcomer channel list, in one Onboarding edit: default channels become `ONBOARDING_DEFAULT_CHANNELS` (the core of 9) and one question, `FOCUS_PROMPT`, offers the `FOCUS_GROUPS`. `--plan` prints the plan from `layout.py` without connecting and fails when a public channel is in no list or in two; `--revert` restores `ONBOARDING_EVERYTHING` as the defaults and leaves the question. Never touches permissions, channels, roles or the other questions | with `--apply` |
 | `expressions.py` | Upload emoji and soundboard sounds from `assets/expressions/` (skips existing names) | with `--apply` |
 | `snapshot_server.py` + `snapshot_lib.py` | Read-only dump of live config to `server/snapshot/*.json` (names not IDs, sorted); `--compare` lists drift from `layout.py` | never |
 | `watchdog.py`, `install_watchdog.ps1` | Downtime watchdog and its Task Scheduler install | no (webhook alert only) |
@@ -309,7 +329,10 @@ written by `sitedata`), and the two tracked banks `qotd.txt` and `polls.txt`.
 | `register_linked_roles.py` | Writes the Linked Roles metadata records and the verification URL to the Discord application (`docs/LINKED_ROLES.md`) | the application, not the server; with `--apply` |
 
 Every script dry-runs by default. None deletes roles or channels that are missing from
-`layout.py`; they are listed for a human. Because Front Desk now sits below Keeper and
+`layout.py`; they are listed for a human. The one step that takes something away from members
+is `public_mode.py`'s `retire_games`, which hides a retired game's channel in the archive; it
+runs after the option is removed from Onboarding, and `restore_games` runs before a re-listed
+game becomes an option again. Because Front Desk now sits below Keeper and
 Moderator, `setup_server.py` (which calls `edit_role_positions`) must not be run against the
 live server again: use `public_mode.py`.
 
@@ -377,7 +400,8 @@ Never run the bot on two machines with the same token: the lock is per machine. 
 | Post in a channel or hand out a role | Add the name to `bot/config.py` (and to `server/layout.py` if it does not exist yet, created with `public_mode.py`), then add a `Need` / `ROLE_NEEDS` entry in `bot/logic/ops.py` so the self-check covers it |
 | Repost member text | Run it through `logic/textfilter`, escape markdown, send with `ping_only(...)` or `AllowedMentions.none()` |
 | Record member activity | Check `db.tracking_allowed` first; make opt-out delete it (`cogs/stats.py` `/privacy`) |
-| Add a game | Edit `GAMES` in `server/layout.py`, run `public_mode.py`, regenerate the site block with `logic.sitegen`, add a feed to `bot/assets/news_sources.json` if one exists |
+| Add or retire a game | Move the game's line between `GAMES` and `RETIRED_GAMES` in `server/layout.py` (or add a new line to `GAMES`), regenerate the site block with `logic.sitegen`, dry-run then `--apply` `public_mode.py`, restart the bot. For a new game add a feed to `bot/assets/news_sources.json` if one exists (a retired game's entry is kept and ignored) and a team size in `logic/matchmaking.py` `DEFAULT_SIZES` if it has a usual one |
+| Add a public channel | Besides `CATEGORIES`, put it in exactly one of `ONBOARDING_DEFAULT_CHANNELS`, a `FOCUS_GROUPS` group or `FOCUS_UNLISTED` in `layout.py`; `focus_mode.py --plan` and a server test fail otherwise |
 | Change the server's structure | Edit `layout.py`, dry-run then `--apply` `public_mode.py`, re-run `snapshot_server.py` and commit the snapshot |
 | Add a persistent button | A `DynamicItem` with ids in `custom_id`, registered in the cog's setup; re-read state from the DB on click |
 

@@ -15,20 +15,38 @@ SLATE = 0x606976
 # ---------------------------------------------------------------- games
 # One ping role + one channel per game. Members pick their games in
 # Onboarding and only see the channels for games they chose, so the sidebar
-# stays short. Top friend-group games of 2026, plus the group's own picks.
+# stays short. The list is what the server actually plays (the bot's weekly
+# owner digest says when it has drifted), in the order it is shown.
 GAMES = [
     # (emoji, channel name, role name)
-    ("🪖", "wardogs", "Wardogs"),
+    ("🌧️", "risk-of-rain-2", "Risk of Rain 2"),
+    ("🪚", "gears-of-war", "Gears of War"),
+    ("🦍", "overwatch", "Overwatch"),
+    ("🦸", "marvel-rivals", "Marvel Rivals"),
     ("⛏️", "minecraft", "Minecraft"),
+    ("🃏", "tabletop-simulator", "Tabletop Simulator"),
+    ("🪖", "wardogs", "Wardogs"),
+    ("🔺", "apex-legends", "Apex Legends"),
+]
+
+# Games the server used to list. Nothing of theirs is deleted: public_mode.py takes them
+# out of the "What do you play?" question, the bot stops offering their roles, and their
+# channels move into the staff-only GAME_ARCHIVE category. The roles stay, so a member who
+# has one keeps it. To retire a game, move its line from GAMES to here; to bring one back,
+# move its line from here to GAMES. Then run public_mode.py (dry run first).
+RETIRED_GAMES = [
     ("🪂", "fortnite", "Fortnite"),
     ("🎯", "valorant", "Valorant"),
     ("💥", "call-of-duty", "Call of Duty"),
     ("🧙", "league-of-legends", "League of Legends"),
     ("💣", "counter-strike", "Counter-Strike 2"),
-    ("🔺", "apex-legends", "Apex Legends"),
     ("🚗", "gta-online", "GTA Online"),
     ("🧱", "roblox", "Roblox"),
 ]
+
+# Where retired game channels are kept: hidden from @everyone, visible to these roles. It is
+# deliberately not in CATEGORIES, so nothing else creates, fills or rearranges it.
+GAME_ARCHIVE = {"name": "99 · archive", "private_to": ["Keeper", "Moderator"]}
 
 # Any role, category or channel can list old names under "was": the existing
 # one is renamed and restyled in place, so members, messages and permissions
@@ -69,6 +87,8 @@ ROLES = [
     *({"name": n} for n in ("NA", "EU", "LATAM", "Asia", "OCE")),
     *({"name": n} for n in ("Early Bird", "Night Owl", "Weekend Warrior")),
     *({"name": role, "mentionable": True} for _, _, role in GAMES),
+    # Retired game roles stay where they are (members keep them); they are just not offered.
+    *({"name": role, "mentionable": True} for _, _, role in RETIRED_GAMES),
     {"name": "Welcome Crew", "mentionable": True},  # opt-in via /crew: pinged when someone new arrives
     # Cosmetic thank-you tier: no colour and no permissions, so it can't pass for staff. Given by
     # Ko-fi's Discord bot or Server Subscriptions (or /supporter grant).
@@ -147,7 +167,7 @@ CATEGORIES = [
                     [
                         "Tips, builds, settings and how-tos that are worth finding again next month.",
                         "One topic per post. Put the game and the point in the title, like "
-                        "\"Valorant: crosshair settings that work\".",
+                        "\"Overwatch: crosshair settings that work\".",
                         "Tag the game. Write it so someone new can follow it: steps, numbers, a screenshot if it helps.",
                         "Your own words, please: no pasted articles, no link-only posts.",
                         "A real guide that stays up for a day earns a few coins (a couple of posts a week at most).",
@@ -265,12 +285,19 @@ POSTS = {
         "title": "Welcome in",
         "description": "\n".join(
             [
-                "Chill gamers. No tryhards, no toxicity. Read {#rules}, then say hi in {#general}.",
+                "This is a small co-op and PvE server. People are mostly in voice in the evenings, "
+                "US Pacific time. Read {#rules}, then say hi in {#general}.",
+                "",
+                "**Start here**",
+                "`VOICE`  If someone is in the Lobby, join them. That is how most games here start.",
+                "`GAMES`  Pick yours under **Channels & Roles** at the top of the channel list.",
+                "`HOUSE`  Front Desk sorts you into Fern, Kestrel or Otter. `/house me` shows yours.",
+                "`MINECRAFT`  The Realms is the owner's modded server. After two weeks here, "
+                "`/realms link` puts you on its whitelist.",
                 "",
                 "**Roles**",
                 "{@Keeper}  runs the place",
                 "{@Squad}  the regulars",
-                "`GAME ROLES`  pick yours under **Channels & Roles** at the top of the channel list",
             ]
         ),
         "footer": "FRONT DESK · 03",
@@ -291,9 +318,19 @@ COMMUNITY = {
     "updates_channel": "🛡️・mod",  # where Discord sends admin-only notices
 }
 
-# Onboarding: what new members see before they land. Channels listed here are
-# the defaults everyone gets; Discord needs at least 7, 5 of them postable.
+# Onboarding: what new members see before they land. Channels listed here are the core: the
+# defaults every newcomer gets. Discord needs at least 7, and 5 of them must let @everyone
+# send messages. Everything else public is opt-in (FOCUS_GROUPS below), so a newcomer lands
+# on a short list of rooms with something in them. focus_mode.py applies this and prints
+# the whole plan first; `focus_mode.py --revert` puts ONBOARDING_EVERYTHING back.
+# #gaming is core because game nights, watch parties and the weekly free games are posted
+# there, and it is a plain text channel that certainly counts towards Discord's five.
 ONBOARDING_DEFAULT_CHANNELS = [
+    "📌・rules", "📣・announcements", "💬・general", "🆘・help", "🕹️・gaming", "🎮・lfg", "📸・clips",
+    "🔊 Lobby", "➕ New Squad",
+]
+# The default list before the core was cut down, word for word: what --revert restores.
+ONBOARDING_EVERYTHING = [
     "📌・rules", "📣・announcements", "👋・welcome", "💬・general",
     "🆘・help", "💡・suggestions", "🤣・memes", "📸・clips", "⭐・hall-of-fame", "🔢・counting", "🎲・games", "🕹️・gaming", "🎮・lfg", "🎨・art", "💻・code",
     "👗・fashion", "♟️・chess", "🤖・bot-commands", "📺・creators", "🏆・tournaments", "🎭・roles", "🤝・partners",
@@ -301,11 +338,53 @@ ONBOARDING_DEFAULT_CHANNELS = [
     "📚・guides", "🖥・setups",
     "⛏️・realms",
 ]
-# Anything public that's neither a default channel nor an Onboarding option is
-# hidden from members who went through Onboarding, so keep this list complete.
-# Two kinds never go in it: private ("private_to") channels, and the Stage channel. Discord
-# may refuse a Stage as a default channel, and one refused channel fails the whole
-# Onboarding edit; a Stage shows itself to everyone while an event is live anyway.
+# Opt-in groups: one question under Channels & Roles (asked after joining, so it does not
+# count against Discord's cap on pre-join questions). Every public channel that is not a
+# game channel is in the core, in exactly one group, or in FOCUS_UNLISTED; a test checks it.
+# Nobody loses access: these channels stay visible to @everyone, and members who are already
+# here keep the channel list they have. Only what a newcomer starts with changes.
+FOCUS_PROMPT = "What else do you want to see?"
+FOCUS_GROUPS = [
+    {"title": "Events and tournaments", "emoji": "🏆",
+     "description": "Brackets, sign-ups and results.",
+     "channels": ["🏆・tournaments"]},
+    {"title": "Coins, levels and games", "emoji": "🎲",
+     "description": "Daily word game, counting, coin games and bot commands.",
+     "channels": ["🎲・games", "🔢・counting", "🤖・bot-commands"]},
+    {"title": "Creators and highlights", "emoji": "📺",
+     "description": "Members' streams and uploads, starred messages, partner servers.",
+     "channels": ["📺・creators", "⭐・hall-of-fame", "🤝・partners"]},
+    {"title": "Forums", "emoji": "📚",
+     "description": "Guides, setups and suggestions for the server.",
+     "channels": ["📚・guides", "🖥・setups", "💡・suggestions"]},
+    {"title": "Off topic", "emoji": "🤣",
+     "description": "Memes, art, code, fashion and chess.",
+     "channels": ["🤣・memes", "🎨・art", "💻・code", "👗・fashion", "♟️・chess"]},
+    {"title": "Minecraft", "emoji": "⛏️",
+     "description": "The Realms: server status and chat with whoever is in game.",
+     "channels": ["⛏️・realms"]},
+    {"title": "Roles and arrivals", "emoji": "🎭",
+     "description": "The roles panel, and who just joined.",
+     "channels": ["👋・welcome", "🎭・roles"]},
+    {"title": "More voice rooms", "emoji": "🔊",
+     "description": "The five-seat squad room and the AFK room.",
+     "channels": ["🎮 Squad", "💤 AFK"]},
+]
+# Event-driven: opt-in most of the time, and a default channel for newcomers while the thing
+# is live. Front Desk (bot/cogs/focus.py) adds the channel to the defaults when it starts and
+# takes it out again afterwards. These are the only channels that module may touch.
+FOCUS_EVENT_CHANNELS = {
+    "🏆・tournaments": "a tournament is open or running",
+    "⛏️・realms": "the Minecraft server is online",
+}
+# Public, but never a default and never an answer. Discord may refuse a Stage as a default
+# channel, and one refused channel fails the whole Onboarding edit; a Stage shows itself to
+# everyone while an event is live anyway.
+FOCUS_UNLISTED = {"🎙・stage": "Discord shows a live Stage to everyone by itself"}
+# If Discord says the core does not have five channels @everyone can post in (it may not
+# count a forum or a voice channel), focus_mode.py adds these one at a time until it does.
+FOCUS_RESERVE = ["🤣・memes", "🤖・bot-commands"]
+# Private ("private_to") channels never go in any of these lists.
 ONBOARDING_PROMPTS = [
     {
         "title": "What do you play?",
@@ -334,7 +413,8 @@ ONBOARDING_PROMPTS = [
 
 # Welcome Screen: the card new members see, with up to 5 channels.
 WELCOME_SCREEN = {
-    "description": "Chill gamers. No tryhards, no toxicity. Pick your games and find a squad tonight.",
+    "description": "A small co-op and PvE server. Pick your games, then join the Lobby voice room when someone "
+                   "is in it. Evenings, Pacific time.",
     "channels": [
         ("📌・rules", "📌", "Short and worth reading"),
         ("💬・general", "💬", "Say hi"),
@@ -352,7 +432,8 @@ REVOKE_PERMANENT_INVITES = False
 # Used by public_mode.py. The server description shows in invites and
 # Discovery; keep it under 120 characters.
 PUBLIC = {
-    "description": "Chill gamers. No tryhards, no toxicity. Squad up for Valorant, CoD, Fortnite, Minecraft and more.",
+    "description": "A small, friendly co-op and PvE server. Risk of Rain 2, Gears of War, Overwatch, Minecraft. "
+                   "Evenings, Pacific time.",
     "invite_channel": "👋・welcome",
 }
 

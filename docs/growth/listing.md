@@ -15,7 +15,7 @@ invite tracker can tell listing traffic from friend invites.
 
 **Short description** (shown in search results):
 
-> Chill gamers. No tryhards, no toxicity. Squad up for Valorant, CoD, Fortnite, Minecraft and more.
+> Chill gamers. No tryhards, no toxicity. Squad up for Risk of Rain 2, Gears of War, Overwatch, Minecraft and more.
 
 **Long description:**
 
@@ -28,7 +28,7 @@ invite tracker can tell listing traffic from friend invites.
 > 📊 **Weekly MVP and leaderboards.** Bragging rights, nothing more.
 > 🎵 **Music bot** in voice.
 >
-> Games: Valorant, Call of Duty, Fortnite, Minecraft, Apex, CS2, League, GTA Online, Roblox, Wardogs,
+> Games: Risk of Rain 2, Gears of War, Overwatch, Marvel Rivals, Minecraft, Tabletop Simulator, Wardogs, Apex,
 > plus whatever you're playing.
 >
 > Rules are short: be decent, no cheats, no spam, no NSFW, 18+ only.
@@ -54,12 +54,12 @@ invite tracker can tell listing traffic from friend invites.
 Most subreddits ban plain "join my Discord" posts. Post in the **LFG and Discord-ad threads**
 each sub allows, and lead with what people can do there, not with the server.
 
-Places: r/DiscordAdvertising, r/discordservers, r/LFG, r/ValorantLFG, r/CODWarzone (LFG
-megathread), r/FortniteLFG, r/MinecraftBuddies, r/GTAOnlineCrews. Read each sub's rules first.
+Places: r/DiscordAdvertising, r/discordservers, r/LFG, r/MinecraftBuddies, and the LFG thread of
+each game's own subreddit where it has one. Read each sub's rules first.
 
 **Template (LFG subs):**
 
-> **[NA West] Chill squad for Valorant / CoD / Fortnite tonight**
+> **[NA West] Chill squad for Risk of Rain 2 / Gears / Overwatch tonight**
 > Adult gamers, any rank, no rage. We run games most nights around 8 to 11 PM PT and have a
 > small Discord with a squad-finder bot so you're never solo-queuing. DM me or grab the invite:
 > <invite>
@@ -68,7 +68,7 @@ megathread), r/FortniteLFG, r/MinecraftBuddies, r/GTAOnlineCrews. Read each sub'
 
 > **Chill Gamers**: laid-back gaming hangout for adults
 > No tryhards, no toxicity. LFG bot with Join buttons, voice every night, weekly MVP, music.
-> Valorant, CoD, Fortnite, Minecraft, Apex and more. <invite>
+> Risk of Rain 2, Gears of War, Overwatch, Minecraft, Apex and more. <invite>
 
 ## Partner swap (with servers your size)
 

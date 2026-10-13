@@ -13,7 +13,12 @@ anything from `bot/data/` (the SQLite DB, logs and lock file live there and are 
 - `server/layout.py` source of truth for games, roles, channels and their emoji names; the bot
   imports it (via `bot/config.py`), so the setup scripts and the bot always agree
 - `server/setup_server.py` (first build), `polish_server.py` (Community, Onboarding, AutoMod),
-  `public_mode.py` (additive changes only), `expressions.py` (emoji and soundboard upload),
+  `public_mode.py` (later changes; adds what is missing and never deletes, but its
+  `retire_games` step moves the channels of games in `layout.RETIRED_GAMES` into the staff-only
+  `99 · archive` category and drops them from the "What do you play?" question),
+  `focus_mode.py` (Onboarding only: cuts the default channels to the core in
+  `ONBOARDING_DEFAULT_CHANNELS` and adds one opt-in question; `--plan`, `--revert`),
+  `expressions.py` (emoji and soundboard upload),
   `snapshot_server.py` + `snapshot_lib.py` (read-only config dump to `server/snapshot/*.json`),
   `publish_site_data.py` + `site_schema.py` (push the landing page's live data),
   `register_linked_roles.py` (Linked Roles metadata, `docs/LINKED_ROLES.md`)
@@ -34,8 +39,8 @@ The bot and scripts share one virtualenv at `server/.venv` (gitignored); it runs
 - Install: `python -m venv server/.venv`, then `server/.venv/Scripts/pip install -r requirements-dev.txt`
   (the runtime pins in `bot/requirements.txt` plus pytest and ruff; `server/requirements.txt` is a
   subset of the runtime pins). A new third-party import needs a line in `bot/requirements.txt`.
-- Bot tests: `cd bot && ../server/.venv/Scripts/python -m pytest -q -p no:warnings` (~3,940 tests, a few minutes)
-- Server tests: `cd server && .venv/Scripts/python -m pytest -q tests` (216 tests)
+- Bot tests: `cd bot && ../server/.venv/Scripts/python -m pytest -q -p no:warnings` (~4,100 tests, a few minutes)
+- Server tests: `cd server && .venv/Scripts/python -m pytest -q tests` (255 tests)
 - Site function tests: `cd site/api && node --test` (34 tests, no network, no `npm install`;
   run from that folder, as CI does, so every Node version finds the test files)
 - Lint: `server/.venv/Scripts/ruff check .` from the repo root (`ruff.toml`: bug-catching rules only,
@@ -62,7 +67,8 @@ CI (`.github/workflows/ci.yml`) runs ruff, both Python test suites and the site 
 
 - Role order: Front Desk sits below Keeper/Moderator and cannot move roles to or above its own
   position. Never reorder roles near the bot (`setup_server.py` calls `edit_role_positions`); use
-  `public_mode.py`, which only adds. Roles the bot hands out must sit below it.
+  `public_mode.py`, which never reorders or deletes (it only adds, except that it archives the
+  channels of retired games; read its dry run first). Roles the bot hands out must sit below it.
 - The live bot runs from a scheduled task and holds `bot/data/bot.lock`; stop the task before
   running `main.py` by hand (README runbook).
 - The "Front Desk watchdog" task restarts the bot if `bot/data/heartbeat` goes stale; run

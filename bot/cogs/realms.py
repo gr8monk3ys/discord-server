@@ -337,6 +337,16 @@ class Realms(commands.Cog):
         guild = self.guild()
         return config.match_by_name(guild.text_channels, config.REALMS_CHANNEL) if guild is not None else None
 
+    def is_online(self) -> bool | None:
+        """For other modules: True once a poll has reached the server, False once it has been
+        declared down, None while that isn't known (not set up, not polled yet, or a first
+        missed poll that may be a blip)."""
+        if not (self.setup.status_on or self.setup.rcon_on):
+            return None
+        if self.down_since is not None:
+            return False
+        return True if self.next_poll_at and self.failures == 0 else None
+
     def once(self, key: str, level: int, text: str, *args) -> None:
         """Log a condition when it starts, not every time it is seen again."""
         if key not in self.said:

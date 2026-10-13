@@ -329,7 +329,7 @@ def test_verify_with_code_in_summary_links_the_account(monkeypatch):
             (U1, "steam", SID, "Cool *Kid*", 1)
         assert row["linked_at"] == row["updated_at"] == T0 + G.VERIFY_COOLDOWN
         data = json.loads(row["data"])
-        assert data["hours"] == {"counterstrike2": 1234.0, "wardogs": 54.0} and data["persona"] == "Cool *Kid*"
+        assert data["hours"] == {"riskofrain2": 1234.0, "wardogs": 54.0} and data["persona"] == "Cool *Kid*"
         assert await env.pending() == []
         assert (await env.verify(U1))["content"] == MESSAGES["already"]
     with_env(go, monkeypatch)
@@ -500,7 +500,7 @@ def test_profile_lines_and_accounts(monkeypatch):
         assert len(lines) == 3 and lines[0].startswith("**Steam** · ")
         assert lines[0].endswith(f"<https://steamcommunity.com/profiles/{SID}>")
         assert "[x](" not in lines[0] and "evil.example" not in lines[0]  # the filter dropped the persona
-        assert "Counter-Strike 2 1,234 h" in lines[1] and "Wardogs 54 h" in lines[1]
+        assert "Risk of Rain 2 1,234 h" in lines[1] and "Wardogs 54 h" in lines[1]
         assert lines[2].startswith("Lately: ")
         reply = await env.accounts(U2, U1)
         assert reply["ephemeral"] is True and reply["allowed_mentions"].users is False
@@ -568,7 +568,7 @@ def test_refresh_updates_due_accounts_once_a_day(monkeypatch):
         (row,) = await env.rows()
         data = json.loads(row["data"])
         assert row["display"] == "Renamed" and row["updated_at"] == env.t and row["linked_at"] == linked
-        assert data["hours"] == {"counterstrike2": 1234.0, "wardogs": 54.0, "apexlegends": 60.0}
+        assert data["hours"] == {"riskofrain2": 1234.0, "wardogs": 54.0, "apexlegends": 60.0}
         assert len(env.http.calls) == 1
         assert await env.cog.refresh_due() == 0 and len(env.http.calls) == 1  # never twice in a day
     with_env(go, monkeypatch)

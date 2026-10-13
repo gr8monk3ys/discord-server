@@ -1,5 +1,5 @@
 {
-  "_comment": "Official news feeds per game, keyed by the game's role name in server/layout.py GAMES. Each value is {\"steam_appid\": N} (public Steam news API, official announcements only) or {\"rss\": \"https://...\"} (an official RSS/Atom feed; links must stay on that feed's host). A game left out gets no news. Checked with curl on 2026-10-08; 'comment' says how.",
+  "_comment": "Official news feeds per game, keyed by the game's role name in server/layout.py GAMES. Each value is {\"steam_appid\": N} (public Steam news API, official announcements only) or {\"rss\": \"https://...\"} (an official RSS/Atom feed; links must stay on that feed's host). A game left out gets no news. An entry for a retired game (RETIRED_GAMES) is kept and ignored, so its feed is back the moment the game is listed again. Checked with curl on 2026-10-08; 'comment' says how.",
   "Wardogs": {
     "steam_appid": 1867240,
     "comment": "Steam store search 'wardogs' -> 1867240 WARDOGS; GetNewsForApp returns its steam_community_announcements patch notes."

@@ -317,11 +317,11 @@ def test_cog_load_registers_menu_and_buttons_and_unload_removes(monkeypatch):
 # ---------------------------------------------------------------- welcome
 def test_welcome_on_onboarding_flip_once_ever(monkeypatch):
     async def go(env):
-        m = env.member(A, roles=["Valorant", "Minecraft"])
+        m = env.member(A, roles=["Overwatch", "Minecraft"])
         await env.finish_onboarding(m)
         (post,) = env.guild.general.sent
         assert post["content"].startswith(rules.opener(A, m.mention))
-        assert "Minecraft and Valorant" in post["content"]
+        assert "Overwatch and Minecraft" in post["content"]
         assert "<#4242>" in post["content"] and "/lfg" in post["content"]
         am = post["allowed_mentions"]
         assert am.everyone is False and am.roles is False and [u.id for u in am.users] == [A]
@@ -402,24 +402,24 @@ def test_onboarding_check_failure_assumes_onboarding(monkeypatch):
 
 def test_welcome_links_open_lfg_post_for_a_picked_game(monkeypatch):
     async def go(env):
-        await add_lfg_post(env, "fortnite", 771)  # not one of theirs
-        await add_lfg_post(env, "valorant", 772, created=env.t - 100)
-        await add_lfg_post(env, "valorant", 773)  # newest wins
-        m = env.member(A, roles=["Valorant", "Minecraft"])
+        await add_lfg_post(env, "apexlegends", 771)  # not one of theirs
+        await add_lfg_post(env, "overwatch", 772, created=env.t - 100)
+        await add_lfg_post(env, "overwatch", 773)  # newest wins
+        m = env.member(A, roles=["Overwatch", "Minecraft"])
         await env.finish_onboarding(m)
         text = env.guild.general.sent[0]["content"]
-        assert "Valorant squad looking for people right now: https://discord.com/channels/999/773" in text
+        assert "Overwatch squad looking for people right now: https://discord.com/channels/999/773" in text
         assert "<#4242>" not in text
     with_env(go, monkeypatch)
 
 
 def test_welcome_skips_closed_full_and_unthreaded_posts(monkeypatch):
     async def go(env):
-        await add_lfg_post(env, "valorant", 781, closed=True)
-        await add_lfg_post(env, "valorant", 782, size=2, members=2)  # full
-        pid = await add_lfg_post(env, "valorant", 783)
+        await add_lfg_post(env, "overwatch", 781, closed=True)
+        await add_lfg_post(env, "overwatch", 782, size=2, members=2)  # full
+        pid = await add_lfg_post(env, "overwatch", 783)
         await env.db.execute("UPDATE lfg_posts SET thread_id = NULL WHERE id = ?", (pid,))  # still creating
-        await env.finish_onboarding(env.member(A, roles=["Valorant"]))
+        await env.finish_onboarding(env.member(A, roles=["Overwatch"]))
         text = env.guild.general.sent[0]["content"]
         assert "discord.com/channels" not in text and "<#4242>" in text
     with_env(go, monkeypatch)
