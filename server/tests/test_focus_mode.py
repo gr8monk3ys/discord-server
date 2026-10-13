@@ -101,7 +101,7 @@ def test_the_core_and_the_question_fit_discords_limits():
     assert focus_mode.limit_problems() == []
     rows = {slug(r["name"]): r for r in focus_mode.layout_rows()}
     core = [rows[slug(n)] for n in layout.ONBOARDING_DEFAULT_CHANNELS]
-    assert focus_mode.MIN_DEFAULTS <= len(core) <= 8  # Discord's floor; and still a short list
+    assert focus_mode.MIN_DEFAULTS <= len(core) <= 9  # Discord's floor; and still a short list
     assert len(focus_mode.postable(core)) >= focus_mode.MIN_POSTABLE
     assert all(r["type"] in ("text", "forum", "voice") for r in core)
     # If Discord counts only plain text channels, the reserve makes up the difference.
@@ -179,7 +179,7 @@ def test_dry_run_prints_the_whole_plan_and_changes_nothing(capsys):
     assert "DRY RUN" in out
     for line in focus_mode.plan_lines():
         assert line in out
-    assert "default channels: 29 -> 8" in out
+    assert "default channels: 29 -> 9" in out
     assert 'add     question "What else do you want to see?"' in out
     assert "🤣 Off topic: 🤣・memes, 🎨・art, 💻・code, 👗・fashion, ♟️・chess" in out
 
@@ -208,7 +208,7 @@ def test_rerun_is_a_noop(capsys):
     assert run(guild, apply=True) is True
     assert len(guild.edits) == 1
     out = capsys.readouterr().out
-    assert "ok      default channels (8)" in out and 'ok      question "What else do you want to see?"' in out
+    assert "ok      default channels (9)" in out and 'ok      question "What else do you want to see?"' in out
 
 
 def test_revert_restores_todays_defaults_exactly_and_keeps_the_question():

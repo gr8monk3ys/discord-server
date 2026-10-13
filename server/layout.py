@@ -326,7 +326,7 @@ COMMUNITY = {
 # #gaming is core because game nights, watch parties and the weekly free games are posted
 # there, and it is a plain text channel that certainly counts towards Discord's five.
 ONBOARDING_DEFAULT_CHANNELS = [
-    "📌・rules", "📣・announcements", "💬・general", "🕹️・gaming", "🎮・lfg", "📸・clips",
+    "📌・rules", "📣・announcements", "💬・general", "🆘・help", "🕹️・gaming", "🎮・lfg", "📸・clips",
     "🔊 Lobby", "➕ New Squad",
 ]
 # The default list before the core was cut down, word for word: what --revert restores.
@@ -363,9 +363,9 @@ FOCUS_GROUPS = [
     {"title": "Minecraft", "emoji": "⛏️",
      "description": "The Realms: server status and chat with whoever is in game.",
      "channels": ["⛏️・realms"]},
-    {"title": "Help desk, roles and arrivals", "emoji": "🆘",
-     "description": "Open a ticket with the mods, the roles panel, who just joined.",
-     "channels": ["👋・welcome", "🆘・help", "🎭・roles"]},
+    {"title": "Roles and arrivals", "emoji": "🎭",
+     "description": "The roles panel, and who just joined.",
+     "channels": ["👋・welcome", "🎭・roles"]},
     {"title": "More voice rooms", "emoji": "🔊",
      "description": "The five-seat squad room and the AFK room.",
      "channels": ["🎮 Squad", "💤 AFK"]},

@@ -249,7 +249,7 @@ def test_retired_games_are_offered_nowhere_but_their_roles_stay_declared():
     assert slug(layout.GAME_ARCHIVE["name"]) not in {slug(c["name"]) for c in layout.CATEGORIES}
     assert set(layout.GAME_ARCHIVE["private_to"]) == {"Keeper", "Moderator"}
     assert len(layout.PUBLIC["description"]) <= 120
-    assert layout.PUBLIC["description"].startswith("Chill gamers. No tryhards, no toxicity.")
+    assert layout.PUBLIC["description"].startswith("A small, friendly co-op and PvE server.")
     assert not any(r in layout.PUBLIC["description"] for r in retired_roles)
 
 
