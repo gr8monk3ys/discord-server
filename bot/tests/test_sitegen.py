@@ -186,7 +186,7 @@ def test_site_leads_with_what_a_new_member_does():
     features = re.search(r'<section id="features".*?</section>', _page(), re.S).group(0)
     assert len(re.findall(r'<li><h3 class="card-title">', features)) == 4
     assert len(re.findall(r"<li\b", features)) <= 8
-    for want in ("Lobby", "/lfg", "Fern, Kestrel or Otter", "The Realms", "/realms link"):
+    for want in ("Lobby", "/lfg", "Fern, Kestrel or Otter", "Monkey SMP", "/smp link"):
         assert want in features, want
 
 
@@ -223,7 +223,7 @@ def test_site_week_strip_and_faq_promise_only_what_happens():
     assert "puts a 9 PM game night on the calendar" in week and "Tournament night" not in week
     faq = re.search(r'<section id="faq".*?</section>', page, re.S).group(0)
     assert 5 <= faq.count("<details>") <= 8
-    for want in ("How busy is it?", "/realms link", "US Pacific"):
+    for want in ("How busy is it?", "/smp link", "US Pacific"):
         assert want in faq, want
     for machinery in ("/partner", "Mythic", "/shop"):
         assert machinery not in faq, machinery

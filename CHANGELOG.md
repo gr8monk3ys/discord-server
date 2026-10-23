@@ -73,6 +73,10 @@ All notable changes to this project are recorded here. The format follows
 
 ### Changed
 
+- The Minecraft server is now Monkey SMP: `/realms` is `/smp` (`/smp link`, `/smp remove`, `/smp adopt`),
+  and the channel is #monkey-smp. The bridge also answers in the old #realms channel until
+  `public_mode.py` renames it in place (its new `renamed_channels` step, for any layout channel
+  still under a "was" name). Internal names (the cog, `REALMS_*` settings, tables, job keys) are unchanged.
 - The emoji pack is redrawn in the Field Notebook style of the server icon: every emoji is a
   night-paper stamp with one mark in pen green, near-white or muted ink, made to read at 22 px
   on both Discord themes (`assets/expressions/contact-sheet.png`). Names are unchanged.

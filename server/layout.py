@@ -179,10 +179,10 @@ CATEGORIES = [
                 "post_slowmode": 600, "slowmode": 5,
             },
             # Front Desk's bridge to our Minecraft server: pinned status panel, chat both ways.
-            {"name": "⛏️・realms", "topic": "The Realms, our Minecraft server. Status is pinned; chat here reaches "
-                                           "the game, and linked players' chat comes back. /realms link gets "
+            {"name": "⛏️・monkey-smp", "topic": "Monkey SMP, our Minecraft server. Status is pinned; chat here reaches "
+                                           "the game, and linked players' chat comes back. /smp link gets "
                                            "you on the whitelist.",
-             "slowmode": 2},
+             "slowmode": 2, "was": ["⛏️・realms"]},  # renamed in place by public_mode.py
         ],
     },
     {
@@ -292,8 +292,8 @@ POSTS = {
                 "`VOICE`  If someone is in the Lobby, join them. That is how most games here start.",
                 "`GAMES`  Pick yours under **Channels & Roles** at the top of the channel list.",
                 "`HOUSE`  Front Desk sorts you into Fern, Kestrel or Otter. `/house me` shows yours.",
-                "`MINECRAFT`  The Realms is the owner's modded server. After two weeks here, "
-                "`/realms link` puts you on its whitelist.",
+                "`MINECRAFT`  Monkey SMP is the owner's modded server. After two weeks here, "
+                "`/smp link` puts you on its whitelist.",
                 "",
                 "**Roles**",
                 "{@Keeper}  runs the place",
@@ -336,7 +336,7 @@ ONBOARDING_EVERYTHING = [
     "👗・fashion", "♟️・chess", "🤖・bot-commands", "📺・creators", "🏆・tournaments", "🎭・roles", "🤝・partners",
     "🔊 Lobby", "➕ New Squad", "🎮 Squad", "💤 AFK",
     "📚・guides", "🖥・setups",
-    "⛏️・realms",
+    "⛏️・monkey-smp",
 ]
 # Opt-in groups: one question under Channels & Roles (asked after joining, so it does not
 # count against Discord's cap on pre-join questions). Every public channel that is not a
@@ -361,8 +361,8 @@ FOCUS_GROUPS = [
      "description": "Memes, art, code, fashion and chess.",
      "channels": ["🤣・memes", "🎨・art", "💻・code", "👗・fashion", "♟️・chess"]},
     {"title": "Minecraft", "emoji": "⛏️",
-     "description": "The Realms: server status and chat with whoever is in game.",
-     "channels": ["⛏️・realms"]},
+     "description": "Monkey SMP: server status and chat with whoever is in game.",
+     "channels": ["⛏️・monkey-smp"]},
     {"title": "Roles and arrivals", "emoji": "🎭",
      "description": "The roles panel, and who just joined.",
      "channels": ["👋・welcome", "🎭・roles"]},

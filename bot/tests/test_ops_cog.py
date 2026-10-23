@@ -557,7 +557,7 @@ def test_status_shows_the_realms_bridge_when_that_module_is_loaded(monkeypatch, 
             inter = FakeInteraction(FakeMember(OWNER, env.guild))
             await Ops.status.callback(env.cog, inter)
             return {f.name: f.value for f in inter.calls[0]["embed"].fields}
-        assert realms.HEALTH_NAME == "Realms bridge" and realms.Realms.__cog_name__ == "Realms"
+        assert realms.HEALTH_NAME == "Monkey SMP bridge" and realms.Realms.__cog_name__ == "Realms"
         assert realms.HEALTH_NAME not in await fields()  # this fake bot has no get_cog at all
         loaded = {}
         env.bot.get_cog = loaded.get
