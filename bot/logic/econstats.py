@@ -26,7 +26,7 @@ LABELS = {
     "birthday": "Birthdays", "raffle": "Raffle",
     "crew": "Welcome Crew greetings", "supporterstipend": "Supporter tier stipend",
     "clipcast": "Clipcast (YouTube)",
-    "housecup": "House Cup", "forum_post": "Guides and setups", "realms": "The Realms playtime",
+    "housecup": "House Cup", "forum_post": "Guides and setups", "realms": "Monkey SMP playtime",
 }
 
 

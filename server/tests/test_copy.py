@@ -45,7 +45,7 @@ def test_welcome_post_says_what_a_new_member_does():
     post = layout.POSTS["welcome"]
     text = post["description"]
     assert len(text) <= 4096 and len(post["title"]) <= 256  # Discord's embed limits
-    for want in ("co-op and PvE", "US Pacific", "{#rules}", "{#general}", "Lobby", "/realms link", *HOUSES):
+    for want in ("co-op and PvE", "US Pacific", "{#rules}", "{#general}", "Lobby", "/smp link", *HOUSES):
         assert want in text, want
     clean(text, "the welcome post")
     # only placeholders setup_server.expand() knows how to fill, for roles that exist
@@ -67,7 +67,7 @@ def test_listing_long_description_fits_discord_me():
     assert len(long) <= 1025  # discord.me's description field, the tightest of the sites
     stated = re.search(r"## Long description \((\d[\d,]*) characters", LISTING)
     assert stated and int(stated.group(1).replace(",", "")) == len(long)
-    for want in ("co-op and PvE", "Risk of Rain 2", "Gears of War", "The Realms", "US Pacific", *HOUSES,
+    for want in ("co-op and PvE", "Risk of Rain 2", "Gears of War", "Monkey SMP", "US Pacific", *HOUSES,
                  "https://discord.lscaturchio.xyz/"):
         assert want in long, want
 

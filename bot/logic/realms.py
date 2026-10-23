@@ -1,4 +1,4 @@
-"""The Realms: rules for the bridge between the Discord server and the owner's Minecraft
+"""Monkey SMP: rules for the bridge between the Discord server and the owner's Minecraft
 server. Pure: no sockets, no files, no Discord I/O, no database, no clock of its own.
 
 What lives here:
@@ -500,9 +500,9 @@ def discord_line(event: Event) -> str | None:
     if event.kind == CHAT:
         return f"**<{name}>** {shown}" if shown else None
     if event.kind == JOIN:
-        return f"➕ **{name}** joined The Realms"
+        return f"➕ **{name}** joined Monkey SMP"
     if event.kind == LEAVE:
-        return f"➖ **{name}** left The Realms"
+        return f"➖ **{name}** left Monkey SMP"
     if event.kind == ADVANCEMENT:
         return f"🏅 **{name}** has {event.verb} **{shown}**" if shown else None
     return None
@@ -629,8 +629,8 @@ SWEEP_EVERY = 30 * 60  # how often linked members are checked against the member
 SYNC_BATCH = 10  # whitelist changes sent per poll
 MAX_ATTEMPTS = 5  # refused whitelist changes are retried this often at poll speed...
 SLOW_RETRY = 60 * 60  # ...then once an hour
-LINK_COOLDOWN = 30  # seconds between one member's /realms link attempts
-LINK_MEMBER_DAYS = 14  # days in this server before /realms link works (staff can /realms adopt sooner)
+LINK_COOLDOWN = 30  # seconds between one member's /smp link attempts
+LINK_MEMBER_DAYS = 14  # days in this server before /smp link works (staff can /smp adopt sooner)
 # A player's words reach Discord only for a confirmed link whose member may talk there now.
 # When that member isn't in the gateway cache the API is asked, and its answer reused for:
 MEMBER_GONE_FOR = 5 * 60  # "not a member"

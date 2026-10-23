@@ -11,6 +11,8 @@ Create Invite on Front Desk's role.
 Steps, all driven by layout.py:
 - create the roles Front Desk hands out (Clip of the Week, Recruiter, Bumper, the house roles,
   Welcome Crew, Supporter, ...); new roles land at the bottom of the list and nothing is moved
+- rename a channel still under one of its layout "was" names to its layout name (name only;
+  e.g. #realms -> #monkey-smp)
 - create any public layout channel that doesn't exist yet (never moves or edits existing ones),
   forums with their tags, layout, sort order, default reaction and slowmode, and the Stage channel
 - create private categories/channels ("private_to") and keep them private
@@ -49,7 +51,7 @@ from dotenv import load_dotenv
 
 import layout
 from names import slug
-from setup_server import Makeover, find, forum_options, private_overwrites
+from setup_server import Makeover, find, forum_options, layout_channels, private_overwrites
 
 sys.stdout.reconfigure(encoding="utf-8")
 
@@ -158,6 +160,21 @@ class PublicMode:
                               lambda: role.edit(hoist=hoist, reason="Public server"))
             else:
                 print(f"  ok      @{name}")
+
+    # ------------------------------------------------------------ renamed channels
+    async def renamed_channels(self):
+        """A channel still under one of its layout "was" names gets its layout name. Name only:
+        nothing is moved, restyled or re-permissioned, and messages stay where they are."""
+        print("\nRenamed channels")
+        for spec in layout_channels():
+            if not spec.get("was") or self.channel(spec["name"]) is not None:
+                continue
+            pool = [*self.guild.text_channels, *self.guild.voice_channels, *self.guild.forums,
+                    *self.guild.stage_channels]  # not categories
+            old = next((c for c in pool if slug(c.name) in {slug(w) for w in spec["was"]}), None)
+            if old is not None:
+                await self.do("rename", f"#{old.name} -> #{spec['name']}",
+                              lambda old=old, spec=spec: old.edit(name=spec["name"], reason="Public server: renamed"))
 
     # ------------------------------------------------------------ new public channels
     async def new_channels(self):
@@ -749,6 +766,7 @@ class PublicMode:
         if not self.preflight():
             return False
         await self.roles()
+        await self.renamed_channels()
         await self.new_channels()
         await self.bot_posting()
         await self.private()

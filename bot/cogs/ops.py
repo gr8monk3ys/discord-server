@@ -567,7 +567,7 @@ class Ops(commands.Cog):
         embed.add_field(name="Permissions", value=self.permissions_text(), inline=False)
         realms = self.realms_text()
         if realms is not None:
-            embed.add_field(name="Realms bridge", value=realms[:1024], inline=False)
+            embed.add_field(name="Monkey SMP bridge", value=realms[:1024], inline=False)
         quiet = await self.quiet_text()
         if quiet is not None:
             embed.add_field(name="Paused prompts", value=quiet[:1024], inline=False)

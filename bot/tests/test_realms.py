@@ -165,7 +165,7 @@ def status_payload(obj, packet_id=0) -> bytes:
 
 STATUS = {"version": {"name": "Fabric 1.21.1", "protocol": 767},
           "players": {"max": 20, "online": 2, "sample": [{"name": "Steve", "id": "x"}, {"name": "Alex_2", "id": "y"}]},
-          "description": {"text": "The ", "extra": [{"text": "Realms", "bold": True}, " " + SECTION + "6gold"]}}
+          "description": {"text": "Monkey ", "extra": [{"text": "SMP", "bold": True}, " " + SECTION + "6gold"]}}
 
 
 def test_parse_status_roundtrip_and_errors():
@@ -182,7 +182,7 @@ def test_parse_status_roundtrip_and_errors():
 def test_read_status_sanitises():
     s = R.read_status(STATUS)
     assert (s.online, s.max, s.names, s.version, s.motd) == (2, 20, ("Steve", "Alex_2"), "Fabric 1.21.1",
-                                                           "The Realms gold")
+                                                           "Monkey SMP gold")
     assert R.read_status({"description": "plain " + SECTION + "cred"}).motd == "plain red"
 
 
@@ -389,8 +389,8 @@ def test_chat_cannot_pose_as_another_event_or_player():
 def test_discord_line_formats_each_event():
     assert R.discord_line(R.Event(R.CHAT, "Steve", "hello")) == "**<Steve>** hello"
     assert R.discord_line(R.Event(R.CHAT, "A_b_c", "x")) == "**<A\\_b\\_c>** x"
-    assert R.discord_line(R.Event(R.JOIN, "Steve")) == "➕ **Steve** joined The Realms"
-    assert R.discord_line(R.Event(R.LEAVE, "Steve")) == "➖ **Steve** left The Realms"
+    assert R.discord_line(R.Event(R.JOIN, "Steve")) == "➕ **Steve** joined Monkey SMP"
+    assert R.discord_line(R.Event(R.LEAVE, "Steve")) == "➖ **Steve** left Monkey SMP"
     assert R.discord_line(R.Event(R.DEATH, "Steve", "was slain by Zombie")) == "💀 **Steve** died"
     assert R.discord_line(R.Event(R.ADVANCEMENT, "Steve", "Stone Age", "made the advancement")) == \
         "🏅 **Steve** has made the advancement **Stone Age**"
@@ -538,10 +538,10 @@ def test_days_weeks_and_durations():
 
 
 def test_panel_text_and_signature():
-    s = R.Status(2, 20, ("Steve", "A_b_c"), "Fabric 1.21.1", "The Realms")
+    s = R.Status(2, 20, ("Steve", "A_b_c"), "Fabric 1.21.1", "Monkey SMP")
     text = R.panel_text(s, ["Steve", "A_b_c"], None)
     assert text.splitlines() == ["🟢 **Online** · 2 / 20 players", "A\\_b\\_c, Steve", "Version: Fabric 1.21.1",
-                                 "*The Realms*"]
+                                 "*Monkey SMP*"]
     assert "Nobody is on" in R.panel_text(R.Status(0, 20, (), "", ""), [], None)
     assert "isn't sharing" in R.panel_text(R.Status(3, 20, (), "", ""), [], None)
     many = [f"Player{i:02}" for i in range(30)]
