@@ -901,6 +901,12 @@ def test_only_members_messages_in_the_bridge_channel_are_relayed(monkeypatch):
         assert (await env.say(U2, "beep", author=bot_user))[0] == "bot"
         assert (await env.say(U1, "hook", webhook_id=77))[0] == "bot"
         assert (await env.say(U1, "wrong room", channel=env.guild.general))[0] == "elsewhere"
+        # Only the bridge channel itself, by ID: a same-named channel (or one under the old name) doesn't relay.
+        twin = FakeText(99, config.REALMS_CHANNEL, env.guild)
+        old = FakeText(98, config.REALMS_CHANNEL_WAS[0], env.guild)
+        env.guild.text_channels += [twin, old]
+        assert (await env.say(U1, "twin", channel=twin))[0] == "elsewhere"
+        assert (await env.say(U1, "old", channel=old))[0] == "elsewhere"
         other = FakeGuild(gid=555)
         assert (await env.say(U1, "wrong server", channel=other.realms))[0] == "elsewhere"
         assert (await env.say(U1, "pinned", type=discord.MessageType.pins_add))[0] == "system"

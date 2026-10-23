@@ -884,8 +884,8 @@ class Realms(commands.Cog):
         guild = getattr(message, "guild", None)
         if guild is None or guild.id != self.bot.settings.guild_id:
             return "elsewhere"
-        names = (config.REALMS_CHANNEL, *config.REALMS_CHANNEL_WAS)
-        if config.slug(getattr(message.channel, "name", "")) not in {config.slug(n) for n in names}:
+        bridge = self.channel()  # the one channel the bridge uses, by ID: a same-named channel or thread doesn't count
+        if bridge is None or getattr(message.channel, "id", None) != bridge.id:
             return "elsewhere"
         if message.type not in (discord.MessageType.default, discord.MessageType.reply):
             return "system"
