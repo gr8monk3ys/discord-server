@@ -1,8 +1,8 @@
 # Growing the server
 
 Positioning: **a small, friendly co-op and PvE server, evenings US Pacific.** The tagline is
-"Chill gamers. No tryhards, no toxicity." Say what is true: who plays what, when, and that it is small. The server is 18+ by rule;
-the copy implies it ("for adults") and states it once, in the rules line.
+"Chill gamers. No tryhards, no toxicity." Say what is true: who plays what, when, and that it is small. The chats are 18+
+(the chat channels are age-restricted; the server itself isn't); the copy implies it ("for adults") and states it once, in the rules line.
 
 Use the permanent invite that `server/public_mode.py --apply` prints. It's one link, so the
 invite tracker can tell listing traffic from friend invites.

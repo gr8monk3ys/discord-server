@@ -14,7 +14,7 @@ Reddit templates live in [growth/listing.md](growth/listing.md); this file is th
 | **Icon** | `assets/server-icon.png` |
 | **Language** | English |
 | **Category** | Gaming |
-| **Age** | 18+ by rule; no NSFW anywhere (don't tick a site's "NSFW" box) |
+| **Age** | 18+: the chat channels are age-restricted, the server itself isn't; no NSFW content (don't tick a site's "NSFW" box) |
 | **Time zone** | US Pacific; people are mostly on in the evening |
 
 Regenerate the images with `python assets/listing/make_banner.py` (needs Pillow).
@@ -126,8 +126,11 @@ which shows a live checklist):
 - **2FA required for moderators** (Server Settings → Safety Setup).
 - **Clean safety record**: no recent Trust & Safety strikes; server name, description and channel
   names free of slurs and NSFW words. AutoMod and the verification level count in your favour.
-- **Not age-restricted**: servers or channels flagged age-restricted / NSFW can't be in Discovery.
-  Our 18+ is a rule, not the NSFW flag; keep it that way.
+- **Not age-restricted**: an age-restricted server can't be in Discovery, so keep the server-level
+  flag off (Server Settings; only the owner can change it, the bot can't). The chat channels (lobby,
+  games, off topic, squad) are age-restricted instead, while the front desk channels stay open so
+  anyone can read the rules and finish Onboarding. Discord's Discovery page doesn't say clearly
+  whether age-restricted channels count against a server; check it when applying.
 - Discovery listing: description (the short one), **primary category** Gaming, **up to 5 tags**
   (`gaming`, `co-op`, `chill`, `risk of rain 2`, `minecraft`; Discovery tags are searchable keywords, so
   no age tag), banner/cover image (`hero.png`), primary language English.
