@@ -1,0 +1,19 @@
+{
+ "generated_at": "2026-10-24T04:28:15Z",
+ "hall": {
+  "badges": 20
+ },
+ "members": {
+  "online": 4,
+  "total": 22
+ },
+ "seasonal": {
+  "emoji": "🎃",
+  "ends": "2026-11-01T07:00:00Z",
+  "name": "Halloween"
+ },
+ "v": 1,
+ "week": {
+  "voice_hours": 2
+ }
+}
