@@ -2,7 +2,7 @@
   "afk_channel": "💤 AFK",
   "afk_timeout": 900,
   "default_notifications": "only_mentions",
-  "description": "A small, friendly co-op and PvE server. Risk of Rain 2, Gears of War, Overwatch, Minecraft. Evenings, Pacific time.",
+  "description": null,
   "explicit_content_filter": "all_members",
   "features": [
     "AUTO_MODERATION",

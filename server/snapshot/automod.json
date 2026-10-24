@@ -27,7 +27,7 @@
         "type": "block_message"
       },
       {
-        "channel": "📋・mod-log",
+        "channel": "🛡️・mod",
         "type": "send_alert_message"
       }
     ],

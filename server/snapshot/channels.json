@@ -362,7 +362,7 @@
         },
         {
           "bitrate": 64000,
-          "name": "👥 Members: 16",
+          "name": "👥 Members: 15",
           "nsfw": false,
           "overwrites": {
             "member:Front Desk": {
@@ -389,7 +389,7 @@
         },
         {
           "bitrate": 64000,
-          "name": "🟢 Online: 5",
+          "name": "🟢 Online: 4",
           "nsfw": false,
           "overwrites": {
             "member:Front Desk": {
@@ -423,7 +423,7 @@
       "channels": [
         {
           "name": "💬・general",
-          "nsfw": false,
+          "nsfw": true,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -432,7 +432,7 @@
         },
         {
           "name": "🤣・memes",
-          "nsfw": false,
+          "nsfw": true,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -441,7 +441,7 @@
         },
         {
           "name": "📸・clips",
-          "nsfw": false,
+          "nsfw": true,
           "overwrites": {},
           "slowmode": 10,
           "synced": true,
@@ -450,7 +450,7 @@
         },
         {
           "name": "⭐・hall-of-fame",
-          "nsfw": false,
+          "nsfw": true,
           "overwrites": {
             "member:Front Desk": {
               "allow": [
@@ -483,7 +483,7 @@
         },
         {
           "name": "🔢・counting",
-          "nsfw": false,
+          "nsfw": true,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -492,7 +492,7 @@
         },
         {
           "name": "🎲・games",
-          "nsfw": false,
+          "nsfw": true,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -501,7 +501,7 @@
         },
         {
           "name": "💜・supporters",
-          "nsfw": false,
+          "nsfw": true,
           "overwrites": {
             "member:Front Desk": {
               "allow": [
@@ -551,7 +551,7 @@
       "channels": [
         {
           "name": "🕹️・gaming",
-          "nsfw": false,
+          "nsfw": true,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -562,7 +562,7 @@
           "default_reaction": null,
           "layout": "list_view",
           "name": "🎮・lfg",
-          "nsfw": false,
+          "nsfw": true,
           "overwrites": {},
           "require_tag": true,
           "slowmode": 0,
@@ -661,7 +661,7 @@
         },
         {
           "name": "🪖・wardogs",
-          "nsfw": false,
+          "nsfw": true,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -670,7 +670,7 @@
         },
         {
           "name": "⛏️・minecraft",
-          "nsfw": false,
+          "nsfw": true,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -681,7 +681,7 @@
           "default_reaction": "👍",
           "layout": "list_view",
           "name": "📚・guides",
-          "nsfw": false,
+          "nsfw": true,
           "overwrites": {},
           "require_tag": false,
           "slowmode": 600,
@@ -790,7 +790,7 @@
         },
         {
           "name": "🔺・apex-legends",
-          "nsfw": false,
+          "nsfw": true,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -799,7 +799,7 @@
         },
         {
           "name": "🏆・tournaments",
-          "nsfw": false,
+          "nsfw": true,
           "overwrites": {
             "member:Front Desk": {
               "allow": [
@@ -832,7 +832,7 @@
         },
         {
           "name": "⛏️・realms",
-          "nsfw": false,
+          "nsfw": true,
           "overwrites": {},
           "slowmode": 2,
           "synced": true,
@@ -841,7 +841,7 @@
         },
         {
           "name": "🌧️・risk-of-rain-2",
-          "nsfw": false,
+          "nsfw": true,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -850,7 +850,7 @@
         },
         {
           "name": "🪚・gears-of-war",
-          "nsfw": false,
+          "nsfw": true,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -859,7 +859,7 @@
         },
         {
           "name": "🦍・overwatch",
-          "nsfw": false,
+          "nsfw": true,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -868,7 +868,7 @@
         },
         {
           "name": "🦸・marvel-rivals",
-          "nsfw": false,
+          "nsfw": true,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -877,7 +877,7 @@
         },
         {
           "name": "🃏・tabletop-simulator",
-          "nsfw": false,
+          "nsfw": true,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -895,7 +895,7 @@
           "default_reaction": "🔥",
           "layout": "gallery_view",
           "name": "🖥・setups",
-          "nsfw": false,
+          "nsfw": true,
           "overwrites": {},
           "require_tag": false,
           "slowmode": 600,
@@ -939,7 +939,7 @@
         },
         {
           "name": "🎨・art",
-          "nsfw": false,
+          "nsfw": true,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -948,7 +948,7 @@
         },
         {
           "name": "💻・code",
-          "nsfw": false,
+          "nsfw": true,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -957,7 +957,7 @@
         },
         {
           "name": "👗・fashion",
-          "nsfw": false,
+          "nsfw": true,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -966,7 +966,7 @@
         },
         {
           "name": "♟️・chess",
-          "nsfw": false,
+          "nsfw": true,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -975,7 +975,7 @@
         },
         {
           "name": "🤖・bot-commands",
-          "nsfw": false,
+          "nsfw": true,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -984,7 +984,7 @@
         },
         {
           "name": "📺・creators",
-          "nsfw": false,
+          "nsfw": true,
           "overwrites": {
             "member:Front Desk": {
               "allow": [
@@ -1017,7 +1017,7 @@
         },
         {
           "name": "🤝・partners",
-          "nsfw": false,
+          "nsfw": true,
           "overwrites": {
             "member:Front Desk": {
               "allow": [
@@ -1114,7 +1114,7 @@
       "channels": [
         {
           "name": "🔒・squad-chat",
-          "nsfw": false,
+          "nsfw": true,
           "overwrites": {
             "member:Front Desk": {
               "allow": [
