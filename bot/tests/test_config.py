@@ -35,6 +35,21 @@ def test_match_ignores_emoji_and_separators():
     assert config.match_by_name(named("general"), "missing") is None
 
 
+def test_old_names_come_from_layout():
+    assert config.REALMS_CHANNEL_WAS == ("⛏️・realms",)
+    assert config.layout_old_names("01 · front desk") == ("Welcome",)  # categories too
+    assert config.layout_old_names(config.GENERAL_CHANNEL) == ()
+    assert config.layout_old_names("not in the layout") == ()
+
+
+def test_match_by_names_takes_the_first_name_that_matches():
+    both = named("⛏️・realms", "⛏️・monkey-smp")
+    assert config.match_by_names(both, ("⛏️・monkey-smp", "⛏️・realms")).name == "⛏️・monkey-smp"
+    assert config.match_by_names(named("⛏️・realms"), ("⛏️・monkey-smp", "⛏️・realms")).name == "⛏️・realms"
+    assert config.match_by_names(named("general"), ("⛏️・monkey-smp", "⛏️・realms")) is None
+    assert config.match_by_names(both, ()) is None
+
+
 def test_unknown_game_key():
     assert config.game_by_key("tetris") is None
 

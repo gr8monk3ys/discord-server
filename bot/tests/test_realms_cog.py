@@ -895,6 +895,16 @@ def test_discord_chat_reaches_minecraft_as_tellraw(monkeypatch):
     with_env(go, monkeypatch)
 
 
+def test_bridge_uses_the_old_channel_name_until_the_rename(monkeypatch):
+    async def go(env):
+        old = FakeText(98, config.REALMS_CHANNEL_WAS[0], env.guild)
+        env.guild.text_channels.append(old)
+        assert env.cog.channel() is old  # not renamed yet
+        env.guild.text_channels.append(env.guild.realms)
+        assert env.cog.channel() is env.guild.realms  # the new name wins once it exists
+    with_env(go, monkeypatch, with_channel=False)
+
+
 def test_only_members_messages_in_the_bridge_channel_are_relayed(monkeypatch):
     async def go(env):
         bot_user = FakeMember(U2, env.guild, bot=True)

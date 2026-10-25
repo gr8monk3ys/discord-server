@@ -679,6 +679,34 @@ def test_permission_check_guild_level_roles_and_missing_channel(monkeypatch, tmp
     with_env(go, monkeypatch, tmp_path)
 
 
+def test_permission_check_finds_a_channel_under_its_old_name(monkeypatch, tmp_path):
+    # The bridge keeps working in #realms until public_mode.py renames it, so that is no problem.
+    async def go(env):
+        g = perm_guild(env, loaded=("ops", "realms"))
+        chan(g, config.REALMS_CHANNEL).name = config.REALMS_CHANNEL_WAS[0]
+        assert await env.cog.check_permissions() == []
+        assert g.mod_log.sent == []
+        # ...but its permissions there still count, reported under the layout name
+        chan(g, config.REALMS_CHANNEL_WAS[0]).perms = without(pin_messages=True)
+        texts = {(p.where, p.text) for p in await env.cog.check_permissions()}
+        assert texts == {(config.REALMS_CHANNEL, "missing Pin Messages (realms)")}
+        g.text_channels.remove(chan(g, config.REALMS_CHANNEL_WAS[0]))
+        texts = {(p.where, p.text) for p in await env.cog.check_permissions()}
+        assert texts == {(config.REALMS_CHANNEL, "channel not found (needed by realms)")}
+    with_env(go, monkeypatch, tmp_path)
+
+
+def test_permission_check_ignores_old_names_the_cog_does_not_use(monkeypatch, tmp_path):
+    # The voice category was "Voice Channels" in layout.py, but tempvoice only looks for the new name.
+    async def go(env):
+        g = perm_guild(env, loaded=("ops", "tempvoice"))
+        assert config.layout_old_names(config.VOICE_CATEGORY) == ("Voice Channels",)
+        g.categories[0].name = "Voice Channels"
+        texts = {(p.where, p.text) for p in await env.cog.check_permissions()}
+        assert texts == {(config.VOICE_CATEGORY, "channel not found (needed by tempvoice)")}
+    with_env(go, monkeypatch, tmp_path)
+
+
 @pytest.mark.parametrize("how", ["forbidden", "gone"])
 def test_permission_check_warns_when_mod_log_unusable(monkeypatch, tmp_path, caplog, how):
     async def go(env):
