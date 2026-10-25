@@ -252,7 +252,7 @@ The first `docker compose build` takes a few minutes on a Pi.
 Nothing, unless you use one of the two features below. The bot, its database, its backups and
 its restart logic all live on the new host.
 
-- **The Realms (Minecraft bridge).** The bot talks to the Minecraft server over RCON, which only
+- **Monkey SMP (Minecraft bridge).** The bot talks to the Minecraft server over RCON, which only
   accepts localhost or a private-network address, and reads the Minecraft server's log file from
   disk (`REALMS_LOG_PATH`). After a move to a VPS neither is reachable. Leave the five `REALMS_*`
   lines out of the new `server/.env` (the bridge then stays off and says so), or run the bot on a

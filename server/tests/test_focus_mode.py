@@ -19,7 +19,7 @@ TODAY = [
     "👗・fashion", "♟️・chess", "🤖・bot-commands", "📺・creators", "🏆・tournaments", "🎭・roles", "🤝・partners",
     "🔊 Lobby", "➕ New Squad", "🎮 Squad", "💤 AFK",
     "📚・guides", "🖥・setups",
-    "⛏️・realms",
+    "⛏️・monkey-smp",
 ]
 PRIVATE = ["💜・supporters", "🛡️・mod", "🔒・admin", "📋・mod-log", "🔒・appeals", "🔒・squad-chat", "🔒 Squad Only"]
 
@@ -72,7 +72,7 @@ def test_statuses_and_event_channels():
         assert rows[name]["status"] == focus_mode.CORE
     assert {n for n, r in rows.items() if r["status"] == focus_mode.EVENT} == set(layout.FOCUS_EVENT_CHANNELS)
     assert rows["🏆・tournaments"]["group"] == "Events and tournaments"
-    assert rows["⛏️・realms"]["group"] == "Minecraft"
+    assert rows["⛏️・monkey-smp"]["group"] == "Minecraft"
     assert rows["🎙・stage"]["status"] == focus_mode.UNLISTED
     assert rows["⛏️・minecraft"]["status"] == focus_mode.GAME
 

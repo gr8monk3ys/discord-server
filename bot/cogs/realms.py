@@ -1,4 +1,4 @@
-"""The Realms: a bridge between this server and the owner's Minecraft server.
+"""Monkey SMP: a bridge between this server and the owner's Minecraft server.
 
 Four parts, each on only when its own settings are in the environment (see
 logic/realms.py `read_setup`); with none of them the cog loads, starts nothing and every
@@ -7,14 +7,14 @@ command says the bridge is not set up.
 - Status panel (REALMS_ADDRESS): one message in the realms channel, edited in place when
   what it shows changes. The server is asked with the Server List Ping protocol every two
   minutes; while it does not answer the polls back off and the panel is edited once.
-- Whitelist (RCON): `/realms link <name>` for established accounts that have been in the
-  server two weeks runs `whitelist add`, `/realms unlink` (or leaving, or a ban) runs
+- Whitelist (RCON): `/smp link <name>` for established accounts that have been in the
+  server two weeks runs `whitelist add`, `/smp unlink` (or leaving, or a ban) runs
   `whitelist remove`. One name per member, one member per name. A change the server could
   not take yet waits in `realms_links` (state add / remove) and is sent after the next poll
   that reaches the server. The bot only ever removes a name it added itself (`managed`): an
   add answered "already whitelisted" means somebody else put the name there, so the link is
   refused, and a link the server never confirmed is forgotten without a `whitelist remove`.
-  Staff link such a name for a member with `/realms adopt`.
+  Staff link such a name for a member with `/smp adopt`.
 - Chat, both ways, in the realms channel. Discord to Minecraft is a `tellraw` over RCON,
   rate limited, never for bots. Minecraft to Discord tails the server log read-only
   (REALMS_LOG_PATH) in a worker thread and posts at most one batched message every few
@@ -26,7 +26,7 @@ command says the bridge is not set up.
 - Playtime: a linked member seen in two player-list polls in a row, with at least one other
   player on in both (company, like voice coins: nobody is paid to idle alone), is credited
   the time between them; every full half hour pays a few coins up to a daily cap (refs keyed
-  on member, day and slot). `/realms top` ranks the week; tracking opt-out is respected.
+  on member, day and slot). `/smp top` ranks the week; tracking opt-out is respected.
 
 This file owns the sockets and the file handle. Nothing here ever starts, stops or
 configures the Minecraft server, and the RCON password is never logged or shown: errors
@@ -54,33 +54,33 @@ log = logging.getLogger(__name__)
 
 NO_PINGS = discord.AllowedMentions.none()
 PANEL_KEY = "realms:panel"  # meta: "channel_id:message_id" of the status panel
-HEALTH_NAME = "Realms bridge"  # field name for /status (see `health_text`)
+HEALTH_NAME = "Monkey SMP bridge"  # field name for /status (see `health_text`)
 SLOW_DOWN, NOT_SENT = "⏳", "📴"
 # Posted (rarely) where a player's chat would have been; no name, none of their text.
-UNLINKED_HINT = "*Some players aren't linked, so their chat stays in the game. `/realms link`*"
+UNLINKED_HINT = "*Some players aren't linked, so their chat stays in the game. `/smp link`*"
 
 MESSAGES = {
-    "off": "The Realms bridge isn't set up yet.",
+    "off": "The Monkey SMP bridge isn't set up yet.",
     "no_whitelist": "Whitelisting through Discord isn't set up yet. Ask a Keeper to add you.",
     "bad_name": "That isn't a Minecraft Java name: 3 to 16 letters, digits or underscores, nothing else.",
     "young": (f"Your Discord account must be {quests.MIN_ACCOUNT_DAYS}+ days old to join "
-              "The Realms through Discord. Ask a Keeper to add you."),
+              "Monkey SMP through Discord. Ask a Keeper to add you."),
     "new_here": (f"Linking opens once you've been in the server for {R.LINK_MEMBER_DAYS} days. "
                  "Until then, ask a Keeper to add you."),
-    "claimed": ("`{name}` is already on The Realms whitelist, and I didn't put it there, so I can't link it. "
+    "claimed": ("`{name}` is already on the Monkey SMP whitelist, and I didn't put it there, so I can't link it. "
                 "If it's yours, ask a mod to link it for you."),
     "unlink_unconfirmed": "Unlinked. `{name}` was still waiting to be added, so the whitelist is unchanged.",
     "cooldown": "Give it a moment, then try again.",
-    "have_one": "You already linked `{name}`. Run `/realms unlink` first if you want to change it.",
+    "have_one": "You already linked `{name}`. Run `/smp unlink` first if you want to change it.",
     "taken": "Someone here already linked that Minecraft name. If it's yours, ask a mod.",
     "already": "`{name}` is already linked to you and on the whitelist.",
-    "linked": ("Linked. `{name}` is on The Realms whitelist, and what you say in the game now shows up in the "
-               "realms channel. `/realms unlink` takes it off again."),
+    "linked": ("Linked. `{name}` is on the Monkey SMP whitelist, and what you say in the game now shows up in the "
+               "Monkey SMP channel. `/smp unlink` takes it off again."),
     "pending": ("Saved `{name}`. I can't reach the Minecraft server right now, so you'll be added to the "
                 "whitelist as soon as it answers."),
     "unknown": "Minecraft doesn't know a player by that name. Check the spelling and try again.",
-    "none": "You haven't linked a Minecraft name. `/realms link` gets you on the whitelist.",
-    "unlinked": "Unlinked. `{name}` is off The Realms whitelist.",
+    "none": "You haven't linked a Minecraft name. `/smp link` gets you on the whitelist.",
+    "unlinked": "Unlinked. `{name}` is off the Monkey SMP whitelist.",
     "unlink_pending": ("Unlinked `{name}`. I can't reach the Minecraft server right now; it comes off the "
                        "whitelist as soon as the server answers."),
     "failed": "Something went wrong on my side. Try again in a minute.",
@@ -254,7 +254,7 @@ def parse_ref(raw: str | None) -> tuple[int, int] | None:
 
 
 class Realms(commands.Cog):
-    realms = app_commands.Group(name="realms", description="The Realms, our Minecraft server", guild_only=True)
+    realms = app_commands.Group(name="smp", description="Monkey SMP, our Minecraft server", guild_only=True)
 
     def __init__(self, bot, environ=None, pinger=None, rcon=None, reader=None):
         self.bot = bot
@@ -328,7 +328,13 @@ class Realms(commands.Cog):
 
     def channel(self):
         guild = self.guild()
-        return config.match_by_name(guild.text_channels, config.REALMS_CHANNEL) if guild is not None else None
+        if guild is None:
+            return None
+        for name in (config.REALMS_CHANNEL, *config.REALMS_CHANNEL_WAS):
+            found = config.match_by_name(guild.text_channels, name)
+            if found is not None:
+                return found
+        return None
 
     def once(self, key: str, level: int, text: str, *args) -> None:
         """Log a condition when it starts, not every time it is seen again."""
@@ -456,8 +462,8 @@ class Realms(commands.Cog):
             return "skipped"
         text = R.panel_text(self.status, self.names, self.down_since)
         if self.setup.rcon_on:
-            text += "\n\nWant in? `/realms link` with your Minecraft name."
-        embed = style.embed(title="The Realms", description=text[:4000], footer=style.label("realms", "minecraft"),
+            text += "\n\nWant in? `/smp link` with your Minecraft name."
+        embed = style.embed(title="Monkey SMP", description=text[:4000], footer=style.label("monkey smp", "minecraft"),
                             color=style.FOREST if self.status is not None else style.MUTED)
         if here:
             try:
@@ -479,7 +485,7 @@ class Realms(commands.Cog):
         self.last_signature = signature
         self.said.discard("panel")
         try:
-            await sent.pin(reason="The Realms status panel")  # chat shares the channel
+            await sent.pin(reason="Monkey SMP status panel")  # chat shares the channel
         except Exception:
             log.info("realms: couldn't pin the status panel")
         return "posted"
@@ -568,9 +574,9 @@ class Realms(commands.Cog):
             await self.db.execute("DELETE FROM realms_links WHERE name_key = ? AND state = ?", (key, row["state"]))
             if action == "add" and result == "already":
                 await self.mod_log(
-                    f"⛏️ <@{row['user_id']}> tried to link `{row['name']}`, which was already on The Realms "
+                    f"⛏️ <@{row['user_id']}> tried to link `{row['name']}`, which was already on the Monkey SMP "
                     "whitelist (added by hand, or somebody else's). Not linked, and the whitelist is unchanged. "
-                    "If the name is theirs, `/realms adopt` links it.")
+                    "If the name is theirs, `/smp adopt` links it.")
                 return "claimed"
             return "unknown" if action == "add" else "removed"
 
@@ -624,8 +630,8 @@ class Realms(commands.Cog):
         if row.get("unconfirmed"):
             what = "was still waiting to be added, so the whitelist is unchanged"
         else:
-            what = ("is off The Realms whitelist" if done else
-                    "comes off The Realms whitelist when the server answers")
+            what = ("is off the Monkey SMP whitelist" if done else
+                    "comes off the Monkey SMP whitelist when the server answers")
         await self.mod_log(f"⛏️ <@{user_id}> {why}: `{row['name']}` {what}")
         return True
 
@@ -658,7 +664,7 @@ class Realms(commands.Cog):
             log.exception("realms: handling a ban failed")
 
     async def link_member(self, member, name: str) -> str:
-        """/realms link: returns the reply. The name is never echoed unless it is valid."""
+        """/smp link: returns the reply. The name is never echoed unless it is valid."""
         if not self.setup.rcon_on:
             return MESSAGES["no_whitelist" if self.setup.any_on else "off"]
         if not R.valid_name(name):
@@ -701,7 +707,7 @@ class Realms(commands.Cog):
         return MESSAGES["linked" if result == "ok" else "pending"].format(name=name)
 
     async def adopt_member(self, mod, member, name: str) -> str:
-        """/realms adopt: staff vouch that a name already on the whitelist (put there by hand)
+        """/smp adopt: staff vouch that a name already on the whitelist (put there by hand)
         is this member's. The link is recorded as the bot's own, so unlinking, leaving or a
         ban takes the name off like any other. Returns the reply."""
         if not self.setup.rcon_on:
@@ -709,15 +715,15 @@ class Realms(commands.Cog):
         if not R.valid_name(name):
             return MESSAGES["bad_name"]
         if getattr(member, "bot", False):
-            return "Bots don't play on The Realms."
+            return "Bots don't play on Monkey SMP."
         key, t = R.name_key(name), now()
         mine = await self.db.fetchone("SELECT name, name_key FROM realms_links WHERE user_id = ? AND state != 'remove'",
                                       (member.id,))
         if mine is not None and mine["name_key"] != key:
-            return f"{member.mention} already has `{mine['name']}` linked. `/realms remove` it first."
+            return f"{member.mention} already has `{mine['name']}` linked. `/smp remove` it first."
         row = await self.db.fetchone("SELECT user_id, state FROM realms_links WHERE name_key = ?", (key,))
         if row is not None and row["state"] != "remove" and row["user_id"] != member.id:
-            return f"`{name}` is linked to <@{row['user_id']}>. `/realms remove` that link first."
+            return f"`{name}` is linked to <@{row['user_id']}>. `/smp remove` that link first."
         try:
             # Makes sure the name is on the whitelist; "already whitelisted" is the expected answer.
             result = R.whitelist_result("add", await self.rcon_call(R.whitelist_command("add", name)))
@@ -733,12 +739,12 @@ class Realms(commands.Cog):
             " user_id = excluded.user_id, state = 'ok', attempts = 0, linked_at = excluded.linked_at,"
             " updated_at = excluded.updated_at, managed = 1", (key, name, member.id, t, t))
         log.info("realms: %s adopted a whitelisted name for %s", mod.id, member.id)
-        await self.mod_log(f"⛏️ <@{mod.id}> linked the Minecraft name `{name}` to <@{member.id}> (`/realms adopt`: "
+        await self.mod_log(f"⛏️ <@{mod.id}> linked the Minecraft name `{name}` to <@{member.id}> (`/smp adopt`: "
                            "it was on the whitelist already, and is now managed like any other link)")
         return f"Linked `{name}` to {member.mention}. It comes off the whitelist if they unlink, leave or are banned."
 
     # ------------------------------------------------------------ commands
-    @realms.command(name="link", description="Get on The Realms whitelist with your Minecraft name")
+    @realms.command(name="link", description="Get on the Monkey SMP whitelist with your Minecraft name")
     @app_commands.describe(minecraft_name="Your Minecraft Java name (3 to 16 letters, digits or _)")
     async def link(self, interaction: discord.Interaction, minecraft_name: app_commands.Range[str, 1, 32]) -> None:
         await interaction.response.defer(ephemeral=True, thinking=True)
@@ -749,7 +755,7 @@ class Realms(commands.Cog):
             text = MESSAGES["failed"]
         await interaction.followup.send(text, ephemeral=True, allowed_mentions=NO_PINGS)
 
-    @realms.command(name="unlink", description="Take your Minecraft name off The Realms whitelist")
+    @realms.command(name="unlink", description="Take your Minecraft name off the Monkey SMP whitelist")
     async def unlink(self, interaction: discord.Interaction) -> None:
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
@@ -797,7 +803,7 @@ class Realms(commands.Cog):
                                      " WHERE user_id = ? AND day >= ?", (user_id, since_day))
         return row["n"]
 
-    @realms.command(name="status", description="Is The Realms up, who is on, and your own link and playtime")
+    @realms.command(name="status", description="Is Monkey SMP up, who is on, and your own link and playtime")
     async def status_command(self, interaction: discord.Interaction) -> None:
         if not self.setup.any_on:
             await interaction.response.send_message(MESSAGES["off"], ephemeral=True)
@@ -812,7 +818,7 @@ class Realms(commands.Cog):
         row = await self.db.fetchone("SELECT name, state FROM realms_links WHERE user_id = ? AND state != 'remove'",
                                      (uid,))
         if row is None:
-            lines.append("\n**You**: no Minecraft name linked. `/realms link` gets you on the whitelist; only "
+            lines.append("\n**You**: no Minecraft name linked. `/smp link` gets you on the whitelist; only "
                          "linked players' chat is passed on from the game to this channel.")
         else:
             wait = "" if row["state"] == "ok" else " (waiting for the server to take the whitelist change)"
@@ -831,11 +837,11 @@ class Realms(commands.Cog):
                 lines.append("Playtime isn't counted for you (`/privacy`).")
         if is_staff(interaction.user):
             lines.append(f"\n**{HEALTH_NAME}**: {self.health_text()}")
-        embed = style.embed(title="The Realms", description="\n".join(lines)[:4000],
+        embed = style.embed(title="Monkey SMP", description="\n".join(lines)[:4000],
                             footer=style.label("realms", "status"))
         await interaction.response.send_message(embed=embed, ephemeral=True, allowed_mentions=NO_PINGS)
 
-    @realms.command(name="top", description="Who played the most on The Realms this week")
+    @realms.command(name="top", description="Who played the most on Monkey SMP this week")
     async def top(self, interaction: discord.Interaction) -> None:
         if not self.setup.any_on:
             await interaction.response.send_message(MESSAGES["off"], ephemeral=True)
@@ -848,7 +854,7 @@ class Realms(commands.Cog):
             " ORDER BY n DESC, user_id LIMIT 50", (since,))
         here = [r for r in rows if guild is not None and guild.get_member(r["user_id"]) is not None][:R.TOP_SIZE]
         text = "\n".join(f"`{i:>2}` <@{r['user_id']}> · {R.fmt_duration(r['n'])}" for i, r in enumerate(here, 1))
-        embed = style.embed(title="The Realms · playtime this week",
+        embed = style.embed(title="Monkey SMP · playtime this week",
                             description=text or "Nobody has played this week yet.",
                             footer=style.label("realms", "top"))
         await interaction.response.send_message(embed=embed, allowed_mentions=NO_PINGS)
@@ -878,7 +884,8 @@ class Realms(commands.Cog):
         guild = getattr(message, "guild", None)
         if guild is None or guild.id != self.bot.settings.guild_id:
             return "elsewhere"
-        if config.slug(getattr(message.channel, "name", "")) != config.slug(config.REALMS_CHANNEL):
+        bridge = self.channel()  # the one channel the bridge uses, by ID: a same-named channel or thread doesn't count
+        if bridge is None or getattr(message.channel, "id", None) != bridge.id:
             return "elsewhere"
         if message.type not in (discord.MessageType.default, discord.MessageType.reply):
             return "system"

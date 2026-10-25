@@ -246,7 +246,7 @@ class ChatMessage:
         self.reactions.append(emoji)
 
 
-def status_json(names=(), online=None, version="Fabric 1.21.1", motd="The Realms"):
+def status_json(names=(), online=None, version="Fabric 1.21.1", motd="Monkey SMP"):
     return {"version": {"name": version}, "description": {"text": motd},
             "players": {"max": 20, "online": len(names) if online is None else online,
                         "sample": [{"name": n, "id": "x"} for n in names]}}
@@ -456,7 +456,7 @@ def test_panel_is_posted_once_then_edited_in_place(monkeypatch):
         (panel,) = env.posts
         assert panel.pinned and panel.kwargs["allowed_mentions"].everyone is False
         assert "🟢 **Online** · 1 / 20 players" in panel.text and "Steve" in panel.text
-        assert "/realms link" in panel.text and "Fabric 1.21.1" in panel.text
+        assert "/smp link" in panel.text and "Fabric 1.21.1" in panel.text
         assert await env.cog.meta_get(cogmod.PANEL_KEY) == f"{env.guild.realms.id}:{panel.id}"
         await env.poll()
         await env.poll()
@@ -571,7 +571,7 @@ def test_panel_never_shows_hostile_status_text(monkeypatch):
     with_env(go, monkeypatch)
 
 
-# ---------------------------------------------------------------- /realms link
+# ---------------------------------------------------------------- /smp link
 def test_link_adds_to_the_whitelist(monkeypatch):
     async def go(env):
         reply = await env.link(U1, "Steve_01")
@@ -626,7 +626,7 @@ def test_a_name_somebody_else_whitelisted_cannot_be_linked_or_removed(monkeypatc
         assert reply["content"] == MESSAGES["claimed"].format(name="OwnerFriend") and "ask a mod" in reply["content"]
         assert await env.links() == [] and env.rcon.whitelist == {"ownerfriend"}
         (line,) = env.mod_lines()  # one line, and it is not "linked"
-        assert f"<@{U1}> tried to link `OwnerFriend`" in line and "Not linked" in line and "/realms adopt" in line
+        assert f"<@{U1}> tried to link `OwnerFriend`" in line and "Not linked" in line and "/smp adopt" in line
         # nothing the member can do now sends a remove for it
         assert (await env.unlink(U1))["content"] == MESSAGES["none"]
         await env.cog.on_member_ban(env.guild, SimpleNamespace(id=U1))
@@ -690,7 +690,7 @@ def test_staff_adopt_a_hand_whitelisted_name_for_a_member(monkeypatch):
         assert reply["allowed_mentions"].users is False
         assert await env.links() == [("OwnerFriend", U1, "ok")]
         assert env.mod_lines() == [
-            f"⛏️ <@{MOD}> linked the Minecraft name `OwnerFriend` to <@{U1}> (`/realms adopt`: it was on the "
+            f"⛏️ <@{MOD}> linked the Minecraft name `OwnerFriend` to <@{U1}> (`/smp adopt`: it was on the "
             "whitelist already, and is now managed like any other link)"]
         # from here on it is the bot's: leaving takes it off
         await env.cog.on_member_remove(env.member(U1))
@@ -830,13 +830,13 @@ def test_members_who_leave_or_are_banned_come_off_the_whitelist(monkeypatch):
         await env.link(U2, "Alex")
         await env.cog.on_member_remove(env.member(U1))
         assert env.rcon.whitelist == {"alex"} and await env.links() == [("Alex", U2, "ok")]
-        assert env.mod_lines()[-1] == f"⛏️ <@{U1}> left: `Steve` is off The Realms whitelist"
+        assert env.mod_lines()[-1] == f"⛏️ <@{U1}> left: `Steve` is off the Monkey SMP whitelist"
         banned = SimpleNamespace(id=U2)
         await env.cog.on_member_ban(env.guild, banned)
         await env.cog.on_member_remove(env.member(U2))  # Discord sends both for a ban
         assert env.rcon.whitelist == set() and await env.links() == []
         assert env.rcon.sent("whitelist remove") == ["whitelist remove Steve", "whitelist remove Alex"]
-        assert env.mod_lines()[-1] == f"⛏️ <@{U2}> was banned: `Alex` is off The Realms whitelist"
+        assert env.mod_lines()[-1] == f"⛏️ <@{U2}> was banned: `Alex` is off the Monkey SMP whitelist"
         await env.cog.on_member_remove(env.member(U3))  # no link: nothing happens
         assert len(env.rcon.sent("whitelist remove")) == 2
     with_env(go, monkeypatch)
@@ -852,7 +852,7 @@ def test_other_servers_events_are_ignored_and_a_ban_while_down_waits(monkeypatch
         env.rcon.down = True
         await env.cog.on_member_ban(env.guild, SimpleNamespace(id=U1))
         assert await env.links() == [("Steve", U1, "remove")]
-        assert "comes off The Realms whitelist when the server answers" in env.mod_lines()[-1]
+        assert "comes off the Monkey SMP whitelist when the server answers" in env.mod_lines()[-1]
         env.rcon.down = False
         await env.poll()
         assert await env.links() == [] and env.rcon.whitelist == set()
@@ -901,6 +901,12 @@ def test_only_members_messages_in_the_bridge_channel_are_relayed(monkeypatch):
         assert (await env.say(U2, "beep", author=bot_user))[0] == "bot"
         assert (await env.say(U1, "hook", webhook_id=77))[0] == "bot"
         assert (await env.say(U1, "wrong room", channel=env.guild.general))[0] == "elsewhere"
+        # Only the bridge channel itself, by ID: a same-named channel (or one under the old name) doesn't relay.
+        twin = FakeText(99, config.REALMS_CHANNEL, env.guild)
+        old = FakeText(98, config.REALMS_CHANNEL_WAS[0], env.guild)
+        env.guild.text_channels += [twin, old]
+        assert (await env.say(U1, "twin", channel=twin))[0] == "elsewhere"
+        assert (await env.say(U1, "old", channel=old))[0] == "elsewhere"
         other = FakeGuild(gid=555)
         assert (await env.say(U1, "wrong server", channel=other.realms))[0] == "elsewhere"
         assert (await env.say(U1, "pinned", type=discord.MessageType.pins_add))[0] == "system"
@@ -995,9 +1001,9 @@ def test_minecraft_chat_reaches_discord_as_one_batched_message(monkeypatch):
                       P + "Steve left the game")
         (post,) = env.posts
         assert post.kwargs["content"].split("\n") == [
-            "➕ **Steve** joined The Realms", "**<Steve>** hello discord",
+            "➕ **Steve** joined Monkey SMP", "**<Steve>** hello discord",
             "🏅 **Steve** has made the advancement **Stone Age**", "💀 **Steve** died",
-            "➖ **Steve** left The Realms"]
+            "➖ **Steve** left Monkey SMP"]
         mentions = post.kwargs["allowed_mentions"]
         assert mentions.everyone is False and mentions.users is False and mentions.roles is False
         await env.cog.relay_once()
@@ -1045,14 +1051,14 @@ def test_deaths_and_advancements_go_through_the_same_gate_and_joins_do_not(monke
                     P + f"{name} has made the advancement [Totally Real Prize]", P + f"{name} left the game"]
         await env.log(*lines("Stranger"))
         assert env.posts[-1].kwargs["content"].split("\n")[:2] == [
-            "➕ **Stranger** joined The Realms", "➖ **Stranger** left The Realms"]
+            "➕ **Stranger** joined Monkey SMP", "➖ **Stranger** left Monkey SMP"]
         assert "nitro" not in env.posts[-1].kwargs["content"] and "Prize" not in env.posts[-1].kwargs["content"]
         await env.log(*lines("Steve"))
         text = env.posts[-1].kwargs["content"]
         assert "💀 **Steve** died" in text and "free nitro" not in text and "🏅 **Steve** has made the advancement" in text
         env.member(U1).timed_out = True
         await env.log(*lines("Steve"))
-        assert env.posts[-1].kwargs["content"] == "➕ **Steve** joined The Realms\n➖ **Steve** left The Realms"
+        assert env.posts[-1].kwargs["content"] == "➕ **Steve** joined Monkey SMP\n➖ **Steve** left Monkey SMP"
     with_env(go, monkeypatch)
 
 
@@ -1171,7 +1177,7 @@ def test_a_member_outside_the_cache_is_asked_from_the_api_with_short_memories(mo
 def test_the_unlinked_hint_is_rare_bot_worded_and_names_nobody(monkeypatch):
     async def go(env):
         await env.linked(U1, "Steve")
-        assert "`/realms link`" in HINT and HINT.startswith("*") and HINT.endswith("*")
+        assert "`/smp link`" in HINT and HINT.startswith("*") and HINT.endswith("*")
         # on its own when nothing else would be posted
         assert await chat(env, "Stranger") == HINT
         # not again for that name for six hours, however much they say
@@ -1539,7 +1545,7 @@ def test_rcon_only_setup_polls_through_rcon(monkeypatch):
     with_env(go, monkeypatch, environ={R.ENV_RCON_PASSWORD: PASSWORD})
 
 
-# ---------------------------------------------------------------- /realms top and status
+# ---------------------------------------------------------------- /smp top and status
 def test_top_ranks_this_weeks_playtime(monkeypatch):
     async def go(env):
         for uid in (U1, U2, U3):

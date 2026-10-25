@@ -462,7 +462,7 @@ def test_public_mode_run_includes_automod_gaps(monkeypatch):
     ran = []
     # The games steps: additive ones first, and retire_games (the only step that hides
     # anything) after the Onboarding question has been brought up to date.
-    steps = ("roles", "new_channels", "private", "description", "posts", "invite", "onboarding",
+    steps = ("roles", "renamed_channels", "new_channels", "private", "description", "posts", "invite", "onboarding",
              "onboarding_prompts", "game_tags", "restore_games", "game_options", "retire_games", "automod_gaps")
     pm = public_mode.PublicMode(guild, apply=False)
     for name in steps:
@@ -471,6 +471,44 @@ def test_public_mode_run_includes_automod_gaps(monkeypatch):
         monkeypatch.setattr(pm, name, step)
     assert asyncio.run(pm.run()) is True
     assert ran == list(steps)
+
+
+def _renamable(guild, name):
+    edits = []
+
+    async def edit(**kw):
+        edits.append(kw)
+    ch = NS(id=800 + len(guild.text_channels), name=name, category_id=None, overwrites={}, edit=edit)
+    guild.text_channels.append(ch)
+    return edits
+
+
+def _was_spec():
+    return _spec("⛏️・monkey-smp")  # its old name slugs differently, so it really is a rename
+
+
+def test_renamed_channels_gives_an_old_name_its_layout_name():
+    guild = FakeGuild()
+    spec = _was_spec()
+    edits = _renamable(guild, spec["was"][0])
+    asyncio.run(public_mode.PublicMode(guild, apply=True).renamed_channels())
+    assert edits == [{"name": spec["name"], "reason": "Public server: renamed"}]
+
+
+def test_renamed_channels_dry_run_and_current_name_change_nothing(capsys):
+    guild = FakeGuild()
+    spec = _was_spec()
+    old = _renamable(guild, spec["was"][0])
+    asyncio.run(public_mode.PublicMode(guild, apply=False).renamed_channels())
+    assert old == [] and f"-> #{spec['name']}" in capsys.readouterr().out
+    current = _renamable(guild, spec["name"])  # the layout name exists: the old one is left alone
+    asyncio.run(public_mode.PublicMode(guild, apply=True).renamed_channels())
+    assert old == [] and current == []
+
+
+def test_monkey_smp_channel_keeps_its_old_name_for_the_rename():
+    spec = _spec("⛏️・monkey-smp")
+    assert spec["was"] == ["⛏️・realms"]
 
 
 def _read_only_channel(guild, name, allowed):
@@ -634,7 +672,7 @@ def test_setup_creates_the_stage_as_a_stage_and_forums_with_their_settings():
 # ------------------------------------------------------------ wave 9: everything new, on a server that has none of it
 
 WAVE9_ROLES = ("House Fern", "House Kestrel", "House Otter", "Welcome Crew", "Supporter")
-WAVE9_PUBLIC = {"📚・guides": "forum", "🖥・setups": "forum", "🎙・stage": "stage", "⛏️・realms": "text"}
+WAVE9_PUBLIC = {"📚・guides": "forum", "🖥・setups": "forum", "🎙・stage": "stage", "⛏️・monkey-smp": "text"}
 WAVE9_PRIVATE = {"💜・supporters": {"Supporter", "Keeper", "Moderator"}, "🔒・appeals": {"Keeper", "Moderator"}}
 
 
@@ -672,7 +710,7 @@ def test_public_mode_dry_run_lists_everything_wave9_adds_and_changes_nothing(cap
     assert "create  #📚・guides (forum) in 03 · games" in out
     assert "create  #🖥・setups (forum) in " in out
     assert "create  🎙・stage (stage) in 05 · voice" in out
-    assert "create  #⛏️・realms in 03 · games" in out
+    assert "create  #⛏️・monkey-smp in 03 · games" in out
     assert "create  #💜・supporters (private)" in out
     assert "create  #🔒・appeals (private)" in out
 
@@ -736,7 +774,7 @@ def test_onboarding_defaults_are_ordinary_public_channels_only():
         assert kind in ("text", "forum", "voice") and not private, name
     everything = {slug(n) for n in layout.ONBOARDING_EVERYTHING}
     assert {slug(n) for n in layout.ONBOARDING_DEFAULT_CHANNELS} <= everything
-    assert {slug(n) for n in ("📚・guides", "🖥・setups", "⛏️・realms")} <= everything
+    assert {slug(n) for n in ("📚・guides", "🖥・setups", "⛏️・monkey-smp")} <= everything
     assert not everything & {slug(n) for n in ("🎙・stage", "💜・supporters", "🔒・appeals", "📋・mod-log")}
 
 
@@ -746,7 +784,7 @@ def test_onboarding_step_adds_forums_but_never_the_stage_or_a_private_channel(ca
     monkeypatch.setattr(layout, "ONBOARDING_DEFAULT_CHANNELS", layout.ONBOARDING_EVERYTHING)
     guild = _wave9_guild()
     existing = NS(id=500, name="💬・general")
-    guild.text_channels += [existing, NS(id=501, name="⛏️・realms"), NS(id=502, name="💜・supporters"),
+    guild.text_channels += [existing, NS(id=501, name="⛏️・monkey-smp"), NS(id=502, name="💜・supporters"),
                             NS(id=503, name="🔒・appeals")]
     guild.forums += [NS(id=510, name="📚・guides"), NS(id=511, name="🖥・setups")]
     guild.stage_channels.append(NS(id=520, name="🎙・stage"))
@@ -764,5 +802,5 @@ def test_onboarding_step_adds_forums_but_never_the_stage_or_a_private_channel(ca
     asyncio.run(public_mode.PublicMode(guild, apply=True).onboarding())
     (edit,) = edits
     names = [c.name for c in edit["default_channels"]]
-    assert names == ["💬・general", "📚・guides", "🖥・setups", "⛏️・realms"]  # the existing ones first, kept
+    assert names == ["💬・general", "📚・guides", "🖥・setups", "⛏️・monkey-smp"]  # the existing ones first, kept
     assert "🎙・stage" not in capsys.readouterr().out
