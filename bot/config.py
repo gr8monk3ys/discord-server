@@ -17,6 +17,16 @@ sys.path.insert(0, str(SERVER_DIR))
 import layout  # noqa: E402
 from names import slug  # noqa: E402
 
+
+def layout_old_names(name: str) -> tuple[str, ...]:
+    """The "was" names layout.py lists for a category or channel: what it is still called
+    until public_mode.py renames it in place."""
+    for cat in layout.CATEGORIES:
+        for spec in (cat, *cat["channels"]):
+            if spec["name"] == name:
+                return tuple(spec.get("was", ()))
+    return ()
+
 # Channel and role names, as they appear in layout.py.
 LFG_FORUM = "🎮・lfg"
 LFG_ROLE = "LFG"
@@ -81,8 +91,8 @@ SETUPS_FORUM = "🖥・setups"
 STAGE_CHANNEL = "🎙・stage"  # watch parties, the monthly Town Hall
 # Monkey SMP (Minecraft bridge): status panel and two-way chat live in this channel.
 REALMS_CHANNEL = "⛏️・monkey-smp"
-# Its old name: until public_mode.py renames the channel in place, the bridge keeps using it.
-REALMS_CHANNEL_WAS = ("⛏️・realms",)
+# Its old names: until public_mode.py renames the channel in place, the bridge keeps using it.
+REALMS_CHANNEL_WAS = layout_old_names(REALMS_CHANNEL)
 REALMS_ENV = ("REALMS_ADDRESS", "REALMS_RCON_HOST", "REALMS_RCON_PORT", "REALMS_RCON_PASSWORD", "REALMS_LOG_PATH")
 
 
@@ -122,6 +132,11 @@ def match_by_name(items, name: str):
     """First item whose .name matches `name`, ignoring emoji, case and separators."""
     target = slug(name)
     return next((i for i in items if slug(i.name) == target), None)
+
+
+def match_by_names(items, names):
+    """match_by_name for each name in turn: the first name that matches wins."""
+    return next((found for name in names if (found := match_by_name(items, name)) is not None), None)
 
 
 @dataclass(frozen=True)

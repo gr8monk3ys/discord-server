@@ -131,6 +131,9 @@ All notable changes to this project are recorded here. The format follows
 - The server description comes from the REST API. The gateway's copy of the server never
   carries it, so `/about` showed no description, `public_mode.py` rewrote it on every run
   and `server/snapshot/server.json` recorded it as `null`.
+- The permission self-check finds a channel under the old names its cog also uses, so it no
+  longer reports the Monkey SMP bridge's channel as missing while it is still called #realms.
+  The bridge's old names now come from the channel's `"was"` list in `server/layout.py`.
 
 ## [1.0.0] - 2026-10-11
 

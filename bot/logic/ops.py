@@ -306,6 +306,7 @@ class Need:
     channel: str  # as in config.py
     perms: tuple[str, ...]
     kind: str = "text"  # text | forum | voice | category | stage
+    was: tuple[str, ...] = ()  # old names the cog also finds the channel under (config.*_WAS)
 
 
 @dataclass(frozen=True)
@@ -403,7 +404,8 @@ CHANNEL_NEEDS: list[Need] = [
     Need("clipcast", config.CLIPS_CHANNEL, POST + ("read_message_history",)),  # consent fallback, "as seen on"
     Need("clipcast", config.MOD_LOG_CHANNEL, POST),  # picks, upload notes, takedown alerts
     # status panel (edited in place, pinned: Pin Messages) and the chat relay; reactions say "not relayed"
-    Need("realms", config.REALMS_CHANNEL, POST + ("read_message_history", "add_reactions", "pin_messages")),
+    Need("realms", config.REALMS_CHANNEL, POST + ("read_message_history", "add_reactions", "pin_messages"),
+         was=config.REALMS_CHANNEL_WAS),
     Need("realms", config.MOD_LOG_CHANNEL, POST),  # whitelist changes
     # appeals: delete the raw webhook message, read missed ones after downtime, open a discussion thread
     Need("appeals", config.APPEALS_CHANNEL, POST + ("manage_messages", "read_message_history",

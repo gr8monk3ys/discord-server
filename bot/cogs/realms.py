@@ -330,11 +330,7 @@ class Realms(commands.Cog):
         guild = self.guild()
         if guild is None:
             return None
-        for name in (config.REALMS_CHANNEL, *config.REALMS_CHANNEL_WAS):
-            found = config.match_by_name(guild.text_channels, name)
-            if found is not None:
-                return found
-        return None
+        return config.match_by_names(guild.text_channels, (config.REALMS_CHANNEL, *config.REALMS_CHANNEL_WAS))
 
     def once(self, key: str, level: int, text: str, *args) -> None:
         """Log a condition when it starts, not every time it is seen again."""

@@ -412,7 +412,7 @@ class Ops(commands.Cog):
         for need in O.CHANNEL_NEEDS:
             if need.channel in channels or need.cog not in loaded:
                 continue
-            channel = config.match_by_name(getattr(guild, POOLS[need.kind], []), need.channel)
+            channel = config.match_by_names(getattr(guild, POOLS[need.kind], []), (need.channel, *need.was))
             channels[need.channel] = (None if channel is None
                                       else granted(channel.permissions_for(me)))
         positions = {}
