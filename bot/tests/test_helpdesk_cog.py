@@ -106,13 +106,14 @@ class FakeQuests:
 
 
 class FakeBot:
-    def __init__(self, guild, tree=None, quests=None, counts=None):
+    def __init__(self, guild, tree=None, quests=None, counts=None, fetched_description=None):
         self.guild = guild
         self.tree = tree or FakeTree(tree_commands())
         self.settings = SimpleNamespace(guild_id=GUILD_ID, tz=TZ)
         self.guild_ref = discord.Object(id=GUILD_ID)
         self.quests = quests
         self.counts = counts
+        self.fetched_description = fetched_description
         self.presences = []
 
     def get_guild(self, gid):
@@ -127,7 +128,8 @@ class FakeBot:
     async def fetch_guild(self, gid, with_counts=False):
         if self.counts is None:
             raise discord.HTTPException(SimpleNamespace(status=500, reason="x"), "down")
-        return SimpleNamespace(approximate_member_count=self.counts[0], approximate_presence_count=self.counts[1])
+        return SimpleNamespace(approximate_member_count=self.counts[0], approximate_presence_count=self.counts[1],
+                               description=self.fetched_description)
 
 
 class FakeResponse:
@@ -361,6 +363,17 @@ def test_about_uses_fetched_counts(monkeypatch):
         assert f["Around for"].startswith("1 year, 7 days (since <t:")
         assert H.SITE_URL in f["Links"] and H.INVITE_URL in f["Links"]
         assert [i.url for i in kw["view"].children] == [H.SITE_URL, H.INVITE_URL]
+    run(go())
+
+
+def test_about_takes_the_description_from_the_fetch():
+    # The live gateway cache has no description; only the REST fetch carries it.
+    async def go():
+        guild, bot, cog = env(counts=(400, 123), fetched_description="From REST")
+        guild.description = None
+        inter = FakeInteraction(user(), guild)
+        await cog.about.callback(cog, inter)
+        assert inter.sent()[0]["embed"].description == "From REST"
     run(go())
 
 

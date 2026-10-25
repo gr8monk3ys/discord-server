@@ -805,6 +805,8 @@ def main():
             if guild is None:
                 print(f"Front Desk isn't in server {guild_id}.")
                 return
+            # The gateway's copy of the server leaves the description out (always None); REST has it.
+            guild.description = (await client.fetch_guild(guild.id)).description
             result["ok"] = await PublicMode(guild, args.apply).run()
         except discord.HTTPException as e:
             print(f"\nDiscord refused a change: {e}")

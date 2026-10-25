@@ -206,10 +206,12 @@ class Helpdesk(commands.Cog):
         guild = interaction.guild
         members = guild.member_count or len(guild.members)
         online = None
+        description = guild.description  # the gateway leaves it out, so the fetch below fills it in
         try:
             full = await self.bot.fetch_guild(guild.id, with_counts=True)
             members = full.approximate_member_count or members
             online = full.approximate_presence_count
+            description = full.description or description
         except (discord.HTTPException, AttributeError):
             log.warning("helpdesk: couldn't fetch member counts; using the cache", exc_info=True)
         if online is None:
@@ -220,7 +222,7 @@ class Helpdesk(commands.Cog):
         ts = int(created.timestamp())
         text = len(guild.text_channels) + len(getattr(guild, "forums", []))
         voice = len(guild.voice_channels) + len(getattr(guild, "stage_channels", []))
-        e = style.embed(title=guild.name, description=guild.description or None, footer=style.label("about"))
+        e = style.embed(title=guild.name, description=description or None, footer=style.label("about"))
         if guild.icon:
             e.set_thumbnail(url=guild.icon.url)
         e.add_field(name="Members", value=f"{members:,}", inline=True)

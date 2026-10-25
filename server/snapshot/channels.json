@@ -389,7 +389,7 @@
         },
         {
           "bitrate": 64000,
-          "name": "🟢 Online: 4",
+          "name": "🟢 Online: 7",
           "nsfw": false,
           "overwrites": {
             "member:Front Desk": {
@@ -831,7 +831,7 @@
           "type": "text"
         },
         {
-          "name": "⛏️・realms",
+          "name": "⛏️・monkey-smp",
           "nsfw": true,
           "overwrites": {},
           "slowmode": 2,
