@@ -144,6 +144,8 @@ def main():
             if guild is None:
                 print(f"The bot isn't in server {guild_id}.")
                 return
+            # The gateway's copy of the server leaves the description out (always None); REST has it.
+            guild.description = (await client.fetch_guild(guild.id)).description
             print(f"Snapshot of {guild.name}")
             files = await snapshot(guild)
             result["ok"] = write(files, token)

@@ -128,6 +128,9 @@ All notable changes to this project are recorded here. The format follows
   longer stops the expiry from running.
 - The monthly auto tournament (`tournaments`) waits for a missing tournaments channel instead
   of skipping the month, until it is too late to open sign-ups.
+- The server description comes from the REST API. The gateway's copy of the server never
+  carries it, so `/about` showed no description, `public_mode.py` rewrote it on every run
+  and `server/snapshot/server.json` recorded it as `null`.
 
 ## [1.0.0] - 2026-10-11
 
