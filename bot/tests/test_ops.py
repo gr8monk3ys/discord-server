@@ -359,7 +359,7 @@ def test_requirements_tables_cover_config():
     assert roles >= set(config.PLATFORM_ROLES) | set(config.REGION_ROLES) | set(config.PLAYTIME_ROLES)
     assert roles >= {config.HYPE_ROLE, config.SEASON_ROLE, config.BIRTHDAY_ROLE, config.COUNTING_ROLE,
                      config.CLIP_ROLE, config.TOURNEY_ROLE, config.RECRUITER_ROLE, config.BUMPER_ROLE,
-                     config.GAMENIGHT_ROLE, config.LFG_ROLE}
+                     config.GAMENIGHT_ROLE, config.LFG_ROLE, config.SMP_PING_ROLE}
     assert config.MOD_ROLE not in roles and config.KEEPER_ROLE not in roles  # above the bot by design
     # wave 9: the Wrapped card is an image in announcements; houses post there and hand out three roles
     announce = {n.cog: set(n.perms) for n in ops.CHANNEL_NEEDS if n.channel == config.ANNOUNCEMENTS_CHANNEL}

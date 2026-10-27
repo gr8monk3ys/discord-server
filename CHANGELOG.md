@@ -53,6 +53,11 @@ All notable changes to this project are recorded here. The format follows
 - `tonight` module: one line in general while two or more people are in a public voice
   channel (counts, the shared game and a channel mention, never names), edited in place and
   kept as a record afterwards. `TONIGHT=off` turns it off.
+- `smpwatch` module: one line in the Monkey SMP channel when 3 or more players are on,
+  mentioning a new opt-in SMP Ping role (on the 🎭・roles panel; `server/public_mode.py --apply`
+  creates it). A status ping of the public address every 5 minutes; after a ping, nothing until
+  the count has dropped and 4 hours have passed, and nothing from 22:00 to 09:00.
+  `SMP_WATCH=off` turns it off.
 - A "Newcomers" field in the Monday owner digest (`bot/logic/funnel.py`): for the week and the
   last 28 days, how many joined, left since, picked roles, said something and joined voice; of
   the week before's joiners, how many are still here and how many came back in week 2; and one
