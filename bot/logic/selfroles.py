@@ -50,8 +50,9 @@ def sections(games=None) -> list[Section]:
         Section("region", "Region", tuple(config.REGION_ROLES), single=True,
                 hint="Where you are. One at a time."),
         Section("playtime", "Play time", tuple(config.PLAYTIME_ROLES), hint="When you're usually on."),
-        Section("pings", "Pings", (config.GAMENIGHT_ROLE, config.LFG_ROLE, config.BUMPER_ROLE),
-                hint="Opt-in pings: game nights, squads, Disboard bumps."),
+        Section("pings", "Pings", (config.GAMENIGHT_ROLE, config.LFG_ROLE, config.BUMPER_ROLE,
+                                   config.SMP_PING_ROLE),
+                hint="Opt-in pings: game nights, squads, Disboard bumps, people on Monkey SMP."),
         Section("games", "Games", tuple(games[:SELECT_MAX]), select=True,
                 hint="Pick games to add or remove: you get their pings and channels."),
     ]

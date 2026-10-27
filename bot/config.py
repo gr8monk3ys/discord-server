@@ -94,6 +94,8 @@ REALMS_CHANNEL = "⛏️・monkey-smp"
 # Its old names: until public_mode.py renames the channel in place, the bridge keeps using it.
 REALMS_CHANNEL_WAS = layout_old_names(REALMS_CHANNEL)
 REALMS_ENV = ("REALMS_ADDRESS", "REALMS_RCON_HOST", "REALMS_RCON_PORT", "REALMS_RCON_PASSWORD", "REALMS_LOG_PATH")
+# SMP watch (cogs/smpwatch.py): opt-in, pinged in the realms channel when 3+ are on Monkey SMP.
+SMP_PING_ROLE = "SMP Ping"
 
 
 @dataclass(frozen=True)

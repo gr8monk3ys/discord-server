@@ -36,7 +36,8 @@ looked up by name at run time, never by a stored ID.
    `YOUTUBE_CLIENT_SECRET`, `YOUTUBE_REFRESH_TOKEN`, `YOUTUBE_PRIVACY` (clipcast),
    `REALMS_ADDRESS`, `REALMS_RCON_HOST`, `REALMS_RCON_PORT`, `REALMS_RCON_PASSWORD`,
    `REALMS_LOG_PATH` (realms), `SITE_DATA` (sitedata), `TONIGHT` (tonight; `off` stops the
-   voice line, anything else or unset leaves it on), `QUIET` (`bot/quietgate.py`; `off` posts
+   voice line, anything else or unset leaves it on), `SMP_WATCH`, `SMP_WATCH_ADDRESS`, `SMP_WATCH_MIN`
+   (smpwatch; `off` stops the Monkey SMP ping), `QUIET` (`bot/quietgate.py`; `off` posts
    every question and poll whether or not anyone answers, anything else or unset leaves the
    quiet rule on), and `APPEAL_SECRET`,
    `APPEAL_COOLING_DAYS`, `APPEAL_REAPPEAL_DAYS`, `SITE_URL` (appeals, and `/ban`'s DM).
@@ -157,6 +158,7 @@ jobs below). Times are local (Pacific unless `TZ` is set). Loops without a wall-
 | `sitedata` | aggregates file for the landing page, staff `/sitedata refresh` | none (writes `bot/data/site/stats.json`) | 1 min tick, rebuilds every 30 min | none |
 | `appeals` | ban appeals from the website: review cards with Accept/Deny, discussion threads, staff `/appeals list/code` | `appeals` | 5 min tick: re-reads the channel for webhook posts missed while down; expiry daily 09:00 (30 days untouched; answers blanked 180 days after a decision) | 🔒・appeals, 📋・mod-log |
 | `tonight` | one line in general while 2+ non-bot members are in a public voice channel (everyone can view and join; not AFK, not the staff category): counts, the shared game, a channel mention; edited in place, past tense when the rooms empty, never deleted. No commands, no coins | none (`meta` only: `tonight:state`, one JSON value with no member data, and `tonight:fired_at`) | 1 min tick: line after a room has held 3 min, edits at most every 2 min, same message reused for 45 min after a session ends, at most 3 new messages a local day; `TONIGHT=off` runs no tick and closes a standing "right now" line once | 💬・general |
+| `smpwatch` | one line mentioning SMP Ping in the realms channel when 3+ are on Monkey SMP: a Server List Ping (the `realms` codec) of the public address, found through its SRV record by a minimal UDP DNS client in `logic/smpwatch.py`; reads the count only, no RCON, no names. No commands, no coins | none (`meta` only: `smpwatch:state`, when the last ping went out and whether the next may go) | 5 min tick; SRV answer cached 1 h; after a ping, none until the count drops below the minimum and 4 h pass; none 22:00 to 09:00 local; `SMP_WATCH=off` runs no tick | ⛏️・monkey-smp; SMP Ping |
 
 Four of the `logic/` modules have no cog of their own: `linkedroles.py` validates
 `site/api/linked-role/metadata.json` and plans the registration diff for
@@ -388,7 +390,7 @@ SQLite at `bot/data/front_desk.db` (gitignored). `MIGRATIONS` in `bot/db.py` is 
 | Monkey SMP | `realms_links` (state: add, ok, remove; unique index "one name per member"), `realms_playtime` (seconds per member per local day); `realms_links.managed` (1 = the bot added the name or staff adopted it; only such a name is ever sent `whitelist remove`) | 20; 22 |
 | Ban appeals | `appeals` (unique index "one open appeal per user"), `appeal_bans` (when a ban happened; written by `moderation`) | 21 |
 
-Wrapped, sitedata, Linked Roles, focus and tonight add no tables. Wrapped keeps its share cooldown and the
+Wrapped, sitedata, Linked Roles, focus, tonight and smpwatch add no tables. Wrapped keeps its share cooldown and the
 January level snapshot in `meta` (`wrapped:shared:YEAR:USER`, `wrapped:levels:YEAR`). Quiet
 rooms and the digest's Newcomers field add none either: quiet rooms keeps one `meta` value per
 prompt kind (`quiet:<kind>`), and the Newcomers field stores nothing.

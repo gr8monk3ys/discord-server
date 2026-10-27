@@ -407,6 +407,7 @@ CHANNEL_NEEDS: list[Need] = [
     Need("realms", config.REALMS_CHANNEL, POST + ("read_message_history", "add_reactions", "pin_messages"),
          was=config.REALMS_CHANNEL_WAS),
     Need("realms", config.MOD_LOG_CHANNEL, POST),  # whitelist changes
+    Need("smpwatch", config.REALMS_CHANNEL, POST, was=config.REALMS_CHANNEL_WAS),  # the SMP Ping line
     # appeals: delete the raw webhook message, read missed ones after downtime, open a discussion thread
     Need("appeals", config.APPEALS_CHANNEL, POST + ("manage_messages", "read_message_history",
                                                     "create_public_threads", "send_messages_in_threads")),
@@ -455,7 +456,7 @@ ROLE_NEEDS: list[tuple[str, str]] = [
     *((name, "levels") for _, name in config.LEVEL_ROLES),
     *((name, "selfroles") for name in (*config.PLATFORM_ROLES, *config.REGION_ROLES, *config.PLAYTIME_ROLES,
                                        config.GAMENIGHT_ROLE, config.LFG_ROLE, config.BUMPER_ROLE,
-                                       *(g.role for g in config.GAMES))),
+                                       config.SMP_PING_ROLE, *(g.role for g in config.GAMES))),
     (config.BUMPER_ROLE, "growth"),
     (config.RECRUITER_ROLE, "growth"),
     (config.CLIP_ROLE, "clips"),

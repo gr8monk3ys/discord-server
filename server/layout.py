@@ -80,6 +80,7 @@ ROLES = [
     {"name": "Recruiter"},  # 3+ people you invited stayed
     {"name": "Bumper", "mentionable": True},  # opt-in: /bumpping on
     {"name": "Game Night", "mentionable": True},  # opt-in: pinged when a game night starts
+    {"name": "SMP Ping", "mentionable": True},  # opt-in: pinged when 3+ are on Monkey SMP
     # Level rewards (Front Desk, from XP).
     {"name": "Mythic"}, {"name": "Legend"}, {"name": "Elite"}, {"name": "Veteran"}, {"name": "Regular"},
     # Self-assign: platform, region, play time (#roles panel and Onboarding).
