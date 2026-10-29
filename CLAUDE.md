@@ -16,7 +16,9 @@ anything from `bot/data/` (the SQLite DB, logs and lock file live there and are 
   `public_mode.py` (later changes; adds what is missing and never deletes, but for games in
   `layout.RETIRED_GAMES` it drops their options from the "What do you play?" question, in
   `game_options` when that step adds a new game and otherwise in `retire_games`, and
-  `retire_games` moves their channels into the staff-only `99 · archive` category),
+  `retire_games` moves their channels into the staff-only `99 · archive` category; it renames
+  categories by their "was" names, makes a missing public category after the one before it, and
+  `moved_channels` moves a layout channel sitting in another layout category into its own),
   `focus_mode.py` (Onboarding only: cuts the default channels to the core in
   `ONBOARDING_DEFAULT_CHANNELS` and adds one opt-in question; `--plan`, `--revert`),
   `expressions.py` (emoji and soundboard upload),

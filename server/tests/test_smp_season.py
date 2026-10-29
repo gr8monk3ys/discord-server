@@ -1,7 +1,7 @@
-"""The Monkey SMP season channels (layout.py) and how public_mode.py adds them: the channels
-themselves, the founding roster's slow mode and no-threads permissions, and the Minecraft answer
-in "What do you play?" that opens them, and the pinned roster, rules and FAQ posts. Fake guilds
-only, no Discord."""
+"""The Monkey SMP channels (layout.py) and how public_mode.py adds them: their own category after
+the games, the channels themselves, the founding roster's slow mode and no-threads permissions, the
+Minecraft answer in "What do you play?" that opens them, and the pinned roster, rules, FAQ and
+commands posts. Fake guilds only, no Discord."""
 
 import asyncio
 import re
@@ -17,8 +17,9 @@ from test_games import old_server
 from test_server_scripts import NS, _wave9_guild, _wave9_steps
 
 ROSTER, FORUM, RULES, FAQ = "📝・founding-roster", "🚩・smp-forum", "📜・smp-rules", "❔・smp-faq"
-SMP = "⛏️・monkey-smp"
-OPENED_BY_MINECRAFT = [SMP, ROSTER, FORUM, RULES]
+SMP, CMDS = "⛏️・monkey-smp", "⌨️・smp-commands"
+SMP_CHANNELS = [RULES, FAQ, CMDS, SMP, ROSTER, FORUM]  # the category's order: read first, then talk
+OPENED_BY_MINECRAFT = [SMP, ROSTER, FORUM, RULES, CMDS]
 DISCORD_MAX_SLOWMODE = 21600
 MAX_TAG_NAME = 20
 
@@ -27,7 +28,7 @@ def spec(name):
     return next(s for c in layout.CATEGORIES for s in c["channels"] if s["name"] == name)
 
 
-def games_category():
+def smp_category():
     return next(c for c in layout.CATEGORIES if any(s["name"] == SMP for s in c["channels"]))
 
 
@@ -37,14 +38,19 @@ def minecraft_option():
 
 
 # ---------------------------------------------------------------- the layout
-def test_the_season_channels_sit_right_after_monkey_smp_and_are_public():
-    cat = games_category()
-    names = [s["name"] for s in cat["channels"]]
-    at = names.index(SMP)
-    assert names[at + 1:at + 5] == [ROSTER, RULES, FAQ, FORUM]
+def test_monkey_smp_has_its_own_public_category_right_after_the_games():
+    cat = smp_category()
+    assert cat["name"] == "04 · monkey smp"
+    assert [s["name"] for s in cat["channels"]] == SMP_CHANNELS
+    names = [c["name"] for c in layout.CATEGORIES]
+    games = next(c for c in layout.CATEGORIES if any(s["name"] == "⛏️・minecraft" for s in c["channels"]))
+    assert names.index(cat["name"]) == names.index(games["name"]) + 1
     assert not cat.get("private_to")
-    for name in (ROSTER, RULES, FAQ, FORUM):
+    for name in SMP_CHANNELS:
         assert not spec(name).get("private_to"), name
+    # Nothing else in the layout is about the SMP, so nobody has to look for it elsewhere.
+    elsewhere = [s["name"] for c in layout.CATEGORIES if c is not cat for s in c["channels"]]
+    assert not [n for n in elsewhere if "smp" in slug(n)]
     assert len({slug(n) for c in layout.CATEGORIES for n in (s["name"] for s in c["channels"])}) == \
         sum(len(c["channels"]) for c in layout.CATEGORIES)  # no slug is used twice
 
@@ -57,15 +63,16 @@ def test_founding_roster_everyone_posts_six_hour_slow_mode_no_threads():
     assert roster["no_threads"] is True
 
 
-def test_rules_and_faq_are_read_only_and_the_forum_is_a_forum():
-    assert spec(RULES)["read_only"] and spec(FAQ)["read_only"]
+def test_rules_faq_and_commands_are_read_only_and_the_forum_is_a_forum():
+    assert spec(RULES)["read_only"] and spec(FAQ)["read_only"] and spec(CMDS)["read_only"]
     forum = spec(FORUM)
     assert forum["type"] == "forum" and not forum.get("read_only")
     tags = forum["tags"]
     assert "Faction" in {n for n, _ in tags} and "Looking for faction" in {n for n, _ in tags}
     assert all(0 < len(n) <= MAX_TAG_NAME for n, _ in tags)
     assert len(tags) <= public_mode.MAX_FORUM_TAGS
-    for text in (spec(ROSTER)["topic"], spec(RULES)["topic"], spec(FAQ)["topic"], forum["topic"]):
+    for text in (spec(ROSTER)["topic"], spec(RULES)["topic"], spec(FAQ)["topic"], spec(CMDS)["topic"],
+                 forum["topic"]):
         assert len(text) <= 1024  # Discord's limit for a channel topic
 
 
@@ -98,7 +105,7 @@ def test_dry_run_lists_the_season_channels_and_changes_nothing(capsys):
     asyncio.run(_wave9_steps(public_mode.PublicMode(guild, apply=False)))
     assert guild.calls == []
     out = capsys.readouterr().out
-    cat = games_category()["name"]
+    cat = smp_category()["name"]
     assert f"create  #{ROSTER} in {cat} (no threads, slow mode 21600 s)" in out
     assert f"create  #{RULES} in {cat} (read-only)" in out
     assert f"create  #{FAQ} in {cat} (read-only)" in out
@@ -138,7 +145,7 @@ def test_a_hand_made_roster_is_never_edited_only_reported(capsys):
 
     async def edit(**kw):
         edits.append(kw)
-    cat = next(c for c in guild.categories if c.name == games_category()["name"])
+    cat = next(c for c in guild.categories if c.name == smp_category()["name"])
     guild.text_channels.append(NS(id=600, name="founding-roster", category_id=cat.id, slowmode_delay=0, edit=edit,
                                   overwrites_for=lambda target: discord.PermissionOverwrite()))
     asyncio.run(public_mode.PublicMode(guild, apply=True).new_channels())
@@ -241,7 +248,7 @@ def test_polish_server_first_build_gives_the_minecraft_answer_every_channel():
 
 
 # ---------------------------------------------------------------- the pinned posts
-SEASON_POSTS = {ROSTER: "founding-roster", RULES: "smp-rules", FAQ: "smp-faq"}
+SEASON_POSTS = {ROSTER: "founding-roster", RULES: "smp-rules", FAQ: "smp-faq", CMDS: "smp-commands"}
 LONGEST_MENTION = len("<#12345678901234567890>")  # a channel or role mention once expand() fills it in
 DATE_OR_TIME = re.compile(
     r"\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*day\b|\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\b"
@@ -350,3 +357,110 @@ def test_public_mode_posts_and_pins_each_season_post_once(capsys):
     for name, key in SEASON_POSTS.items():
         assert len(sent[name]) == 1, name
         assert f"ok      {key} (posted and pinned)" in out
+
+
+# ---------------------------------------------------------------- public_mode: the Monkey SMP category
+OLD_CATEGORIES = ["01 · front desk", "02 · the lobby", "03 · games", "04 · off topic", "05 · voice", "00 · staff",
+                  "06 · squad"]
+
+
+def _before_the_category():
+    """The server before 04 · monkey smp: the old category names, the SMP channels at the end of 03 · games
+    and no #smp-commands. Categories and channels record their edits and moves, as Discord would apply them."""
+    from test_server_scripts import FakeGuild
+    guild = FakeGuild()
+    guild.name = "test"
+    guild.me.guild_permissions = discord.Permissions.all()
+    guild.moves = []
+    everyone = discord.PermissionOverwrite(attach_files=False)
+
+    def place(obj):
+        async def edit(**kw):
+            guild.moves.append(("edit", obj.name, kw))
+            obj.name = kw.get("name", obj.name)
+
+        async def move(**kw):
+            guild.moves.append(("move", obj.name, kw))
+            if "category" in kw:
+                obj.category_id = kw["category"].id
+        obj.edit, obj.move, obj._sorting_bucket = edit, move, 0
+        obj.permissions_for = lambda me: discord.Permissions.all()
+        obj.overwrites_for = lambda target: discord.PermissionOverwrite(create_public_threads=False,
+                                                                       create_private_threads=False)
+        return obj
+
+    make = guild._make
+
+    def made(kind, name, **kw):
+        obj = place(make(kind, name, **kw))
+        lists = {"category": guild.categories, "forum": guild.forums, "voice": guild.voice_channels,
+                 "stage": guild.stage_channels}
+        lists.get(kind, guild.text_channels).append(obj)
+        return obj
+    guild._make = made
+    for i, name in enumerate(OLD_CATEGORIES):
+        overwrites = {guild.default_role: everyone} if name == "03 · games" else {}
+        guild.categories.append(place(NS(id=10 + i, name=name, overwrites=overwrites, category_id=None)))
+    games = guild.categories[2]
+    for name in (SMP, ROSTER, RULES, FAQ):
+        guild.text_channels.append(place(NS(id=len(guild.channels) + 50, name=name, category_id=games.id,
+                                            slowmode_delay=spec(name).get("slowmode", 0))))
+    guild.forums.append(place(NS(id=90, name=FORUM, category_id=games.id)))
+    guild.calls.clear()
+    return guild, games
+
+
+async def _category_steps(pm):
+    await pm.categories()
+    await pm.new_channels()
+    await pm.moved_channels()
+
+
+def test_dry_run_plans_the_category_and_the_moves_and_changes_nothing(capsys):
+    guild, _ = _before_the_category()
+    asyncio.run(_category_steps(public_mode.PublicMode(guild, apply=False)))
+    assert guild.calls == [] and guild.moves == []
+    out = capsys.readouterr().out
+    for old, new in [("04 · off topic", "05 · off topic"), ("05 · voice", "06 · voice"), ("06 · squad", "07 · squad")]:
+        assert f"rename  category {old} -> {new}\n" in out
+    assert "create  category 04 · monkey smp after 03 · games, with its permissions" in out
+    assert f"create  #{CMDS} in 04 · monkey smp (read-only)" in out
+    strays = ", ".join(f"#{n}" for n in SMP_CHANNELS if n != CMDS)
+    assert f"move    {strays} into 04 · monkey smp (permissions kept), then its channels in layout order" in out
+
+
+def test_apply_makes_the_category_after_games_and_moves_the_channels_in_layout_order(capsys):
+    guild, games = _before_the_category()
+    pm = public_mode.PublicMode(guild, apply=True)
+    pm.SETTLE = 0
+    asyncio.run(_category_steps(pm))
+    [(name, kw)] = [(n, kw) for kind, n, kw in guild.calls if kind == "category"]
+    assert name == "04 · monkey smp" and kw["overwrites"] == games.overwrites  # the games category's permissions
+    cat = next(c for c in guild.categories if c.name == name)
+    assert ("move", name, {"after": games}) in guild.moves
+    assert [c.name for c in guild.categories if c is not cat] == [
+        "01 · front desk", "02 · the lobby", "03 · games", "05 · off topic", "06 · voice", "00 · staff", "07 · squad"]
+    [(_, cmd_kw)] = [(n, kw) for kind, n, kw in guild.calls if n == CMDS]
+    assert cmd_kw["category"] is cat
+    moves = [(n, kw) for what, n, kw in guild.moves if what == "move" and "category" in kw]
+    assert [n for n, _ in moves] == SMP_CHANNELS
+    assert all(kw["category"] is cat and kw["sync_permissions"] is False for _, kw in moves)
+    assert moves[0][1]["beginning"] is True
+    assert [kw["after"].name for _, kw in moves[1:]] == SMP_CHANNELS[:-1]
+    # A second run finds everything in place.
+    guild.calls.clear(), guild.moves.clear()
+    capsys.readouterr()
+    asyncio.run(_category_steps(public_mode.PublicMode(guild, apply=True)))
+    assert not [c for c in guild.calls if c[0] == "category" or c[1] in SMP_CHANNELS] and guild.moves == []
+    assert "ok      every layout channel is in its layout category" in capsys.readouterr().out
+
+
+def test_a_channel_in_a_category_the_layout_does_not_list_stays_put(capsys):
+    guild, games = _before_the_category()
+    hand_made = NS(id=99, name="old stuff", overwrites={}, category_id=None)
+    guild.categories.append(hand_made)
+    next(c for c in guild.text_channels if c.name == FAQ).category_id = hand_made.id
+    asyncio.run(_category_steps(public_mode.PublicMode(guild, apply=False)))
+    out = capsys.readouterr().out
+    strays = ", ".join(f"#{n}" for n in SMP_CHANNELS if n not in (CMDS, FAQ))
+    assert f"move    {strays} into 04 · monkey smp" in out

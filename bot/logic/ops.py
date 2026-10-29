@@ -334,7 +334,8 @@ CHANNEL_NEEDS: list[Need] = [
     Need("starboard", config.HALL_OF_FAME_CHANNEL, POST + ("read_message_history",)),
     Need("clips", config.CLIPS_CHANNEL, POST + ("send_polls", "read_message_history")),
     Need("clips", config.MOD_CHANNEL, POST),
-    Need("tempvoice", config.VOICE_CATEGORY, VIEW + ("manage_channels", "move_members", "connect"), "category"),
+    Need("tempvoice", config.VOICE_CATEGORY, VIEW + ("manage_channels", "move_members", "connect"), "category",
+         was=config.VOICE_CATEGORY_WAS),
     Need("tempvoice", config.NEW_SQUAD_VOICE, VIEW + ("connect",), "voice"),
     Need("events", config.GAMING_CHANNEL, POST),
     Need("events", config.SQUAD_VOICE, VIEW + ("connect",), "voice"),  # voice events
@@ -377,7 +378,7 @@ CHANNEL_NEEDS: list[Need] = [
     Need("challenges", config.GAMES_CHANNEL, POST),
     Need("wordgame", config.GAMES_CHANNEL, POST),
     Need("matchmaking", config.GAMES_CHANNEL, POST),
-    Need("matchmaking", config.VOICE_CATEGORY, VIEW + ("manage_channels",), "category"),
+    Need("matchmaking", config.VOICE_CATEGORY, VIEW + ("manage_channels",), "category", was=config.VOICE_CATEGORY_WAS),
     *_game_channels("news"),
     Need("staffapps", config.MOD_LOG_CHANNEL, POST),
     Need("seasonal", config.GENERAL_CHANNEL, POST),  # drops

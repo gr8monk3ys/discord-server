@@ -217,7 +217,7 @@ class Matchmaking(commands.Cog):
     async def create_channel(self, guild, game: config.Game, size: int, members: list[int]):
         if guild is None:
             return None
-        category = config.match_by_name(guild.categories, config.VOICE_CATEGORY)
+        category = config.match_by_names(guild.categories, (config.VOICE_CATEGORY, *config.VOICE_CATEGORY_WAS))
         if category is None:
             log.warning("matchmaking: no %r category; match without a voice channel", config.VOICE_CATEGORY)
             return None

@@ -69,6 +69,18 @@ def no_thread_overwrites(guild, cat):
     return ow
 
 
+async def arrange_category(cat, members):
+    """Put channels into a category in the order given, keeping their own permissions."""
+    prev = {}
+    for ch in members:
+        bucket = ch._sorting_bucket  # text and forums sort together, voice apart
+        if bucket not in prev:
+            await ch.move(beginning=True, category=cat, sync_permissions=False)
+        else:
+            await ch.move(after=prev[bucket], category=cat, sync_permissions=False)
+        prev[bucket] = ch
+
+
 def private_overwrites(guild, role_names, known=None):
     """Hidden from @everyone, visible to the bot and the named roles ("private_to").
 
@@ -329,14 +341,7 @@ class Makeover:
             else:
                 await cat.move(after=prev_cat)
             prev_cat = cat
-            prev = {}
-            for ch in map(fresh, members):
-                bucket = ch._sorting_bucket  # text and forums sort together, voice apart
-                if bucket not in prev:
-                    await ch.move(beginning=True, category=cat, sync_permissions=False)
-                else:
-                    await ch.move(after=prev[bucket], category=cat, sync_permissions=False)
-                prev[bucket] = ch
+            await arrange_category(cat, [fresh(ch) for ch in members])
         print("  move    done")
 
     # ------------------------------------------------------------ server

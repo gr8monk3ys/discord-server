@@ -3,19 +3,27 @@
     python public_mode.py           # dry run: prints what would change
     python public_mode.py --apply   # do it
 
-Unlike setup_server.py this never reorders or deletes anything, so it works
+Unlike setup_server.py this never deletes anything or reorders roles, so it works
 with Front Desk sitting mid-stack (below Keeper/Moderator) and without
 Administrator. It needs Manage Roles, Manage Channels, Manage Server and
-Create Invite on Front Desk's role.
+Create Invite on Front Desk's role. The only channels it moves are the ones below:
+a layout channel sitting in another layout category, and retired games' channels.
 
 Steps, all driven by layout.py:
 - create the roles Front Desk hands out (Clip of the Week, Recruiter, Bumper, the house roles,
   Welcome Crew, Supporter, ...); new roles land at the bottom of the list and nothing is moved
+- rename a category still under one of its layout "was" names (name only; e.g. 04 · off topic
+  -> 05 · off topic), and create a public layout category that doesn't exist yet right after the
+  layout category before it, with that category's permissions (e.g. 04 · monkey smp after 03 · games)
 - rename a channel still under one of its layout "was" names to its layout name (name only;
   e.g. #realms -> #monkey-smp)
 - create any public layout channel that doesn't exist yet (never moves or edits existing ones):
   text channels with their topic, slow mode and read-only or no-threads permissions, forums with
   their tags, layout, sort order, default reaction and slowmode, and the Stage channel
+- moved_channels: a public layout channel that sits in a different layout category moves into
+  its own, keeping its permissions, and that category's channels are put in layout order (e.g. the
+  Monkey SMP channels out of 03 · games). A channel in a category the layout doesn't list (the
+  archive, or one made by hand) stays where it is
 - create private categories/channels ("private_to") and keep them private
 - set the server description and the welcome-screen text (layout.PUBLIC)
 - refresh the rules and welcome posts in place
@@ -45,17 +53,20 @@ Steps, all driven by layout.py:
 """
 
 import argparse
+import asyncio
 import datetime
 import os
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import discord
 from dotenv import load_dotenv
 
 import layout
 from names import slug
-from setup_server import Makeover, find, forum_options, layout_channels, no_thread_overwrites, private_overwrites
+from setup_server import (Makeover, arrange_category, find, forum_options, layout_channels, no_thread_overwrites,
+                          private_overwrites)
 
 sys.stdout.reconfigure(encoding="utf-8")
 
@@ -122,6 +133,8 @@ class PublicMode:
         # later, and the private channels made further down need them straight away.
         self.made_roles: dict[str, discord.Role] = {}
         self.made_channels: dict[str, object] = {}  # slug -> text channel or forum made in this run, same reason
+        # slug -> category made in this run; in a dry run, a stand-in with the name and permissions it would get
+        self.made_categories: dict[str, object] = {}
 
     async def do(self, verb, what, action):
         print(f"  {verb:<7} {what}")
@@ -166,6 +179,43 @@ class PublicMode:
             else:
                 print(f"  ok      @{name}")
 
+    # ------------------------------------------------------------ categories
+    def category(self, cat_spec):
+        """The layout category on the server (under its name or a "was" name), or the one made in this run."""
+        return find(self.guild.categories, cat_spec) or self.made_categories.get(slug(cat_spec["name"]))
+
+    async def categories(self):
+        """A category still under one of its "was" names gets its layout name (name only). A public
+        layout category that doesn't exist yet is made right after the layout category before it,
+        with that one's permissions; moved_channels moves its channels in."""
+        print("\nCategories")
+        prev = None
+        for cat_spec in layout.CATEGORIES:
+            name = cat_spec["name"]
+            cat = self.category(cat_spec)
+            if cat is not None and slug(cat.name) != slug(name):
+                await self.do("rename", f"category {cat.name} -> {name}",
+                              lambda cat=cat, name=name: cat.edit(name=name, reason="Public server: renamed"))
+            elif cat is not None:
+                print(f"  ok      category {cat.name}")
+            elif cat_spec.get("private_to"):
+                continue  # private() makes it
+            elif prev is None:
+                print(f"! skip    category {name}: no layout category before it exists (run setup_server.py)")
+                continue
+            else:
+                made = await self.do("create", f"category {name} after {prev.name}, with its permissions",
+                                     lambda name=name, prev=prev: self.new_category(name, prev))
+                cat = made or SimpleNamespace(name=name, id=None, overwrites=dict(prev.overwrites))
+                self.made_categories[slug(name)] = cat
+            if not cat_spec.get("private_to"):
+                prev = cat
+
+    async def new_category(self, name, prev):
+        cat = await self.guild.create_category(name, overwrites=prev.overwrites, reason="Public server")
+        await cat.move(after=prev)
+        return cat
+
     # ------------------------------------------------------------ renamed channels
     async def renamed_channels(self):
         """A channel still under one of its layout "was" names gets its layout name. Name only:
@@ -188,7 +238,7 @@ class PublicMode:
         for cat_spec in layout.CATEGORIES:
             if cat_spec.get("private_to"):
                 continue  # handled by private()
-            cat = find(self.guild.categories, cat_spec)
+            cat = self.category(cat_spec)
             for spec in cat_spec["channels"]:
                 if spec.get("private_to"):
                     continue
@@ -233,6 +283,47 @@ class PublicMode:
                                      lambda: create(spec["name"], category=cat, **kwargs))
                 if made is not None and not voice:
                     self.made_channels[slug(spec["name"])] = made
+
+    # ------------------------------------------------------------ channels in another category
+    def existing(self, spec):
+        """The layout channel on the server, of the spec's type, or the one made in this run."""
+        pool = {"forum": self.guild.forums, "voice": self.guild.voice_channels,
+                "stage": getattr(self.guild, "stage_channels", [])}.get(spec.get("type"), self.guild.text_channels)
+        return find(pool, spec) or self.made_channels.get(slug(spec["name"]))
+
+    async def moved_channels(self):
+        """A public layout channel sitting in another layout category moves into its own, keeping its
+        permissions, and that category's channels are put in layout order. A channel in a category the
+        layout doesn't list (the archive, or one made by hand) stays where it is."""
+        print("\nChannels in another category")
+        public = [c for c in layout.CATEGORIES if not c.get("private_to")]
+        homes = [(c, self.category(c)) for c in public]
+        layout_ids = {cat.id for _, cat in homes if cat is not None and cat.id is not None}
+        moved = False
+        for cat_spec, home in homes:
+            if home is None:
+                continue
+            members = [ch for spec in cat_spec["channels"]
+                       if not spec.get("private_to") and (ch := self.existing(spec)) is not None]
+            strays = [ch for ch in members if ch.category_id in layout_ids and ch.category_id != home.id]
+            if not strays:
+                continue
+            moved = True
+            await self.do("move", f"{', '.join('#' + ch.name for ch in strays)} into {home.name} "
+                                  "(permissions kept), then its channels in layout order",
+                          lambda home=home, members=members: self.arrange(home, members))
+        if not moved:
+            print("  ok      every layout channel is in its layout category")
+
+    SETTLE = 2  # seconds for the gateway to deliver the category and channels made in this run
+
+    async def arrange(self, home, members):
+        await asyncio.sleep(self.SETTLE)
+
+        def fresh(c):
+            return self.guild.get_channel(c.id) or c
+
+        await arrange_category(fresh(home), [fresh(ch) for ch in members])
 
     def check_no_threads(self, ch, spec):
         """A "no_threads" channel made by hand before the layout listed it: this script never edits
@@ -392,7 +483,7 @@ class PublicMode:
     async def posts(self):
         # Reuse setup_server's in-place refresh of the rules/welcome posts.
         m = Makeover(self.guild, self.apply)
-        m.channels = {slug(c.name): c for c in self.guild.channels}
+        m.channels = {**{slug(c.name): c for c in self.guild.channels}, **self.made_channels}
         m.roles = {r.name: r for r in self.guild.roles}
         await m.make_posts()
 
@@ -851,8 +942,10 @@ class PublicMode:
         if not self.preflight():
             return False
         await self.roles()
+        await self.categories()
         await self.renamed_channels()
         await self.new_channels()
+        await self.moved_channels()
         await self.bot_posting()
         await self.private()
         await self.description()
