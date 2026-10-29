@@ -361,8 +361,41 @@
           "type": "text"
         },
         {
+          "name": "📓・field-notes",
+          "nsfw": false,
+          "overwrites": {
+            "member:Front Desk": {
+              "allow": [
+                "embed_links",
+                "send_messages"
+              ],
+              "deny": []
+            },
+            "role:@everyone": {
+              "allow": [
+                "add_reactions"
+              ],
+              "deny": [
+                "create_private_threads",
+                "create_public_threads",
+                "send_messages"
+              ]
+            },
+            "role:Keeper": {
+              "allow": [
+                "send_messages"
+              ],
+              "deny": []
+            }
+          },
+          "slowmode": 0,
+          "synced": false,
+          "topic": "What Lorenzo built, heard and watched this week.",
+          "type": "text"
+        },
+        {
           "bitrate": 64000,
-          "name": "👥 Members: 24",
+          "name": "👥 Members: 25",
           "nsfw": false,
           "overwrites": {
             "member:Front Desk": {
@@ -389,7 +422,7 @@
         },
         {
           "bitrate": 64000,
-          "name": "🟢 Online: 6",
+          "name": "🟢 Online: 5",
           "nsfw": false,
           "overwrites": {
             "member:Front Desk": {
