@@ -1,8 +1,10 @@
 """The Monkey SMP season channels (layout.py) and how public_mode.py adds them: the channels
 themselves, the founding roster's slow mode and no-threads permissions, and the Minecraft answer
-in "What do you play?" that opens them. Fake guilds only, no Discord."""
+in "What do you play?" that opens them, and the pinned roster, rules and FAQ posts. Fake guilds
+only, no Discord."""
 
 import asyncio
+import re
 
 import discord
 
@@ -236,3 +238,115 @@ def test_polish_server_first_build_gives_the_minecraft_answer_every_channel():
     answer = minecraft_answer(guild)
     assert set(answer.channel_ids) == channel_ids(guild, minecraft_option()["channels"])
     assert edit["enabled"] is True
+
+
+# ---------------------------------------------------------------- the pinned posts
+SEASON_POSTS = {ROSTER: "founding-roster", RULES: "smp-rules", FAQ: "smp-faq"}
+LONGEST_MENTION = len("<#12345678901234567890>")  # a channel or role mention once expand() fills it in
+DATE_OR_TIME = re.compile(
+    r"\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*day\b|\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\b"
+    r"|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}(:\d{2})?\s?(AM|PM|am|pm)\b|\b(Pacific|Eastern|PT|ET|UTC)\b|<t:\d+",
+)
+
+
+def placeholders(text):
+    return re.findall(r"\{#([^}]+)\}", text), re.findall(r"\{@([^}]+)\}", text)
+
+
+def test_each_season_channel_carries_its_post():
+    for name, key in SEASON_POSTS.items():
+        assert spec(name).get("post") == key, name
+    used = [s["post"] for c in layout.CATEGORIES for s in c["channels"] if s.get("post")]
+    assert len(used) == len(set(used)) and set(used) <= set(layout.POSTS)
+
+
+def test_season_posts_fit_discords_embed_limits_once_mentions_are_filled_in():
+    for key in SEASON_POSTS.values():
+        post = layout.POSTS[key]
+        chans, roles = placeholders(post["description"])
+        longest = len(re.sub(r"\{[#@][^}]+\}", "x" * LONGEST_MENTION, post["description"]))
+        assert longest <= 4096, key  # an embed description
+        assert len(post["title"]) <= 256 and len(post["footer"]) <= 2048, key
+        assert len(post["title"]) + longest + len(post["footer"]) <= 6000, key  # one message's embeds
+
+
+def test_season_posts_link_only_layout_channels_and_roles():
+    channels = {slug(s["name"]) for c in layout.CATEGORIES for s in c["channels"]}
+    roles = {r["name"] for r in layout.ROLES}
+    for key in SEASON_POSTS.values():
+        chans, used_roles = placeholders(layout.POSTS[key]["description"])
+        assert chans, key
+        for name in chans:
+            assert slug(name) in channels, f"{key}: {{#{name}}}"
+        assert set(used_roles) <= roles, key
+
+
+def test_season_posts_carry_no_dates_or_times():
+    # The season date is announced elsewhere; a date in a pinned post goes stale.
+    for key in SEASON_POSTS.values():
+        post = layout.POSTS[key]
+        for part in (post["title"], post["description"], post["footer"]):
+            found = DATE_OR_TIME.search(part)
+            assert not found, f"{key}: {found.group(0)!r}"
+
+
+def test_season_posts_send_questions_to_the_forum_or_a_ticket():
+    for key in SEASON_POSTS.values():
+        text = layout.POSTS[key]["description"]
+        assert "{#smp-forum}" in text and "{#help}" in text, key
+    rules = layout.POSTS["smp-rules"]["description"]
+    assert "https://monkeysmp.lscaturchio.xyz/#rules" in rules
+    cited = re.findall(r"\(([^()]*\d[^()]*)\)$", rules, re.M)
+    numbers = [int(n) for c in cited for n in re.findall(r"(?<![B\d])(\d+)", c)]
+    bans = [int(n) for c in cited for n in re.findall(r"B(\d+)", c)]
+    assert numbers and max(numbers) <= 46 and bans and max(bans) <= 19  # the rulebook's 46 rules, B1-B19
+    roster = layout.POSTS["founding-roster"]["description"]
+    for want in ("Minecraft Java name", "faction", "First come, first listed", "isn't a pass"):
+        assert want in roster, want
+
+
+def _post_guild():
+    """Every layout channel, the ones that carry a post empty; send() records the embed and returns a message."""
+    from test_server_scripts import FakeGuild, aiter_of
+    guild = FakeGuild()
+    sent = {}
+    for s in setup_server.layout_channels():
+        ch = guild._make("text", s["name"])
+        ch.mention = f"<#{ch.id}>"
+        guild.text_channels.append(ch)
+        if not s.get("post"):
+            continue
+
+        async def send(embed, ch=ch):
+            async def pin(msg=None):
+                msg_ref.pinned = True
+            msg_ref = NS(author=guild.me, embeds=[embed], pinned=False, pin=pin)
+            msg_ref.edit = _no_edit
+            sent.setdefault(ch.name, []).append(msg_ref)
+            return msg_ref
+        ch.send = send
+        ch.pins = lambda limit=None, ch=ch: aiter_of([m for m in sent.get(ch.name, []) if m.pinned])
+        ch.history = lambda limit=50, ch=ch: aiter_of(sent.get(ch.name, []))
+    guild.calls.clear()
+    return guild, sent
+
+
+async def _no_edit(**_):
+    raise AssertionError("edited a post that had not changed")
+
+
+def test_public_mode_posts_and_pins_each_season_post_once(capsys):
+    guild, sent = _post_guild()
+    asyncio.run(public_mode.PublicMode(guild, apply=True).posts())
+    out = capsys.readouterr().out
+    for name, key in SEASON_POSTS.items():
+        (msg,) = sent[name]
+        assert msg.pinned and msg.embeds[0].title == layout.POSTS[key]["title"], name
+        assert "{#" not in msg.embeds[0].description and "<#" in msg.embeds[0].description, name
+        assert f"post    {key} -> #{name} (pinned)" in out
+    # A second run finds the pinned posts and leaves them alone.
+    asyncio.run(public_mode.PublicMode(guild, apply=True).posts())
+    out = capsys.readouterr().out
+    for name, key in SEASON_POSTS.items():
+        assert len(sent[name]) == 1, name
+        assert f"ok      {key} (posted and pinned)" in out
