@@ -442,7 +442,9 @@ MENTION_LIMIT = 6
 
 # New-member media lock: @everyone can't post images, files or link embeds
 # until they pass the captcha (Captcha.bot gives @Verified). These roles
-# get media back.
+# get media back. Off since 2026-10-28 (captcha paused so new members get
+# straight in); set True again when Captcha.bot is back.
+MEDIA_LOCK = False
 MEDIA_ROLES = ["Keeper", "Moderator", "Squad", "Verified"]
 
 # Every bot member (except Front Desk itself) gets this role, so bots are

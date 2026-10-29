@@ -84,7 +84,9 @@ MEE6 was tried and dropped: its Levels and Welcome plugins now need Premium.
 
 `polish_server.py` also handles the **media lock**: `@everyone` can't post images,
 files or link embeds until they have one of the `MEDIA_ROLES` (Captcha.bot's
-@Verified covers new members). The bot roles are ordered by the `keep` entries
+@Verified covers new members). The lock is off for now (`layout.MEDIA_LOCK = False`,
+captcha paused since 2026-10-28), so `polish_server.py` gives `@everyone` media instead;
+set it back to `True` when Captcha.bot returns. The bot roles are ordered by the `keep` entries
 in `layout.ROLES`, and every bot gets `@Bots` so they're grouped in the member list.
 
 **Afterwards**

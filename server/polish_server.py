@@ -207,6 +207,14 @@ class Polish:
         print("\nMedia lock")
         media = discord.Permissions(attach_files=True, embed_links=True)
         everyone = self.guild.default_role
+        if not layout.MEDIA_LOCK:
+            if (everyone.permissions.value & media.value) == media.value:
+                print("  ok      off: @everyone can post media")
+            else:
+                opened = discord.Permissions(everyone.permissions.value | media.value)
+                await self.do("update", "@everyone: allow images, files and embeds (lock off)",
+                              lambda: everyone.edit(permissions=opened))
+            return
         if everyone.permissions.attach_files or everyone.permissions.embed_links:
             locked = discord.Permissions(everyone.permissions.value & ~media.value)
             await self.do("update", "@everyone: no images, files or link embeds", lambda: everyone.edit(permissions=locked))
