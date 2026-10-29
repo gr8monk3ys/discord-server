@@ -61,7 +61,7 @@ class TempVoice(commands.Cog):
 
     def places(self, guild: discord.Guild):
         """(category, hub), or None (logged once) if either is missing."""
-        category = config.match_by_name(guild.categories, config.VOICE_CATEGORY)
+        category = config.match_by_names(guild.categories, config.VOICE_CATEGORY_NAMES)
         hubs = [c for c in guild.voice_channels if c.id not in self.owners]
         hub = config.match_by_name(hubs, config.NEW_SQUAD_VOICE)
         if category is None or hub is None:

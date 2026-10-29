@@ -119,7 +119,7 @@ jobs below). Times are local (Pacific unless `TZ` is set). Loops without a wall-
 | `community` | welcome after Onboarding, `/report`, mod log of joins/leaves/bans/AutoMod | `welcomed`, `reports` | none | 💬・general, 📋・mod-log, 🛡️・mod |
 | `starboard` | hall of fame at 3 stars | `starboard` | none | ⭐・hall-of-fame |
 | `clips` | clip collection, weekly poll, winner role | `clips`, `clip_polls` | poll Sun 18:05 (open 24 h) | 📸・clips, 🛡️・mod; Clip of the Week |
-| `tempvoice` | join-to-create voice, `/squad` | `temp_voice` | none (deletes 30 s after empty) | 05 · voice category, ➕ New Squad |
+| `tempvoice` | join-to-create voice, `/squad` | `temp_voice` | none (deletes 30 s after empty) | 06 · voice category, ➕ New Squad |
 | `events` | `/gamenight`, `/watchparty`, the monthly Town Hall, 15-minute reminders, free games | `gamenights`, `hosted_events`, `free_games` | free games Thu 18:00; reminders 1 min; Town Hall job Saturdays at `TOWNHALL_TIME` (default 12:00), which schedules the first Saturday of a month a week ahead | 🕹️・gaming, game channels, voice channels, 🎙・stage (else 🔊 Lobby), 📣・announcements; Game Night |
 | `economy` | earning (voice, chat, clips, squads, MVP, clip of the week), `/daily`, `/balance`, `/give`, `/coinflip`, `/richest` | `wallets` streak columns; coins via `economy.py` | voice coins 5 min | none of its own |
 | `games` | `/slots`, `/blackjack`, `/trivia`, `/predict` | `predictions`, `prediction_bets`, `blackjack_open` | none (open blackjack bets refunded at start) | none of its own |
@@ -140,7 +140,7 @@ jobs below). Times are local (Pacific unless `TZ` is set). Loops without a wall-
 | `heartbeat` | `bot/data/heartbeat` file, event-loop lag warning | none (a file, not the DB) | beat 60 s; lag probe 5 s | none |
 | `challenges` | weekly challenges, `/challenges`, Claim button | `challenge_claims` | board Mon 09:00; auto-claim sweep hourly | 🎲・games |
 | `wordgame` | Daily Word, `/word` | `word_games` | none (word changes at local midnight by date) | 🎲・games |
-| `matchmaking` | `/queue`, match voice channels | `mm_queue`, `mm_matches`, `temp_voice` | expiry sweep 1 min (entries last 60 min) | 🎲・games (else 🤖・bot-commands), 05 · voice category |
+| `matchmaking` | `/queue`, match voice channels | `mm_queue`, `mm_matches`, `temp_voice` | expiry sweep 1 min (entries last 60 min) | 🎲・games (else 🤖・bot-commands), 06 · voice category |
 | `econstats` | staff `/economy` (read-only) | none | none | none |
 | `helpdesk` | `/help`, `/about`, rotating presence | none | presence every 5 min | 🎭・roles (link only) |
 | `news` | official game news feeds, staff `/news test` | `news_seen` | poll every 30 min | every game channel |

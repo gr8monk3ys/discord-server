@@ -66,8 +66,8 @@ const FAQ: [string, ReactNode][] = [
     "How do I get on the Minecraft server?",
     <>
       Monkey SMP takes a pass. Season dates and how to get one are on{" "}
-      <a className="ink" href={SMP_URL} rel="noopener">its page</a>. In the Discord, news goes in #monkey-smp, and the SMP
-      Ping role tells you when three or more people are on.
+      <a className="ink" href={SMP_URL} rel="noopener">its page</a>. In the Discord it all sits in the Monkey SMP category: news goes in
+      #monkey-smp, the commands are in #smp-commands, and the SMP Ping role tells you when three or more people are on.
     </>,
   ],
   [

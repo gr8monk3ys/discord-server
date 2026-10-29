@@ -51,7 +51,7 @@ def in_staff(channel) -> bool:
 
 def is_public(channel, guild) -> bool:
     """Only repost what @everyone can already read: never leak private channels
-    (06 · squad, staff) or private threads into the public hall. Fails closed."""
+    (07 · squad, staff) or private threads into the public hall. Fails closed."""
     try:
         private_thread = getattr(channel, "is_private", None)  # only threads have it
         if callable(private_thread) and private_thread():

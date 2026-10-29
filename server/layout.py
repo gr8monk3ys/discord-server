@@ -184,25 +184,39 @@ CATEGORIES = [
                 "layout": "list", "sort": "latest_activity", "reaction": "👍",
                 "post_slowmode": 600, "slowmode": 5,
             },
-            # Front Desk's bridge to our Minecraft server: pinned status panel, chat both ways.
-            {"name": "⛏️・monkey-smp", "topic": "Monkey SMP, our Minecraft server. Status is pinned; chat here reaches "
-                                           "the game, and linked players' chat comes back. Playing needs a "
-                                           "pass: monkeysmp.lscaturchio.xyz or a ticket in #help.",
-             "slowmode": 2, "was": ["⛏️・realms"]},  # renamed in place by public_mode.py
-            # Monkey SMP seasons: the channels the SMP repo's launch plan and rulebook send players
-            # to (its docs/LAUNCH.md and docs/RULES.md). public_mode.py creates them after #monkey-smp.
-            # One sign-up message each, so the order of the founding roster is plain to see:
-            # 6 h slow mode (Discord's maximum) and no threads. Each channel's "post" is pinned by public_mode.py.
-            {"name": "📝・founding-roster",
-             "topic": "Founding roster sign-up: one message with your Minecraft Java name, and your faction's "
-                      "name if you have one. First come, first listed. Rules are pinned.",
-             "slowmode": 21600, "no_threads": True, "post": "founding-roster"},
+        ],
+    },
+    {
+        # Everything Monkey SMP, the owner's Minecraft server, in one place: what to read first, then the
+        # chat with the game, the roster and the forum. The channels the SMP repo's launch plan, rulebook and
+        # guide send players to (gr8monk3ys/monkey-smp-server: docs/LAUNCH.md, docs/RULES.md,
+        # site/src/content/guide/discord.mdx). public_mode.py makes the category after 03 · games with its
+        # permissions and moves these channels in from there. Each channel's "post" is pinned by public_mode.py.
+        "name": "04 · monkey smp",
+        # public_mode.py makes this one if it is missing (after 03 · games, with its permissions); it skips any
+        # other missing category, since a copy of the one before it could be the wrong permissions.
+        "public_mode_creates": True,
+        "channels": [
             {"name": "📜・smp-rules", "topic": "The Monkey SMP rulebook. Staff post here; answers are in "
                                               "#smp-faq, and questions go in #smp-forum or a ticket.", "read_only": True,
              "post": "smp-rules"},
             {"name": "❔・smp-faq", "topic": "Monkey SMP answers: the pass, the modpack, joining. Staff post "
                                            "here; ask anything else in #smp-forum or a ticket.", "read_only": True,
              "post": "smp-faq"},
+            {"name": "⌨️・smp-commands", "topic": "Monkey SMP commands, in game and here. Staff post here; "
+                                                "ask in #smp-forum or a ticket.", "read_only": True,
+             "post": "smp-commands"},
+            # Front Desk's bridge to the server: pinned status panel, chat both ways.
+            {"name": "⛏️・monkey-smp", "topic": "Monkey SMP, our Minecraft server. Status is pinned; chat here reaches "
+                                           "the game, and linked players' chat comes back. Playing needs a "
+                                           "pass: monkeysmp.lscaturchio.xyz or a ticket in #help.",
+             "slowmode": 2, "was": ["⛏️・realms"]},  # renamed in place by public_mode.py
+            # One sign-up message each, so the order of the founding roster is plain to see:
+            # 6 h slow mode (Discord's maximum) and no threads.
+            {"name": "📝・founding-roster",
+             "topic": "Founding roster sign-up: one message with your Minecraft Java name, and your faction's "
+                      "name if you have one. First come, first listed. Rules are pinned.",
+             "slowmode": 21600, "no_threads": True, "post": "founding-roster"},
             {
                 "name": "🚩・smp-forum",
                 "type": "forum",
@@ -222,7 +236,8 @@ CATEGORIES = [
         ],
     },
     {
-        "name": "04 · off topic",
+        "name": "05 · off topic",
+        "was": ["04 · off topic"],
         "channels": [
             {"name": "🎨・art", "topic": "Things you made."},
             {"name": "💻・code", "topic": "Projects, snippets, and bugs."},
@@ -253,8 +268,8 @@ CATEGORIES = [
         ],
     },
     {
-        "name": "05 · voice",
-        "was": ["Voice Channels"],
+        "name": "06 · voice",
+        "was": ["Voice Channels", "05 · voice"],
         "channels": [
             {"name": "🔊 Lobby", "type": "voice", "was": ["General"]},
             {"name": "➕ New Squad", "type": "voice"},  # join to get your own channel
@@ -281,7 +296,8 @@ CATEGORIES = [
     },
     {
         # The friend group's own space now that the server is public.
-        "name": "06 · squad",
+        "name": "07 · squad",
+        "was": ["06 · squad"],
         "private_to": ["Squad", "Keeper"],
         "channels": [
             {"name": "🔒・squad-chat", "topic": "Just us."},
@@ -328,7 +344,8 @@ POSTS = {
                 "`GAMES`  Pick yours under **Channels & Roles** at the top of the channel list.",
                 "`HOUSE`  Front Desk sorts you into Fern, Kestrel or Otter. `/house me` shows yours.",
                 "`MINECRAFT`  Monkey SMP is the owner's modded server, with its own pass "
-                "(monkeysmp.lscaturchio.xyz or a ticket in {#help}). `/smp link` connects your name to chat here.",
+                "(monkeysmp.lscaturchio.xyz or a ticket in {#help}). All of it is in the Monkey SMP category: "
+                "start with {#smp-rules}, and the commands are in {#smp-commands}.",
                 "",
                 "**Roles**",
                 "{@Keeper}  runs the place",
@@ -477,6 +494,58 @@ POSTS = {
         ),
         "footer": "FRONT DESK · MONKEY SMP · FAQ",
     },
+    # The player commands from the SMP repo's guide (site/src/content/guide/commands.tsx, "players"),
+    # condensed, plus Front Desk's /smp commands (bot/cogs/realms.py). The guide has every rank's.
+    "smp-commands": {
+        "title": "Monkey SMP commands",
+        "description": "\n".join(
+            [
+                "What players type. Menus open in chat; click a line to use it. Type the start of a command "
+                "and press Tab to see the rest. Every rank's commands, staff too: "
+                "https://monkeysmp.lscaturchio.xyz/guide/commands",
+                "",
+                "**Menus**",
+                "`/trigger wardrobe`  your skins, and how to unlock the rest",
+                "`/trigger challenges`  this week's three challenges and how far you've got",
+                "`/trigger standings`  this week's faction standings",
+                "`/trigger diplomacy`  wars, pacts and offers with every other faction (a leader gets buttons)",
+                "`/trigger outposts`  the four outposts, who holds them, and your faction's hours",
+                "`/trigger firsts`  the season's Server Firsts and who holds each",
+                "`/trigger end_grace`  ends your 48 hours of safety now. There's no getting it back.",
+                "",
+                "**Factions and land**",
+                "`/oparties create`  starts a party: your faction, with you as its leader",
+                "`/oparties join <leader>`  joins the party that invited you, named by its leader",
+                "`/oclaims claim`  claims the chunk you're standing in (or press M and right-click chunks)",
+                "`/opac`  your party and claim settings",
+                "Leaders also have `/oparties member invite <player>` (four to a faction) and "
+                "`/oparties ally add <leader>` (allies share claims).",
+                "",
+                "**Arena Glory**",
+                "`/trigger arena set 1`  joins while it's open: stand by the entrance, in survival, with an "
+                "empty inventory, armor and offhand",
+                "`/trigger arena set 2`  leaves, with what you went in with",
+                "",
+                "**Keys**",
+                "`V`  voice chat settings",
+                "`M`  the world map, where you claim land",
+                "Sneak + right-click with both hands empty picks up a passive animal or a block like an "
+                "enchanting table. Nothing that stores items, and nothing in someone else's claim.",
+                "",
+                "**Here on Discord**",
+                "`/smp link <minecraft name>`  connects your Java name, so your game chat shows in "
+                "{#monkey-smp} and your playtime counts. It isn't a pass.",
+                "`/smp unlink`  forgets your linked name",
+                "`/smp status`  is the server up, who's on, and your own link and playtime",
+                "`/smp top`  who played the most this week",
+                "Only you see the answers, except `/smp top`. Take {@SMP Ping} in {#roles} for a ping when "
+                "three or more players are on.",
+                "",
+                "Questions go in {#smp-forum}. Payment problems, reports and appeals go in a ticket in {#help}.",
+            ]
+        ),
+        "footer": "FRONT DESK · MONKEY SMP · COMMANDS",
+    },
     "founding-roster": {
         "title": "Founding roster",
         "description": "\n".join(
@@ -560,8 +629,9 @@ FOCUS_GROUPS = [
      "description": "Memes, art, code, fashion and chess.",
      "channels": ["🤣・memes", "🎨・art", "💻・code", "👗・fashion", "♟️・chess"]},
     {"title": "Minecraft", "emoji": "⛏️",
-     "description": "Monkey SMP: status, in-game chat, the founding roster, rules, FAQ and the faction forum.",
-     "channels": ["⛏️・monkey-smp", "📝・founding-roster", "🚩・smp-forum", "📜・smp-rules", "❔・smp-faq"]},
+     "description": "Monkey SMP: rules, FAQ, commands, in-game chat, the founding roster and the faction forum.",
+     "channels": ["⛏️・monkey-smp", "📝・founding-roster", "🚩・smp-forum", "📜・smp-rules", "❔・smp-faq",
+                  "⌨️・smp-commands"]},
     {"title": "Roles and arrivals", "emoji": "🎭",
      "description": "The roles panel, and who just joined.",
      "channels": ["👋・welcome", "🎭・roles"]},
@@ -585,7 +655,7 @@ FOCUS_RESERVE = ["🤣・memes", "🤖・bot-commands"]
 # Minecraft opens Monkey SMP too; it hands out the @Minecraft role only, never @SMP Ping (that
 # ping stays opt-in, on the 🎭・roles panel).
 GAME_EXTRA_CHANNELS = {
-    "Minecraft": ["⛏️・monkey-smp", "📝・founding-roster", "🚩・smp-forum", "📜・smp-rules"],
+    "Minecraft": ["⛏️・monkey-smp", "📝・founding-roster", "🚩・smp-forum", "📜・smp-rules", "⌨️・smp-commands"],
 }
 # Private ("private_to") channels never go in any of these lists.
 ONBOARDING_PROMPTS = [

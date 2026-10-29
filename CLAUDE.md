@@ -16,7 +16,9 @@ anything from `bot/data/` (the SQLite DB, logs and lock file live there and are 
   `public_mode.py` (later changes; adds what is missing and never deletes, but for games in
   `layout.RETIRED_GAMES` it drops their options from the "What do you play?" question, in
   `game_options` when that step adds a new game and otherwise in `retire_games`, and
-  `retire_games` moves their channels into the staff-only `99 · archive` category),
+  `retire_games` moves their channels into the staff-only `99 · archive` category; it renames
+  categories by their "was" names, makes a missing public category after the one before it, and
+  `moved_channels` moves a layout channel sitting in another layout category into its own),
   `focus_mode.py` (Onboarding only: cuts the default channels to the core in
   `ONBOARDING_DEFAULT_CHANNELS` and adds one opt-in question; `--plan`, `--revert`),
   `expressions.py` (emoji and soundboard upload),
@@ -77,8 +79,10 @@ CI (`.github/workflows/ci.yml`) runs ruff, both Python test suites and the site 
 
 - Role order: Front Desk sits below Keeper/Moderator and cannot move roles to or above its own
   position. Never reorder roles near the bot (`setup_server.py` calls `edit_role_positions`); use
-  `public_mode.py`, which never reorders or deletes (it only adds, except that it drops the
-  Onboarding options of retired games and archives their channels; read its dry run first). Roles the bot hands out must sit below it.
+  `public_mode.py`, which never reorders roles or deletes anything (it adds; it also renames
+  categories by their "was" names, makes a category marked `public_mode_creates`, moves a layout
+  channel sitting in another layout category into its own, drops the Onboarding options of retired
+  games and archives their channels; read its dry run first). Roles the bot hands out must sit below it.
 - The live bot runs from a scheduled task and holds `bot/data/bot.lock`; stop the task before
   running `main.py` by hand (README runbook).
 - The "Front Desk watchdog" task restarts the bot if `bot/data/heartbeat` goes stale; run

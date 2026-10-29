@@ -174,12 +174,12 @@ def test_setup_creates_private_to_spaces_hidden_from_everyone():
         for spec in cat_spec["channels"]:
             if spec.get("private_to") or cat_spec.get("private_to"):
                 private_names.add(spec["name"])
-    assert {"06 · squad", "🔒・squad-chat", "🔒 Squad Only", "📋・mod-log"} <= private_names
+    assert {"07 · squad", "🔒・squad-chat", "🔒 Squad Only", "📋・mod-log"} <= private_names
     for name in private_names:
         ow = created[name].get("overwrites", {})
         assert _hidden(ow, guild), name
         assert ow[guild.me].view_channel is True
-    assert created["06 · squad"]["overwrites"][squad].view_channel is True
+    assert created["07 · squad"]["overwrites"][squad].view_channel is True
     assert created["📋・mod-log"]["overwrites"][mod].view_channel is True
     assert not _hidden(created["💬・general"].get("overwrites", {}), guild)
     assert not _hidden(created["02 · the lobby"].get("overwrites", {}), guild)
@@ -615,7 +615,7 @@ def test_public_mode_creates_new_forums_and_the_stage_once(capsys):
     kind, kw = made["setups"]
     assert kind == "forum" and kw["default_layout"] is discord.ForumLayoutType.gallery_view
     kind, kw = made["stage"]
-    assert kind == "stage" and kw["category"].name == "05 · voice"
+    assert kind == "stage" and kw["category"].name == "06 · voice"
     assert made["general"][0] == "text" and made["lobby"][0] == "voice"  # the stage isn't mistaken for either
     assert "can't schedule Stage events without Manage Channels, Mute Members, Move Members" in capsys.readouterr().out
 
@@ -637,19 +637,19 @@ def test_public_mode_forums_and_stage_dry_run_and_missing_category(capsys):
     assert guild.calls == []
     out = capsys.readouterr().out
     assert "#📚・guides (forum) in 03 · games with 12 tags (layout, sort, reaction, post_slowmode, slowmode)" in out
-    assert "🎙・stage (stage) in 05 · voice" in out
+    assert "🎙・stage (stage) in 06 · voice" in out
 
     bare = FakeGuild()  # no categories at all: skipped with a reason, never created loose
     asyncio.run(public_mode.PublicMode(bare, apply=True).new_channels())
     assert bare.calls == []
-    assert "🎙・stage (stage): category 05 · voice doesn't exist" in capsys.readouterr().out
+    assert "🎙・stage (stage): category 06 · voice doesn't exist" in capsys.readouterr().out
 
 
 def test_public_mode_reports_a_stage_the_bot_cannot_schedule_on(capsys):
     guild = _with_categories(FakeGuild())
     guild.stage_channels.append(NS(id=77, name="🎙・stage", overwrites={}, permissions_for=lambda me: discord.Permissions(
         manage_channels=True, move_members=True)))
-    asyncio.run(public_mode.PublicMode(guild, apply=True).new_stage(_spec("stage"), guild.categories[0], "05 · voice"))
+    asyncio.run(public_mode.PublicMode(guild, apply=True).new_stage(_spec("stage"), guild.categories[0], "06 · voice"))
     assert guild.calls == []
     out = capsys.readouterr().out
     assert "without Mute Members (" in out and "Manage Channels" not in out
@@ -710,8 +710,8 @@ def test_public_mode_dry_run_lists_everything_wave9_adds_and_changes_nothing(cap
         assert f"  create  @{name}\n" in out, name
     assert "create  #📚・guides (forum) in 03 · games" in out
     assert "create  #🖥・setups (forum) in " in out
-    assert "create  🎙・stage (stage) in 05 · voice" in out
-    assert "create  #⛏️・monkey-smp in 03 · games" in out
+    assert "create  🎙・stage (stage) in 06 · voice" in out
+    assert "create  #⛏️・monkey-smp in 04 · monkey smp" in out
     assert "create  #💜・supporters (private)" in out
     assert "create  #🔒・appeals (private)" in out
 

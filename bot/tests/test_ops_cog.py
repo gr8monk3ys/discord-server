@@ -697,13 +697,24 @@ def test_permission_check_finds_a_channel_under_its_old_name(monkeypatch, tmp_pa
 
 
 def test_permission_check_ignores_old_names_the_cog_does_not_use(monkeypatch, tmp_path):
-    # The voice category was "Voice Channels" in layout.py, but tempvoice only looks for the new name.
+    # The squad room was "General 2" in layout.py, but events only looks for the new name.
     async def go(env):
-        g = perm_guild(env, loaded=("ops", "tempvoice"))
-        assert config.layout_old_names(config.VOICE_CATEGORY) == ("Voice Channels",)
-        g.categories[0].name = "Voice Channels"
+        g = perm_guild(env, loaded=("ops", "events"))
+        assert config.layout_old_names(config.SQUAD_VOICE) == ("🎮 Squad I", "General 2")
+        config.match_by_name(g.voice_channels, config.SQUAD_VOICE).name = "General 2"
         texts = {(p.where, p.text) for p in await env.cog.check_permissions()}
-        assert texts == {(config.VOICE_CATEGORY, "channel not found (needed by tempvoice)")}
+        assert texts == {(config.SQUAD_VOICE, "channel not found (needed by events)")}
+    with_env(go, monkeypatch, tmp_path)
+
+
+@pytest.mark.parametrize("old", ["05 · voice", "Voice Channels"])
+def test_permission_check_finds_the_voice_category_under_an_old_name(monkeypatch, tmp_path, old):
+    # Temp voice and matchmaking keep working until public_mode.py renames the category to 06 · voice.
+    async def go(env):
+        g = perm_guild(env, loaded=("ops", "tempvoice", "matchmaking"))
+        assert config.VOICE_CATEGORY_WAS == ("Voice Channels", "05 · voice")
+        g.categories[0].name = old
+        assert await env.cog.check_permissions() == []
     with_env(go, monkeypatch, tmp_path)
 
 

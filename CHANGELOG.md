@@ -8,6 +8,14 @@ All notable changes to this project are recorded here. The format follows
 
 ### Changed
 
+- Monkey SMP has its own category, `04 · monkey smp`, right after `03 · games`: #smp-rules,
+  #smp-faq, a new read-only #smp-commands (a pinned list of the player commands, in game and
+  `/smp`), #monkey-smp, #founding-roster and #smp-forum. The categories after it are renumbered
+  (`05 · off topic`, `06 · voice`, `07 · squad`). `public_mode.py` renames categories by their
+  "was" names, makes the new category with the games category's permissions, and moves the SMP
+  channels in, keeping their permissions. Temp voice and matchmaking find the voice category
+  under its old name too, so restart Front Desk before applying. Picking Minecraft in
+  Onboarding also opens #smp-commands.
 - The landing page is a Next.js app on the lscaturchio.xyz stack (Next.js 16, App Router,
   TypeScript, Tailwind v4, next-themes, bun, Vitest, Playwright), at the owner's request of
   2026-10-29; it was static HTML. Same look, copy, behaviour and URLs. The appeal form and Linked

@@ -272,6 +272,17 @@ def test_join_hub_creates_named_after_game_and_moves(monkeypatch):
     with_env(go, monkeypatch)
 
 
+def test_voice_category_under_its_old_name_still_works(monkeypatch):
+    # Until public_mode.py renames 05 · voice to 06 · voice.
+    async def go(env):
+        env.guild.category.name = "05 · voice"
+        env.member(A, game="Valorant")
+        await env.voice(A, env.guild.hub)
+        [temp] = env.temps()
+        assert env.guild.category.created and env.member(A).moves == [temp]
+    with_env(go, monkeypatch)
+
+
 def test_join_hub_without_game_uses_display_name(monkeypatch):
     async def go(env):
         await env.voice(A, env.guild.hub)
