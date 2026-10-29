@@ -100,6 +100,8 @@ ROLES = [
 # Categories are numbered like a catalogue; Discord uppercases them, which
 # gives you the site's wall-label look for free.
 # "read_only": everyone can read and react, only Keepers (and the bot) post.
+# "no_threads": everyone can still post, but @everyone can't start threads (public or private).
+# "slowmode" on a text channel: seconds between one member's messages (Discord allows up to 21600).
 # Forums ("type": "forum") may also set "layout" (list | gallery), "sort" (latest_activity |
 # creation_date), "reaction" (the default reaction emoji), "post_slowmode" (seconds between
 # new posts per member) and "slowmode" (seconds between messages inside a post).
@@ -184,6 +186,34 @@ CATEGORIES = [
                                            "the game, and linked players' chat comes back. Playing needs a "
                                            "pass: monkeysmp.lscaturchio.xyz or a ticket in #help.",
              "slowmode": 2, "was": ["⛏️・realms"]},  # renamed in place by public_mode.py
+            # Monkey SMP seasons: the channels the SMP repo's launch plan and rulebook send players
+            # to (its docs/LAUNCH.md and docs/RULES.md). public_mode.py creates them after #monkey-smp.
+            # One sign-up message each, so the order of the founding roster is plain to see:
+            # 6 h slow mode (Discord's maximum) and no threads. Staff pin the roster rules.
+            {"name": "📝・founding-roster",
+             "topic": "Founding roster sign-up: one message with your Minecraft Java name, and your faction's "
+                      "name if you have one. First come, first listed. Rules are pinned.",
+             "slowmode": 21600, "no_threads": True},
+            {"name": "📜・smp-rules", "topic": "The Monkey SMP rulebook. Staff post here; answers are in "
+                                              "#smp-faq, and questions go in #smp-forum or a ticket.", "read_only": True},
+            {"name": "❔・smp-faq", "topic": "Monkey SMP answers: the pass, the modpack, joining. Staff post "
+                                           "here; ask anything else in #smp-forum or a ticket.", "read_only": True},
+            {
+                "name": "🚩・smp-forum",
+                "type": "forum",
+                "topic": "\n".join(
+                    [
+                        "Monkey SMP factions, recruiting, suggestions, bugs and trading.",
+                        "Register a faction (up to four players) with one post: the name, the members' Minecraft "
+                        "names, the banner and a charter. One post per faction, tagged Faction.",
+                        "Playing solo? Post with the Looking for faction tag and staff will find you one.",
+                        "Payment problems, reports and appeals go in a ticket, not here.",
+                    ]
+                ),
+                "tags": [("Faction", "🏰"), ("Recruiting", "📯"), ("Looking for faction", "🔎"),
+                         ("Suggestion", "💡"), ("Bug", "🐛"), ("Trading", "⚖️")],
+                "layout": "list", "sort": "latest_activity",
+            },
         ],
     },
     {
@@ -361,8 +391,8 @@ FOCUS_GROUPS = [
      "description": "Memes, art, code, fashion and chess.",
      "channels": ["🤣・memes", "🎨・art", "💻・code", "👗・fashion", "♟️・chess"]},
     {"title": "Minecraft", "emoji": "⛏️",
-     "description": "Monkey SMP: server status and chat with whoever is in game.",
-     "channels": ["⛏️・monkey-smp"]},
+     "description": "Monkey SMP: status, in-game chat, the founding roster, rules, FAQ and the faction forum.",
+     "channels": ["⛏️・monkey-smp", "📝・founding-roster", "🚩・smp-forum", "📜・smp-rules", "❔・smp-faq"]},
     {"title": "Roles and arrivals", "emoji": "🎭",
      "description": "The roles panel, and who just joined.",
      "channels": ["👋・welcome", "🎭・roles"]},
@@ -381,6 +411,13 @@ FOCUS_UNLISTED = {"🎙・stage": "Discord shows a live Stage to everyone by its
 # If Discord says the core does not have five channels @everyone can post in (it may not
 # count a forum or a voice channel), focus_mode.py adds these one at a time until it does.
 FOCUS_RESERVE = ["🤣・memes", "🤖・bot-commands"]
+# More channels a game's "What do you play?" answer opens, after the game's own channel.
+# public_mode.py adds the missing ones to the answer and never takes a channel off it. Picking
+# Minecraft opens Monkey SMP too; it hands out the @Minecraft role only, never @SMP Ping (that
+# ping stays opt-in, on the 🎭・roles panel).
+GAME_EXTRA_CHANNELS = {
+    "Minecraft": ["⛏️・monkey-smp", "📝・founding-roster", "🚩・smp-forum", "📜・smp-rules"],
+}
 # Private ("private_to") channels never go in any of these lists.
 ONBOARDING_PROMPTS = [
     {
@@ -389,7 +426,8 @@ ONBOARDING_PROMPTS = [
         "required": True,
         "options": [
             *(
-                {"title": role, "emoji": emoji, "role": role, "channel": f"{emoji}・{channel}",
+                {"title": role, "emoji": emoji, "role": role,
+                 "channels": [f"{emoji}・{channel}", *GAME_EXTRA_CHANNELS.get(role, [])],
                  "description": f"Get @{role} pings and the #{channel} channel."}
                 for emoji, channel, role in GAMES
             ),

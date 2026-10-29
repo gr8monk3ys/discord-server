@@ -13,8 +13,9 @@ Steps, all driven by layout.py:
   Welcome Crew, Supporter, ...); new roles land at the bottom of the list and nothing is moved
 - rename a channel still under one of its layout "was" names to its layout name (name only;
   e.g. #realms -> #monkey-smp)
-- create any public layout channel that doesn't exist yet (never moves or edits existing ones),
-  forums with their tags, layout, sort order, default reaction and slowmode, and the Stage channel
+- create any public layout channel that doesn't exist yet (never moves or edits existing ones):
+  text channels with their topic, slow mode and read-only or no-threads permissions, forums with
+  their tags, layout, sort order, default reaction and slowmode, and the Stage channel
 - create private categories/channels ("private_to") and keep them private
 - set the server description and the welcome-screen text (layout.PUBLIC)
 - refresh the rules and welcome posts in place
@@ -25,6 +26,9 @@ Steps, all driven by layout.py:
   forums that tag by game, and add it to the "What do you play?" question. When that edit adds
   a game, the options of retired games leave the question in the same edit (Discord caps the
   options of one question, so new ones may not fit beside them)
+- game_answer_channels: a listed game's existing answer in "What do you play?" also opens the
+  channels its layout option lists and it doesn't open yet (layout.GAME_EXTRA_CHANNELS: Minecraft
+  opens the Monkey SMP channels). Adds only; its roles stay as they are
 - restore_games: a listed game whose channel sits in the archive (it was retired, and is listed
   again) gets its channel moved back to the games category
 - retire_games (layout.RETIRED_GAMES): the game leaves the "What do you play?" question, if the
@@ -51,7 +55,7 @@ from dotenv import load_dotenv
 
 import layout
 from names import slug
-from setup_server import Makeover, find, forum_options, layout_channels, private_overwrites
+from setup_server import Makeover, find, forum_options, layout_channels, no_thread_overwrites, private_overwrites
 
 sys.stdout.reconfigure(encoding="utf-8")
 
@@ -116,7 +120,7 @@ class PublicMode:
         # Roles made in this run: guild.roles only learns about them from the gateway a moment
         # later, and the private channels made further down need them straight away.
         self.made_roles: dict[str, discord.Role] = {}
-        self.made_channels: dict[str, object] = {}  # slug -> text channel made in this run, same reason
+        self.made_channels: dict[str, object] = {}  # slug -> text channel or forum made in this run, same reason
 
     async def do(self, verb, what, action):
         print(f"  {verb:<7} {what}")
@@ -196,7 +200,10 @@ class PublicMode:
                 voice = spec.get("type") == "voice"
                 pool = self.guild.voice_channels if voice else self.guild.text_channels
                 label = spec["name"] if voice else f"#{spec['name']}"
-                if find(pool, spec) is not None:
+                existing = find(pool, spec)
+                if existing is not None:
+                    if spec.get("no_threads") and not voice:
+                        self.check_no_threads(existing, spec)
                     continue
                 if cat is None:
                     print(f"! skip    {label}: category {cat_spec['name']} doesn't exist (run setup_server.py)")
@@ -215,11 +222,31 @@ class PublicMode:
                     if keeper:
                         ow[keeper] = discord.PermissionOverwrite(send_messages=True)
                     kwargs["overwrites"] = {**cat.overwrites, **ow}
+                elif spec.get("no_threads") and not voice:
+                    kwargs["overwrites"] = no_thread_overwrites(self.guild, cat)
+                notes = [*(["read-only"] if spec.get("read_only") else []),
+                         *(["no threads"] if spec.get("no_threads") and not voice else []),
+                         *([f"slow mode {spec['slowmode']} s"] if spec.get("slowmode") and not voice else [])]
                 create = self.guild.create_voice_channel if voice else self.guild.create_text_channel
-                made = await self.do("create", f"{label} in {cat.name}" + (" (read-only)" if spec.get("read_only") else ""),
+                made = await self.do("create", f"{label} in {cat.name}" + (f" ({', '.join(notes)})" if notes else ""),
                                      lambda: create(spec["name"], category=cat, **kwargs))
                 if made is not None and not voice:
                     self.made_channels[slug(spec["name"])] = made
+
+    def check_no_threads(self, ch, spec):
+        """A "no_threads" channel made by hand before the layout listed it: this script never edits
+        an existing channel, so it only says what differs."""
+        off = []
+        if getattr(ch, "slowmode_delay", 0) != spec.get("slowmode", 0):
+            off.append(f"slow mode is {getattr(ch, 'slowmode_delay', 0)} s, the layout says {spec.get('slowmode', 0)} s")
+        everyone = ch.overwrites_for(self.guild.default_role) if hasattr(ch, "overwrites_for") else None
+        if everyone is None or everyone.create_public_threads is not False or everyone.create_private_threads is not False:
+            off.append("@everyone may start threads")
+        if off:
+            print(f"! note    #{ch.name} exists but {'; '.join(off)}: change it in the channel's settings "
+                  "(this script never edits an existing channel)")
+        else:
+            print(f"  ok      #{ch.name} (slow mode, no threads)")
 
     async def new_forum(self, spec, cat, cat_name):
         if find(self.guild.forums, spec) is not None:
@@ -231,9 +258,11 @@ class PublicMode:
         tags = [discord.ForumTag(name=n, emoji=e) for n, e in spec.get("tags", [])]
         options = forum_options(spec)
         extras = ", ".join(k for k in ("layout", "sort", "reaction", "post_slowmode", "slowmode") if k in spec)
-        await self.do("create", f"{label} in {cat.name} with {len(tags)} tags" + (f" ({extras})" if extras else ""),
-                      lambda: self.guild.create_forum(spec["name"], category=cat, topic=spec.get("topic", ""),
-                                                      available_tags=tags, **options))
+        made = await self.do("create", f"{label} in {cat.name} with {len(tags)} tags" + (f" ({extras})" if extras else ""),
+                             lambda: self.guild.create_forum(spec["name"], category=cat, topic=spec.get("topic", ""),
+                                                             available_tags=tags, **options))
+        if made is not None:
+            self.made_channels[slug(spec["name"])] = made  # a game's answer may open it in this same run
 
     # Scheduling a Stage event needs these in the stage channel, on top of Create Events.
     STAGE_EVENT_PERMS = ("manage_channels", "mute_members", "move_members")
@@ -570,9 +599,10 @@ class PublicMode:
                 print(f"! skip    {role_name}: #{ch.name} is still in {archive.name} (re-run)")
                 continue
             spec = specs.get(key, {})
+            more = [c for c in map(self.layout_channel, spec.get("channels", ())) if c is not None and c.id != ch.id]
             new[key] = discord.OnboardingPromptOption(
                 title=spec.get("title", role_name), emoji=spec.get("emoji", emoji),
-                description=spec.get("description"), roles=[role], channels=[ch])
+                description=spec.get("description"), roles=[role], channels=[ch, *more])
             names.append(role_name)
         if not names:
             print("  ok      every listed game is an option")
@@ -607,6 +637,60 @@ class PublicMode:
         if swapped:
             what += f" (in the same edit, retired options leave: {', '.join(swapped)}; members who picked one keep the role)"
         await self.do("add", what, edit)
+
+    def layout_channel(self, name):
+        """A layout channel by name: on the server, or made earlier in this run."""
+        return self.channel(name) or self.made_channels.get(slug(name))
+
+    async def game_answer_channels(self):
+        """A listed game's answer in "What do you play?" opens every channel its layout option
+        lists ("channels": the game's own channel, then layout.GAME_EXTRA_CHANNELS; picking
+        Minecraft also opens the Monkey SMP channels). Additive: a channel already on an answer
+        stays, the answer's roles, title and text are left alone, and an answer that isn't there
+        yet is game_options()'s job."""
+        print("\nGame answers' channels")
+        ob, prompt, readable = await self.games_prompt()
+        if not readable:
+            return
+        if prompt is None:
+            print(f"  skip    no \"{GAMES_PROMPT}\" question (polish_server.py makes it)")
+            return
+        listed = {slug(role) for _, _, role in layout.GAMES}
+        specs = {slug(o["role"]): o for p in layout.ONBOARDING_PROMPTS if slug(p["title"]) == slug(GAMES_PROMPT)
+                 for o in p["options"] if o.get("role") and slug(o["role"]) in listed}
+        plan = []  # (option, channels to add, their names)
+        for option in prompt.options:
+            spec = specs.get(slug(option.title))
+            if spec is None:
+                continue
+            have = {int(i) for i in option.channel_ids}
+            add, names, waiting = [], [], []
+            for name in spec.get("channels", ()):
+                ch = self.layout_channel(name)
+                if ch is not None and ch.id in have:
+                    continue
+                if ch is None and self.apply:
+                    waiting.append(name)
+                    continue
+                names.append(name)  # in a dry run, a missing channel is created earlier in the same run
+                if ch is not None:
+                    add.append(ch)
+            if waiting:
+                print(f"! skip    {option.title} -> {', '.join(waiting)}: no such channel yet (re-run once it exists)")
+            if names:
+                plan.append((option, add, names))
+        if not plan:
+            print("  ok      every game answer opens its channels")
+            return
+
+        async def edit():
+            for option, add, _ in plan:
+                option.channel_ids.update(c.id for c in add)
+            # Only the prompts are sent: default channels and the enabled flag are left alone.
+            return await self.guild.edit_onboarding(prompts=ob.prompts)
+
+        what = "; ".join(f"{option.title} also opens {', '.join(names)}" for option, _, names in plan)
+        await self.do("add", f"\"{GAMES_PROMPT}\" channels: {what} (roles unchanged)", edit)
 
     async def retire_games(self):
         """Takes something away (so does game_options(), which drops a retired game's option when
@@ -780,6 +864,7 @@ class PublicMode:
         await self.game_tags()
         await self.restore_games()
         await self.game_options()
+        await self.game_answer_channels()
         await self.retire_games()
         await self.automod_gaps()
         print("\nDone." if self.apply else "\nThat's the plan. Run again with --apply.")

@@ -82,6 +82,17 @@ All notable changes to this project are recorded here. The format follows
   and `QUIET=off` to post every day again. The chat revival (`vibes`) asks the same gate, but
   its own rule already needs a member message, so the gate never refuses it. State is one
   `meta` value per prompt (`quiet:<kind>`) with no member ids.
+- Monkey SMP season channels in `server/layout.py`, after #monkey-smp in `03 · games`: #founding-roster
+  (everyone posts, 6 h slow mode, no threads), #smp-rules and #smp-faq (read-only), and the
+  #smp-forum forum for factions, recruiting, suggestions, bugs and trading. The "Minecraft" answer
+  in "What do you play?" now also opens #monkey-smp, #founding-roster, #smp-forum and #smp-rules
+  (`layout.GAME_EXTRA_CHANNELS`; it still gives only @Minecraft, never @SMP Ping), and the
+  Minecraft opt-in group lists all five SMP channels.
+- Layout: a text channel can set `"no_threads"` (members post, but can't start threads).
+  `public_mode.py` creates it with that permission and its slow mode, and only reports (never
+  edits) one that was made by hand with other settings. Its new `game_answer_channels` step adds a
+  listed game's missing layout channels to that game's existing Onboarding answer, never removing
+  a channel or touching its roles.
 
 ### Security
 
