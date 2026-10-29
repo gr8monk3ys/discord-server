@@ -114,14 +114,14 @@ class Polish:
         for p in layout.ONBOARDING_PROMPTS:
             options = []
             for o in p["options"]:
-                ch = self.channel(o["channel"]) if o.get("channel") else None
+                chans = [c for c in map(self.channel, o.get("channels", ())) if c is not None]
                 options.append(
                     discord.OnboardingPromptOption(
                         title=o["title"],
                         emoji=o.get("emoji", discord.utils.MISSING),
                         description=o.get("description"),
                         roles=[self.role(o["role"])] if o.get("role") else [],
-                        channels=[ch] if ch else [],
+                        channels=chans,
                     )
                 )
                 role = f" (@{o['role']})" if o.get("role") else ""

@@ -463,7 +463,8 @@ def test_public_mode_run_includes_automod_gaps(monkeypatch):
     # The games steps: additive ones first, and retire_games (the only step that hides
     # anything) after the Onboarding question has been brought up to date.
     steps = ("roles", "renamed_channels", "new_channels", "private", "description", "posts", "invite", "onboarding",
-             "onboarding_prompts", "game_tags", "restore_games", "game_options", "retire_games", "automod_gaps")
+             "onboarding_prompts", "game_tags", "restore_games", "game_options", "game_answer_channels",
+             "retire_games", "automod_gaps")
     pm = public_mode.PublicMode(guild, apply=False)
     for name in steps:
         async def step(name=name):

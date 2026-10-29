@@ -50,8 +50,9 @@ def test_every_public_channel_is_in_the_core_or_exactly_one_group():
     assert len(public) == len(set(public))
     assert set(public) == set(listed) | games  # total: nothing public is left out
     assert not set(listed) & games  # game channels belong to "What do you play?"
-    # Everything that is a default today is still a default or one click away.
-    assert {slug(n) for n in TODAY} == set(core) | set(groups)
+    # Everything that is a default today is still a default or one click away; channels added
+    # since (the Monkey SMP season channels) are opt-in from the start.
+    assert {slug(n) for n in TODAY} <= set(core) | set(groups)
 
 
 def test_private_channels_are_untouched():
