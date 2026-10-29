@@ -62,7 +62,11 @@
         },
         {
           "channels": [
-            "⛏️・minecraft"
+            "⛏️・minecraft",
+            "⛏️・monkey-smp",
+            "📜・smp-rules",
+            "📝・founding-roster",
+            "🚩・smp-forum"
           ],
           "description": "Get @Minecraft pings and the #minecraft channel.",
           "emoji": "⛏️",
@@ -323,9 +327,13 @@
         },
         {
           "channels": [
-            "⛏️・monkey-smp"
+            "⛏️・monkey-smp",
+            "❔・smp-faq",
+            "📜・smp-rules",
+            "📝・founding-roster",
+            "🚩・smp-forum"
           ],
-          "description": "The Realms: server status and chat with whoever is in game.",
+          "description": "Monkey SMP: status, in-game chat, the founding roster, rules, FAQ and the faction forum.",
           "emoji": "⛏️",
           "roles": [],
           "title": "Minecraft"

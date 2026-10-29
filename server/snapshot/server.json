@@ -20,11 +20,11 @@
   ],
   "mfa_level": "require_2fa",
   "name": "Lorenzo's Server",
-  "nsfw_level": "age_restricted",
+  "nsfw_level": "default",
   "preferred_locale": "en-US",
   "premium_progress_bar_enabled": true,
   "public_updates_channel": "🛡️・mod",
   "rules_channel": "📌・rules",
   "system_channel": "👋・welcome",
-  "verification_level": "highest"
+  "verification_level": "medium"
 }

@@ -362,7 +362,7 @@
         },
         {
           "bitrate": 64000,
-          "name": "👥 Members: 15",
+          "name": "👥 Members: 24",
           "nsfw": false,
           "overwrites": {
             "member:Front Desk": {
@@ -389,7 +389,7 @@
         },
         {
           "bitrate": 64000,
-          "name": "🟢 Online: 7",
+          "name": "🟢 Online: 6",
           "nsfw": false,
           "overwrites": {
             "member:Front Desk": {
@@ -423,7 +423,7 @@
       "channels": [
         {
           "name": "💬・general",
-          "nsfw": true,
+          "nsfw": false,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -432,7 +432,7 @@
         },
         {
           "name": "🤣・memes",
-          "nsfw": true,
+          "nsfw": false,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -441,7 +441,7 @@
         },
         {
           "name": "📸・clips",
-          "nsfw": true,
+          "nsfw": false,
           "overwrites": {},
           "slowmode": 10,
           "synced": true,
@@ -450,7 +450,7 @@
         },
         {
           "name": "⭐・hall-of-fame",
-          "nsfw": true,
+          "nsfw": false,
           "overwrites": {
             "member:Front Desk": {
               "allow": [
@@ -483,7 +483,7 @@
         },
         {
           "name": "🔢・counting",
-          "nsfw": true,
+          "nsfw": false,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -492,7 +492,7 @@
         },
         {
           "name": "🎲・games",
-          "nsfw": true,
+          "nsfw": false,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -501,7 +501,7 @@
         },
         {
           "name": "💜・supporters",
-          "nsfw": true,
+          "nsfw": false,
           "overwrites": {
             "member:Front Desk": {
               "allow": [
@@ -551,7 +551,7 @@
       "channels": [
         {
           "name": "🕹️・gaming",
-          "nsfw": true,
+          "nsfw": false,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -562,7 +562,7 @@
           "default_reaction": null,
           "layout": "list_view",
           "name": "🎮・lfg",
-          "nsfw": true,
+          "nsfw": false,
           "overwrites": {},
           "require_tag": true,
           "slowmode": 0,
@@ -661,7 +661,7 @@
         },
         {
           "name": "🪖・wardogs",
-          "nsfw": true,
+          "nsfw": false,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -670,7 +670,7 @@
         },
         {
           "name": "⛏️・minecraft",
-          "nsfw": true,
+          "nsfw": false,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -681,7 +681,7 @@
           "default_reaction": "👍",
           "layout": "list_view",
           "name": "📚・guides",
-          "nsfw": true,
+          "nsfw": false,
           "overwrites": {},
           "require_tag": false,
           "slowmode": 600,
@@ -789,8 +789,54 @@
           "type": "forum"
         },
         {
+          "default_reaction": null,
+          "layout": "list_view",
+          "name": "🚩・smp-forum",
+          "nsfw": false,
+          "overwrites": {},
+          "require_tag": false,
+          "slowmode": 0,
+          "sort_order": "latest_activity",
+          "synced": true,
+          "tags": [
+            {
+              "emoji": "🐛",
+              "moderated": false,
+              "name": "Bug"
+            },
+            {
+              "emoji": "🏰",
+              "moderated": false,
+              "name": "Faction"
+            },
+            {
+              "emoji": "🔎",
+              "moderated": false,
+              "name": "Looking for faction"
+            },
+            {
+              "emoji": "📯",
+              "moderated": false,
+              "name": "Recruiting"
+            },
+            {
+              "emoji": "💡",
+              "moderated": false,
+              "name": "Suggestion"
+            },
+            {
+              "emoji": "⚖️",
+              "moderated": false,
+              "name": "Trading"
+            }
+          ],
+          "thread_slowmode": 0,
+          "topic": "Monkey SMP factions, recruiting, suggestions, bugs and trading.\nRegister a faction (up to four players) with one post: the name, the members' Minecraft names, the banner and a charter. One post per faction, tagged Faction.\nPlaying solo? Post with the Looking for faction tag and staff will find you one.\nPayment problems, reports and appeals go in a ticket, not here.",
+          "type": "forum"
+        },
+        {
           "name": "🔺・apex-legends",
-          "nsfw": true,
+          "nsfw": false,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -799,7 +845,7 @@
         },
         {
           "name": "🏆・tournaments",
-          "nsfw": true,
+          "nsfw": false,
           "overwrites": {
             "member:Front Desk": {
               "allow": [
@@ -832,7 +878,7 @@
         },
         {
           "name": "⛏️・monkey-smp",
-          "nsfw": true,
+          "nsfw": false,
           "overwrites": {},
           "slowmode": 2,
           "synced": true,
@@ -841,7 +887,7 @@
         },
         {
           "name": "🌧️・risk-of-rain-2",
-          "nsfw": true,
+          "nsfw": false,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -850,7 +896,7 @@
         },
         {
           "name": "🪚・gears-of-war",
-          "nsfw": true,
+          "nsfw": false,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -859,7 +905,7 @@
         },
         {
           "name": "🦍・overwatch",
-          "nsfw": true,
+          "nsfw": false,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -868,7 +914,7 @@
         },
         {
           "name": "🦸・marvel-rivals",
-          "nsfw": true,
+          "nsfw": false,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -877,11 +923,94 @@
         },
         {
           "name": "🃏・tabletop-simulator",
-          "nsfw": true,
+          "nsfw": false,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
           "topic": "Tabletop Simulator talk, squads, and strats. Ping @Tabletop Simulator.",
+          "type": "text"
+        },
+        {
+          "name": "📝・founding-roster",
+          "nsfw": false,
+          "overwrites": {
+            "role:@everyone": {
+              "allow": [],
+              "deny": [
+                "create_private_threads",
+                "create_public_threads"
+              ]
+            }
+          },
+          "slowmode": 21600,
+          "synced": false,
+          "topic": "Founding roster sign-up: one message with your Minecraft Java name, and your faction's name if you have one. First come, first listed. Rules are pinned.",
+          "type": "text"
+        },
+        {
+          "name": "📜・smp-rules",
+          "nsfw": false,
+          "overwrites": {
+            "member:Front Desk": {
+              "allow": [
+                "embed_links",
+                "send_messages"
+              ],
+              "deny": []
+            },
+            "role:@everyone": {
+              "allow": [
+                "add_reactions"
+              ],
+              "deny": [
+                "create_private_threads",
+                "create_public_threads",
+                "send_messages"
+              ]
+            },
+            "role:Keeper": {
+              "allow": [
+                "send_messages"
+              ],
+              "deny": []
+            }
+          },
+          "slowmode": 0,
+          "synced": false,
+          "topic": "The Monkey SMP rulebook. Staff post here; answers are in #smp-faq, and questions go in #smp-forum or a ticket.",
+          "type": "text"
+        },
+        {
+          "name": "❔・smp-faq",
+          "nsfw": false,
+          "overwrites": {
+            "member:Front Desk": {
+              "allow": [
+                "embed_links",
+                "send_messages"
+              ],
+              "deny": []
+            },
+            "role:@everyone": {
+              "allow": [
+                "add_reactions"
+              ],
+              "deny": [
+                "create_private_threads",
+                "create_public_threads",
+                "send_messages"
+              ]
+            },
+            "role:Keeper": {
+              "allow": [
+                "send_messages"
+              ],
+              "deny": []
+            }
+          },
+          "slowmode": 0,
+          "synced": false,
+          "topic": "Monkey SMP answers: the pass, the modpack, joining. Staff post here; ask anything else in #smp-forum or a ticket.",
           "type": "text"
         }
       ],
@@ -895,7 +1024,7 @@
           "default_reaction": "🔥",
           "layout": "gallery_view",
           "name": "🖥・setups",
-          "nsfw": true,
+          "nsfw": false,
           "overwrites": {},
           "require_tag": false,
           "slowmode": 600,
@@ -939,7 +1068,7 @@
         },
         {
           "name": "🎨・art",
-          "nsfw": true,
+          "nsfw": false,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -948,7 +1077,7 @@
         },
         {
           "name": "💻・code",
-          "nsfw": true,
+          "nsfw": false,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -957,7 +1086,7 @@
         },
         {
           "name": "👗・fashion",
-          "nsfw": true,
+          "nsfw": false,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -966,7 +1095,7 @@
         },
         {
           "name": "♟️・chess",
-          "nsfw": true,
+          "nsfw": false,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -975,7 +1104,7 @@
         },
         {
           "name": "🤖・bot-commands",
-          "nsfw": true,
+          "nsfw": false,
           "overwrites": {},
           "slowmode": 0,
           "synced": true,
@@ -984,7 +1113,7 @@
         },
         {
           "name": "📺・creators",
-          "nsfw": true,
+          "nsfw": false,
           "overwrites": {
             "member:Front Desk": {
               "allow": [
@@ -1017,7 +1146,7 @@
         },
         {
           "name": "🤝・partners",
-          "nsfw": true,
+          "nsfw": false,
           "overwrites": {
             "member:Front Desk": {
               "allow": [
@@ -1114,7 +1243,7 @@
       "channels": [
         {
           "name": "🔒・squad-chat",
-          "nsfw": true,
+          "nsfw": false,
           "overwrites": {
             "member:Front Desk": {
               "allow": [
