@@ -6,6 +6,17 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Monkey SMP: `/smp link` only records the Discord-to-Minecraft name pair, for the chat bridge and
+  playtime. Front Desk no longer whitelists or un-whitelists anyone (access is a paid pass staff
+  grant by hand or through the store), and its RCON client refuses every command but `list` and
+  `tellraw`. The 14-days-in-the-server wait is gone; the 30-day account age stays. `/smp unlink`,
+  leaving and a ban just forget the link. `/smp adopt` stays as a staff link. Link rows still
+  waiting on the old whitelist sync are settled on load without sending anything. Replies, the
+  status panel, the channel topic, the welcome copy and the site say a link is not access and
+  point to the pass and a ticket in #help.
+
 ### Added
 
 - CI: GitHub Actions runs ruff and both test suites on every pull request and push to `main`.

@@ -35,7 +35,7 @@ _Last updated: 2026-10-12_
 | Guide and setup posts you make: the post's ID, its title and when you posted it (not the post's text) | The one-time post reward |
 | Watch parties you schedule (the event, you as host, the start time) | Reminders and the one-event-per-host limit |
 | Clips shortlisted for the server's YouTube: the message ID, your answer, who gave it and when, the name you asked to be credited as, and the video's YouTube ID once posted | Clipcast, proof of consent, taking a clip down |
-| A Minecraft name you link with `/smp link`, and how long you were online on the Minecraft server each day | The whitelist, playtime coins, `/smp top` |
+| A Minecraft name you link with `/smp link`, and how long you were online on the Minecraft server each day | Passing your in-game chat to the Monkey SMP channel, playtime coins, `/smp top` |
 | When you last shared a Wrapped card, and your level on January 1 | The share cooldown, "levels gained" on next year's card |
 | When you were banned; a ban appeal you send (your user ID, your answers, the decision, who made it and their reason) | The waiting period before an appeal, staff review |
 
@@ -98,10 +98,9 @@ otherwise tells the owner to remove it by hand. The record of the clip and your 
 either way, because it is the proof of what you agreed to.
 
 **Monkey SMP (Minecraft).** The Minecraft server belongs to the server owner and runs on the
-owner's own computer or home network. `/smp link` sends the Minecraft name you give to that server's whitelist and keeps
-the name with your Discord ID; `/smp unlink`, leaving or a ban takes it off the whitelist
-and deletes it once the Minecraft server has confirmed. Front Desk only removes names it added
-itself. What you type in the Monkey SMP channel is
+owner's own computer or home network. `/smp link` keeps the Minecraft name you give with your Discord ID; it is
+not sent to the Minecraft server, and Front Desk never changes who may join it (that is a pass staff grant).
+`/smp unlink`, leaving or a ban deletes the link. What you type in the Monkey SMP channel is
 shown to players in the game with your display name, whatever your `/privacy` setting, and what
 linked players say in the game is posted in that channel; Front Desk keeps neither. In-game chat is
 passed on only from a player whose name is linked to a member who can post in that channel right now, so

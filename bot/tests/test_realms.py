@@ -245,43 +245,22 @@ def test_rcon_length_and_parse_reject_malformed():
 
 
 # ---------------------------------------------------------------- commands
-def test_whitelist_command_only_takes_valid_names():
-    assert R.whitelist_command("add", "Steve_1") == "whitelist add Steve_1"
-    assert R.whitelist_command("remove", "Steve_1") == "whitelist remove Steve_1"
-    for name in HOSTILE_NAMES:
-        with pytest.raises(ValueError):
-            R.whitelist_command("add", name)
-    with pytest.raises(ValueError):
-        R.whitelist_command("reload", "Steve")
-
-
-def test_whitelist_result():
-    assert R.whitelist_result("add", "Added Steve to the whitelist") == "ok"
-    # not "ok": the name was there before this add, so somebody else put it on the whitelist
-    assert R.whitelist_result("add", "Player is already whitelisted") == "already"
-    assert R.whitelist_result("remove", "Player is already whitelisted") == "error"
-    assert R.whitelist_result("add", "That player does not exist") == "unknown"
-    assert R.whitelist_result("add", "") == "error"
-    assert R.whitelist_result("add", "Removed Steve from the whitelist") == "error"
-    assert R.whitelist_result("remove", "Removed Steve from the whitelist") == "ok"
-    assert R.whitelist_result("remove", "Player is not whitelisted") == "ok"
-    assert R.whitelist_result("remove", "That player does not exist") == "unknown"
-    assert R.whitelist_result("remove", "Unknown or incomplete command") == "error"
+def test_only_list_and_tellraw_are_ever_sent():
+    """Monkey SMP access is a paid pass staff grant: the bot never changes the whitelist."""
+    assert R.sendable("list") and R.sendable(R.tellraw_command("Lori", "hi"))
+    for command in ("whitelist add Steve", "whitelist remove Steve", "whitelist on", "op Steve", "stop",
+                    "list uuids", " list", "tellraw Steve hi", "tellraw @p {}", "", None, 7):
+        assert not R.sendable(command), command
+    for gone in ("whitelist_command", "whitelist_result", "member_long_enough", "LINK_MEMBER_DAYS",
+                 "retry_due", "MAX_ATTEMPTS", "SLOW_RETRY", "SYNC_BATCH"):
+        assert not hasattr(R, gone), gone
+    assert R.PASS_URL == "https://monkeysmp.lscaturchio.xyz"
 
 
 def test_relay_gate_timings():
     # an API "not a member" may be reused for five minutes, a fetched member for one at most
     assert R.MEMBER_GONE_FOR == 5 * 60 and R.MEMBER_FRESH_FOR == 60 and R.HINT_EVERY == 6 * 3600
     assert not hasattr(R, "removed_key") and not hasattr(R, "REMOVED_KEEP")
-
-
-def test_linking_needs_two_weeks_in_the_server():
-    day = 86400
-    assert R.LINK_MEMBER_DAYS == 14
-    assert not R.member_long_enough(1000, 1000 + 14 * day - 1)
-    assert R.member_long_enough(1000, 1000 + 14 * day)
-    assert not R.member_long_enough(None, 10 ** 10)  # join time unknown: not taken on trust
-    assert not R.member_long_enough(2000, 1000)  # a clock that makes no sense
 
 
 def test_parse_list():
@@ -507,12 +486,6 @@ def test_poll_delay_backs_off_and_recovers():
     assert R.poll_delay(-1) == R.POLL_EVERY
 
 
-def test_retry_due():
-    assert R.retry_due(0, 100, 100) and R.retry_due(R.MAX_ATTEMPTS - 1, 100, 100)
-    assert not R.retry_due(R.MAX_ATTEMPTS, 100, 100 + R.SLOW_RETRY - 1)
-    assert R.retry_due(R.MAX_ATTEMPTS, 100, 100 + R.SLOW_RETRY)
-
-
 def test_credit_seconds_needs_two_close_polls():
     assert R.credit_seconds(None, 1000) == 0
     assert R.credit_seconds(1000, 1120) == 120 and R.credit_seconds(1000, 1000 + R.MAX_GAP) == R.MAX_GAP
@@ -559,13 +532,13 @@ def test_panel_text_and_signature():
 def test_health_line():
     full = R.read_setup({R.ENV_ADDRESS: "127.0.0.1", R.ENV_RCON_PASSWORD: PASSWORD,
                          R.ENV_LOG_PATH: "/srv/mc/logs/latest.log"})
-    assert R.health(full) == "ok (status, whitelist, chat to Minecraft, chat from Minecraft)"
+    assert R.health(full) == "ok (status, chat to Minecraft, chat from Minecraft)"
     assert R.health(full, down_since=1_790_000_000) == "unreachable since <t:1790000000:f>"
     assert R.health(full, rcon_down_since=5) == \
-        "ok (status, whitelist, chat to Minecraft, chat from Minecraft); RCON unreachable since <t:5:f>"
-    noisy = R.health(full, rcon_down_since=5, rcon_refused=True, log_missing=True, waiting=2)
+        "ok (status, chat to Minecraft, chat from Minecraft); RCON unreachable since <t:5:f>"
+    noisy = R.health(full, rcon_down_since=5, rcon_refused=True, log_missing=True)
     assert "RCON refused the password" in noisy and "log file not found" in noisy
-    assert "2 whitelist changes waiting" in noisy and PASSWORD not in noisy
+    assert "whitelist" not in noisy and PASSWORD not in noisy
     half = R.read_setup({R.ENV_ADDRESS: "127.0.0.1", R.ENV_RCON_HOST: "8.8.8.8", R.ENV_RCON_PASSWORD: PASSWORD})
     assert R.health(half).startswith("ok (status); setting problem: REALMS_RCON_HOST refused")
 
@@ -731,13 +704,13 @@ def with_rcon(fn, **kwargs):
 def test_rcon_signs_in_once_and_runs_commands():
     async def go(fake, client, port):
         assert await client.command("list") == "There are 0 of a max of 20 players online: "
-        assert await client.command("whitelist add Steve") == "Added Steve to the whitelist"
+        assert await client.command("say hi") == "hi said"
         assert await client.command("tellraw @a [\"\"]") == ""
         assert fake.auth_attempts == [PASSWORD] and fake.connections == 1  # one connection, kept
-        assert fake.commands == ["list", "whitelist add Steve", "tellraw @a [\"\"]"]
+        assert fake.commands == ["list", "say hi", "tellraw @a [\"\"]"]
         assert len(set(fake.ids)) == len(fake.ids) == 4 and all(i > 0 for i in fake.ids)
     with_rcon(go, replies={"list": "There are 0 of a max of 20 players online: ",
-                           "whitelist add Steve": "Added Steve to the whitelist"})
+                           "say hi": "hi said"})
 
 
 def test_rcon_accepts_the_source_style_sign_in():
