@@ -269,11 +269,20 @@ h3.label { font-family: var(--mono); font-size: 0.72rem; font-weight: 500; lette
 }
 .sections a:hover { color: color-mix(in srgb, var(--ink) 90%, transparent); }
 .sections a:hover::after { transform: scaleX(1); }
+/* The section you are reading (app.js sets aria-current): the pen stays under it,
+   and moves to the next link as you scroll on. */
+.sections a[aria-current] { color: var(--ink); }
+.sections a[aria-current]::after { transform: scaleX(1); transition-duration: var(--slow); transition-timing-function: var(--ease-ink); }
 
 .controls { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 
-/* Between 768 and 900px the pill gives up its inner air so the bar still fits. */
-@media (min-width: 768px) and (max-width: 899px) { .sections ul { gap: 0; padding: 8px 4px; } }
+/* Between 768 and 900px the pill and its links give up their inner air, and the brand
+   slot shrinks to the wordmark, so six links and the controls still fit. */
+@media (min-width: 768px) and (max-width: 899px) {
+  .sections ul { gap: 0; padding: 8px 4px; }
+  .sections a { padding: 8px 8px; }
+  .sections a::after { left: 8px; right: 8px; }
+}
 @media (min-width: 768px) {
   .top { z-index: 50; -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); box-shadow: var(--sheet-shadow); }
   .brand { width: 200px; flex: none; }
@@ -283,6 +292,7 @@ h3.label { font-family: var(--mono); font-size: 0.72rem; font-weight: 500; lette
   .sections { display: flex; align-items: center; }
   .controls { gap: 12px; }
 }
+@media (min-width: 768px) and (max-width: 899px) { .brand { width: auto; } .wordmark { height: 36px; } }
 
 /* The quiet control: paper card, hairline, tint and a warmer border on hover. */
 .theme-toggle, .btn-quiet {
@@ -415,6 +425,8 @@ h3.label { font-family: var(--mono); font-size: 0.72rem; font-weight: 500; lette
    the right. The rule that opens each one ends where the content ends. */
 main > section[id] { scroll-margin-top: var(--header-h); }
 .ledger { display: grid; align-items: start; gap: 48px; padding: 96px 0; border-top: 1px solid var(--hairline); }
+/* A list ends on the next section's rule, not one of its own. */
+.ledger-body > :is(.days, .rules) > li:last-child, .faq > details:last-child { border-bottom-color: transparent; }
 @media (min-width: 768px) { .ledger { padding: 144px 0; } }
 @media (min-width: 1024px) {
   .ledger { grid-template-columns: minmax(280px, 360px) 1fr; }
@@ -430,6 +442,17 @@ main > section[id] { scroll-margin-top: var(--header-h); }
 /* Entries: a title and two lines under it, two to a row once there is room. */
 .rows { display: grid; gap: 24px 40px; margin-top: 20px; }
 @media (min-width: 640px) { .rows { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* A closing note under the entries: body size, muted, a hairline above it. */
+.smp-note { max-width: 40rem; font-size: 1.0625rem; line-height: 1.65; }
+.aside { margin-top: 40px; padding-top: 20px; max-width: 40rem; border-top: 1px solid var(--hairline); font-size: 0.9375rem; line-height: 1.6; color: var(--ink-muted); }
+/* Outbound links under a ledger: one line of pen-underlined text links. */
+.links { display: flex; flex-wrap: wrap; gap: 4px 28px; margin-top: 20px; }
+.links a { display: inline-flex; align-items: center; gap: 4px; min-height: 2.75rem; font-weight: 500; color: var(--ink); }
+.links a:hover { color: var(--pen); }
+/* The season line in the rail: a wall label in the pen, since it is the date that matters. */
+.season { margin-top: 20px; color: var(--pen); white-space: pre-line; line-height: 1.6; }
+.rows a { color: var(--ink); font-weight: 500; }
+.rows a:hover { color: var(--pen); }
 .rows p, .days p { margin-top: 6px; max-width: 32rem; font-size: 0.9375rem; line-height: 1.6; color: var(--ink-muted); }
 
 /* -------------------------------------------------------------- this week */
@@ -592,13 +615,13 @@ footer { border-top: 1px solid color-mix(in srgb, var(--hairline) 60%, transpare
 .game-hours { font: 500 0.72rem/1 var(--mono); letter-spacing: 0.04em; font-feature-settings: "tnum" 1; color: var(--ink-muted); }
 
 /* House standings: name and points on one line, a hairline-thin bar under it.
-   The leader gets the pen; the rest are the pen thinned out. */
+   A clear leader gets the pen; the rest (and everyone in a tie) are the pen thinned out. */
 .houses { margin-top: 16px; }
 .houses li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 8px 16px; }
 .houses li + li { margin-top: 16px; }
 .bar { grid-column: 1 / -1; height: 6px; border-radius: 9999px; background: var(--tint); overflow: hidden; }
 .bar-fill { display: block; width: 0; height: 100%; border-radius: inherit; background: color-mix(in srgb, var(--pen) 45%, transparent); }
-.houses li:first-child .bar-fill { background: var(--pen); }
+.houses li.lead .bar-fill { background: var(--pen); }
 
 /* ------------------------------------------------------------------ motion */
 /* Scroll: the pen rules the page. app.js puts .inks on <html> (never when the
@@ -608,8 +631,10 @@ footer { border-top: 1px solid color-mix(in srgb, var(--hairline) 60%, transpare
 
    A section's opening rule is drawn left to right in Forest Ink and dries to
    the hairline, and its heading is written in behind the pen. A ledger's rows
-   are ruled one under another. The game chips are set down one at a time.
-   Nothing here moves text that is already on screen. */
+   are ruled one under another, and each row's words are written in just
+   behind its rule. The game chips fade in one at a time; the house bars
+   are drawn out to their score. Nothing here moves text that is already on
+   screen. */
 @media (prefers-reduced-motion: no-preference) {
   /* The rules become drawable: a 1px bar over the (now clear) border, and a
      1px background line where the element's pseudo-elements are spoken for. */
@@ -641,7 +666,10 @@ footer { border-top: 1px solid color-mix(in srgb, var(--hairline) 60%, transpare
   .inks .armed::before { transform: scaleX(0); background: var(--pen); }
   .inks .armed h2 { clip-path: inset(-0.2em 100% -0.2em 0); }
   .inks .armed:is(.days, .rules), .inks .armed:is(.days, .rules) > li, .inks .faq.armed > details { background-size: 0 1px; }
-  .inks .games.armed > .game { opacity: 0; transform: translateY(6px) scale(0.96); }
+  .inks .games.armed > .game { opacity: 0; }
+  .inks .armed:is(.days, .rules) > li > *, .inks .rows.armed > li > * { clip-path: inset(-0.3em 100% -0.3em 0); }
+  .inks .rules.armed > li::before { opacity: 0; }
+  .inks .houses.armed .bar-fill { transform: scaleX(0); transform-origin: left center; }
 
   /* Inked: each piece arrives once. Rows and chips follow one another, capped
      at the eighth so a long list never keeps the reader waiting. */
@@ -661,11 +689,37 @@ footer { border-top: 1px solid color-mix(in srgb, var(--hairline) 60%, transpare
   .inks .armed.inked h2 { clip-path: inset(-0.2em -0.1em -0.2em 0); transition: clip-path 900ms var(--ease-ink) 120ms; }
   .inks .armed.inked:is(.days, .rules), .inks .armed.inked:is(.days, .rules) > li, .inks .faq.armed.inked > details {
     background-size: 100% 1px;
-    transition: background-size 700ms var(--ease-ink) calc(var(--n, 0) * 70ms);
+    transition: background-size 600ms var(--ease-ink) calc(var(--n, 0) * 50ms);
   }
-  .inks .games.armed.inked > .game {
-    opacity: 1;
-    transform: none;
-    transition: opacity 320ms ease calc(var(--n, 0) * 45ms), transform 560ms var(--ease-ink) calc(var(--n, 0) * 45ms);
+  .inks .games.armed.inked > .game { opacity: 1; transition: opacity 360ms ease calc(var(--n, 0) * 45ms); }
+  /* The words follow their rule by 100ms; the rule number is stamped as the row arrives. */
+  .inks .armed.inked:is(.days, .rules) > li > *, .inks .rows.armed.inked > li > * {
+    clip-path: inset(-0.3em -1em -0.3em 0);
+    transition: clip-path 560ms var(--ease-ink) calc(var(--n, 0) * 50ms + 100ms);
+  }
+  .inks .rules.armed.inked > li::before { opacity: 1; transition: opacity 240ms ease calc(var(--n, 0) * 50ms); }
+  .inks .houses.armed.inked .bar-fill { transform: none; transition: transform 1100ms var(--ease-ink) calc(var(--n, 0) * 120ms + 200ms); }
+  .inks .ledger-body > :is(.days, .rules) > li:last-child, .inks .ledger-body > .faq > details:last-child { background-size: 0 1px; }
+}
+
+/* The reading meter: on wide screens the heading rail stays put while its
+   entries scroll past, and a rule under it fills with the pen as the reading
+   line (the same band app.js uses for the nav) passes through the section. Scroll-linked, so it only runs where the browser can
+   tie an animation to scroll; elsewhere the rail is as it was. */
+@supports (animation-timeline: view()) {
+  @media (min-width: 1024px) and (prefers-reduced-motion: no-preference) {
+    main .ledger { view-timeline: --ledger block; view-timeline-inset: 38% 58%; }
+    .ledger-head::after {
+      content: "";
+      display: block;
+      height: 1px;
+      margin-top: 28px;
+      background: linear-gradient(var(--pen), var(--pen)) left center / 0 100% no-repeat, var(--hairline);
+      background-size: 0 100%, 100% 100%; /* both layers sized, so the fill interpolates */
+      animation: read linear both;
+      animation-timeline: --ledger;
+      animation-range: cover 0% cover 100%;
+    }
   }
 }
+@keyframes read { from { background-size: 0 100%, 100% 100%; } to { background-size: 100% 100%, 100% 100%; } }

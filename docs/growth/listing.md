@@ -1,8 +1,8 @@
 # Growing the server
 
 Positioning: **a small, friendly co-op and PvE server, evenings US Pacific.** The tagline is
-"Chill gamers. No tryhards, no toxicity." Say what is true: who plays what, when, and that it is small. The chats are 18+
-(the chat channels are age-restricted; the server itself isn't); the copy implies it ("for adults") and states it once, in the rules line.
+"Chill gamers. No tryhards, no toxicity." Say what is true: who plays what, when, and that it is small. Since 2026-10-29 the server is
+all-ages and SFW (no age-restricted channels, no NSFW anywhere), so the copy no longer says "adults".
 
 Use the permanent invite that `server/public_mode.py --apply` prints. It's one link, so the
 invite tracker can tell listing traffic from friend invites.
@@ -48,15 +48,15 @@ play, and only post it on a night you will be there. Update the member count if 
 
 > **[NA West] Risk of Rain 2 tonight around 8 PM Pacific, looking for 1 or 2 more**
 > I'm starting a Risk of Rain 2 run tonight around 8 PM Pacific and I'd like one or two more
-> people. I'm an adult and I play for fun: any skill level is fine, new players too, and
+> people. I play for fun: any skill level is fine, new players too, and
 > nobody gets yelled at over a bad run. I play with a few people from a small co-op Discord
-> (about 20 of us, all adults), and I'll be in voice there. Reply or DM me, or join and say
+> (about 30 of us), and I'll be in voice there. Reply or DM me, or join and say
 > hi: <invite>
 
 **Template (r/DiscordAdvertising / r/discordservers):**
 
-> **Lorenzo's Server: a small co-op and PvE server for adults**
-> Chill gamers. No tryhards, no toxicity. We're a small, friendly server of about 20 adults
+> **Lorenzo's Server: a small co-op and PvE server**
+> Chill gamers. No tryhards, no toxicity. We're a small, friendly server of about 30 people
 > who play co-op and PvE games. We play Risk of Rain 2, Gears of War, Overwatch, Marvel
 > Rivals, Apex Legends, Tabletop Simulator, Wardogs and Minecraft, and the owner runs a modded
 > Minecraft server. A few of us are in voice in the evenings, US Pacific time, and some nights
@@ -64,7 +64,7 @@ play, and only post it on a night you will be there. Update the member count if 
 
 ## Partner swap (with servers your size)
 
-> Hey! I run a chill gaming server for adults (~N members) that plays co-op and PvE games in the evenings, US Pacific time.
+> Hey! I run a chill gaming server (~N members) that plays co-op and PvE games in the evenings, US Pacific time.
 > Want to swap partner posts? I'll post yours in our #📣・announcements and you post ours.
 > Happy to do a joint game night too.
 

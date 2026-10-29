@@ -47,7 +47,7 @@ def test_app_js_renders_with_text_content_only():
     assert "textContent" in js and "createElement" in js
     # only fixed attribute names are ever set from script
     assert set(re.findall(r'setAttribute\("([^"]+)"', js)) <= {"href", "rel", "aria-disabled", "aria-hidden",
-                                                              "datetime"}
+                                                              "aria-current", "datetime"}
 
 
 def test_app_js_has_a_timeout_and_a_staleness_limit():
@@ -79,9 +79,9 @@ def test_live_markup_is_hidden_until_script_fills_it():
     for block in ("live-events", "live-houses", "live-games", "live-tally"):
         assert re.search(rf'id="{block}" hidden', live), block
     assert re.search(r'<p class="now label" id="now" hidden>', page)
-    # between "This week" and "Games", outside the numbered sequence
-    assert page.index('<section id="week">') < page.index('<section id="live"') < page.index('<section id="games">')
-    assert re.search(r'<div class="ledger-head">\s*<h2>Right now</h2>', live)
+    # between "Monkey SMP" and "House rules", outside the numbered sequence
+    assert page.index('<section id="smp">') < page.index('<section id="live"') < page.index('<section id="rules">')
+    assert re.search(r'<div class="ledger-head">\s*<h2>This week</h2>', live)
     assert not re.search(r'<p class="label">\d\d\b', live)
     assert "<li" not in live and "<img" not in live  # no placeholder content, no avatars
     assert 'href="#live"' in page

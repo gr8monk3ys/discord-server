@@ -78,6 +78,11 @@ All notable changes to this project are recorded here. The format follows
 
 ### Changed
 
+- Landing page: the rules are generated from the `#rules` embed in `server/layout.py` (`logic.sitegen`,
+  with a drift test); a short Monkey SMP section with the Season I date links to its own site; the FAQ
+  explains the paid SMP pass, the "Lorenzo's Server" name and what the bot keeps; quieter copy, ink-in
+  scroll reveals, a scroll-spy header and a footer Help column (ban appeals, privacy).
+- The server is all-ages: the 18+ rule is gone from the rules embed, and the listing copy says so.
 - The Minecraft server is now Monkey SMP: `/realms` is `/smp` (`/smp link`, `/smp remove`, `/smp adopt`),
   and the channel is #monkey-smp. The bridge also answers in the old #realms channel until
   `public_mode.py` renames it in place (its new `renamed_channels` step, for any layout channel
