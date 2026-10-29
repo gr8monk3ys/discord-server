@@ -79,8 +79,10 @@ CI (`.github/workflows/ci.yml`) runs ruff, both Python test suites and the site 
 
 - Role order: Front Desk sits below Keeper/Moderator and cannot move roles to or above its own
   position. Never reorder roles near the bot (`setup_server.py` calls `edit_role_positions`); use
-  `public_mode.py`, which never reorders or deletes (it only adds, except that it drops the
-  Onboarding options of retired games and archives their channels; read its dry run first). Roles the bot hands out must sit below it.
+  `public_mode.py`, which never reorders roles or deletes anything (it adds; it also renames
+  categories by their "was" names, makes a category marked `public_mode_creates`, moves a layout
+  channel sitting in another layout category into its own, drops the Onboarding options of retired
+  games and archives their channels; read its dry run first). Roles the bot hands out must sit below it.
 - The live bot runs from a scheduled task and holds `bot/data/bot.lock`; stop the task before
   running `main.py` by hand (README runbook).
 - The "Front Desk watchdog" task restarts the bot if `bot/data/heartbeat` goes stale; run

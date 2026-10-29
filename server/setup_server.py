@@ -69,16 +69,33 @@ def no_thread_overwrites(guild, cat):
     return ow
 
 
-async def arrange_category(cat, members):
-    """Put channels into a category in the order given, keeping their own permissions."""
+async def arrange_category(cat, members, only=None):
+    """Put channels into a category in the order given, keeping their own permissions. With `only` (channel
+    ids), just those channels move, each after the one before it in `members`; the rest stay where they are."""
     prev = {}
     for ch in members:
         bucket = ch._sorting_bucket  # text and forums sort together, voice apart
-        if bucket not in prev:
-            await ch.move(beginning=True, category=cat, sync_permissions=False)
-        else:
-            await ch.move(after=prev[bucket], category=cat, sync_permissions=False)
+        if only is None or ch.id in only:
+            if bucket not in prev:
+                await ch.move(beginning=True, category=cat, sync_permissions=False)
+            else:
+                await ch.move(after=prev[bucket], category=cat, sync_permissions=False)
+            ch = await landed(ch, cat)
         prev[bucket] = ch
+
+
+async def landed(ch, cat, tries=40):
+    """The channel once the gateway has told the cache it is in `cat`: the next move works out its position
+    from the cached channels of that category, so it must not run before then (or it can't find this one)."""
+    guild = getattr(cat, "guild", None)
+    for _ in range(tries):
+        now = guild.get_channel(ch.id) if guild is not None else None
+        if now is None:
+            return ch
+        if now.category_id == cat.id:
+            return now
+        await asyncio.sleep(0.25)
+    raise RuntimeError(f"#{ch.name} didn't show up in {cat.name} after its move; run this again")
 
 
 def private_overwrites(guild, role_names, known=None):

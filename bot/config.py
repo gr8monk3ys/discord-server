@@ -51,6 +51,7 @@ VOICE_CATEGORY = "06 · voice"
 # Its old names (it was 05 · voice before the Monkey SMP category): temp voice and matchmaking
 # keep finding it until public_mode.py renames it in place.
 VOICE_CATEGORY_WAS = layout_old_names(VOICE_CATEGORY)
+VOICE_CATEGORY_NAMES = (VOICE_CATEGORY, *VOICE_CATEGORY_WAS)
 NEW_SQUAD_VOICE = "➕ New Squad"  # join to get your own temporary voice channel
 HYPE_ROLE = "Hype"  # shop: 24 h hoisted role
 SEASON_ROLE = "Season Champ"  # top 3 of the last finished season

@@ -426,7 +426,7 @@ def test_dry_run_plans_the_category_and_the_moves_and_changes_nothing(capsys):
     assert "create  category 04 · monkey smp after 03 · games, with its permissions" in out
     assert f"create  #{CMDS} in 04 · monkey smp (read-only)" in out
     strays = ", ".join(f"#{n}" for n in SMP_CHANNELS if n != CMDS)
-    assert f"move    {strays} into 04 · monkey smp (permissions kept), then its channels in layout order" in out
+    assert f"move    {strays} into 04 · monkey smp (permissions kept), each after the layout channel before it" in out
 
 
 def test_apply_makes_the_category_after_games_and_moves_the_channels_in_layout_order(capsys):
@@ -442,11 +442,13 @@ def test_apply_makes_the_category_after_games_and_moves_the_channels_in_layout_o
         "01 · front desk", "02 · the lobby", "03 · games", "05 · off topic", "06 · voice", "00 · staff", "07 · squad"]
     [(_, cmd_kw)] = [(n, kw) for kind, n, kw in guild.calls if n == CMDS]
     assert cmd_kw["category"] is cat
+    # Only the channels from 03 · games move (#smp-commands was made in place), each after the one before it.
     moves = [(n, kw) for what, n, kw in guild.moves if what == "move" and "category" in kw]
-    assert [n for n, _ in moves] == SMP_CHANNELS
+    moved = [n for n in SMP_CHANNELS if n != CMDS]
+    assert [n for n, _ in moves] == moved
     assert all(kw["category"] is cat and kw["sync_permissions"] is False for _, kw in moves)
     assert moves[0][1]["beginning"] is True
-    assert [kw["after"].name for _, kw in moves[1:]] == SMP_CHANNELS[:-1]
+    assert [kw["after"].name for _, kw in moves[1:]] == [SMP_CHANNELS[SMP_CHANNELS.index(n) - 1] for n in moved[1:]]
     # A second run finds everything in place.
     guild.calls.clear(), guild.moves.clear()
     capsys.readouterr()
@@ -464,3 +466,42 @@ def test_a_channel_in_a_category_the_layout_does_not_list_stays_put(capsys):
     out = capsys.readouterr().out
     strays = ", ".join(f"#{n}" for n in SMP_CHANNELS if n not in (CMDS, FAQ))
     assert f"move    {strays} into 04 · monkey smp" in out
+
+
+def test_a_missing_category_not_marked_for_public_mode_is_skipped(capsys):
+    guild, _ = _before_the_category()
+    guild.categories.remove(next(c for c in guild.categories if c.name == "00 · staff"))
+    asyncio.run(_category_steps(public_mode.PublicMode(guild, apply=True)))
+    made = [n for kind, n, _ in guild.calls if kind == "category"]
+    assert made == ["04 · monkey smp"]  # never a public copy of 00 · staff
+    out = capsys.readouterr().out
+    assert "! skip    category 00 · staff: doesn't exist" in out
+    assert not [n for kind, n, _ in guild.calls if n in ("🛡️・mod", "🔒・admin")]
+
+
+def test_a_refused_category_is_reported_and_its_channels_skipped(capsys):
+    guild, games = _before_the_category()
+
+    async def refused(name, **kw):
+        raise discord.Forbidden(NS(status=403, reason="Forbidden"), "Missing Permissions")
+    guild.create_category = refused
+    pm = public_mode.PublicMode(guild, apply=True)
+    pm.SETTLE = 0
+    asyncio.run(_category_steps(pm))
+    out = capsys.readouterr().out
+    assert "! failed  category 04 · monkey smp: Missing Permissions" in out
+    assert f"! skip    #{CMDS}: category 04 · monkey smp doesn't exist" in out
+    assert not [m for m in guild.moves if m[0] == "move" and "category" in m[2]]
+
+
+def test_each_move_waits_until_the_cache_has_the_channel_in_its_new_category():
+    from setup_server import landed
+    seen = []
+    cat = NS(id=1, name="04 · monkey smp")
+    stale, moved = NS(id=5, name="smp-rules", category_id=2), NS(id=5, name="smp-rules", category_id=1)
+
+    def get_channel(cid):
+        seen.append(cid)
+        return stale if len(seen) < 3 else moved
+    cat.guild = NS(get_channel=get_channel)
+    assert asyncio.run(landed(stale, cat)) is moved and len(seen) == 3

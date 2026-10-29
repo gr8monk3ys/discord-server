@@ -193,6 +193,9 @@ CATEGORIES = [
         # site/src/content/guide/discord.mdx). public_mode.py makes the category after 03 · games with its
         # permissions and moves these channels in from there. Each channel's "post" is pinned by public_mode.py.
         "name": "04 · monkey smp",
+        # public_mode.py makes this one if it is missing (after 03 · games, with its permissions); it skips any
+        # other missing category, since a copy of the one before it could be the wrong permissions.
+        "public_mode_creates": True,
         "channels": [
             {"name": "📜・smp-rules", "topic": "The Monkey SMP rulebook. Staff post here; answers are in "
                                               "#smp-faq, and questions go in #smp-forum or a ticket.", "read_only": True,
