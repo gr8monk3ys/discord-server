@@ -75,6 +75,13 @@ All notable changes to this project are recorded here. The format follows
   creates it). A status ping of the public address every 5 minutes; after a ping, nothing until
   the count has dropped and 4 hours have passed, and nothing from 22:00 to 09:00.
   `SMP_WATCH=off` turns it off.
+- `welcomers` module: when someone who joined in the last 14 days joins a public voice channel
+  for the first time, one line in general pings a new opt-in Welcomer role (on the 🎭・roles
+  panel, Pings; `server/public_mode.py --apply` creates it) and names the channel. Once per
+  newcomer, after 30 seconds in the channel, not when a Welcomer or staff member is already
+  there, at most one ping per 15 minutes, never in the crew's quiet hours (`CREW_QUIET_HOURS`)
+  and never for members with tracking off. "First time" comes from the voice history the stats
+  module already keeps.
 - A "Newcomers" field in the Monday owner digest (`bot/logic/funnel.py`): for the week and the
   last 28 days, how many joined, left since, picked roles, said something and joined voice; of
   the week before's joiners, how many are still here and how many came back in week 2; and one
@@ -99,6 +106,16 @@ All notable changes to this project are recorded here. The format follows
   edits) one that was made by hand with other settings. Its new `game_answer_channels` step adds a
   listed game's missing layout channels to that game's existing Onboarding answer, never removing
   a channel or touching its roles.
+- `fieldnotes` module: the owner's weekly field notes in a new read-only 📓・field-notes channel
+  (`01 · front desk`, a newcomer default): Built (merged pull requests in public GitHub repos),
+  Heard (SpotifyForge's listening log), Watched (Letterboxd RSS) and Played (the owner's game
+  time), Sundays at 18:00, with a reply thread and one question through quiet rooms
+  (`quiet:fieldnotes`). Staff `/fieldnotes preview`. Off until a `FIELD_NOTES_*` setting is set.
+- Monkey SMP season posts in `layout.POSTS`: the founding roster's sign-up rules in #founding-roster,
+  the condensed Season I rulebook in #smp-rules (rule numbers match the SMP repo's `docs/RULES.md`,
+  which is too long for one message, so it links the website's rules) and a short FAQ in #smp-faq.
+  `public_mode.py` posts and pins each once and edits it in place when the text changes, as it does
+  #rules and #welcome. The posts carry no dates.
 
 ### Security
 

@@ -64,6 +64,7 @@ BOT_ROLES = ("Season Champ", "Hype", "Birthday", "Tournament Champ", "Event Cham
              "PC", "PlayStation", "Xbox", "Switch", "Mobile", "NA", "EU", "LATAM", "Asia", "OCE",
              "Early Bird", "Night Owl", "Weekend Warrior",
              "Welcome Crew", "Supporter", "SMP Ping")  # roles Front Desk hands out
+BOT_ROLES += ("Welcomer",)  # opt-in voice greeters (cogs/welcomers.py), created at the bottom
 BOT_ROLES += tuple(layout.HOUSE_ROLES.values())  # the three house roles (created at the bottom)
 BOT_ROLES += tuple(role for _, _, role in layout.GAMES)  # a newly listed game's ping role (never a retired one)
 GAMES_PROMPT = "What do you play?"  # the Onboarding question whose options are the games

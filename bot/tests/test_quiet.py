@@ -171,7 +171,8 @@ def test_posted_keeps_the_last_n():
 
 
 def test_keys_are_distinct_and_stable():
-    assert [Q.key(k) for k in Q.KINDS] == ["quiet:qotd", "quiet:thisorthat", "quiet:revival"]
+    assert [Q.key(k) for k in Q.KINDS] == ["quiet:qotd", "quiet:thisorthat", "quiet:revival",
+                                          "quiet:fieldnotes"]
 
 
 def test_what_staff_read():
