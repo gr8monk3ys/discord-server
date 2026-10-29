@@ -113,6 +113,8 @@ CATEGORIES = [
         "channels": [
             {"name": "📌・rules", "topic": "Read these once. They're short.", "read_only": True, "post": "rules"},
             {"name": "📣・announcements", "topic": "Game nights, updates, server news.", "read_only": True},
+            # Front Desk's weekly field notes (bot/cogs/fieldnotes.py); replies go in each post's thread.
+            {"name": "📓・field-notes", "topic": "What Lorenzo built, heard and watched this week.", "read_only": True},
             {"name": "👋・welcome", "topic": "New faces land here.", "read_only": True, "system": True, "post": "welcome"},
             {"name": "🆘・help", "topic": "Need a mod? Press the button to open a private ticket.", "read_only": True},
             {"name": "🎭・roles", "topic": "Pick your platform, region and pings with the buttons.", "read_only": True},
@@ -358,6 +360,7 @@ COMMUNITY = {
 ONBOARDING_DEFAULT_CHANNELS = [
     "📌・rules", "📣・announcements", "💬・general", "🆘・help", "🕹️・gaming", "🎮・lfg", "📸・clips",
     "🔊 Lobby", "➕ New Squad",
+    "📓・field-notes",  # one post a week, quiet otherwise
 ]
 # The default list before the core was cut down, word for word: what --revert restores.
 ONBOARDING_EVERYTHING = [
@@ -367,6 +370,7 @@ ONBOARDING_EVERYTHING = [
     "🔊 Lobby", "➕ New Squad", "🎮 Squad", "💤 AFK",
     "📚・guides", "🖥・setups",
     "⛏️・monkey-smp",
+    "📓・field-notes",  # added after the cut, as a default from the start
 ]
 # Opt-in groups: one question under Channels & Roles (asked after joining, so it does not
 # count against Discord's cap on pre-join questions). Every public channel that is not a

@@ -21,6 +21,8 @@ TODAY = [
     "📚・guides", "🖥・setups",
     "⛏️・monkey-smp",
 ]
+# Default channels added to ONBOARDING_EVERYTHING after that day, so --revert keeps them too.
+ADDED_SINCE = ["📓・field-notes"]
 PRIVATE = ["💜・supporters", "🛡️・mod", "🔒・admin", "📋・mod-log", "🔒・appeals", "🔒・squad-chat", "🔒 Squad Only"]
 
 
@@ -34,7 +36,8 @@ def grouped() -> list[str]:
 
 # ---------------------------------------------------------------- the grouping
 def test_revert_list_is_todays_list_exactly():
-    assert layout.ONBOARDING_EVERYTHING == TODAY
+    assert [n for n in layout.ONBOARDING_EVERYTHING if n not in ADDED_SINCE] == TODAY
+    assert set(ADDED_SINCE) <= set(layout.ONBOARDING_EVERYTHING) & set(layout.ONBOARDING_DEFAULT_CHANNELS)
 
 
 def test_every_public_channel_is_in_the_core_or_exactly_one_group():
@@ -102,7 +105,7 @@ def test_the_core_and_the_question_fit_discords_limits():
     assert focus_mode.limit_problems() == []
     rows = {slug(r["name"]): r for r in focus_mode.layout_rows()}
     core = [rows[slug(n)] for n in layout.ONBOARDING_DEFAULT_CHANNELS]
-    assert focus_mode.MIN_DEFAULTS <= len(core) <= 9  # Discord's floor; and still a short list
+    assert focus_mode.MIN_DEFAULTS <= len(core) <= 10  # Discord's floor; and still a short list
     assert len(focus_mode.postable(core)) >= focus_mode.MIN_POSTABLE
     assert all(r["type"] in ("text", "forum", "voice") for r in core)
     # If Discord counts only plain text channels, the reserve makes up the difference.
@@ -180,7 +183,7 @@ def test_dry_run_prints_the_whole_plan_and_changes_nothing(capsys):
     assert "DRY RUN" in out
     for line in focus_mode.plan_lines():
         assert line in out
-    assert "default channels: 29 -> 9" in out
+    assert "default channels: 29 -> 10" in out
     assert 'add     question "What else do you want to see?"' in out
     assert "🤣 Off topic: 🤣・memes, 🎨・art, 💻・code, 👗・fashion, ♟️・chess" in out
 
@@ -209,7 +212,7 @@ def test_rerun_is_a_noop(capsys):
     assert run(guild, apply=True) is True
     assert len(guild.edits) == 1
     out = capsys.readouterr().out
-    assert "ok      default channels (9)" in out and 'ok      question "What else do you want to see?"' in out
+    assert "ok      default channels (10)" in out and 'ok      question "What else do you want to see?"' in out
 
 
 def test_revert_restores_todays_defaults_exactly_and_keeps_the_question():
@@ -219,8 +222,8 @@ def test_revert_restores_todays_defaults_exactly_and_keeps_the_question():
     assert run(guild, apply=True, revert=True) is True
     revert = guild.edits[-1]
     assert set(revert) == {"default_channels", "reason"}  # the questions are not touched
-    assert sorted(c.name for c in revert["default_channels"]) == sorted(TODAY)
-    assert len(revert["default_channels"]) == len(TODAY)
+    assert sorted(c.name for c in revert["default_channels"]) == sorted([*TODAY, *ADDED_SINCE])
+    assert len(revert["default_channels"]) == len(TODAY) + len(ADDED_SINCE)
     assert any(p.title == layout.FOCUS_PROMPT for p in guild.ob.prompts)
     assert run(guild, apply=True, revert=True) is True and len(guild.edits) == 2  # and it is a no-op after
 
@@ -231,7 +234,7 @@ def test_revert_never_drops_a_default_and_focus_keeps_defaults_layout_does_not_k
     run(guild, apply=True)
     assert [c.name for c in guild.edits[0]["default_channels"]] == [stray.name, *layout.ONBOARDING_DEFAULT_CHANNELS]
     run(guild, apply=True, revert=True)
-    assert {c.name for c in guild.edits[1]["default_channels"]} == {stray.name, *TODAY}
+    assert {c.name for c in guild.edits[1]["default_channels"]} == {stray.name, *TODAY, *ADDED_SINCE}
 
 
 def test_discord_refusing_the_short_list_adds_the_reserve_one_at_a_time(capsys):

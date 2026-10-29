@@ -75,6 +75,7 @@ MODULES = [
     ("cogs.appeals", {"message_content"}),  # ban appeals from the website: review cards, /appeals list|code
     ("cogs.tonight", {"members", "presences"}),  # one line in general while people are in voice (TONIGHT=off)
     ("cogs.smpwatch", set()),  # one @SMP Ping when 3+ are on Monkey SMP (SMP_WATCH=off)
+    ("cogs.fieldnotes", set()),  # the owner's weekly field notes, Sundays (FIELD_NOTES_* sources)
 ]
 
 PERMISSIONS = discord.Permissions(

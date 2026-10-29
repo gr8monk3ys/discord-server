@@ -93,6 +93,11 @@ All notable changes to this project are recorded here. The format follows
   edits) one that was made by hand with other settings. Its new `game_answer_channels` step adds a
   listed game's missing layout channels to that game's existing Onboarding answer, never removing
   a channel or touching its roles.
+- `fieldnotes` module: the owner's weekly field notes in a new read-only 📓・field-notes channel
+  (`01 · front desk`, a newcomer default): Built (merged pull requests in public GitHub repos),
+  Heard (SpotifyForge's listening log), Watched (Letterboxd RSS) and Played (the owner's game
+  time), Sundays at 18:00, with a reply thread and one question through quiet rooms
+  (`quiet:fieldnotes`). Staff `/fieldnotes preview`. Off until a `FIELD_NOTES_*` setting is set.
 
 ### Security
 
