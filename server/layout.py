@@ -269,18 +269,17 @@ POSTS = {
         "title": "House rules",
         "description": "\n".join(
             [
-                "`01`  18+ only. If you're under 18, this isn't the server for you.",
-                "`02`  Be decent. Trash-talk the play, not the person. No racism, sexism or slurs.",
-                "`03`  No cheats, no exploits, no selling accounts.",
-                "`04`  No spam or self-promo, and no DM advertising to members.",
-                "`05`  Clips in {#clips}, memes in {#memes}, music in {#bot-commands}.",
-                "`06`  Spoilers go under ||spoiler tags||. No NSFW anywhere.",
-                "`07`  Want a squad? Post in {#lfg} and ping {@LFG}, not @everyone.",
-                "`08`  Something wrong? Right-click the message → Apps → Report message, or use `/report`.",
-                "`09`  Mods have the final word.",
+                "`01`  Be decent. Trash-talk the play, not the person. No racism, sexism or slurs.",
+                "`02`  No cheats, no exploits, no selling accounts.",
+                "`03`  No spam or self-promo, and no DM advertising to members.",
+                "`04`  Clips in {#clips}, memes in {#memes}, music in {#bot-commands}.",
+                "`05`  Spoilers go under ||spoiler tags||. No NSFW anywhere.",
+                "`06`  Want a squad? Post in {#lfg} and ping {@LFG}, not @everyone.",
+                "`07`  Something wrong? Right-click the message → Apps → Report message, or use `/report`.",
+                "`08`  Mods have the final word.",
             ]
         ),
-        "footer": "FRONT DESK · 01 · UPDATED 2026-10-03",
+        "footer": "FRONT DESK · 01 · UPDATED 2026-10-29",
     },
     "welcome": {
         "title": "Welcome in",
@@ -293,8 +292,8 @@ POSTS = {
                 "`VOICE`  If someone is in the Lobby, join them. That is how most games here start.",
                 "`GAMES`  Pick yours under **Channels & Roles** at the top of the channel list.",
                 "`HOUSE`  Front Desk sorts you into Fern, Kestrel or Otter. `/house me` shows yours.",
-                "`MINECRAFT`  Monkey SMP is the owner's modded server. Playing needs a pass "
-                "(monkeysmp.lscaturchio.xyz); `/smp link` connects your name to chat here.",
+                "`MINECRAFT`  Monkey SMP is the owner's modded server, with its own pass "
+                "(monkeysmp.lscaturchio.xyz or a ticket in {#help}). `/smp link` connects your name to chat here.",
                 "",
                 "**Roles**",
                 "{@Keeper}  runs the place",

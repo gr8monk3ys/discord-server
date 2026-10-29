@@ -1,7 +1,8 @@
-"""Landing page (site/) helpers: the games list is generated from layout.GAMES.
+"""Landing page (site/) helpers: the games list is generated from layout.GAMES and the
+rules list from the rules embed in layout.POSTS.
 
 Pure string functions; the only I/O is the `python -m logic.sitegen` entry point
-(run from bot/), which rewrites the games block in site/index.html in place, and
+(run from bot/), which rewrites the games and rules blocks in site/index.html in place, and
 `python -m logic.sitegen --og`, which rebuilds the 1200x630 social card
 site/img/og.png from assets/listing/hero.png.
 tests/test_sitegen.py fails when the page drifts from layout.py.
@@ -22,6 +23,37 @@ def render_games(games) -> str:
     names only: the emoji belong to Discord's channel list, and on a web page they render
     differently on every system."""
     items = [f"<li class=\"game\"><span>{html.escape(role)}</span></li>" for _emoji, _channel, role in games]
+    return "\n".join(items)
+
+
+_RULE_RE = re.compile(r"^`(\d+)`\s+(.+)$")
+_LEAD_RE = re.compile(r"^(.+?[.?!])\s+(.+)$")
+
+
+def _rule_text(text: str) -> str:
+    """One rule from the Discord embed as page HTML: {#clips} and {@LFG} become plain #clips and
+    @LFG (they are links only inside Discord), ||spoiler|| loses its bars and `code` stays code."""
+    text = re.sub(r"\{([#@])([^}]+)\}", r"\1\2", text)
+    text = text.replace("||", "")
+    parts = re.split(r"`([^`]+)`", text)
+    return "".join(f"<code>{html.escape(p, quote=False)}</code>" if i % 2 else html.escape(p, quote=False) for i, p in enumerate(parts))
+
+
+def render_rules(description: str) -> str:
+    """description: layout.POSTS["rules"]["description"], one "`01`  rule" per line. The first
+    sentence of each rule is its lead; the page numbers the list itself, as the embed does."""
+    items = []
+    for line in description.splitlines():
+        m = _RULE_RE.match(line.strip())
+        if not m:
+            continue
+        rule = m.group(2).strip()
+        lead = _LEAD_RE.match(rule)
+        if lead:
+            body = f"<strong>{_rule_text(lead.group(1))}</strong> {_rule_text(lead.group(2))}"
+        else:
+            body = f"<strong>{_rule_text(rule)}</strong>"
+        items.append(f"<li><span>{body}</span></li>")
     return "\n".join(items)
 
 
@@ -133,5 +165,6 @@ if __name__ == "__main__":  # pragma: no cover
     games = [(g.emoji, g.channel, g.role) for g in config.GAMES]
     page = path.read_text(encoding="utf-8")
     new = replace_block(page, "games", render_games(games))
+    new = replace_block(new, "rules", render_rules(config.layout.POSTS["rules"]["description"]))
     path.write_text(new, encoding="utf-8", newline="\n")
-    print("site/index.html games:", "updated" if new != page else "already current")
+    print("site/index.html games and rules:", "updated" if new != page else "already current")

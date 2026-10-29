@@ -74,9 +74,10 @@
       </div>
       <nav class="sections" aria-label="Primary">
         <ul>
-          <li><a href="#features">First week</a></li>
-          <li><a href="#week">A normal week</a></li>
           <li><a href="#games">Games</a></li>
+          <li><a href="#features">First week</a></li>
+          <li><a href="#week">The week</a></li>
+          <li><a href="#smp">Monkey SMP</a></li>
           <li><a href="#rules">Rules</a></li>
           <li><a href="#faq">FAQ</a></li>
         </ul>
@@ -96,8 +97,8 @@
       <div class="hero-grid">
         <div class="hero-copy">
           <h1>Chill gamers. <em>No tryhards, no toxicity.</em></h1>
-          <p class="lede">A small Discord server for co-op and PvE games. We play Risk of Rain 2, Gears of War, Overwatch, Marvel Rivals, Apex Legends, Tabletop Simulator and Wardogs, and the owner runs a modded Minecraft server.</p>
-          <p class="lede">It's a small group, so you'll know everyone within a week. Most evenings, US Pacific time, a few of us are in voice, and nobody minds if you're new to a game or bad at it. Join, pick your games, and hop into the Lobby when you see someone in it.</p>
+          <p class="lede">A small Discord server for co-op and PvE games: Risk of Rain 2, Gears of War, Overwatch, Marvel Rivals and a few more, plus Monkey SMP, the owner's modded Minecraft server.</p>
+          <p class="lede">People get on in the evenings, US Pacific time. Some nights a few of us are in voice and some nights it's quiet. Nobody minds if you're new to a game or bad at it. Join (a mod approves new members), pick your games, and hop into the Lobby when you see someone there.</p>
           <div class="cta">
             <a class="btn btn-lg" id="join" data-join href="#join">
               <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M20.3 4.4A19.6 19.6 0 0 0 15.4 3l-.6 1.3a18 18 0 0 0-5.5 0L8.6 3a19.6 19.6 0 0 0-4.9 1.5C.6 9.1-.3 13.6.1 18.1a19.8 19.8 0 0 0 6 3l1.3-2a12.7 12.7 0 0 1-2-1l.5-.4a14 14 0 0 0 12.1 0l.5.4-2 1 1.3 2a19.7 19.7 0 0 0 6-3c.5-5.2-.9-9.7-3.5-13.7ZM8 15.3c-1.2 0-2.2-1.1-2.2-2.4S6.8 10.5 8 10.5s2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Zm8 0c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Z"/></svg>
@@ -117,83 +118,6 @@
         <!-- Filled in by app.js from the live data; sits in the masthead's bottom margin, so
              showing it moves nothing. Stays hidden without JavaScript or without data. -->
         <p class="now label" id="now" hidden><a href="#live"><span class="dot" aria-hidden="true"></span><span id="now-text"></span></a></p>
-      </div>
-    </section>
-
-    <section id="features">
-      <div class="wrap">
-        <div class="ledger">
-          <div class="ledger-head">
-            <h2>Your first week</h2>
-            <p class="blurb">Four things a new member ends up doing. None of them is required.</p>
-          </div>
-          <div class="ledger-body">
-            <div class="group">
-              <ul class="rows">
-                <li><h3 class="card-title">Hop in voice</h3><p>The Lobby is the open voice room. If someone is in it, join them: that is how most games here start. For a room of your own, join New Squad and Front Desk makes one named after your game.</p></li>
-                <li><h3 class="card-title">Find people for a game</h3><p>Post with <code>/lfg</code>: what you're playing, when, and how many you need. Members who picked that game get the ping. On a server this size, asking in general works too.</p></li>
-                <li><h3 class="card-title">Get sorted into a house</h3><p>Front Desk, the server's bot, puts you in Fern, Kestrel or Otter. You don't choose. Time spent in voice and chat scores for your house, and Monday's post says which one won the week.</p></li>
-                <li><h3 class="card-title">Play on Monkey SMP</h3><p>Monkey SMP is the owner's modded Minecraft server. Playing needs a pass from <a href="https://monkeysmp.lscaturchio.xyz">monkeysmp.lscaturchio.xyz</a>, and <code>/smp link</code> connects your Minecraft name to the chat bridge and playtime here.</p></li>
-              </ul>
-            </div>
-            <div class="group">
-              <h3 class="card-title">Also here</h3>
-              <ul class="rows">
-                <li><p>Levels for chatting and voice time. <code>/rank</code> shows your card.</p></li>
-                <li><p>Coins for being around, and a <code>/shop</code> that sells name colours.</p></li>
-                <li><p><code>/word guess</code> is a five-letter word puzzle, new each day.</p></li>
-                <li><p>A monthly bracket, once four people sign up for it.</p></li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="week">
-      <div class="wrap">
-        <div class="ledger">
-          <div class="ledger-head">
-            <h2>A normal week</h2>
-            <p class="blurb">Times are US Pacific. Evenings are when people play. The other rows are what Front Desk, the bot, posts each week.</p>
-          </div>
-          <div class="ledger-body">
-            <ol class="days">
-              <li><span class="label">Evenings</span><div><h3 class="card-title">Voice</h3><p>Whoever's around joins the Lobby and picks a game. Nothing is scheduled, so some nights are busier than others.</p></div></li>
-              <li><span class="label">Mon</span><div><h3 class="card-title">House result</h3><p>Front Desk adds up last week's house points and posts the winner.</p></div></li>
-              <li><span class="label">Thu</span><div><h3 class="card-title">Free games</h3><p>A list of PC games that are free to keep that week, when there are new ones.</p></div></li>
-              <li><span class="label">Fri</span><div><h3 class="card-title">Game night</h3><p>At noon Front Desk puts a 9 PM game night on the calendar for whatever was played most that week, unless a member has already set one up with <code>/gamenight</code>. Come if you're free.</p></div></li>
-            </ol>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Live: aggregates the bot publishes (no names, no IDs). Hidden until app.js has fresh
-         data; if the fetch fails or the data is stale it stays hidden and the page is unchanged. -->
-    <section id="live" hidden>
-      <div class="wrap">
-        <div class="ledger">
-          <div class="ledger-head">
-            <h2>Right now</h2>
-            <p class="blurb" id="live-updated"></p>
-            <p class="counts label tally" id="live-tally" hidden></p>
-          </div>
-          <div class="ledger-body live-body">
-            <div class="group" id="live-events" hidden>
-              <div class="group-head"><h3>Coming up</h3><span class="label" id="live-events-count">00</span></div>
-              <ol class="days" id="live-events-list"></ol>
-            </div>
-            <div class="group" id="live-houses" hidden>
-              <div class="group-head"><h3>House standings</h3><span class="label">Points per member</span></div>
-              <ol class="houses" id="live-houses-list"></ol>
-            </div>
-            <div class="group" id="live-games" hidden>
-              <div class="group-head"><h3>Most played this week</h3><span class="label">Hours</span></div>
-              <ul class="games" id="live-games-list"></ul>
-            </div>
-          </div>
-        </div>
       </div>
     </section>
 
@@ -222,21 +146,113 @@
       </div>
     </section>
 
+    <section id="features">
+      <div class="wrap">
+        <div class="ledger">
+          <div class="ledger-head">
+            <h2>Your first week</h2>
+            <p class="blurb">Four things a new member ends up doing. None of them is required.</p>
+          </div>
+          <div class="ledger-body">
+            <div class="group">
+              <ul class="rows">
+                <li><h3 class="card-title">Hop in voice</h3><p>The Lobby is the open voice room. If someone is in it, join them: that is how most games here start. For a room of your own, join New Squad and Front Desk makes one named after what you're playing.</p></li>
+                <li><h3 class="card-title">Find people for a game</h3><p>Post with <code>/lfg</code>: what you're playing, when, and how many you need. Members who picked that game get the ping. On a server this size, asking in general works too.</p></li>
+                <li><h3 class="card-title">Get sorted into a house</h3><p>Front Desk, the server's bot, puts you in Fern, Kestrel or Otter. You don't choose. Voice time, chatting, squads and the daily word all score for your house, and Monday's post says which one won the week.</p></li>
+                <li><h3 class="card-title">Play on Monkey SMP</h3><p>Monkey SMP is the owner's modded Minecraft server. It takes its own pass. <a class="ink" href="#smp">How to get in</a></p></li>
+              </ul>
+            </div>
+            <p class="aside">Smaller things, if you want them: levels for chat and voice time (<code>/rank</code>), coins and a <code>/shop</code> for name colours, a daily word puzzle (<code>/word guess</code>), and a monthly bracket once four people sign up.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="week">
+      <div class="wrap">
+        <div class="ledger">
+          <div class="ledger-head">
+            <h2>A normal week</h2>
+            <p class="blurb">Times are US Pacific. Evenings are when people play. The other rows are what Front Desk, the bot, posts each week.</p>
+          </div>
+          <div class="ledger-body">
+            <ol class="days">
+              <li><span class="label">Evenings</span><div><h3 class="card-title">Voice</h3><p>Whoever's around joins the Lobby and picks a game. Nothing is scheduled, so some nights are busier than others.</p></div></li>
+              <li><span class="label">Mon</span><div><h3 class="card-title">House result</h3><p>Front Desk adds up last week's house points and posts the winner.</p></div></li>
+              <li><span class="label">Thu</span><div><h3 class="card-title">Free games</h3><p>A list of PC games that are free to keep that week, when there are new ones.</p></div></li>
+              <li><span class="label">Fri</span><div><h3 class="card-title">Game night</h3><p>At noon Front Desk puts a 9 PM game night on the calendar for whatever was played most that week, unless a member has already set one up with <code>/gamenight</code>. Come if you're free.</p></div></li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="smp">
+      <div class="wrap">
+        <div class="ledger">
+          <div class="ledger-head">
+            <h2>Monkey SMP</h2>
+            <p class="blurb">The owner's modded Minecraft server, run alongside the Discord. The Discord is free; the server takes a pass.</p>
+            <p class="label season" id="season" data-start="2026-11-08T01:00:00Z">Season I · Sat&nbsp;7&nbsp;Nov, 5&nbsp;PM&nbsp;Pacific</p>
+          </div>
+          <div class="ledger-body">
+            <p class="smp-note">Java Edition, with factions of up to four, land you claim that nobody may grief, PvP everywhere else and voice chat by distance. Prices, rules and how to get in are on its own site.</p>
+            <ul class="links">
+              <li><a class="ink" href="https://monkeysmp.lscaturchio.xyz" rel="noopener">monkeysmp.lscaturchio.xyz <span aria-hidden="true">↗&#xFE0E;</span></a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Live: aggregates the bot publishes (no names, no IDs). Hidden until app.js has fresh
+         data; if the fetch fails or the data is stale it stays hidden and the page is unchanged. -->
+    <section id="live" hidden>
+      <div class="wrap">
+        <div class="ledger">
+          <div class="ledger-head">
+            <h2>This week</h2>
+            <p class="blurb" id="live-updated"></p>
+            <p class="counts label tally" id="live-tally" hidden></p>
+          </div>
+          <div class="ledger-body live-body">
+            <div class="group" id="live-events" hidden>
+              <div class="group-head"><h3>Coming up</h3><span class="label" id="live-events-count">00</span></div>
+              <ol class="days" id="live-events-list"></ol>
+            </div>
+            <div class="group" id="live-houses" hidden>
+              <div class="group-head"><h3>House standings</h3><span class="label">Points per member</span></div>
+              <ol class="houses" id="live-houses-list"></ol>
+            </div>
+            <div class="group" id="live-games" hidden>
+              <div class="group-head"><h3>Most played this week</h3><span class="label">Hours</span></div>
+              <ul class="games" id="live-games-list"></ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
     <section id="rules">
       <div class="wrap">
         <div class="ledger">
           <div class="ledger-head">
             <h2>House rules</h2>
+            <p class="blurb">The same rules are pinned in #rules on Discord. Monkey SMP has its own, on its site.</p>
           </div>
           <div class="ledger-body">
             <ol class="rules">
-              <li><span><strong>18+ only.</strong> If you're under 18, this isn't the server for you.</span></li>
-              <li><span><strong>Be decent.</strong> Trash-talk the play, not the person. Racism, sexism and slurs get you removed.</span></li>
-              <li><span><strong>Play fair.</strong> Cheats, exploits and account selling aren't welcome.</span></li>
-              <li><span><strong>Keep the ads out.</strong> That covers spam, self-promo and advertising in members' DMs.</span></li>
-              <li><span><strong>Keep it safe for work.</strong> Spoilers go under spoiler tags.</span></li>
-              <li><span><strong>Need a squad?</strong> Use <code>/lfg</code> and the game pings, not @everyone.</span></li>
-              <li><span><strong>Mods have the final word.</strong> Report anything off with <code>/report</code>.</span></li>
+<!-- rules:start -->
+<li><span><strong>Be decent.</strong> Trash-talk the play, not the person. No racism, sexism or slurs.</span></li>
+<li><span><strong>No cheats, no exploits, no selling accounts.</strong></span></li>
+<li><span><strong>No spam or self-promo, and no DM advertising to members.</strong></span></li>
+<li><span><strong>Clips in #clips, memes in #memes, music in #bot-commands.</strong></span></li>
+<li><span><strong>Spoilers go under spoiler tags.</strong> No NSFW anywhere.</span></li>
+<li><span><strong>Want a squad?</strong> Post in #lfg and ping @LFG, not @everyone.</span></li>
+<li><span><strong>Something wrong?</strong> Right-click the message → Apps → Report message, or use <code>/report</code>.</span></li>
+<li><span><strong>Mods have the final word.</strong></span></li>
+<!-- rules:end -->
             </ol>
           </div>
         </div>
@@ -257,23 +273,27 @@
               </details>
               <details>
                 <summary>How busy is it?</summary>
-                <p>It's a small server. Most evenings a few people are in voice, and some nights are quiet. When the bot has fresh numbers, the Right now section of this page shows them.</p>
+                <p>It's a small server. Most of us are in US Pacific and play in the evening: some nights a few people are in voice, some nights nobody is. When the bot has fresh numbers, this page shows them under This week.</p>
               </details>
               <details>
                 <summary>What happens when I join?</summary>
-                <p>A quick check to keep bots out, then you pick your games and land in general. Say hi, and look at who is in voice.</p>
+                <p>Discord asks you to apply, and a mod approves it. Then you pick your games and land in the main channels. Say hi in general, and look at who is in voice.</p>
               </details>
               <details>
                 <summary>Is voice chat required?</summary>
                 <p>It isn't. Most of the talking happens in voice, so the text channels are on the quiet side. You're welcome to join a room muted and just listen.</p>
               </details>
               <details>
-                <summary>What time zone is everyone in?</summary>
-                <p>Mostly US Pacific, playing in the evening. Anything Front Desk schedules is set in Pacific time, and Discord shows events in your own time zone.</p>
+                <summary>How do I get on the Minecraft server?</summary>
+                <p>Monkey SMP takes a pass. Season dates and how to get one are on <a class="ink" href="https://monkeysmp.lscaturchio.xyz" rel="noopener">its page</a>. In the Discord, news goes in #monkey-smp, and the SMP Ping role tells you when three or more people are on.</p>
               </details>
               <details>
-                <summary>How do I get on the Minecraft server?</summary>
-                <p>You need a Monkey SMP pass, from <a href="https://monkeysmp.lscaturchio.xyz">monkeysmp.lscaturchio.xyz</a> or through a ticket in the help channel. In the Discord, <code>/smp link</code> with your Minecraft name connects your in-game chat and playtime; it doesn't get you in by itself. The Monkey SMP channel shows whether the server is up and who is on.</p>
+                <summary>Why does Discord call it Lorenzo's Server?</summary>
+                <p>That's the server's name on Discord. Chill Gamers is what we call it here. It's the same place.</p>
+              </details>
+              <details>
+                <summary>What does the bot keep about me?</summary>
+                <p>Counts, not content. Front Desk notes how many messages you send each day, never what they say, plus your time in voice and the game Discord shows you playing. That drives levels, coins and house points. <code>/privacy tracking:off</code> stops it and deletes that history. The full list is in the <a class="ink" href="https://github.com/gr8monk3ys/discord-server/blob/front-desk-bot/PRIVACY.md" rel="noopener">privacy policy</a>.</p>
               </details>
               <details>
                 <summary>My game isn't listed. Can I still join?</summary>
@@ -306,9 +326,10 @@
           <nav aria-label="On this page">
             <h3 class="label">On this page</h3>
             <ul>
-              <li><a class="ink" href="#features">First week</a></li>
-              <li><a class="ink" href="#week">A normal week</a></li>
               <li><a class="ink" href="#games">Games</a></li>
+              <li><a class="ink" href="#features">First week</a></li>
+              <li><a class="ink" href="#week">The week</a></li>
+              <li><a class="ink" href="#smp">Monkey SMP</a></li>
               <li><a class="ink" href="#rules">Rules</a></li>
               <li><a class="ink" href="#faq">FAQ</a></li>
             </ul>
@@ -316,15 +337,23 @@
           <nav aria-label="Elsewhere">
             <h3 class="label">Elsewhere</h3>
             <ul>
-              <li><a class="ink" href="https://lscaturchio.xyz" rel="author">lscaturchio.xyz <span aria-hidden="true">↗</span></a></li>
-              <li><a class="ink" href="https://lscaturchio.xyz/blog" rel="author">Writing <span aria-hidden="true">↗</span></a></li>
-              <li><a class="ink" href="https://lscaturchio.xyz/projects" rel="author">Projects <span aria-hidden="true">↗</span></a></li>
+              <li><a class="ink" href="https://lscaturchio.xyz" rel="author">lscaturchio.xyz <span aria-hidden="true">↗&#xFE0E;</span></a></li>
+              <li><a class="ink" href="https://lscaturchio.xyz/blog" rel="author">Writing <span aria-hidden="true">↗&#xFE0E;</span></a></li>
+              <li><a class="ink" href="https://lscaturchio.xyz/projects" rel="author">Projects <span aria-hidden="true">↗&#xFE0E;</span></a></li>
+            </ul>
+          </nav>
+          <nav aria-label="Help">
+            <h3 class="label">Help</h3>
+            <ul>
+              <li><a class="ink" href="appeal/">Appeal a ban</a></li>
+              <li><a class="ink" href="https://github.com/gr8monk3ys/discord-server/blob/front-desk-bot/PRIVACY.md" rel="noopener">Privacy <span aria-hidden="true">↗&#xFE0E;</span></a></li>
+              <li><a class="ink" href="https://monkeysmp.lscaturchio.xyz" rel="noopener">Monkey SMP <span aria-hidden="true">↗&#xFE0E;</span></a></li>
             </ul>
           </nav>
           <nav aria-label="Source">
             <h3 class="label">Source</h3>
             <ul>
-              <li><a class="ink" href="https://github.com/gr8monk3ys/discord-server" rel="noopener">GitHub <span aria-hidden="true">↗</span></a></li>
+              <li><a class="ink" href="https://github.com/gr8monk3ys/discord-server" rel="noopener">GitHub <span aria-hidden="true">↗&#xFE0E;</span></a></li>
             </ul>
           </nav>
         </div>
