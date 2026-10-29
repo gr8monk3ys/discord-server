@@ -58,6 +58,17 @@ def forum_options(spec) -> dict:
     return out
 
 
+def no_thread_overwrites(guild, cat):
+    """A "no_threads" channel's permissions: the category's own, with @everyone also denied
+    starting threads (posting is unchanged)."""
+    ow = dict(cat.overwrites) if cat is not None else {}
+    base = ow.get(guild.default_role) or discord.PermissionOverwrite()
+    everyone = discord.PermissionOverwrite.from_pair(*base.pair())
+    everyone.update(create_public_threads=False, create_private_threads=False)
+    ow[guild.default_role] = everyone
+    return ow
+
+
 def private_overwrites(guild, role_names, known=None):
     """Hidden from @everyone, visible to the bot and the named roles ("private_to").
 
@@ -278,7 +289,9 @@ class Makeover:
                 label += " (private)"
             elif spec.get("read_only"):
                 kwargs["overwrites"] = self.read_only_overwrites()
-            create = self.guild.create_voice_channel if voice else self.guild.create_text_channel
+            elif spec.get("no_threads"):
+                kwargs["overwrites"] = no_thread_overwrites(self.guild, cat)
+            create =self.guild.create_voice_channel if voice else self.guild.create_text_channel
             return await self.do("create", label, lambda: create(category=cat, **kwargs))
 
         changed = [k for k, v in kwargs.items() if (getattr(ch, k, v) or type(v)()) != v]
