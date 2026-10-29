@@ -194,8 +194,8 @@ CATEGORIES = [
              "topic": "Founding roster sign-up: one message with your Minecraft Java name, and your faction's "
                       "name if you have one. First come, first listed. Rules are pinned.",
              "slowmode": 21600, "no_threads": True},
-            {"name": "📜・smp-rules", "topic": "The Monkey SMP rulebook. Staff post here; questions go in "
-                                              "#smp-faq or a ticket.", "read_only": True},
+            {"name": "📜・smp-rules", "topic": "The Monkey SMP rulebook. Staff post here; answers are in "
+                                              "#smp-faq, and questions go in #smp-forum or a ticket.", "read_only": True},
             {"name": "❔・smp-faq", "topic": "Monkey SMP answers: the pass, the modpack, joining. Staff post "
                                            "here; ask anything else in #smp-forum or a ticket.", "read_only": True},
             {
