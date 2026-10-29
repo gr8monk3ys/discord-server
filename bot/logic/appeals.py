@@ -3,7 +3,7 @@ through the staff webhook, who may appeal when, status moves and the text staff 
 banned members see. Pure: no Discord, no database, no network, no clock of its own.
 
 The code is base32(HMAC-SHA256(APPEAL_SECRET, str(user_id)))[:16]: 80 bits that only
-someone holding the secret can produce, so the website function (site/api/appeal.js,
+someone holding the secret can produce, so the website function (site/src/server/appeal.ts,
 which computes the same thing) forwards nothing for a made-up user ID, and the bot
 checks it again before it believes a webhook message. Callers escape member text
 before it reaches a Discord message; nothing here does."""
@@ -49,7 +49,7 @@ class Question:
     required: bool
 
 
-# Keys, order and caps are mirrored in site/appeal/appeal.js and site/api/appeal.js.
+# Keys, order and caps are mirrored in site/src/lib/appeal-form.ts and site/src/server/appeal.ts.
 QUESTIONS = (
     Question("what", "What happened?", 600, True),
     Question("why", "Why should we reconsider?", 600, True),

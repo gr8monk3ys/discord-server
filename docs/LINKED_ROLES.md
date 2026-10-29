@@ -25,7 +25,7 @@ Platforms offered: **Steam, Xbox, PlayStation, Epic Games**, plus a count of how
 four are verified. Riot Games and Battle.net are not on Discord's documented list of connection
 services (checked 2026-10-12), so there are no flags for them. Discord allows five records per
 application and all five are used; adding a platform means dropping one
-(`site/api/linked-role/metadata.json`).
+(`site/src/server/linked-role/metadata.json`).
 
 ## Privacy
 
@@ -84,10 +84,9 @@ Check: open <https://discord.lscaturchio.xyz/api/linked-role/start> in a browser
 land on Discord's consent screen. Cancel there; you should end on `/linked-role` saying
 "Cancelled."
 
-The functions need no configuration: Vercel builds every `.js` file under `site/api/` as a
-Node function (the project's root directory is `site`, framework "Other"). Files and folders
-starting with `_` (`_lib.js`, `_tests/`) are not published as endpoints. The GitHub Pages mirror
-is static and has no functions; the redirect URI must always be the Vercel domain.
+The endpoints need no configuration of their own: they are route handlers in the site's
+Next.js app (`site/src/app/api/linked-role/`; the project's root directory is `site`). The
+redirect URI must always be the Vercel domain, which is the site's only address.
 
 ### 3. Register the metadata and the verification URL
 
@@ -139,31 +138,31 @@ pick the condition. Suggested, named so they cannot be mistaken for the self-ass
 
 Remove the Links requirement from the roles (or delete them), and clear the Linked Roles
 Verification URL in the Developer Portal > General Information. Removing any of the four Vercel
-variables turns the functions off on the next deploy.
+variables turns the endpoints off on the next deploy.
 
 ## Files
 
-- `site/api/linked-role/metadata.json`: the five records, the label, the verification URL.
-  Read by the functions and by `bot/logic/linkedroles.py`.
-- `site/api/linked-role/_lib.js`: settings, the signed state cookie, the mapping from
+- `site/src/server/linked-role/metadata.json`: the five records, the label, the verification URL.
+  Read by the site and by `bot/logic/linkedroles.py`.
+- `site/src/server/linked-role/lib.ts`: settings, the signed state cookie, the mapping from
   connections to metadata, the three Discord calls.
-- `site/api/linked-role/start.js`, `callback.js`: the two endpoints.
-- `site/linked-role/index.html`, `result.js`: the page the flow ends on.
+- `site/src/server/linked-role/flow.ts`: the two endpoints; the routes are
+  `site/src/app/api/linked-role/start/route.ts` and `callback/route.ts`.
+- `site/src/app/linked-role/page.tsx`, `site/src/lib/linked-role-results.ts`: the page the flow ends on.
 - `bot/logic/linkedroles.py`: validation of `metadata.json` and the registration diff.
 - `server/register_linked_roles.py`: step 3.
 
 Tests (no network):
 
-    node --test site/api/linked-role/_tests/
+    cd site && bun run test src/server/linked-role
     cd bot && ../server/.venv/Scripts/python -m pytest -q -p no:warnings tests/test_linkedroles.py
     cd server && .venv/Scripts/python -m pytest -q tests/test_register_linked_roles.py
 
-CI runs the Node tests too (`node --test` from `site/api`).
+CI runs the site tests too (the "Site" job).
 
 ## Not verified against the live service
 
 Written from Discord's developer docs as read on 2026-10-12; nothing here has been run against
 Discord or deployed. In particular: that a linked role survives the access token expiring
 (tokens are dropped, not refreshed), that deauthorising removes the role, that a role with a
-Links requirement cannot be assigned by hand, and that Vercel skips `_`-prefixed files under
-`api/` in a project with no framework. Step 5 covers the first two.
+Links requirement cannot be assigned by hand. Step 5 covers the first two.

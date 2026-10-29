@@ -1,0 +1,23 @@
+/* Tailwind v4 supplies its theme variables and utilities; its preflight reset is left out,
+   because field-notebook.css carries its own base styles and the page must look exactly as
+   it did before the port. The house classes in the markup do the styling; the utilities
+   (mapped to the notebook's tokens below) are there for new work. Unlayered rules beat
+   layered ones, so nothing Tailwind adds can override the notebook. */
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+@import "./field-notebook.css";
+@import "./appeal.css";
+
+@theme inline {
+  --color-page: var(--page);
+  --color-card: var(--card);
+  --color-tint: var(--tint);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-hairline: var(--hairline);
+  --color-pen: var(--pen);
+  --font-display: var(--display);
+  --font-body: var(--body);
+  --font-mono: var(--mono);
+}

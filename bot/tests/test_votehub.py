@@ -26,7 +26,7 @@ def test_urls_are_the_documented_ones():
     assert V.DISCORD_ME_URL == "https://discord.me/chill-gamers-hq"
     assert V.SHARE_URL == "https://discord.lscaturchio.xyz/join"
     assert V.TOPGG_URL == "" or V.link_url(V.TOPGG_URL)
-    assert "discord.gg" not in V.SHARE_URL  # the invite code lives only in site/config.js
+    assert "discord.gg" not in V.SHARE_URL  # the invite code lives only in site/src/data/site-config.json
     assert V.REWARDS == (300, 200, 100)
 
 

@@ -4,7 +4,7 @@
     python publish_site_data.py --apply    # push
     pythonw publish_site_data.py --apply --quiet   # what a scheduled task runs every 30 minutes
 
-The bot (cogs/sitedata.py) writes the file; site/app.js reads it from
+The bot (cogs/sitedata.py) writes the file; the site (site/src/lib/live.ts) reads it from
 raw.githubusercontent.com/<repo>/site-data/stats.json. Each run:
 
 - reads the file and checks it again with the same schema and leak guard the bot used

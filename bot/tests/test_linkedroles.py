@@ -42,17 +42,18 @@ def test_platform_flags_are_booleans_and_the_count_is_at_least_n():
 
 
 def test_the_functions_read_the_same_file_and_use_the_same_paths():
-    """site/api/linked-role/_lib.js requires metadata.json; nothing is defined twice."""
+    """site/src/server/linked-role/lib.ts imports metadata.json; nothing is defined twice."""
     folder = linkedroles.DEFINITIONS.parent
-    lib = (folder / "_lib.js").read_text(encoding="utf-8")
-    assert 'require("./metadata.json")' in lib
-    # The JS never spells a metadata key or platform name itself.
+    code = "".join((folder / name).read_text(encoding="utf-8") for name in ("lib.ts", "flow.ts"))
+    assert 'import definitions from "./metadata.json";' in code
+    # The TypeScript never spells a metadata key or platform name itself.
     d = linkedroles.load()
     for key in linkedroles.services(d):
-        assert not re.search(rf"""["']{key}["']""", lib), key
+        assert not re.search(rf"""["']{key}["']""", code), key
     assert linkedroles.START_PATH == "/api/linked-role/start"
-    assert (folder / "start.js").exists() and (folder / "callback.js").exists()
-    assert 'CALLBACK_PATH = "/api/linked-role/callback"' in lib
+    routes = folder.parents[1] / "app" / "api" / "linked-role"
+    assert (routes / "start" / "route.ts").exists() and (routes / "callback" / "route.ts").exists()
+    assert 'CALLBACK_PATH = "/api/linked-role/callback"' in code
 
 
 # ------------------------------------------------------------ validation

@@ -5,8 +5,8 @@
     python register_linked_roles.py --apply      # write the records and the URL
     python register_linked_roles.py --url https://example.com/api/linked-role/start
 
-The records come from site/api/linked-role/metadata.json (the same file the site's functions
-read). Needs DISCORD_TOKEN in .env (see .env.example); no GUILD_ID: this edits the application,
+The records come from site/src/server/linked-role/metadata.json (the same file the site's
+route handlers read). Needs DISCORD_TOKEN in .env (see .env.example); no GUILD_ID: this edits the application,
 not a server. The token is sent to discord.com only and never printed. Run it AFTER the site
 functions are deployed and their settings are in place, or the Link button leads to a
 "not set up yet" page. See docs/LINKED_ROLES.md.
