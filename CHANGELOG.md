@@ -100,6 +100,11 @@ All notable changes to this project are recorded here. The format follows
   edits) one that was made by hand with other settings. Its new `game_answer_channels` step adds a
   listed game's missing layout channels to that game's existing Onboarding answer, never removing
   a channel or touching its roles.
+- Monkey SMP season posts in `layout.POSTS`: the founding roster's sign-up rules in #founding-roster,
+  the condensed Season I rulebook in #smp-rules (rule numbers match the SMP repo's `docs/RULES.md`,
+  which is too long for one message, so it links the website's rules) and a short FAQ in #smp-faq.
+  `public_mode.py` posts and pins each once and edits it in place when the text changes, as it does
+  #rules and #welcome. The posts carry no dates.
 
 ### Security
 
