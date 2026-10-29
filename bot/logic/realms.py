@@ -3,8 +3,8 @@ server. Pure: no sockets, no files, no Discord I/O, no database, no clock of its
 
 What lives here:
 
-- Settings (`read_setup`): which of the four parts are on. Status needs REALMS_ADDRESS;
-  whitelisting and Discord-to-Minecraft chat need RCON (host, port, password);
+- Settings (`read_setup`): which of the three parts are on. Status needs REALMS_ADDRESS;
+  Discord-to-Minecraft chat (and the RCON player list) needs RCON (host, port, password);
   Minecraft-to-Discord chat needs REALMS_LOG_PATH. The RCON host must be this machine or
   a private network (same rule as OLLAMA_URL in logic/catchup.py), and the password never
   appears in a repr, a problem line or an error.
@@ -12,9 +12,10 @@ What lives here:
   handshake, status JSON) and Source RCON (length-prefixed packets). The cog owns the
   sockets and the timeouts.
 - Everything that crosses the bridge is hostile input. Minecraft names must match
-  `NAME_RE` before they are put in a command; chat going to Minecraft becomes a JSON text
-  component built by `json.dumps` (so nothing a member types can end the string or start a
-  command); text coming from Minecraft loses its formatting codes and control characters,
+  `NAME_RE` before they are stored; only `list` and `tellraw` are ever sent over RCON
+  (`sendable`), so the bot never changes the whitelist or anything else on the server;
+  chat going to Minecraft becomes a JSON text component built by `json.dumps` (so nothing
+  a member types can end the string or start a command); text coming from Minecraft loses its formatting codes and control characters,
   is length-capped, filtered (logic/textfilter.py, links refused) and escaped.
 - The server log parser for vanilla-format lines (chat, join, leave, death, advancement),
   the line splitter and the tail position rules (rotation, truncation, falling behind).
@@ -35,6 +36,10 @@ from discord.utils import escape_markdown, escape_mentions
 from logic import textfilter
 from logic.catchup import local_host
 from logic.quests import established  # noqa: F401 (re-exported: the cog gates coins and links on it)
+
+# Monkey SMP access is a paid pass that staff grant (by hand or through the store). A link
+# here never gives access; this is where members are sent for it.
+PASS_URL = "https://monkeysmp.lscaturchio.xyz"
 
 # ---------------------------------------------------------------- names
 NAME_RE = re.compile(r"[A-Za-z0-9_]{3,16}")
@@ -90,8 +95,7 @@ class Setup:
         return self.status_on or self.rcon_on or self.log_on
 
     def parts(self) -> list[str]:
-        names = [("status", self.status_on), ("whitelist", self.rcon_on), ("chat to Minecraft", self.rcon_on),
-                 ("chat from Minecraft", self.log_on)]
+        names = [("status", self.status_on), ("chat to Minecraft", self.rcon_on), ("chat from Minecraft", self.log_on)]
         return [n for n, on in names if on]
 
 
@@ -149,16 +153,16 @@ def read_setup(environ) -> Setup:
         port = parse_port(raw_port) if raw_port else DEFAULT_RCON_PORT
         if not local_host(host):
             problems.append(f"{ENV_RCON_HOST} refused: it must be localhost or a loopback/private-network IP "
-                            "address; whitelisting and chat to Minecraft are off")
+                            "address; chat to Minecraft is off")
         elif port is None:
-            problems.append(f"{ENV_RCON_PORT} is not a port number; whitelisting and chat to Minecraft are off")
+            problems.append(f"{ENV_RCON_PORT} is not a port number; chat to Minecraft is off")
         elif "\x00" in password or len(password.encode("utf-8")) > MAX_COMMAND_BYTES:
             problems.append(f"{ENV_RCON_PASSWORD} is not usable (too long, or it holds a NUL); "
-                            "whitelisting and chat to Minecraft are off")
+                            "chat to Minecraft is off")
         else:
             rcon = (host, port)
     elif raw_host or raw_port:
-        problems.append(f"{ENV_RCON_PASSWORD} is empty; whitelisting and chat to Minecraft are off")
+        problems.append(f"{ENV_RCON_PASSWORD} is empty; chat to Minecraft is off")
     if rcon is None:
         password = ""
 
@@ -359,37 +363,15 @@ BRIDGE_TAG = "[Discord]"  # prefix of relayed chat in Minecraft; lines carrying 
 SENDER_CAP = 32
 CHAT_CAP = 256  # Minecraft's own chat length
 LIST_COMMAND = "list"
+TELLRAW_PREFIX = "tellraw @a "
 LIST_RE = re.compile(r"There are (\d{1,6}) of a max(?: of)? (\d{1,6}) players online:?(.*)", re.DOTALL)
 
 
-def whitelist_command(action: str, name: str) -> str:
-    """`whitelist add|remove <name>`. The name is checked again here, at the last moment
-    before it becomes part of a command, whatever the caller already did."""
-    if action not in ("add", "remove"):
-        raise ValueError("unknown whitelist action")
-    if not valid_name(name):
-        raise ValueError("not a Minecraft name")
-    return f"whitelist {action} {name}"
-
-
-def whitelist_result(action: str, reply: str) -> str:
-    """What the server's answer means: "ok" (this command put it in the wanted state, or a
-    removal found it already gone), "already" (an add for a name that was on the whitelist
-    before: somebody else put it there), "unknown" (no such Minecraft account) or "error"
-    (anything else; try again later)."""
-    text = clean_plain(reply, 300).lower()
-    if "does not exist" in text:
-        return "unknown"
-    if action == "add" and "already whitelisted" in text:
-        return "already"
-    wanted = ("added",) if action == "add" else ("removed", "not whitelisted")
-    return "ok" if any(w in text for w in wanted) else "error"
-
-
-def member_long_enough(joined_at: int | None, now: int) -> bool:
-    """Linking is for members who have been in the server LINK_MEMBER_DAYS (on top of the
-    account-age gate): a fresh join can't put a name on the whitelist. Unknown join time: no."""
-    return joined_at is not None and now - joined_at >= LINK_MEMBER_DAYS * 24 * 60 * 60
+def sendable(command: str) -> bool:
+    """The only commands this bot sends over RCON: `list` (who is on) and `tellraw @a`
+    (relayed chat). Anything else, `whitelist` above all, is refused before it is sent:
+    Monkey SMP access is staff's to grant, never the bot's."""
+    return isinstance(command, str) and (command == LIST_COMMAND or command.startswith(TELLRAW_PREFIX))
 
 
 def parse_list(reply: str) -> list[str] | None:
@@ -422,7 +404,7 @@ def tellraw_command(sender: str, text: str) -> str:
     while True:
         payload = json.dumps(["", {"text": BRIDGE_TAG + " ", "color": "aqua"}, {"text": f"<{sender}> {text}"}],
                              ensure_ascii=True, separators=(",", ":"))
-        command = "tellraw @a " + payload
+        command = TELLRAW_PREFIX + payload
         if len(command) <= MAX_COMMAND_BYTES or len(text) <= 1:
             return command
         text = text[: len(text) * 3 // 4]
@@ -626,11 +608,7 @@ POLL_EVERY = 120  # seconds between polls while the server answers
 OFFLINE_AFTER = 2  # failed polls in a row before the panel says offline (one blip is ignored)
 BACKOFF = (30, 120, 240, 480, 900)  # delay after the 1st, 2nd, ... failed poll in a row
 SWEEP_EVERY = 30 * 60  # how often linked members are checked against the member list
-SYNC_BATCH = 10  # whitelist changes sent per poll
-MAX_ATTEMPTS = 5  # refused whitelist changes are retried this often at poll speed...
-SLOW_RETRY = 60 * 60  # ...then once an hour
 LINK_COOLDOWN = 30  # seconds between one member's /smp link attempts
-LINK_MEMBER_DAYS = 14  # days in this server before /smp link works (staff can /smp adopt sooner)
 # A player's words reach Discord only for a confirmed link whose member may talk there now.
 # When that member isn't in the gateway cache the API is asked, and its answer reused for:
 MEMBER_GONE_FOR = 5 * 60  # "not a member"
@@ -641,10 +619,6 @@ HINT_EVERY = 6 * 60 * 60  # per name: "some players aren't linked, so their chat
 def poll_delay(failures: int) -> int:
     """Seconds until the next poll after `failures` failed polls in a row."""
     return POLL_EVERY if failures <= 0 else BACKOFF[min(failures, len(BACKOFF)) - 1]
-
-
-def retry_due(attempts: int, updated_at: int, now: int) -> bool:
-    return attempts < MAX_ATTEMPTS or now - updated_at >= SLOW_RETRY
 
 
 # ---------------------------------------------------------------- playtime and coins
@@ -720,7 +694,7 @@ def panel_text(status: Status | None, names, down_since: int | None) -> str:
 
 
 def health(setup: Setup, *, down_since: int | None = None, rcon_down_since: int | None = None,
-           rcon_refused: bool = False, log_missing: bool = False, waiting: int = 0) -> str:
+           rcon_refused: bool = False, log_missing: bool = False) -> str:
     """The self-check line: "off", "ok ..." or "unreachable since ...". Times are Discord
     timestamps, since this is shown in an embed."""
     if not setup.any_on:
@@ -734,8 +708,6 @@ def health(setup: Setup, *, down_since: int | None = None, rcon_down_since: int 
         notes.append(f"RCON unreachable since <t:{rcon_down_since}:f>")
     if log_missing:
         notes.append("log file not found")
-    if waiting:
-        notes.append(f"{waiting} whitelist change{'s' if waiting != 1 else ''} waiting")
     notes += [f"setting problem: {p}" for p in setup.problems]
     text = "ok (" + ", ".join(setup.parts()) + ")"
     return text + ("; " + "; ".join(notes) if notes else "")

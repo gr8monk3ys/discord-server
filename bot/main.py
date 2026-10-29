@@ -69,7 +69,7 @@ MODULES = [
     ("cogs.supporter", {"members"}),  # Supporter tier: /support, thank-you, stipend, /supporter grant|revoke
     ("cogs.forums", {"message_content"}),  # guides + setups forums: reaction, one-time post reward, recap line
     ("cogs.clipcast", {"members", "message_content"}),  # consented weekly clips to YouTube Shorts, /clipcast
-    ("cogs.realms", {"members", "message_content"}),  # Minecraft bridge: status panel, whitelist, chat relay, playtime
+    ("cogs.realms", {"members", "message_content"}),  # Minecraft bridge: status panel, name links, chat relay, playtime
     ("cogs.wrapped", {"members"}),  # /wrapped year-in-review cards (Dec 1 - Jan 15), /wrapped-preview (staff)
     ("cogs.sitedata", {"members", "presences"}),  # landing page live data: aggregates file every 30 min, /sitedata refresh
     ("cogs.appeals", {"message_content"}),  # ban appeals from the website: review cards, /appeals list|code

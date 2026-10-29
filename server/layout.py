@@ -183,8 +183,8 @@ CATEGORIES = [
             },
             # Front Desk's bridge to our Minecraft server: pinned status panel, chat both ways.
             {"name": "⛏️・monkey-smp", "topic": "Monkey SMP, our Minecraft server. Status is pinned; chat here reaches "
-                                           "the game, and linked players' chat comes back. /smp link gets "
-                                           "you on the whitelist.",
+                                           "the game, and linked players' chat comes back. Playing needs a "
+                                           "pass: monkeysmp.lscaturchio.xyz or a ticket in #help.",
              "slowmode": 2, "was": ["⛏️・realms"]},  # renamed in place by public_mode.py
             # Monkey SMP seasons: the channels the SMP repo's launch plan and rulebook send players
             # to (its docs/LAUNCH.md and docs/RULES.md). public_mode.py creates them after #monkey-smp.
@@ -322,8 +322,8 @@ POSTS = {
                 "`VOICE`  If someone is in the Lobby, join them. That is how most games here start.",
                 "`GAMES`  Pick yours under **Channels & Roles** at the top of the channel list.",
                 "`HOUSE`  Front Desk sorts you into Fern, Kestrel or Otter. `/house me` shows yours.",
-                "`MINECRAFT`  Monkey SMP is the owner's modded server, with its own paid pass. "
-                "Open a ticket in {#help} to get one.",
+                "`MINECRAFT`  Monkey SMP is the owner's modded server, with its own pass "
+                "(monkeysmp.lscaturchio.xyz or a ticket in {#help}). `/smp link` connects your name to chat here.",
                 "",
                 "**Roles**",
                 "{@Keeper}  runs the place",

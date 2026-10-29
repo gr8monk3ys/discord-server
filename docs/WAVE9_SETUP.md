@@ -114,31 +114,30 @@ on the Minecraft server first.
 | Name | Where | Value | Turns on |
 |---|---|---|---|
 | `REALMS_ADDRESS` | `server/.env` | the Minecraft server as the bot's PC sees it, for example `127.0.0.1:25565` | the status panel |
-| `REALMS_RCON_PASSWORD` | `server/.env` | the `rcon.password` from step E | `/smp link` (whitelist) and Discord-to-Minecraft chat |
+| `REALMS_RCON_PASSWORD` | `server/.env` | the `rcon.password` from step E | Discord-to-Minecraft chat and the player list |
 | `REALMS_RCON_HOST` | `server/.env` | optional; empty means `127.0.0.1`. Only this machine or a private-network address is accepted | |
 | `REALMS_RCON_PORT` | `server/.env` | optional; empty means `25575` | |
 | `REALMS_LOG_PATH` | `server/.env` | the full path of the Minecraft server's `logs\latest.log`. The bot only reads it | Minecraft-to-Discord chat |
 
 Check: a "Monkey SMP" panel appears in ⛏️・monkey-smp and is pinned. `/status` and `/smp status`
-(as staff) have a line "Monkey SMP bridge: ok (status, whitelist, chat to Minecraft, chat from
+(as staff) have a line "Monkey SMP bridge: ok (status, chat to Minecraft, chat from
 Minecraft)" listing the parts that are on, or saying what is wrong ("RCON refused the password",
 "log file not found"). Then type in ⛏️・monkey-smp and see it in the game, and type in the game and
 see it in the channel.
 
-Things to know when testing the whitelist:
+Things to know when testing links:
 
-- `/smp link` works for accounts 30+ days old that have been in the server 14 days.
-- A name that is already on the whitelist is refused ("ask a mod"), because the bot did not put
-  it there. That includes your own name from step E and anyone you whitelisted by hand. Link
-  those with `/smp adopt <member> <name>` (mods). An adopted name is then handled like any
-  other link.
-- The bot only ever removes names it added or you adopted. Names you whitelisted by hand and
-  never adopted stay on the whitelist whatever happens in Discord.
+- A link is not access. Monkey SMP is a paid pass, granted by staff by hand or through the store
+  (https://monkeysmp.lscaturchio.xyz). Front Desk never adds anyone to the whitelist or removes
+  anyone from it, whatever happens in Discord.
+- `/smp link` works for accounts 30+ days old and only records which Minecraft name is whose, for
+  the chat bridge and playtime. `/smp adopt <member> <name>` (mods) links a name for a member
+  without the account-age bar. `/smp unlink`, leaving and a ban just forget the link.
 - Playtime and its coins count only while at least two players are online, so nothing shows
   while you test alone.
 - Chat in the game reaches the channel only from players whose name is linked to a member who
-  can post there right now. Players you whitelisted by hand stay silent in Discord until a mod
-  runs `/smp adopt` for them (`/smp link` refuses a name that is already whitelisted).
+  can post there right now. A player who has a pass but no link stays silent in Discord until
+  they run `/smp link` (or a mod runs `/smp adopt` for them).
   Join and leave lines show for everyone.
 
 ### C.4 Live site data, public half
@@ -263,17 +262,17 @@ On the Minecraft server, set these lines and restart it:
 
 - `enable-status` is what the status panel asks. It is on by default.
 - `rcon.password` is the value for `REALMS_RCON_PASSWORD`. Use a long random one.
-- `white-list=true` makes the whitelist count. Without it `/smp link` still adds names, but
-  anyone can join anyway. Add yourself first (`whitelist add YourName` in the server console) so
-  you are not locked out. Names added this way are not the bot's: it will not link them through
-  `/smp link` and will never remove them. Use `/smp adopt` to hand one over to the bot.
+- `white-list=true` keeps out anyone without a pass. Add yourself first (`whitelist add YourName`
+  in the server console) so you are not locked out. Staff or the store add pass holders the same
+  way; Front Desk never touches the whitelist.
 - Optional: `broadcast-rcon-to-ops=false` stops operators in the game seeing a line for every
   command the bot sends.
 - Do not forward the RCON port (25575) on your router. The bot only talks to it on this machine
   or your home network, and refuses any other address.
 
-Front Desk never starts, stops or reconfigures the Minecraft server. It sends three kinds of
-command over RCON: `list`, `whitelist add/remove NAME` and `tellraw` for chat.
+Front Desk never starts, stops or reconfigures the Minecraft server. It sends two kinds of
+command over RCON: `list` and `tellraw` for chat. Its RCON client refuses anything else before
+it is sent.
 
 ## If something stays off
 

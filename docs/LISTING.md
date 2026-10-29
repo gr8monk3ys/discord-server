@@ -31,7 +31,7 @@ The same text as the server description in `server/layout.py` (`PUBLIC`).
 A small, friendly co-op and PvE server. Risk of Rain 2, Gears of War, Overwatch, Minecraft. Evenings, Pacific time.
 ```
 
-## Long description (965 characters, fits discord.me's 1,025 limit)
+## Long description (1,012 characters, fits discord.me's 1,025 limit)
 
 Plain text with no markdown and no emoji, so it reads the same on every site. The first
 paragraph stands on its own, because Disboard shows it as the summary.
@@ -39,7 +39,7 @@ paragraph stands on its own, because Disboard shows it as the summary.
 ```
 Lorenzo's Server is a small, friendly Discord for co-op and PvE games. Nobody here is grinding ranked, and nobody tracks your K/D.
 
-What we play: Risk of Rain 2, Gears of War, Overwatch, Marvel Rivals, Apex Legends, Tabletop Simulator, Wardogs and Minecraft. The owner runs a modded Minecraft server called Monkey SMP. After two weeks in the Discord, /smp link puts you on its whitelist.
+What we play: Risk of Rain 2, Gears of War, Overwatch, Marvel Rivals, Apex Legends, Tabletop Simulator, Wardogs and Minecraft. The owner runs a modded Minecraft server called Monkey SMP. Playing needs a pass from monkeysmp.lscaturchio.xyz; /smp link connects your Minecraft name to chat in the Discord.
 
 When: people are mostly in voice in the evenings, US Pacific time. It is a small group, so some nights are quiet. If someone is in the Lobby you join them, and that is how most games start.
 

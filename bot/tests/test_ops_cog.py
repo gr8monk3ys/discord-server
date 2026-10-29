@@ -562,9 +562,9 @@ def test_status_shows_the_realms_bridge_when_that_module_is_loaded(monkeypatch, 
         loaded = {}
         env.bot.get_cog = loaded.get
         assert realms.HEALTH_NAME not in await fields()  # the module is off: no empty field
-        health = SimpleNamespace(health_text=lambda: "ok (status, whitelist)")
+        health = SimpleNamespace(health_text=lambda: "ok (status, chat to Minecraft)")
         loaded["Realms"] = health
-        assert (await fields())[realms.HEALTH_NAME] == "ok (status, whitelist)"
+        assert (await fields())[realms.HEALTH_NAME] == "ok (status, chat to Minecraft)"
         health.health_text = lambda: 1 / 0
         shown = await fields()
         assert shown[realms.HEALTH_NAME] == "check failed, see bot.log" and shown["Uptime"]  # the rest still shows

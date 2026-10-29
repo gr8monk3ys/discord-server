@@ -1,27 +1,26 @@
 """Monkey SMP: a bridge between this server and the owner's Minecraft server.
 
-Four parts, each on only when its own settings are in the environment (see
+Three parts, each on only when its own settings are in the environment (see
 logic/realms.py `read_setup`); with none of them the cog loads, starts nothing and every
 command says the bridge is not set up.
 
 - Status panel (REALMS_ADDRESS): one message in the realms channel, edited in place when
   what it shows changes. The server is asked with the Server List Ping protocol every two
   minutes; while it does not answer the polls back off and the panel is edited once.
-- Whitelist (RCON): `/smp link <name>` for established accounts that have been in the
-  server two weeks runs `whitelist add`, `/smp unlink` (or leaving, or a ban) runs
-  `whitelist remove`. One name per member, one member per name. A change the server could
-  not take yet waits in `realms_links` (state add / remove) and is sent after the next poll
-  that reaches the server. The bot only ever removes a name it added itself (`managed`): an
-  add answered "already whitelisted" means somebody else put the name there, so the link is
-  refused, and a link the server never confirmed is forgotten without a `whitelist remove`.
-  Staff link such a name for a member with `/smp adopt`.
+- Links: `/smp link <name>` records which Minecraft name is whose (one name per member,
+  one member per name), for the chat relay and playtime. A link is only that: it never
+  gives anyone access to Monkey SMP. Access is a paid pass that staff grant by hand or
+  through the store, and this bot never sends `whitelist` or any other command that
+  changes the server (`R.sendable`). `/smp unlink`, leaving or a ban forget the link and
+  nothing else, so a paying player keeps their access. Staff link a name for a member with
+  `/smp adopt` and forget one with `/smp remove`.
 - Chat, both ways, in the realms channel. Discord to Minecraft is a `tellraw` over RCON,
   rate limited, never for bots. Minecraft to Discord tails the server log read-only
   (REALMS_LOG_PATH) in a worker thread and posts at most one batched message every few
   seconds, with no pings. An allow-list decides what comes through: a player's words (chat,
   and death and advancement lines, whose text a player or a mod can shape) are relayed only
-  when the name has a confirmed, bot-managed link to a member who is in the server, not
-  timed out and able to send messages in the realms channel. Everything else stays in the
+  when the name is linked to a member who is in the server, not timed out and able to
+  send messages in the realms channel. Everything else stays in the
   game. Join and leave lines are the bot's own words and show for anyone.
 - Playtime: a linked member seen in two player-list polls in a row, with at least one other
   player on in both (company, like voice coins: nobody is paid to idle alone), is credited
@@ -29,8 +28,8 @@ command says the bridge is not set up.
   on member, day and slot). `/smp top` ranks the week; tracking opt-out is respected.
 
 This file owns the sockets and the file handle. Nothing here ever starts, stops or
-configures the Minecraft server, and the RCON password is never logged or shown: errors
-carry fixed text and an exception type name only.
+configures the Minecraft server or changes its whitelist, and the RCON password is never
+logged or shown: errors carry fixed text and an exception type name only.
 """
 
 import asyncio
@@ -61,30 +60,22 @@ UNLINKED_HINT = "*Some players aren't linked, so their chat stays in the game. `
 
 MESSAGES = {
     "off": "The Monkey SMP bridge isn't set up yet.",
-    "no_whitelist": "Whitelisting through Discord isn't set up yet. Ask a Keeper to add you.",
     "bad_name": "That isn't a Minecraft Java name: 3 to 16 letters, digits or underscores, nothing else.",
-    "young": (f"Your Discord account must be {quests.MIN_ACCOUNT_DAYS}+ days old to join "
-              "Monkey SMP through Discord. Ask a Keeper to add you."),
-    "new_here": (f"Linking opens once you've been in the server for {R.LINK_MEMBER_DAYS} days. "
-                 "Until then, ask a Keeper to add you."),
-    "claimed": ("`{name}` is already on the Monkey SMP whitelist, and I didn't put it there, so I can't link it. "
-                "If it's yours, ask a mod to link it for you."),
-    "unlink_unconfirmed": "Unlinked. `{name}` was still waiting to be added, so the whitelist is unchanged.",
+    "young": (f"Your Discord account must be {quests.MIN_ACCOUNT_DAYS}+ days old to link a Minecraft name. "
+              "If it can't wait, ask a mod to link it for you."),
     "cooldown": "Give it a moment, then try again.",
     "have_one": "You already linked `{name}`. Run `/smp unlink` first if you want to change it.",
-    "taken": "Someone here already linked that Minecraft name. If it's yours, ask a mod.",
-    "already": "`{name}` is already linked to you and on the whitelist.",
-    "linked": ("Linked. `{name}` is on the Monkey SMP whitelist, and what you say in the game now shows up in the "
-               "Monkey SMP channel. `/smp unlink` takes it off again."),
-    "pending": ("Saved `{name}`. I can't reach the Minecraft server right now, so you'll be added to the "
-                "whitelist as soon as it answers."),
-    "unknown": "Minecraft doesn't know a player by that name. Check the spelling and try again.",
-    "none": "You haven't linked a Minecraft name. `/smp link` gets you on the whitelist.",
-    "unlinked": "Unlinked. `{name}` is off the Monkey SMP whitelist.",
-    "unlink_pending": ("Unlinked `{name}`. I can't reach the Minecraft server right now; it comes off the "
-                       "whitelist as soon as the server answers."),
+    "taken": "Someone here already linked that Minecraft name. If it's yours, open a ticket in {help}.",
+    "already": "`{name}` is already linked to you.",
+    "linked": ("Linked `{name}` to your Discord account. What you say in the game now shows up in the Monkey SMP "
+               "channel, and your playtime counts here. A link doesn't get you onto the server; {access} "
+               "`/smp unlink` forgets the link."),
+    "none": "You haven't linked a Minecraft name. `/smp link` connects one for chat and playtime.",
+    "unlinked": "Unlinked `{name}`. Your access to Monkey SMP doesn't change.",
     "failed": "Something went wrong on my side. Try again in a minute.",
 }
+# How a member gets onto Monkey SMP. {help} is the help channel (a mention when it exists).
+ACCESS = f"for that you need a Monkey SMP pass, from <{R.PASS_URL}> or through a ticket in {{help}}."
 
 
 def now() -> int:
@@ -277,7 +268,6 @@ class Realms(commands.Cog):
         self.rcon_down_since: int | None = None
         self.rcon_refused = False
         self.rcon_retry_at = 0
-        self.waiting = 0  # whitelist changes not yet confirmed by the server
         self.last_signature: tuple | None = None
         self.last_sweep_at = 0
         self.tail = R.TailState()
@@ -289,7 +279,6 @@ class Realms(commands.Cog):
         self.last_link: dict[int, int] = {}
         self.fetched: dict[int, tuple[int, object | None, int]] = {}  # uid -> (asked at, member, good for)
         self.hinted: dict[str, int] = {}  # name key -> when "link to be heard here" was last said for it
-        self.sync_lock = asyncio.Lock()
         self.said: set[str] = set()  # log lines already written once (see `once`)
 
     async def cog_load(self) -> None:
@@ -303,6 +292,10 @@ class Realms(commands.Cog):
             await self.forget_opted_out()
         except Exception:
             log.exception("realms: clearing opted-out playtime failed")
+        try:
+            await self.settle_old_links()
+        except Exception:
+            log.exception("realms: tidying links left from the whitelist days failed")
         if self.setup.status_on or self.setup.rcon_on:
             self.poll_loop.start()
         if self.setup.log_on:
@@ -355,17 +348,29 @@ class Realms(commands.Cog):
         except Exception:
             log.warning("realms: couldn't write to the mod log", exc_info=True)
 
+    def help_ref(self) -> str:
+        """The help channel as a mention, or its plain name when it can't be found."""
+        guild = self.guild()
+        channel = config.match_by_name(guild.text_channels, config.HELP_CHANNEL) if guild is not None else None
+        return channel.mention if channel is not None else "#help"
+
+    def access_text(self) -> str:
+        return ACCESS.format(help=self.help_ref())
+
     def health_text(self) -> str:
         """The self-check line for /status: "off", "ok (...)" or "unreachable since ...".
         Reads cached state only, so it is safe to call from any cog at any time."""
         return R.health(self.setup, down_since=self.down_since, rcon_down_since=self.rcon_down_since,
-                        rcon_refused=self.rcon_refused, log_missing=self.log_missing, waiting=self.waiting)
+                        rcon_refused=self.rcon_refused, log_missing=self.log_missing)
 
     # ------------------------------------------------------------ RCON
     async def rcon_call(self, command: str) -> str:
-        """Run a command, keeping track of whether RCON is answering. Raises RconError."""
+        """Run a command, keeping track of whether RCON is answering. Raises RconError.
+        Only `list` and `tellraw` get past here (`R.sendable`): never a whitelist change."""
         if self.rcon is None or not self.setup.rcon_on:
             raise RconError("RCON is not set up")
+        if not R.sendable(command):
+            raise RconError("that command is not one this bot sends")
         try:
             reply = await self.rcon.command(command)
         except RconError as exc:
@@ -382,8 +387,8 @@ class Realms(commands.Cog):
 
     # ------------------------------------------------------------ polling
     async def poll_once(self) -> None:
-        """Ask the server how it is and act on the answer: playtime, waiting whitelist
-        changes, members who left, the panel."""
+        """Ask the server how it is and act on the answer: playtime, members who left,
+        the panel."""
         t = now()
         self.next_poll_at = t + R.POLL_EVERY  # replaced below; set first so a bug cannot spin
         status, names, reached = None, None, False
@@ -418,8 +423,6 @@ class Realms(commands.Cog):
         self.next_poll_at = t + R.poll_delay(self.failures)
 
         steps = [("playtime", self.credit_playtime(names if reached else None, t))]
-        if reached and self.setup.rcon_on and self.rcon_down_since is None:
-            steps.append(("whitelist sync", self.sync_whitelist()))
         if t - self.last_sweep_at >= R.SWEEP_EVERY:
             self.last_sweep_at = t
             steps.append(("member sweep", self.sweep_departed()))
@@ -457,8 +460,8 @@ class Realms(commands.Cog):
         if here and signature == self.last_signature:
             return "skipped"
         text = R.panel_text(self.status, self.names, self.down_since)
-        if self.setup.rcon_on:
-            text += "\n\nWant in? `/smp link` with your Minecraft name."
+        text += (f"\n\nWant to play? You need a Monkey SMP pass: {R.PASS_URL}, or open a ticket in "
+                 f"{self.help_ref()}. `/smp link` connects your Minecraft name to chat and playtime here.")
         embed = style.embed(title="Monkey SMP", description=text[:4000], footer=style.label("monkey smp", "minecraft"),
                             color=style.FOREST if self.status is not None else style.MUTED)
         if here:
@@ -532,103 +535,37 @@ class Realms(commands.Cog):
                     paid += R.SLOT_COINS if result.ok else 0
         return paid
 
-    # ------------------------------------------------------------ whitelist
-    async def sync_one(self, key: str) -> str:
-        """Send one waiting whitelist change. Returns ok / removed / unknown / claimed /
-        pending / gone. "claimed": the name was on the whitelist before this bot ever added
-        it (by hand, or for somebody else), so the link is refused and the row deleted."""
-        async with self.sync_lock:
-            row = await self.db.fetchone("SELECT * FROM realms_links WHERE name_key = ?", (key,))
-            if row is None:
-                return "gone"
-            if row["state"] == "ok":
-                return "ok"
-            action = "add" if row["state"] == "add" else "remove"
-            if action == "remove" and not row["managed"]:
-                # Never sent for a name this bot did not put there itself.
-                await self.db.execute("DELETE FROM realms_links WHERE name_key = ? AND state = 'remove'", (key,))
-                return "gone"
-            try:
-                reply = await self.rcon_call(R.whitelist_command(action, row["name"]))
-            except (RconError, ValueError):
-                return "pending"
-            result = R.whitelist_result(action, reply)
-            t = now()
-            if result == "error":
-                await self.db.execute("UPDATE realms_links SET attempts = attempts + 1, updated_at = ?"
-                                      " WHERE name_key = ? AND state = ?", (t, key, row["state"]))
-                log.warning("realms: the server gave an unexpected answer to a whitelist %s", action)
-                return "pending"
-            # "already whitelisted" is fine only for a name this bot added before (it was being
-            # removed and got claimed again before the server took the removal).
-            if action == "add" and (result == "ok" or (result == "already" and row["managed"])):
-                await self.db.execute("UPDATE realms_links SET state = 'ok', managed = 1, attempts = 0, updated_at = ?"
-                                      " WHERE name_key = ? AND state = 'add'", (t, key))
-                return "ok"
-            # an add for a name Minecraft does not know or that somebody else whitelisted, or a
-            # finished removal: the row goes
-            await self.db.execute("DELETE FROM realms_links WHERE name_key = ? AND state = ?", (key, row["state"]))
-            if action == "add" and result == "already":
-                await self.mod_log(
-                    f"⛏️ <@{row['user_id']}> tried to link `{row['name']}`, which was already on the Monkey SMP "
-                    "whitelist (added by hand, or somebody else's). Not linked, and the whitelist is unchanged. "
-                    "If the name is theirs, `/smp adopt` links it.")
-                return "claimed"
-            return "unknown" if action == "add" else "removed"
-
-    async def sync_whitelist(self) -> None:
-        """Send waiting changes, oldest first, a few per poll; stop when RCON stops answering."""
-        t = now()
-        rows = await self.db.fetchall("SELECT name_key, attempts, updated_at FROM realms_links"
-                                      " WHERE state IN ('add', 'remove') ORDER BY updated_at, name_key")
-        left = len(rows)
-        for row in [r for r in rows if R.retry_due(r["attempts"], r["updated_at"], t)][:R.SYNC_BATCH]:
-            if await self.sync_one(row["name_key"]) != "pending":
-                left -= 1
-            if self.rcon_down_since is not None:
-                break
-        self.waiting = left
-
-    async def mark_remove(self, user_id: int) -> dict | None:
-        """Turn the member's link into a waiting removal; None when they have none. A link
-        the server never confirmed is just forgotten ("unconfirmed" in the result): as far as
-        the bot knows that name is not on the whitelist, or not by its doing."""
+    # ------------------------------------------------------------ links
+    async def settle_old_links(self) -> int:
+        """Rows left from when linking ran the whitelist: a removal that was still waiting is
+        forgotten, and an add that was still waiting is a plain link like any other. Nothing
+        is sent to the server. Returns the rows changed (0 once done; safe on every load)."""
         async with self.db.transaction() as tx:
-            row = await tx.fetchone("SELECT * FROM realms_links WHERE user_id = ? AND state != 'remove'", (user_id,))
+            gone = await tx.execute("DELETE FROM realms_links WHERE state = 'remove'")
+            kept = await tx.execute("UPDATE realms_links SET state = 'ok', attempts = 0 WHERE state != 'ok'")
+            changed = max(gone.rowcount, 0) + max(kept.rowcount, 0)
+        if changed:
+            log.info("realms: tidied %s link row(s) left from the whitelist days", changed)
+        return changed
+
+    async def forget_link(self, user_id: int) -> dict | None:
+        """Delete the member's link and return it; None when they had none. That is all:
+        their access to Monkey SMP is staff's business, not the bot's."""
+        async with self.db.transaction() as tx:
+            row = await tx.fetchone("SELECT * FROM realms_links WHERE user_id = ?", (user_id,))
             if row is None:
                 return None
-            if not row["managed"]:
-                await tx.execute("DELETE FROM realms_links WHERE name_key = ?", (row["name_key"],))
-                return {**dict(row), "unconfirmed": True}
-            await tx.execute("UPDATE realms_links SET state = 'remove', attempts = 0, updated_at = ?"
-                             " WHERE name_key = ?", (now(), row["name_key"]))
-        self.waiting += 1
+            await tx.execute("DELETE FROM realms_links WHERE user_id = ?", (user_id,))
         return dict(row)
 
-    async def remove_now(self, row: dict) -> bool:
-        """Try the removal at once; False when it has to wait for the server."""
-        if row.get("unconfirmed"):
-            return True  # nothing was ever added: nothing to send
-        if not self.setup.rcon_on:
-            return False
-        done = await self.sync_one(row["name_key"]) in ("removed", "gone")
-        if done:
-            self.waiting = max(0, self.waiting - 1)
-        return done
-
     async def drop_member(self, user_id: int, why: str) -> bool:
-        """Take a member's name off the whitelist (they left, were banned, or staff said
-        so). True when they had one."""
-        row = await self.mark_remove(user_id)
+        """Forget a member's link (they left, were banned, or staff said so). True when they
+        had one."""
+        row = await self.forget_link(user_id)
         if row is None:
             return False
-        done = await self.remove_now(row)
-        if row.get("unconfirmed"):
-            what = "was still waiting to be added, so the whitelist is unchanged"
-        else:
-            what = ("is off the Monkey SMP whitelist" if done else
-                    "comes off the Monkey SMP whitelist when the server answers")
-        await self.mod_log(f"⛏️ <@{user_id}> {why}: `{row['name']}` {what}")
+        await self.mod_log(f"<@{user_id}> {why}: forgot their Minecraft link `{row['name']}` "
+                           "(their Monkey SMP access is unchanged)")
         return True
 
     async def sweep_departed(self) -> int:
@@ -638,7 +575,7 @@ class Realms(commands.Cog):
         if guild is None or not getattr(guild, "chunked", False):
             return 0
         gone = 0
-        for row in await self.db.fetchall("SELECT user_id FROM realms_links WHERE state != 'remove'"):
+        for row in await self.db.fetchall("SELECT user_id FROM realms_links"):
             if guild.get_member(row["user_id"]) is None:
                 gone += await self.drop_member(row["user_id"], "is no longer here")
         return gone
@@ -659,88 +596,71 @@ class Realms(commands.Cog):
         except Exception:
             log.exception("realms: handling a ban failed")
 
+    async def save_link(self, member_id: int, name: str) -> str | None:
+        """Record `name` as the member's. None when it was saved; otherwise why not:
+        "already" (this name is theirs), "have_one" (they linked another) or "taken"."""
+        key, t = R.name_key(name), now()
+        async with self.db.transaction() as tx:
+            mine = await tx.fetchone("SELECT name_key FROM realms_links WHERE user_id = ?", (member_id,))
+            if mine is not None:
+                return "already" if mine["name_key"] == key else "have_one"
+            if await tx.fetchone("SELECT 1 FROM realms_links WHERE name_key = ?", (key,)) is not None:
+                return "taken"
+            await tx.execute("INSERT INTO realms_links (name_key, name, user_id, state, attempts, linked_at,"
+                             " updated_at) VALUES (?, ?, ?, 'ok', 0, ?, ?)", (key, name, member_id, t, t))
+        return None
+
+    async def linked_name(self, user_id: int) -> str | None:
+        row = await self.db.fetchone("SELECT name FROM realms_links WHERE user_id = ?", (user_id,))
+        return row["name"] if row is not None else None
+
     async def link_member(self, member, name: str) -> str:
         """/smp link: returns the reply. The name is never echoed unless it is valid."""
-        if not self.setup.rcon_on:
-            return MESSAGES["no_whitelist" if self.setup.any_on else "off"]
+        if not self.setup.any_on:
+            return MESSAGES["off"]
         if not R.valid_name(name):
             return MESSAGES["bad_name"]
         t = now()
+        # A link decides whose in-game words are posted here and whose playtime it is, so a
+        # throwaway account can't claim a name (the same bar as coins and other rewards).
         if not R.established(member.id, t):
             return MESSAGES["young"]
-        joined = getattr(member, "joined_at", None)
-        if not R.member_long_enough(int(joined.timestamp()) if joined is not None else None, t):
-            return MESSAGES["new_here"]
         last = self.last_link.get(member.id)
         if last is not None and t - last < R.LINK_COOLDOWN:
             return MESSAGES["cooldown"]
         self.last_link = {u: at for u, at in self.last_link.items() if t - at < R.LINK_COOLDOWN}
         self.last_link[member.id] = t
-        key = R.name_key(name)
-        async with self.db.transaction() as tx:
-            mine = await tx.fetchone("SELECT * FROM realms_links WHERE user_id = ? AND state != 'remove'",
-                                     (member.id,))
-            if mine is not None and mine["name_key"] != key:
-                return MESSAGES["have_one"].format(name=mine["name"])
-            if mine is not None and mine["state"] == "ok":
-                return MESSAGES["already"].format(name=mine["name"])
-            row = await tx.fetchone("SELECT * FROM realms_links WHERE name_key = ?", (key,))
-            if row is not None and row["state"] != "remove" and row["user_id"] != member.id:
-                return MESSAGES["taken"]
-            if row is None:
-                await tx.execute("INSERT INTO realms_links (name_key, name, user_id, state, attempts, linked_at,"
-                                 " updated_at) VALUES (?, ?, ?, 'add', 0, ?, ?)", (key, name, member.id, t, t))
-            elif mine is None:  # a name whose removal was still waiting: it is claimed again
-                await tx.execute("UPDATE realms_links SET name = ?, user_id = ?, state = 'add', attempts = 0,"
-                                 " linked_at = ?, updated_at = ? WHERE name_key = ?", (name, member.id, t, t, key))
-        result = await self.sync_one(key)
-        if result == "unknown":
-            return MESSAGES["unknown"]
-        if result == "claimed":  # sync_one deleted the row and told the mod log
-            return MESSAGES["claimed"].format(name=name)
-        await self.mod_log(f"⛏️ <@{member.id}> linked the Minecraft name `{name}`"
-                           + ("" if result == "ok" else " (waiting for the server)"))
-        return MESSAGES["linked" if result == "ok" else "pending"].format(name=name)
+        problem = await self.save_link(member.id, name)
+        if problem is not None:
+            return MESSAGES[problem].format(name=await self.linked_name(member.id) or name, help=self.help_ref())
+        await self.mod_log(f"<@{member.id}> linked the Minecraft name `{name}`")
+        return MESSAGES["linked"].format(name=name, access=self.access_text())
 
     async def adopt_member(self, mod, member, name: str) -> str:
-        """/smp adopt: staff vouch that a name already on the whitelist (put there by hand)
-        is this member's. The link is recorded as the bot's own, so unlinking, leaving or a
-        ban takes the name off like any other. Returns the reply."""
-        if not self.setup.rcon_on:
-            return MESSAGES["no_whitelist" if self.setup.any_on else "off"]
+        """/smp adopt: staff link a name for a member, without the account-age bar or the
+        cooldown (someone who can't run `/smp link` yet, or a name sorted out in a ticket).
+        Link-only, like `/smp link`: it gives no access to Monkey SMP. Returns the reply."""
+        if not self.setup.any_on:
+            return MESSAGES["off"]
         if not R.valid_name(name):
             return MESSAGES["bad_name"]
         if getattr(member, "bot", False):
             return "Bots don't play on Monkey SMP."
-        key, t = R.name_key(name), now()
-        mine = await self.db.fetchone("SELECT name, name_key FROM realms_links WHERE user_id = ? AND state != 'remove'",
-                                      (member.id,))
-        if mine is not None and mine["name_key"] != key:
-            return f"{member.mention} already has `{mine['name']}` linked. `/smp remove` it first."
-        row = await self.db.fetchone("SELECT user_id, state FROM realms_links WHERE name_key = ?", (key,))
-        if row is not None and row["state"] != "remove" and row["user_id"] != member.id:
+        problem = await self.save_link(member.id, name)
+        if problem == "have_one":
+            return f"{member.mention} already has `{await self.linked_name(member.id)}` linked. `/smp remove` it first."
+        if problem == "taken":
+            row = await self.db.fetchone("SELECT user_id FROM realms_links WHERE name_key = ?", (R.name_key(name),))
             return f"`{name}` is linked to <@{row['user_id']}>. `/smp remove` that link first."
-        try:
-            # Makes sure the name is on the whitelist; "already whitelisted" is the expected answer.
-            result = R.whitelist_result("add", await self.rcon_call(R.whitelist_command("add", name)))
-        except RconError:
-            return "I can't reach the Minecraft server right now, so nothing was linked. Try again in a minute."
-        if result == "unknown":
-            return MESSAGES["unknown"]
-        if result not in ("ok", "already"):
-            return MESSAGES["failed"]
-        await self.db.execute(
-            "INSERT INTO realms_links (name_key, name, user_id, state, attempts, linked_at, updated_at, managed)"
-            " VALUES (?, ?, ?, 'ok', 0, ?, ?, 1) ON CONFLICT (name_key) DO UPDATE SET name = excluded.name,"
-            " user_id = excluded.user_id, state = 'ok', attempts = 0, linked_at = excluded.linked_at,"
-            " updated_at = excluded.updated_at, managed = 1", (key, name, member.id, t, t))
-        log.info("realms: %s adopted a whitelisted name for %s", mod.id, member.id)
-        await self.mod_log(f"⛏️ <@{mod.id}> linked the Minecraft name `{name}` to <@{member.id}> (`/smp adopt`: "
-                           "it was on the whitelist already, and is now managed like any other link)")
-        return f"Linked `{name}` to {member.mention}. It comes off the whitelist if they unlink, leave or are banned."
+        if problem == "already":
+            return f"`{name}` is already linked to {member.mention}."
+        log.info("realms: %s linked a name for %s", mod.id, member.id)
+        await self.mod_log(f"<@{mod.id}> linked the Minecraft name `{name}` to <@{member.id}> (`/smp adopt`)")
+        return (f"Linked `{name}` to {member.mention}. A link gives no access to Monkey SMP; that is a pass, "
+                "granted separately.")
 
     # ------------------------------------------------------------ commands
-    @realms.command(name="link", description="Get on the Monkey SMP whitelist with your Minecraft name")
+    @realms.command(name="link", description="Connect your Minecraft name for Monkey SMP chat and playtime")
     @app_commands.describe(minecraft_name="Your Minecraft Java name (3 to 16 letters, digits or _)")
     async def link(self, interaction: discord.Interaction, minecraft_name: app_commands.Range[str, 1, 32]) -> None:
         await interaction.response.defer(ephemeral=True, thinking=True)
@@ -751,24 +671,22 @@ class Realms(commands.Cog):
             text = MESSAGES["failed"]
         await interaction.followup.send(text, ephemeral=True, allowed_mentions=NO_PINGS)
 
-    @realms.command(name="unlink", description="Take your Minecraft name off the Monkey SMP whitelist")
+    @realms.command(name="unlink", description="Forget your linked Minecraft name (your server access stays)")
     async def unlink(self, interaction: discord.Interaction) -> None:
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
-            row = await self.mark_remove(interaction.user.id)
+            row = await self.forget_link(interaction.user.id)
             if row is None:
                 text = MESSAGES["none"]
             else:
-                done = await self.remove_now(row)
-                which = "unlink_unconfirmed" if row.get("unconfirmed") else "unlinked" if done else "unlink_pending"
-                text = MESSAGES[which].format(name=row["name"])
-                await self.mod_log(f"⛏️ <@{interaction.user.id}> unlinked the Minecraft name `{row['name']}`")
+                text = MESSAGES["unlinked"].format(name=row["name"])
+                await self.mod_log(f"<@{interaction.user.id}> unlinked the Minecraft name `{row['name']}`")
         except Exception:
             log.exception("realms: unlink failed")
             text = MESSAGES["failed"]
         await interaction.followup.send(text, ephemeral=True, allowed_mentions=NO_PINGS)
 
-    @realms.command(name="remove", description="Take a member's Minecraft name off the whitelist (mods)")
+    @realms.command(name="remove", description="Forget a member's linked Minecraft name (mods)")
     @app_commands.describe(member="Whose link to remove")
     async def remove(self, interaction: discord.Interaction, member: discord.Member) -> None:
         if not is_staff(interaction.user):
@@ -779,8 +697,8 @@ class Realms(commands.Cog):
         text = f"Removed {member.mention}'s Minecraft link." if had else f"{member.mention} has no Minecraft link."
         await interaction.followup.send(text, ephemeral=True, allowed_mentions=NO_PINGS)
 
-    @realms.command(name="adopt", description="Link a name that is already on the whitelist to a member (mods)")
-    @app_commands.describe(member="Whose Minecraft name it is", minecraft_name="The name as it is on the whitelist")
+    @realms.command(name="adopt", description="Link a Minecraft name to a member (mods)")
+    @app_commands.describe(member="Whose Minecraft name it is", minecraft_name="Their Minecraft Java name")
     async def adopt(self, interaction: discord.Interaction, member: discord.Member,
                     minecraft_name: app_commands.Range[str, 1, 32]) -> None:
         if not is_staff(interaction.user):
@@ -811,14 +729,12 @@ class Realms(commands.Cog):
             lines = ["Checking the server. Ask again in a minute."]
         else:
             lines = [R.panel_text(self.status, self.names, self.down_since)]
-        row = await self.db.fetchone("SELECT name, state FROM realms_links WHERE user_id = ? AND state != 'remove'",
-                                     (uid,))
-        if row is None:
-            lines.append("\n**You**: no Minecraft name linked. `/smp link` gets you on the whitelist; only "
-                         "linked players' chat is passed on from the game to this channel.")
+        name = await self.linked_name(uid)
+        if name is None:
+            lines.append("\n**You**: no Minecraft name linked. `/smp link` connects one; only linked players' "
+                         "chat is passed on from the game to this channel.")
         else:
-            wait = "" if row["state"] == "ok" else " (waiting for the server to take the whitelist change)"
-            lines.append(f"\n**You**: `{row['name']}`{wait}")
+            lines.append(f"\n**You**: `{name}`")
             if await self.db.tracking_allowed(uid):
                 today = R.day_key(t, self.tz)
                 start, end = coin_rules.day_bounds(t, self.tz)
@@ -912,16 +828,16 @@ class Realms(commands.Cog):
 
     # ------------------------------------------------------------ Minecraft -> Discord
     async def speaker(self, name: str) -> int | None:
-        """The member a Minecraft name speaks for: only a link the server confirmed and this
-        bot manages (state 'ok', managed). A name nobody linked, a claim still waiting to be
-        added, a link on its way off the whitelist: all None, and None is never relayed."""
+        """The member a Minecraft name speaks for: the member who linked it. A name nobody
+        linked is None, and None is never relayed. (Only 'ok' rows count: anything else is a
+        leftover from the whitelist days that `settle_old_links` has not tidied yet.)"""
         row = await self.db.fetchone(
-            "SELECT user_id FROM realms_links WHERE name_key = ? AND state = 'ok' AND managed = 1", (R.name_key(name),))
+            "SELECT user_id FROM realms_links WHERE name_key = ? AND state = 'ok'", (R.name_key(name),))
         return row["user_id"] if row is not None else None
 
     async def may_relay(self, name: str) -> bool:
         """The allow-list in front of everything a player can put words into: relayed only
-        when the name has a confirmed link to a member who is in the server right now, not
+        when the name is linked to a member who is in the server right now, not
         timed out, and able to send messages in the realms channel. Everything else stays in
         the game, so a second or unlinked Minecraft account is no way around a mute, and
         claiming somebody's name changes nothing for them."""
