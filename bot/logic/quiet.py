@@ -41,7 +41,8 @@ class Kind:
 QOTD = Kind("qotd", "Question of the day")
 POLL = Kind("thisorthat", "This or that poll")
 REVIVAL = Kind("revival", "Conversation starter")
-KINDS = (QOTD, POLL, REVIVAL)
+FIELD_NOTES = Kind("fieldnotes", "Field notes question")  # the last line of the weekly field notes
+KINDS = (QOTD, POLL, REVIVAL, FIELD_NOTES)
 
 
 def key(kind: Kind) -> str:

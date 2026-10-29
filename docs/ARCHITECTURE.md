@@ -37,7 +37,9 @@ looked up by name at run time, never by a stored ID.
    `REALMS_ADDRESS`, `REALMS_RCON_HOST`, `REALMS_RCON_PORT`, `REALMS_RCON_PASSWORD`,
    `REALMS_LOG_PATH` (realms), `SITE_DATA` (sitedata), `TONIGHT` (tonight; `off` stops the
    voice line, anything else or unset leaves it on), `SMP_WATCH`, `SMP_WATCH_ADDRESS`, `SMP_WATCH_MIN`
-   (smpwatch; `off` stops the Monkey SMP ping), `QUIET` (`bot/quietgate.py`; `off` posts
+   (smpwatch; `off` stops the Monkey SMP ping), `FIELD_NOTES_GITHUB_USER`,
+   `FIELD_NOTES_SPOTIFY_HISTORY`, `FIELD_NOTES_LETTERBOXD_USER`, `FIELD_NOTES_PLAYED` (fieldnotes;
+   none set runs no tick), `QUIET` (`bot/quietgate.py`; `off` posts
    every question and poll whether or not anyone answers, anything else or unset leaves the
    quiet rule on), and `APPEAL_SECRET`,
    `APPEAL_COOLING_DAYS`, `APPEAL_REAPPEAL_DAYS`, `SITE_URL` (appeals, and `/ban`'s DM).
@@ -79,7 +81,7 @@ Rules that make this hold together:
 
 - `logic/` modules do no Discord I/O and never touch the database: they import the standard
   library, `config` and each other (plus Pillow for the card images; `events`, `levels`,
-  `recap` and `tonight` import `discord` only for `utils.escape_markdown`). They are what the
+  `recap`, `tonight` and `fieldnotes` import `discord` only for `utils.escape_markdown`). They are what the
   tests exercise most; `tests/test_<name>.py` covers the rules, `tests/test_<name>_cog.py`
   drives the cog with fakes.
 - `Database` (`bot/db.py`) holds one connection in WAL mode with `foreign_keys = ON` and one
@@ -160,6 +162,7 @@ jobs below). Times are local (Pacific unless `TZ` is set). Loops without a wall-
 | `tonight` | one line in general while 2+ non-bot members are in a public voice channel (everyone can view and join; not AFK, not the staff category): counts, the shared game, a channel mention; edited in place, past tense when the rooms empty, never deleted. No commands, no coins | none (`meta` only: `tonight:state`, one JSON value with no member data, and `tonight:fired_at`) | 1 min tick: line after a room has held 3 min, edits at most every 2 min, same message reused for 45 min after a session ends, at most 3 new messages a local day; `TONIGHT=off` runs no tick and closes a standing "right now" line once | 💬・general |
 | `welcomers` | one line in general pinging the opt-in Welcomer role when a member who joined in the last 14 days first joins a public voice channel (`Tonight.public_room`) and stays 30 s; "first" is `voice_sessions` history (read only). Skipped for bots, tracking off, a Welcomer or staff already in the channel, nobody else holding the role, quiet hours (`crew.quiet_hours` of `CREW_QUIET_HOURS`). No commands, no coins | none (`meta` only: `welcomers:last_ping`, and `welcomers:pinged:<id>` per newcomer, pruned after 30 days) | 10 s tick (joins held 30 s); at most one ping per 15 min; prune hourly | 💬・general; Welcomer |
 | `smpwatch` | one line mentioning SMP Ping in the realms channel when 3+ are on Monkey SMP: a Server List Ping (the `realms` codec) of the public address, found through its SRV record by a minimal UDP DNS client in `logic/smpwatch.py`; reads the count only, no RCON, no names. No commands, no coins | none (`meta` only: `smpwatch:state`, when the last ping went out and whether the next may go) | 5 min tick; SRV answer cached 1 h; after a ping, none until the count drops below the minimum and 4 h pass; none 22:00 to 09:00 local; `SMP_WATCH=off` runs no tick | ⛏️・monkey-smp; SMP Ping |
+| `fieldnotes` | the owner's weekly field notes: Built (GitHub search plus the owner's repo listing, public repos only, no token), Heard (SpotifyForge's `listening_history.jsonl`, read only; no Spotify token), Watched (Letterboxd RSS), Played (the guild owner's `game_sessions` rows, unless opted out); a reply thread; the closing question asks `quietgate` (kind `fieldnotes`); staff `/fieldnotes preview` (changes nothing) | none (`jobs` rows `fieldnotes:YYYY-Www`; `meta` `quiet:fieldnotes`) | 5 min tick: Sun 18:00 weekly; an empty week is marked done with no post; no `FIELD_NOTES_*` setting runs no tick | 📓・field-notes |
 
 Four of the `logic/` modules have no cog of their own: `linkedroles.py` validates
 `site/api/linked-role/metadata.json` and plans the registration diff for
@@ -297,7 +300,7 @@ with the ones above.
 
 **Quiet rooms (`logic/quiet.py`, `bot/quietgate.py`).** A recurring prompt that asks members
 for a response is a "kind": the question of the day (`QOTD`), the daily poll (`POLL`) and the
-chat revival (`REVIVAL`). The rule is pure and lives in `logic/quiet.py`: post unless the last
+chat revival (`REVIVAL`) and the question that ends the weekly field notes (`FIELD_NOTES`). The rule is pure and lives in `logic/quiet.py`: post unless the last
 3 prompts of the kind were all ignored; a sleeping kind wakes when a member writes in the
 channel after its last prompt, and if nobody does, one probe goes out 7 days after that
 prompt (a probe nobody answers leaves the kind asleep for another 7 days).
@@ -311,6 +314,8 @@ prompt (a probe nobody answers leaves the kind asleep for another 7 days).
 - `cogs/vibes.py`, for the chat revival. It passes `last_member_at`, so nothing is read from
   Discord. Its own rule already needs a member message since the last revival, so the gate
   never refuses it.
+- `cogs/fieldnotes.py`, for its closing question. It passes the period's scheduled time; a
+  refusal drops only the question line, and the notes still go out.
 - `cogs/ops.py` reads `quietgate.status_lines` for the "Paused prompts" field of `/status`.
 
 Without `last_member_at`, `allowed` fetches the newest prompt once (poll votes, a reaction
@@ -318,7 +323,7 @@ the bot did not add, the message count of the answers thread, and the voter list
 shows no votes) and, only when that shows nothing, reads at most 50 channel messages after it
 (a member's reply is an answer; any member message wakes a sleeping kind). This is why
 `engagement` needs Read Message History in general (`CHANNEL_NEEDS`). State is one JSON value
-per kind in `meta` under `quiet:<kind>` (`quiet:qotd`, `quiet:thisorthat`, `quiet:revival`):
+per kind in `meta` under `quiet:<kind>` (`quiet:qotd`, `quiet:thisorthat`, `quiet:revival`, `quiet:fieldnotes`):
 the last 3 prompts as time, message id and answered, and whether the kind is asleep. No member
 ids. The keys are live data, so never rename a kind's key. The gate fails open: whatever
 cannot be read (a deleted prompt, a missing permission, an outage) never counts against a
@@ -391,7 +396,7 @@ SQLite at `bot/data/front_desk.db` (gitignored). `MIGRATIONS` in `bot/db.py` is 
 | Monkey SMP | `realms_links` (state: new links are always ok; add and remove are left from when linking ran the whitelist and are settled when the cog loads; unique index "one name per member"), `realms_playtime` (seconds per member per local day); `realms_links.managed` and `attempts` are unused since links stopped touching the whitelist (kept, since migrations are never edited) | 20; 22 |
 | Ban appeals | `appeals` (unique index "one open appeal per user"), `appeal_bans` (when a ban happened; written by `moderation`) | 21 |
 
-Wrapped, sitedata, Linked Roles, focus, tonight, smpwatch and welcomers add no tables. Wrapped keeps its share cooldown and the
+Wrapped, sitedata, Linked Roles, focus, tonight, smpwatch, welcomers and fieldnotes add no tables. Wrapped keeps its share cooldown and the
 January level snapshot in `meta` (`wrapped:shared:YEAR:USER`, `wrapped:levels:YEAR`). Quiet
 rooms and the digest's Newcomers field add none either: quiet rooms keeps one `meta` value per
 prompt kind (`quiet:<kind>`), and the Newcomers field stores nothing.
@@ -416,7 +421,7 @@ written by `sitedata`), and the two tracked banks `qotd.txt` and `polls.txt`.
 | `setup_server.py` | First build: create or restyle roles and channels, **reorder roles**, post rules and welcome | with `--apply` |
 | `polish_server.py` | Second pass: Community, Onboarding, welcome screen, AutoMod, media lock, trim empty channels | with `--apply` |
 | `public_mode.py` | Later changes: missing roles and channels, private categories, description, invite, Onboarding prompts, AutoMod gaps, and the games (role, channel, forum tag and "What do you play?" option for each game in `GAMES`; `restore_games` moves a re-listed game's channel back). Additive except for retired games: a game in `RETIRED_GAMES` loses its Onboarding option (in `game_options`, in the same edit that adds a newly listed game, or else in `retire_games`) and its channel moves into the staff-only `GAME_ARCHIVE` category (`99 · archive`; `retire_games` only). Never deletes: messages, roles and forum tags stay | with `--apply` |
-| `focus_mode.py` | The short newcomer channel list, in one Onboarding edit: default channels become `ONBOARDING_DEFAULT_CHANNELS` (the core of 9) and one question, `FOCUS_PROMPT`, offers the `FOCUS_GROUPS`. `--plan` prints the plan from `layout.py` without connecting and fails when a public channel is in no list or in two; `--revert` restores `ONBOARDING_EVERYTHING` as the defaults and leaves the question. Never touches permissions, channels, roles or the other questions | with `--apply` |
+| `focus_mode.py` | The short newcomer channel list, in one Onboarding edit: default channels become `ONBOARDING_DEFAULT_CHANNELS` (the core of 10) and one question, `FOCUS_PROMPT`, offers the `FOCUS_GROUPS`. `--plan` prints the plan from `layout.py` without connecting and fails when a public channel is in no list or in two; `--revert` restores `ONBOARDING_EVERYTHING` as the defaults and leaves the question. Never touches permissions, channels, roles or the other questions | with `--apply` |
 | `expressions.py` | Upload emoji and soundboard sounds from `assets/expressions/` (skips existing names) | with `--apply` |
 | `snapshot_server.py` + `snapshot_lib.py` | Read-only dump of live config to `server/snapshot/*.json` (names not IDs, sorted); `--compare` lists drift from `layout.py` | never |
 | `watchdog.py`, `install_watchdog.ps1` | Downtime watchdog and its Task Scheduler install | no (webhook alert only) |

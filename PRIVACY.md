@@ -177,6 +177,14 @@ account are verified (not your names on them), tells Discord yes or no per platf
 nothing. It sets one cookie for at most 10 minutes during sign-in. To undo it: User Settings >
 Authorized Apps > Front Desk > Deauthorize. Details: `docs/LINKED_ROLES.md`.
 
+**The weekly field notes.** Once a week Front Desk posts the server owner's own notebook: pull
+requests merged in the owner's public GitHub repositories (read from GitHub's public API), the
+owner's top artists and repeated tracks from a listening log kept on the owner's computer, the
+owner's Letterboxd diary entries from its public feed, and the owner's own game time from the
+records above. It reads nothing about any member for this post and stores nothing new; the
+question at the end goes through the same "questions nobody answers" check, and replies go in
+the post's thread like any other message.
+
 ## Your choices
 
 - `/privacy tracking:off` stops voice, message and game tracking and **deletes** your

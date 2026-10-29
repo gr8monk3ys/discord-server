@@ -415,6 +415,8 @@ CHANNEL_NEEDS: list[Need] = [
     Need("appeals", config.MOD_LOG_CHANNEL, POST),
     Need("wrapped", config.ANNOUNCEMENTS_CHANNEL, POST + ("attach_files",)),  # the server-wide card is an image
     Need("houses", config.ANNOUNCEMENTS_CHANNEL, POST),  # House Cup results, the one-time introduction
+    # the weekly post, its reply thread, and the quiet-rooms check that reads the post back
+    Need("fieldnotes", config.FIELD_NOTES_CHANNEL, POST + ("create_public_threads", "read_message_history")),
 ]
 
 # Modules with no row above, and why. A test fails when a module in main.MODULES is in neither,

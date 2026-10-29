@@ -60,6 +60,7 @@ MODULE_CATEGORY = {
     "wrapped": "stats",
     "sitedata": "utility",
     "appeals": "utility",
+    "fieldnotes": "community",
 }
 
 # Staff commands say so in their description: "Staff: ...", "... (mods only)", "... (staff only)",
