@@ -91,6 +91,7 @@ ROLES = [
     # Retired game roles stay where they are (members keep them); they are just not offered.
     *({"name": role, "mentionable": True} for _, _, role in RETIRED_GAMES),
     {"name": "Welcome Crew", "mentionable": True},  # opt-in via /crew: pinged when someone new arrives
+    {"name": "Welcomer", "mentionable": True},  # opt-in (#roles panel): pinged when someone new joins voice
     # Cosmetic thank-you tier: no colour and no permissions, so it can't pass for staff. Given by
     # Ko-fi's Discord bot or Server Subscriptions (or /supporter grant).
     {"name": "Supporter", "hoist": True},

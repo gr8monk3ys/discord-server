@@ -51,8 +51,9 @@ def sections(games=None) -> list[Section]:
                 hint="Where you are. One at a time."),
         Section("playtime", "Play time", tuple(config.PLAYTIME_ROLES), hint="When you're usually on."),
         Section("pings", "Pings", (config.GAMENIGHT_ROLE, config.LFG_ROLE, config.BUMPER_ROLE,
-                                   config.SMP_PING_ROLE),
-                hint="Opt-in pings: game nights, squads, Disboard bumps, people on Monkey SMP."),
+                                   config.SMP_PING_ROLE, config.WELCOMER_ROLE),
+                hint="Opt-in pings: game nights, squads, Disboard bumps, people on Monkey SMP, "
+                     "someone new in voice."),
         Section("games", "Games", tuple(games[:SELECT_MAX]), select=True,
                 hint="Pick games to add or remove: you get their pings and channels."),
     ]
