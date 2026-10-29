@@ -11,7 +11,8 @@ def test_sections_come_from_config_in_panel_order():
     assert by["platform"].names == tuple(config.PLATFORM_ROLES)
     assert by["region"].names == tuple(config.REGION_ROLES)
     assert by["playtime"].names == tuple(config.PLAYTIME_ROLES)
-    assert by["pings"].names == (config.GAMENIGHT_ROLE, config.LFG_ROLE, config.BUMPER_ROLE, config.SMP_PING_ROLE)
+    assert by["pings"].names == (config.GAMENIGHT_ROLE, config.LFG_ROLE, config.BUMPER_ROLE, config.SMP_PING_ROLE,
+                                 config.WELCOMER_ROLE)
     assert by["games"].names == tuple(g.role for g in config.GAMES)
     assert by["region"].single and not by["platform"].single and not by["pings"].single
     assert by["games"].select and not by["platform"].select

@@ -69,6 +69,13 @@ All notable changes to this project are recorded here. The format follows
   creates it). A status ping of the public address every 5 minutes; after a ping, nothing until
   the count has dropped and 4 hours have passed, and nothing from 22:00 to 09:00.
   `SMP_WATCH=off` turns it off.
+- `welcomers` module: when someone who joined in the last 14 days joins a public voice channel
+  for the first time, one line in general pings a new opt-in Welcomer role (on the 🎭・roles
+  panel, Pings; `server/public_mode.py --apply` creates it) and names the channel. Once per
+  newcomer, after 30 seconds in the channel, not when a Welcomer or staff member is already
+  there, at most one ping per 15 minutes, never in the crew's quiet hours (`CREW_QUIET_HOURS`)
+  and never for members with tracking off. "First time" comes from the voice history the stats
+  module already keeps.
 - A "Newcomers" field in the Monday owner digest (`bot/logic/funnel.py`): for the week and the
   last 28 days, how many joined, left since, picked roles, said something and joined voice; of
   the week before's joiners, how many are still here and how many came back in week 2; and one
