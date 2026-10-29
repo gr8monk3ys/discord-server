@@ -392,6 +392,7 @@ CHANNEL_NEEDS: list[Need] = [
     Need("stats", config.GENERAL_CHANNEL, POST),  # weekly MVP
     Need("crew", config.GENERAL_CHANNEL, POST),  # the crew ping
     Need("crew", config.MOD_LOG_CHANNEL, POST),
+    Need("welcomers", config.GENERAL_CHANNEL, POST),  # the Welcomer ping
     Need("supporter", config.GENERAL_CHANNEL, POST),  # the thank-you
     Need("supporter", config.MOD_LOG_CHANNEL, POST),
     # the bot reacts to new posts and reads the starter message to judge the reward
@@ -458,7 +459,7 @@ ROLE_NEEDS: list[tuple[str, str]] = [
     *((name, "levels") for _, name in config.LEVEL_ROLES),
     *((name, "selfroles") for name in (*config.PLATFORM_ROLES, *config.REGION_ROLES, *config.PLAYTIME_ROLES,
                                        config.GAMENIGHT_ROLE, config.LFG_ROLE, config.BUMPER_ROLE,
-                                       config.SMP_PING_ROLE, *(g.role for g in config.GAMES))),
+                                       config.SMP_PING_ROLE, config.WELCOMER_ROLE, *(g.role for g in config.GAMES))),
     (config.BUMPER_ROLE, "growth"),
     (config.RECRUITER_ROLE, "growth"),
     (config.CLIP_ROLE, "clips"),

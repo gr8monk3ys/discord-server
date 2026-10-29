@@ -3,7 +3,7 @@
 Front Desk is the bot for one Discord server, Lorenzo's Server. It isn't offered to other
 servers. This page says what it stores, why, and how to get it deleted.
 
-_Last updated: 2026-10-12_
+_Last updated: 2026-10-29_
 
 ## What Front Desk stores
 
@@ -31,6 +31,7 @@ _Last updated: 2026-10-12_
 | How many `/catchup` summaries you asked for today (a count and token totals, never the text) | The daily limits |
 | Which house you are in, when you joined it and when you left; each closed week's house scores and which members of the winning house were paid | Houses, the House Cup, the 30-day wait after leaving |
 | When you arrived (for the Welcome Crew ping), and which crew member greeted which newcomer and when | The crew ping, the greeting reward, `/crew` |
+| That the Welcomers were pinged about you and when (kept 30 days) | Pinging them once per newcomer |
 | Whether you hold the Supporter role, since when, and when it ended | The thank-you, the `/profile` flair, the monthly stipend |
 | Guide and setup posts you make: the post's ID, its title and when you posted it (not the post's text) | The one-time post reward |
 | Watch parties you schedule (the event, you as host, the start time) | Reminders and the one-event-per-host limit |
@@ -74,6 +75,13 @@ when. It does not read or keep what was said. Nothing is recorded when either of
 tracking off. If either of you turns it off later, the greeting records are deleted at once.
 The note of when you arrived (your ID and times, nothing else) is kept, because it is how
 Front Desk tells a first join from someone leaving and coming back; it no longer leads to a ping.
+
+**Welcomers.** In your first 14 days, the first time you join a public voice channel Front Desk
+may post one line in general that pings members who opted into the Welcomer role, mentions you
+(without pinging you) and names the channel. It decides "first time" from the voice time it
+already keeps; nothing new is recorded about your voice use. If it posts, it notes your ID and
+the time so it happens only once, and deletes that note after 30 days. With tracking off you are
+skipped: no line is posted about you.
 
 **Supporter tier.** Front Desk has no payment code and never sees a payment, an email address
 or an amount. Ko-fi or Discord gives you the Supporter role and Front Desk only notices the
@@ -187,9 +195,10 @@ the post's thread like any other message.
   clip not yet posted.
 - It removes the detail, never a limit. Coins you were paid stay in the coin ledger, which is
   not deleted, and daily and weekly caps are counted from it, so turning tracking off and on
-  again does not let anyone earn a reward twice. For the same reason two bare records are kept:
-  when you first arrived (so a rejoin is not treated as a first join) and, for up to 6 hours,
-  when you last shared a Wrapped card.
+  again does not let anyone earn a reward twice. For the same reason three bare records are kept:
+  when you first arrived (so a rejoin is not treated as a first join), for up to 6 hours,
+  when you last shared a Wrapped card, and, for up to 30 days, the note that the Welcomers were
+  pinged about you.
 - Not touched by it: your house, a linked Minecraft name, Supporter dates, clipcast answers, a
   clip already on YouTube, bans and appeals. Use the command named in each paragraph above
   (`/house leave`, `/smp unlink`, `/clipcast remove`), or ask.

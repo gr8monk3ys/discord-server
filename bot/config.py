@@ -237,3 +237,7 @@ def tonight_enabled(environ=None) -> bool:
 
 # Field notes (cogs/fieldnotes.py): the owner's weekly post, read-only for members.
 FIELD_NOTES_CHANNEL = "📓・field-notes"
+
+# Welcomers (cogs/welcomers.py): opt-in on the 🎭・roles panel; pinged in general when someone new
+# joins a public voice channel for the first time.
+WELCOMER_ROLE = "Welcomer"
