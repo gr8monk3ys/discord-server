@@ -196,7 +196,7 @@ def site_data_enabled() -> bool:
 # Ban appeals (logic/appeals.py). Off unless APPEAL_SECRET is set in server/.env.
 APPEALS_CHANNEL = "🔒・appeals"  # staff only; the website's webhook posts here
 SITE_URL = "https://discord.lscaturchio.xyz"
-APPEAL_SECRET_MIN = 16  # characters; site/api/appeal.js applies the same floor
+APPEAL_SECRET_MIN = 16  # characters; site/src/server/appeal.ts applies the same floor
 
 
 @dataclass(frozen=True)

@@ -2,3 +2,5 @@
 *.sh text eol=lf
 Dockerfile text eol=lf
 docker-compose.yml text eol=lf
+# Generated from layout.py; tests/test_sitegen.py compares them byte for byte, so keep LF on Windows too.
+site/src/data/generated/*.json text eol=lf

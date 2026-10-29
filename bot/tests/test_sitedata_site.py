@@ -1,5 +1,7 @@
 """The landing page's live section: hidden by default, fed only by the published aggregates,
-rendered without innerHTML, and in step with the schema the bot and the publisher use."""
+rendered as React text (never as HTML), and in step with the schema the bot and the publisher
+use. The rendered markup is tested in site/src/app/pages.test.tsx; these tests hold the site's
+sources to the bot's schema and to the publisher's branch and file name."""
 
 import json
 import re
@@ -11,91 +13,110 @@ import site_schema as schema
 from logic import sitegen
 
 SITE = Path(__file__).resolve().parents[2] / "site"
+SRC = SITE / "src"
 RAW = "https://raw.githubusercontent.com/gr8monk3ys/discord-server/site-data/stats.json"
 
 
 def read(name: str) -> str:
-    return (SITE / name).read_text(encoding="utf-8")
+    return (SRC / name).read_text(encoding="utf-8")
 
 
-def test_stats_url_lives_in_config_js_and_names_the_data_branch():
-    url = re.search(r'STATS_URL\s*:\s*"([^"]*)"', read("config.js")).group(1)
+def client_code() -> dict[str, str]:
+    """Everything that runs in the browser or renders a page: src/ minus the route handlers
+    (src/server, src/app/api), the proxy and the tests."""
+    out = {}
+    for path in sorted(SRC.rglob("*")):
+        rel = path.relative_to(SRC).as_posix()
+        if path.suffix not in {".ts", ".tsx"} or ".test." in path.name:
+            continue
+        if rel.startswith(("server/", "app/api/")) or rel == "proxy.ts":
+            continue
+        out[rel] = path.read_text(encoding="utf-8")
+    return out
+
+
+def test_stats_url_lives_in_the_site_config_and_names_the_data_branch():
+    cfg = json.loads(read("data/site-config.json"))
+    url = cfg["statsUrl"]
     assert url == RAW
     assert url.endswith(f"/{pub.BRANCH}/{pub.FILE_NAME}")
-    assert "raw.githubusercontent.com" not in read("app.js")  # app.js reads it from the config
-    assert "cfg.STATS_URL" in read("app.js")
-    # the invite line keeps the shape logic/textfilter.py parses
-    assert re.search(r'INVITE_CODE\s*:\s*"[A-Za-z0-9-]+"', read("config.js"))
+    for rel, text in client_code().items():  # the code reads it from the config
+        assert "raw.githubusercontent.com" not in text, rel
+    assert "STATS_URL" in read("lib/live.ts") and "siteConfig.statsUrl" in read("lib/site.ts")
+    # the invite keeps the shape logic/textfilter.py parses
+    assert re.fullmatch(r"[A-Za-z0-9-]+", cfg["inviteCode"])
 
 
 def test_csp_allows_the_stats_fetch_and_nothing_new_besides():
-    cfg = json.loads(read("vercel.json"))
-    value = next(h["value"] for rule in cfg["headers"] for h in rule["headers"]
-                 if h["key"] == "Content-Security-Policy")
-    csp = sitegen.parse_csp(value)
+    csp = json.loads(read("data/security.json"))["csp"]
     assert sitegen.csp_allows(csp["connect-src"], RAW)
     # 'self': the appeal form posts to /api/appeal
     assert csp["connect-src"] == ["'self'", "https://discord.com", "https://raw.githubusercontent.com"]
-    assert csp["script-src"] == ["'self'"] and csp["style-src"] == ["'self'", "https://fonts.googleapis.com"]
+    # scripts and styles from this origin, plus the per-request nonce (src/proxy.ts) and nothing else
+    assert csp["script-src"] == ["'self'", "'nonce-{nonce}'"]
+    assert csp["style-src"] == ["'self'", "'nonce-{nonce}'"]
 
 
-def test_app_js_renders_with_text_content_only():
-    js = read("app.js")
-    for bad in ("innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "eval(", "new Function",
-                'setAttribute("style"', "cssText", "srcdoc", "javascript:"):
-        assert bad not in js, bad
-    assert "textContent" in js and "createElement" in js
-    # only fixed attribute names are ever set from script
-    assert set(re.findall(r'setAttribute\("([^"]+)"', js)) <= {"href", "rel", "aria-disabled", "aria-hidden",
-                                                              "aria-current", "datetime"}
+def test_the_page_renders_text_only():
+    for rel, js in client_code().items():
+        for bad in ("innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "eval(", "new Function",
+                    'setAttribute("style"', "cssText", "srcdoc", "javascript:", "createElement"):
+            assert bad not in js, f"{bad} in {rel}"
+        # only fixed attribute names are ever set from script
+        assert set(re.findall(r'setAttribute\("([^"]+)"', js)) <= {"aria-current", "data-ink"}, rel
+        if "dangerouslySetInnerHTML" in js:  # the JSON-LD data block, with "<" escaped
+            assert rel == "app/page.tsx" and js.count("dangerouslySetInnerHTML") == 1, rel
+            assert 'JSON.stringify(JSON_LD).replace(/</g, "\\\\u003c")' in js
 
 
-def test_app_js_has_a_timeout_and_a_staleness_limit():
-    js = read("app.js")
-    assert "AbortController" in js and "TIMEOUT_MS = 6000" in js
-    assert "STALE_MS = 48 * HOUR_MS" in js
-    assert 'credentials: "omit"' in js
-    assert js.count("fetch(") == 1  # one helper does every request
-    assert "raw.v !== 1" in js
+def test_the_live_fetch_has_a_timeout_and_a_staleness_limit():
+    stats, live = read("lib/stats.ts"), read("lib/live.ts")
+    assert "AbortController" in live and "export const TIMEOUT_MS = 6000;" in stats
+    assert "export const STALE_MS = 48 * HOUR_MS;" in stats
+    assert 'credentials: "omit"' in live
+    code = client_code()
+    fetchers = {rel for rel, text in code.items() if "fetch(" in text}
+    # one helper does every live request; the appeal form posts to its own origin
+    assert fetchers == {"lib/live.ts", "components/AppealForm.tsx"}
+    assert live.count("fetch(") == 1
+    assert "(raw as Obj).v !== 1" in stats
 
 
-def test_app_js_limits_match_the_schema():
-    js = read("app.js")
-    kinds = re.search(r"var KINDS = \{([^}]*)\}", js).group(1)
+def test_the_live_limits_match_the_schema():
+    stats = read("lib/stats.ts")
+    kinds = re.search(r"export const KINDS = \{([^}]*)\}", stats).group(1)
     assert tuple(re.findall(r"(\w+):", kinds)) == schema.KINDS
-    assert f"list(raw.events, {schema.MAX_EVENTS})" in js
-    assert f"list(raw.houses, {schema.MAX_HOUSES})" in js
-    assert f"list(raw.games, {schema.MAX_GAMES})" in js
-    assert f"text(e.title, {schema.MAX_TITLE})" in js and f"text(h.name, {schema.MAX_NAME})" in js
-    assert f"MAX_COUNT = {schema.MAX_COUNT}" in js
-    assert r"/\d{15,}/" in js and "/[@<>]/" in js  # the client's own ID and mention guard
+    for name in ("MAX_EVENTS", "MAX_HOUSES", "MAX_GAMES", "MAX_TITLE", "MAX_NAME", "MAX_COUNT"):
+        assert f"export const {name} = {getattr(schema, name)};" in stats, name
+    assert "list(r.events, MAX_EVENTS)" in stats and "list(r.houses, MAX_HOUSES)" in stats
+    assert "list(r.games, MAX_GAMES)" in stats
+    assert "text(e.title, MAX_TITLE)" in stats and "text(h.name, MAX_NAME)" in stats
+    assert r"/\d{15,}/" in stats and "/[@<>]/" in stats  # the client's own ID and mention guard
 
 
-def test_live_markup_is_hidden_until_script_fills_it():
-    page = read("index.html")
-    live = re.search(r'<section id="live" hidden>.*?</section>', page, re.S)
-    assert live, "the live section starts hidden"
-    live = live.group(0)
+def test_the_live_section_starts_hidden_in_the_source():
+    """The rendered markup is checked in pages.test.tsx; here, that the hidden states are
+    constant attributes the server always renders, lifted only by the client."""
+    live = read("components/LiveSection.tsx")
+    assert re.search(r'<section id="live" hidden ref=', live) or re.search(r'<section id="live" ref=\{[^}]+\} hidden', live)
     for block in ("live-events", "live-houses", "live-games", "live-tally"):
-        assert re.search(rf'id="{block}" hidden', live), block
-    assert re.search(r'<p class="now label" id="now" hidden>', page)
-    # between "Monkey SMP" and "House rules", outside the numbered sequence
-    assert page.index('<section id="smp">') < page.index('<section id="live"') < page.index('<section id="rules">')
-    assert re.search(r'<div class="ledger-head">\s*<h2>This week</h2>', live)
-    assert not re.search(r'<p class="label">\d\d\b', live)
-    assert "<li" not in live and "<img" not in live  # no placeholder content, no avatars
-    assert 'href="#live"' in page
+        assert re.search(rf'id="{block}"', live), block
+    assert re.search(r'id="now"\s+hidden=\{!line\}', read("components/NowLine.tsx"))
+    page = read("app/page.tsx")
+    assert page.index('<section id="smp">') < page.index("<LiveSection />") < page.index('<section id="rules">')
 
 
-def test_nothing_member_shaped_in_the_live_markup_or_script():
-    for name in ("index.html", "app.js"):
-        text = read(name).lower()
+def test_nothing_member_shaped_in_the_live_code():
+    for rel, text in client_code().items():
+        low = text.lower()
         for bad in ("avatar", "display_name", "username", "user_id", "cdn.discordapp.com"):
-            assert bad not in text, f"{bad} in {name}"
+            if bad == "user_id" and rel in ("lib/appeal-form.ts", "components/AppealForm.tsx", "app/appeal/page.tsx"):
+                continue  # the appeal form asks a banned member for their own ID
+            assert bad not in low, f"{bad} in {rel}"
 
 
 def test_live_styles_use_only_the_house_tokens():
-    css = read("style.css")
+    css = read("app/field-notebook.css")
     assert "[hidden] { display: none !important; }" in css
     live = css[css.index("/* -------------------------------------------------------------------- live */"):]
     live = live[:live.index("/* ------------------------------------------------------------------ motion */")]
@@ -109,5 +130,5 @@ def test_live_styles_use_only_the_house_tokens():
 
 
 def test_site_readme_documents_the_live_section():
-    text = read("README.md")
+    text = (SITE / "README.md").read_text(encoding="utf-8")
     assert "site-data" in text and "stats.json" in text and "publish_site_data.py" in text

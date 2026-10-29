@@ -40,14 +40,15 @@ click.
 ```bash
 cd bot && ../server/.venv/Scripts/python -m pytest -q          # about 4,200 tests, a few minutes
 cd server && .venv/Scripts/python -m pytest -q tests           # 275 tests, seconds
-cd site/api && node --test                                     # 34 tests, the site functions
+cd site && bun install --frozen-lockfile && bun run lint && bun run typecheck && bun run test && bun run build
+cd site && bun run test:e2e                                    # Playwright, the production build
 server/.venv/Scripts/python -m ruff check .                    # from the repo root
 ```
 
 The suites need no token, no `.env` and no network: they use fakes and in-memory or temporary
 SQLite databases. CI runs all of them. Run both Python suites,
 since `bot/` imports `server/layout.py` and a layout change can break bot tests (and
-`bot/tests/test_sitegen.py` fails when `site/index.html` drifts from the games list).
+`bot/tests/test_sitegen.py` fails when `site/src/data/generated/` drifts from `layout.py`).
 
 ## Conventions
 

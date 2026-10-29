@@ -73,17 +73,18 @@ def test_own_invite_next_to_a_foreign_one_is_blocked():
 
 
 def test_default_allowlist_comes_from_site_config():
-    code = next(iter(F.OWN_INVITES))  # the repo's site/config.js has a real code
+    code = next(iter(F.OWN_INVITES))  # the repo's site/src/data/site-config.json has a real code
     assert F.check(f"discord.gg/{code}") == (True, None)
     assert F.check("discord.gg/someone-else") == (False, F.INVITE)
 
 
 def test_load_own_invites_handles_missing_and_placeholder(tmp_path):
-    assert F.load_own_invites(tmp_path / "nope.js") == frozenset()
-    placeholder = tmp_path / "config.js"
-    placeholder.write_text('window.SITE_CONFIG = { INVITE_CODE: "REPLACE_ME" };', encoding="utf-8")
-    assert F.load_own_invites(placeholder) == frozenset()
-    placeholder.write_text('window.SITE_CONFIG = { INVITE_CODE: "AbC-12" };', encoding="utf-8")
+    assert F.load_own_invites(tmp_path / "nope.json") == frozenset()
+    placeholder = tmp_path / "site-config.json"
+    for broken in ("{", "[]", '{"inviteCode": 12}', '{"inviteCode": "no spaces"}', '{"inviteCode": "REPLACE_ME"}'):
+        placeholder.write_text(broken, encoding="utf-8")
+        assert F.load_own_invites(placeholder) == frozenset(), broken
+    placeholder.write_text('{"inviteCode": "AbC-12", "statsUrl": ""}', encoding="utf-8")
     assert F.load_own_invites(placeholder) == frozenset({"abc-12"})
 
 

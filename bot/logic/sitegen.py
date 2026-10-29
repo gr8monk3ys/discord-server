@@ -1,47 +1,47 @@
 """Landing page (site/) helpers: the games list is generated from layout.GAMES and the
 rules list from the rules embed in layout.POSTS.
 
-Pure string functions; the only I/O is the `python -m logic.sitegen` entry point
-(run from bot/), which rewrites the games and rules blocks in site/index.html in place, and
+The site is a Next.js app; it renders both lists from JSON data files that this module
+writes. Pure functions; the only I/O is the `python -m logic.sitegen` entry point (run from
+bot/), which rewrites site/src/data/generated/games.json and rules.json, and
 `python -m logic.sitegen --og`, which rebuilds the 1200x630 social card
-site/img/og.png from assets/listing/hero.png.
-tests/test_sitegen.py fails when the page drifts from layout.py.
+site/public/img/og.png from assets/listing/hero.png.
+tests/test_sitegen.py fails when the data files drift from layout.py.
 """
 
-import html
+import json
 import re
 
 _INVITE_RE = re.compile(r"[A-Za-z0-9-]{2,32}")
-_META_RE = re.compile(r"<meta\b[^>]*>", re.I)
-_ATTR_RE = re.compile(r'([a-zA-Z:-]+)="([^"]*)"')
 
 OG_SIZE = (1200, 630)
 
 
-def render_games(games) -> str:
+def games_data(games) -> list[str]:
     """games: iterable of (emoji, channel, role) tuples, as in layout.GAMES. The page shows the
     names only: the emoji belong to Discord's channel list, and on a web page they render
-    differently on every system."""
-    items = [f"<li class=\"game\"><span>{html.escape(role)}</span></li>" for _emoji, _channel, role in games]
-    return "\n".join(items)
+    differently on every system. React escapes the names when it renders them."""
+    return [role for _emoji, _channel, role in games]
 
 
 _RULE_RE = re.compile(r"^`(\d+)`\s+(.+)$")
 _LEAD_RE = re.compile(r"^(.+?[.?!])\s+(.+)$")
 
 
-def _rule_text(text: str) -> str:
-    """One rule from the Discord embed as page HTML: {#clips} and {@LFG} become plain #clips and
-    @LFG (they are links only inside Discord), ||spoiler|| loses its bars and `code` stays code."""
+def _rule_segments(text: str) -> list:
+    """One rule from the Discord embed as page segments: {#clips} and {@LFG} become plain #clips
+    and @LFG (they are links only inside Discord), ||spoiler|| loses its bars and `code` becomes
+    {"code": "..."}; everything else is a plain string, rendered as text (never as HTML)."""
     text = re.sub(r"\{([#@])([^}]+)\}", r"\1\2", text)
     text = text.replace("||", "")
     parts = re.split(r"`([^`]+)`", text)
-    return "".join(f"<code>{html.escape(p, quote=False)}</code>" if i % 2 else html.escape(p, quote=False) for i, p in enumerate(parts))
+    return [{"code": p} if i % 2 else p for i, p in enumerate(parts) if p]
 
 
-def render_rules(description: str) -> str:
+def rules_data(description: str) -> list[dict]:
     """description: layout.POSTS["rules"]["description"], one "`01`  rule" per line. The first
-    sentence of each rule is its lead; the page numbers the list itself, as the embed does."""
+    sentence of each rule is its lead (set in bold); the page numbers the list itself, as the
+    embed does. Each rule is {"lead": segments, "body": segments}."""
     items = []
     for line in description.splitlines():
         m = _RULE_RE.match(line.strip())
@@ -50,34 +50,15 @@ def render_rules(description: str) -> str:
         rule = m.group(2).strip()
         lead = _LEAD_RE.match(rule)
         if lead:
-            body = f"<strong>{_rule_text(lead.group(1))}</strong> {_rule_text(lead.group(2))}"
+            items.append({"lead": _rule_segments(lead.group(1)), "body": _rule_segments(lead.group(2))})
         else:
-            body = f"<strong>{_rule_text(rule)}</strong>"
-        items.append(f"<li><span>{body}</span></li>")
-    return "\n".join(items)
+            items.append({"lead": _rule_segments(rule), "body": []})
+    return items
 
 
-def _markers(name: str) -> tuple[str, str]:
-    return f"<!-- {name}:start -->", f"<!-- {name}:end -->"
-
-
-def _span(page: str, name: str) -> tuple[int, int]:
-    start, end = _markers(name)
-    i = page.find(start)
-    j = page.find(end, i + len(start)) if i >= 0 else -1
-    if i < 0 or j < 0:
-        raise ValueError(f"missing {start} / {end} markers")
-    return i + len(start), j
-
-
-def extract_block(page: str, name: str) -> str:
-    i, j = _span(page, name)
-    return page[i:j].strip("\n")
-
-
-def replace_block(page: str, name: str, body: str) -> str:
-    i, j = _span(page, name)
-    return page[:i] + "\n" + body + "\n" + page[j:]
+def dump_json(data) -> str:
+    """The data files' exact text: two-space indent, UTF-8 kept, one trailing newline."""
+    return json.dumps(data, ensure_ascii=False, indent=2) + "\n"
 
 
 def valid_invite_code(code: str) -> bool:
@@ -85,20 +66,10 @@ def valid_invite_code(code: str) -> bool:
     return bool(code) and code != "REPLACE_ME" and bool(_INVITE_RE.fullmatch(code))
 
 
-def meta_tags(page: str) -> dict[str, str]:
-    """{property-or-name: content} for every <meta> with both; attribute order doesn't matter."""
-    out: dict[str, str] = {}
-    for tag in _META_RE.findall(page):
-        attrs = dict(_ATTR_RE.findall(tag))
-        key = attrs.get("property") or attrs.get("name")
-        if key and "content" in attrs:
-            out[key] = html.unescape(attrs["content"])
-    return out
-
-
 def parse_csp(value: str) -> dict[str, list[str]]:
     """Content-Security-Policy header -> {directive: [sources]} (lower-cased names,
-    first occurrence wins, as browsers do)."""
+    first occurrence wins, as browsers do). site/src/data/security.json holds the policy
+    as that same mapping; the site joins it into the header."""
     out: dict[str, list[str]] = {}
     for part in value.split(";"):
         bits = part.split()
@@ -110,7 +81,7 @@ def parse_csp(value: str) -> dict[str, list[str]]:
 def csp_allows(sources: list[str], url: str, self_origin: bool = True) -> bool:
     """Whether a source list admits `url` (an absolute https URL or a same-origin
     path). Handles 'self', scheme-only and host sources with an optional path
-    prefix; enough for the static site's own policy, not a full CSP engine."""
+    prefix; enough for the site's own policy, not a full CSP engine."""
     if "*" in sources:
         return True
     if not re.match(r"^[a-z][a-z0-9+.-]*:", url, re.I):  # relative or root path
@@ -142,12 +113,12 @@ def _write_og(root) -> None:  # pragma: no cover - Pillow I/O
     from PIL import Image
 
     src = root / "assets" / "listing" / "hero.png"
-    dst = root / "site" / "img" / "og.png"
+    dst = root / "site" / "public" / "img" / "og.png"
     with Image.open(src) as im:
         im = im.convert("RGB")
         card = im.crop(cover_box(*im.size, *OG_SIZE)).resize(OG_SIZE, Image.LANCZOS)
     card.save(dst, optimize=True)
-    print("site/img/og.png written", card.size)
+    print("site/public/img/og.png written", card.size)
 
 
 if __name__ == "__main__":  # pragma: no cover
@@ -161,10 +132,14 @@ if __name__ == "__main__":  # pragma: no cover
 
     import config
 
-    path = root / "site" / "index.html"
-    games = [(g.emoji, g.channel, g.role) for g in config.GAMES]
-    page = path.read_text(encoding="utf-8")
-    new = replace_block(page, "games", render_games(games))
-    new = replace_block(new, "rules", render_rules(config.layout.POSTS["rules"]["description"]))
-    path.write_text(new, encoding="utf-8", newline="\n")
-    print("site/index.html games and rules:", "updated" if new != page else "already current")
+    out = root / "site" / "src" / "data" / "generated"
+    files = {
+        "games.json": dump_json(games_data((g.emoji, g.channel, g.role) for g in config.GAMES)),
+        "rules.json": dump_json(rules_data(config.layout.POSTS["rules"]["description"])),
+    }
+    for name, text in files.items():
+        path = out / name
+        old = path.read_text(encoding="utf-8") if path.exists() else None
+        if old != text:
+            path.write_text(text, encoding="utf-8", newline="\n")
+        print(f"site/src/data/generated/{name}:", "updated" if old != text else "already current")

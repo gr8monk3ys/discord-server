@@ -1,9 +1,9 @@
 """Discord Linked Roles: the metadata records Front Desk registers with Discord, and the plan
 that takes an application from what it has to what it should have. Pure: no Discord, no network.
 
-The definitions live in one file, site/api/linked-role/metadata.json, read here and by the
-site's serverless functions (site/api/linked-role/_lib.js), so what is registered and what the
-functions write for a member cannot drift apart. Each record there is a Discord "application
+The definitions live in one file, site/src/server/linked-role/metadata.json, read here and by
+the site's route handlers (site/src/server/linked-role/lib.ts), so what is registered and what
+the site writes for a member cannot drift apart. Each record there is a Discord "application
 role connection metadata" object (type, key, name, description) plus one field of ours:
 `service` (the Discord connection type the flag stands for) or `count` (the number of flags
 that are on). Ours are stripped before anything is sent to Discord.
@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlsplit
 
-DEFINITIONS = Path(__file__).resolve().parents[2] / "site" / "api" / "linked-role" / "metadata.json"
+DEFINITIONS = Path(__file__).resolve().parents[2] / "site" / "src" / "server" / "linked-role" / "metadata.json"
 
 # Discord's limits (developer docs, "Application Role Connection Metadata", read 2026-10-12).
 MAX_RECORDS = 5

@@ -16,7 +16,12 @@ All notable changes to this project are recorded here. The format follows
   channels in, keeping their permissions. Temp voice and matchmaking find the voice category
   under its old name too, so restart Front Desk before applying. Picking Minecraft in
   Onboarding also opens #smp-commands.
-
+- The landing page is a Next.js app on the lscaturchio.xyz stack (Next.js 16, App Router,
+  TypeScript, Tailwind v4, next-themes, bun, Vitest, Playwright), at the owner's request of
+  2026-10-29; it was static HTML. Same look, copy, behaviour and URLs. The appeal form and Linked
+  Roles functions are route handlers with Vitest tests, the CSP is per-request nonce based, fonts
+  are served first-party by next/font, the games and rules are generated JSON, and CI builds and
+  tests the site with bun. The GitHub Pages mirror is retired (`pages.yml` removed).
 - Monkey SMP: `/smp link` only records the Discord-to-Minecraft name pair, for the chat bridge and
   playtime. Front Desk no longer whitelists or un-whitelists anyone (access is a paid pass staff
   grant by hand or through the store), and its RCON client refuses every command but `list` and
