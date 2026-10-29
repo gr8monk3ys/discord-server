@@ -43,8 +43,10 @@ page says so instead of inflating it.
 
 ## Capabilities and Constraints
 
-- Static HTML/CSS/JS in `site/`, no build step, no framework, no trackers; Google Fonts is the only
-  third party. Small Vercel functions in `site/api`. Canonical on Vercel, mirror on GitHub Pages.
+- A Next.js app in `site/` on the lscaturchio.xyz stack (App Router, TypeScript, Tailwind v4, bun),
+  since the owner asked for it on 2026-10-29; it was static HTML before. No trackers and no third
+  party: next/font serves the fonts from this origin. The appeal form and Linked Roles are route
+  handlers. One origin, on Vercel; the GitHub Pages mirror was retired with the port.
 - All-ages and SFW (since 2026-10-29; the 18+ rule was dropped). Everything must work without JavaScript and under `prefers-reduced-motion`.
 - The visual language is borrowed from lscaturchio.xyz ("The Field Notebook"); site/README.md
   records it. Refinements keep it.
@@ -67,7 +69,7 @@ member quotes, screenshots of busy voice rooms, activity numbers beyond what Fro
 1. Honest beats impressive: describe the server as it is on a normal night.
 2. One source of truth: rules, games and channels come from `server/layout.py`.
 3. Get people into voice: every section should make the first evening easier.
-4. Quiet and fast: no trackers, no build step, works without JavaScript.
+4. Quiet and fast: no trackers, server-rendered, works without JavaScript.
 
 ## Accessibility & Inclusion
 

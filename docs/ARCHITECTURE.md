@@ -11,7 +11,7 @@ fix the file.
 |---|---|---|
 | Server as code | `server/` | One-shot scripts that build and extend the Discord server from `layout.py`, a read-only snapshot, the watchdog and the host-migration tool |
 | Front Desk | `bot/` | The server's own discord.py bot: one process, one guild, one SQLite file |
-| Landing page | `site/` | Static pages (home, `/join`, `/appeal`, `/linked-role`) and three Vercel functions under `site/api/`; no build step |
+| Landing page | `site/` | A Next.js app (home, `/join`, `/appeal`, `/linked-role`) with three route handlers under `site/src/app/api/` |
 | Client theme and assets | `theme/`, `assets/` | Vencord/BetterDiscord CSS; generated icon, emoji, sounds and listing art plus the scripts that make them |
 
 `server/layout.py` is the shared source of truth. `bot/config.py` puts `server/` on `sys.path`
@@ -165,7 +165,7 @@ jobs below). Times are local (Pacific unless `TZ` is set). Loops without a wall-
 | `fieldnotes` | the owner's weekly field notes: Built (GitHub search plus the owner's repo listing, public repos only, no token), Heard (SpotifyForge's `listening_history.jsonl`, read only; no Spotify token), Watched (Letterboxd RSS), Played (the guild owner's `game_sessions` rows, unless opted out); a reply thread; the closing question asks `quietgate` (kind `fieldnotes`); staff `/fieldnotes preview` (changes nothing) | none (`jobs` rows `fieldnotes:YYYY-Www`; `meta` `quiet:fieldnotes`) | 5 min tick: Sun 18:00 weekly; an empty week is marked done with no post; no `FIELD_NOTES_*` setting runs no tick | 📓・field-notes |
 
 Four of the `logic/` modules have no cog of their own: `linkedroles.py` validates
-`site/api/linked-role/metadata.json` and plans the registration diff for
+`site/src/server/linked-role/metadata.json` and plans the registration diff for
 `server/register_linked_roles.py`, `wrappedcard.py` draws the Wrapped cards, and `gamelist.py`
 compares 28 days of `game_sessions` with `config.GAMES` and `config.RETIRED_GAMES` for the
 owner digest (`Recap.game_list_line`): an unlisted game needs 3 distinct players and 5 hours
@@ -450,32 +450,43 @@ Two drift checks exist and compare different things:
 
 ## Landing page (`site/`)
 
-Plain HTML, CSS and JS with a strict CSP in `vercel.json` (no inline script or style;
-`connect-src` is this origin, `https://discord.com` and `https://raw.githubusercontent.com`). The
-invite code lives only in `site/config.js`; `app.js` shows live counts from Discord's public
-invite endpoint and `join/` redirects to the invite. The games block in `index.html` is
-generated from `layout.GAMES` by `python -m logic.sitegen` (run in `bot/`), and
-`bot/tests/test_sitegen.py` fails when the page drifts from `layout.py` or breaks the CSP.
-`logic/textfilter.py` reads the server's own invite code from `site/config.js` to allow it.
+A Next.js 16 app (App Router, TypeScript, Tailwind v4, bun) on the lscaturchio.xyz stack since
+2026-10-29, when the owner asked for it; it was plain HTML before, and the look, copy and
+behaviour carried over. `site/README.md` is the map. Every page is server-rendered and readable
+without JavaScript; small client components add the live counts, the live section, the theme
+toggle and the scroll motion.
+
+Security headers come from `site/src/data/security.json` (applied in `next.config.ts`), and
+`site/src/proxy.ts` sets a per-request nonce Content-Security-Policy: `script-src` and
+`style-src` are `'self'` plus the nonce, no `'unsafe-inline'`, no `'strict-dynamic'`, and
+`connect-src` is this origin, `https://discord.com` and `https://raw.githubusercontent.com`.
+Because the nonce is new on every response, pages render per request and their HTML is not
+CDN-cached. The invite code lives only in `site/src/data/site-config.json`; the Join buttons
+and the `/join` redirect (`next.config.ts`) read it, and `logic/textfilter.py` reads it to allow
+the server's own invite. The games and rules (`site/src/data/generated/*.json`) are generated
+from `layout.py` by `python -m logic.sitegen` (run in `bot/`), and `bot/tests/test_sitegen.py`
+fails when they drift from `layout.py` or the site breaks the CSP.
 
 Live data: `cogs/sitedata.py` writes `bot/data/site/stats.json`, `server/publish_site_data.py`
-pushes it to the `site-data` branch, and `app.js` fetches `STATS_URL` (`config.js`) from
-raw.githubusercontent.com, checks every field again and renders with `textContent`. The live
-section stays hidden when the fetch fails or the file is older than 48 hours. `site-data` is a
-data branch holding one force-pushed commit; nothing but the publisher may write to it.
+pushes it to the `site-data` branch, and the page fetches `statsUrl` (`site-config.json`) from
+raw.githubusercontent.com in the browser, checks every field again (`site/src/lib/stats.ts`)
+and renders it as React text. The live section stays hidden when the fetch fails or the file
+is older than 48 hours. `site-data` is a data branch holding one force-pushed commit; nothing
+but the publisher may write to it.
 
-Functions: Vercel builds each `.js` file under `site/api/` as a Node function. They have no
-dependencies and there is no `package.json`; files and folders starting with `_` are not
-endpoints. Each answers 503 and does nothing until its variables are set.
+Route handlers: each answers 503 and does nothing until its variables are set. The code lives
+in `site/src/server/`, the routes in `site/src/app/api/`; they have no dependencies beyond
+Next.js and `node:crypto`.
 
-| Path | File | What it does | Vercel env vars |
+| Path | Code | What it does | Vercel env vars |
 |---|---|---|---|
-| `POST /api/appeal` | `api/appeal.js` | Backend of the appeal form (`appeal/index.html`, `appeal/appeal.js`). Checks the appeal code (an HMAC of the user ID, the same as `logic/appeals.py`) and forwards a small JSON payload to a webhook in the staff appeals channel, where `cogs/appeals.py` verifies it again. A wrong code gets the same 200 as a right one | `APPEAL_SECRET`, `APPEAL_WEBHOOK_URL`, optional `APPEAL_ORIGIN` |
-| `GET /api/linked-role/start` | `api/linked-role/start.js` | Sets the signed state cookie and redirects to Discord's consent screen | `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `LINKED_ROLE_STATE_SECRET`, `LINKED_ROLE_REDIRECT_URI` |
-| `GET /api/linked-role/callback` | `api/linked-role/callback.js` | Exchanges the code, reads the member's connections once, writes the role-connection metadata to Discord and redirects to `/linked-role` with a result flag. Shared code is in `api/linked-role/_lib.js`, the records in `metadata.json` | the same four |
+| `POST /api/appeal` | `src/server/appeal.ts` | Backend of the appeal form (`src/app/appeal/`, `src/components/AppealForm.tsx`). Checks the appeal code (an HMAC of the user ID, the same as `logic/appeals.py`) and forwards a small JSON payload to a webhook in the staff appeals channel, where `cogs/appeals.py` verifies it again. A wrong code gets the same 200 as a right one | `APPEAL_SECRET`, `APPEAL_WEBHOOK_URL`, optional `APPEAL_ORIGIN` |
+| `GET /api/linked-role/start` | `src/server/linked-role/flow.ts` | Sets the signed state cookie and redirects to Discord's consent screen | `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `LINKED_ROLE_STATE_SECRET`, `LINKED_ROLE_REDIRECT_URI` |
+| `GET /api/linked-role/callback` | `src/server/linked-role/flow.ts` | Exchanges the code, reads the member's connections once, writes the role-connection metadata to Discord and redirects to `/linked-role` with a result flag. Shared code is in `src/server/linked-role/lib.ts`, the records in `metadata.json` | the same four |
 
-Tests: `node --test` run in `site/api/` (CI runs them the same way). The GitHub Pages mirror is static and has no
-functions, so `/appeal` says so there and Linked Roles must use the Vercel domain.
+Tests: Vitest (`bun run test` in `site/`: the handlers, page markup and metadata, the live-data
+check) and Playwright (`bun run test:e2e`: headers and nonce, `/join`, no-JS rendering, the live
+section with fresh, stale and failed data). CI runs both in the "Site" job.
 
 ## Deployment
 
@@ -485,9 +496,8 @@ functions, so `/appeal` says so there and Linked Roles must use the Vercel domai
 | Watchdog | Task "Front Desk watchdog", `server/watchdog.py` every 5 minutes | Installed by `server/install_watchdog.ps1` |
 | Backups | `ops` daily 04:00, SQLite online backup, integrity-checked, newest 14 kept | `config.BACKUP_DIR`, falling back to `bot/data/backups` when that drive is missing |
 | Container kit | `Dockerfile`, `docker-compose.yml`, `bot/run_container.sh` | Not the live deployment. Read-only root, non-root user, data volume, heartbeat healthcheck and an in-container monitor with the watchdog's thresholds. Steps and cut-over checklist: `docs/HOSTING.md` |
-| Site | Vercel project rooted at `site/`, production branch `main` | No build or install command. The functions under `site/api/` read their settings from the Vercel project's environment variables |
+| Site | Vercel project rooted at `site/`, production branch `main` | Next.js, set by `site/vercel.json` (`bun install --frozen-lockfile`, `bun run build`). The route handlers read their settings from the Vercel project's environment variables |
 | Site data | A scheduled task the owner creates runs `server/publish_site_data.py --apply --quiet` every 30 minutes | Needs git push access to `origin` on that machine; exits 0 without output when there is nothing to do |
-| Site mirror | GitHub Pages via `.github/workflows/pages.yml` on pushes that touch `site/` | Rewrites `404.html` paths for the project sub-path |
 
 Never run the bot on two machines with the same token: the lock is per machine. The
 `front-desk-bot` branch must be kept, because the bot's public privacy link points at

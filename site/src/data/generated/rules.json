@@ -1,0 +1,62 @@
+[
+  {
+    "lead": [
+      "Be decent."
+    ],
+    "body": [
+      "Trash-talk the play, not the person. No racism, sexism or slurs."
+    ]
+  },
+  {
+    "lead": [
+      "No cheats, no exploits, no selling accounts."
+    ],
+    "body": []
+  },
+  {
+    "lead": [
+      "No spam or self-promo, and no DM advertising to members."
+    ],
+    "body": []
+  },
+  {
+    "lead": [
+      "Clips in #clips, memes in #memes, music in #bot-commands."
+    ],
+    "body": []
+  },
+  {
+    "lead": [
+      "Spoilers go under spoiler tags."
+    ],
+    "body": [
+      "No NSFW anywhere."
+    ]
+  },
+  {
+    "lead": [
+      "Want a squad?"
+    ],
+    "body": [
+      "Post in #lfg and ping @LFG, not @everyone."
+    ]
+  },
+  {
+    "lead": [
+      "Something wrong?"
+    ],
+    "body": [
+      "Right-click the message → Apps → Report message, or use ",
+      {
+        "code": "/report"
+      },
+      "."
+    ]
+  },
+  {
+    "lead": [
+      "Mods have the final word."
+    ],
+    "body": []
+  }
+]

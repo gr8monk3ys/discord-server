@@ -3,7 +3,7 @@ bot writes one small JSON file of server-wide aggregates to bot/data/site/stats.
 
 The bot never publishes anything itself: server/publish_site_data.py, run by the owner's
 scheduled task, checks the file again and pushes it to the public `site-data` branch, where
-site/app.js reads it. What may be in the file, and the small-group rule, live in
+the site (site/src/lib/live.ts) reads it. What may be in the file, and the small-group rule, live in
 logic/sitedata.py; the shape and the leak check in server/site_schema.py.
 
 - Read-only: it reads the tables other modules keep and the guild cache, and writes one file

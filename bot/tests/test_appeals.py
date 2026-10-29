@@ -6,7 +6,7 @@ import config
 from logic import appeals as A
 from logic import moderation as M
 
-# The shared vector: site/api/appeal.test.mjs asserts the same literal for the same inputs.
+# The shared vector: site/src/server/appeal.test.ts asserts the same literal for the same inputs.
 SECRET = "test-secret-for-appeal-vectors!!"
 USER = 123456789012345678
 CODE = "TD7YUL66OYCHIZTL"

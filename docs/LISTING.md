@@ -8,7 +8,7 @@ Reddit templates live in [growth/listing.md](growth/listing.md); this file is th
 | **Name** | Lorenzo's Server |
 | **Tagline** | Chill gamers. No tryhards, no toxicity. |
 | **Invite** (permanent) | <https://discord.gg/C25hy9Ca9W> |
-| **Landing page** | <https://discord.lscaturchio.xyz/> (GitHub Pages keeps a mirror at <https://gr8monk3ys.github.io/discord-server/>; always paste the subdomain) |
+| **Landing page** | <https://discord.lscaturchio.xyz/> (the only address; the old GitHub Pages mirror is retired) |
 | **Banner** (960×540) | `assets/listing/banner.png` |
 | **Hero** (1920×1080) | `assets/listing/hero.png` |
 | **Icon** | `assets/server-icon.png` |

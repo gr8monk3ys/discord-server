@@ -6,7 +6,7 @@ partner description) skips the server's AutoMod rules. `check()` is the bot-side
 
 - invite links to other servers (discord.gg/, discord.com/invite/, discordapp.com/invite/,
   dsc.gg/), also when spaced out or written "discord(dot)gg"; the server's own invite code
-  (read from site/config.js, or passed in) is allowed
+  (read from site/src/data/site-config.json, or passed in) is allowed
 - with `allow_links=False`: masked links `[text](url)`, raw URLs and bare domains, for short
   fields where a link makes no sense
 - a short blocklist of slurs and severe sexual terms, matched as whole words after
@@ -24,6 +24,7 @@ never echoing the text back.
 from __future__ import annotations
 
 import itertools
+import json
 import logging
 import re
 import unicodedata
@@ -49,19 +50,19 @@ def message(reason: str | None) -> str:
 
 
 # ---------------------------------------------------------------- the server's own invite
-CONFIG_JS = Path(__file__).resolve().parents[2] / "site" / "config.js"
-_CODE_IN_CONFIG = re.compile(r'INVITE_CODE\s*:\s*"([A-Za-z0-9-]+)"')
+SITE_CONFIG = Path(__file__).resolve().parents[2] / "site" / "src" / "data" / "site-config.json"
+_INVITE_CODE = re.compile(r"[A-Za-z0-9-]+")
 
 
-def load_own_invites(path: Path = CONFIG_JS) -> frozenset[str]:
-    """The site's INVITE_CODE (lowercased), or nothing if the file is missing or unset."""
+def load_own_invites(path: Path = SITE_CONFIG) -> frozenset[str]:
+    """The site's inviteCode (lowercased), or nothing if the file is missing, unreadable or unset."""
     try:
-        found = _CODE_IN_CONFIG.search(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError):
+        code = json.loads(path.read_text(encoding="utf-8")).get("inviteCode")
+    except (OSError, UnicodeDecodeError, ValueError, AttributeError):
         return frozenset()
-    if not found or found.group(1).upper() == "REPLACE_ME":
+    if not isinstance(code, str) or not _INVITE_CODE.fullmatch(code) or code.upper() == "REPLACE_ME":
         return frozenset()
-    return frozenset({found.group(1).lower()})
+    return frozenset({code.lower()})
 
 
 OWN_INVITES = load_own_invites()
