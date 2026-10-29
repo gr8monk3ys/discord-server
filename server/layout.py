@@ -191,15 +191,17 @@ CATEGORIES = [
             # Monkey SMP seasons: the channels the SMP repo's launch plan and rulebook send players
             # to (its docs/LAUNCH.md and docs/RULES.md). public_mode.py creates them after #monkey-smp.
             # One sign-up message each, so the order of the founding roster is plain to see:
-            # 6 h slow mode (Discord's maximum) and no threads. Staff pin the roster rules.
+            # 6 h slow mode (Discord's maximum) and no threads. Each channel's "post" is pinned by public_mode.py.
             {"name": "📝・founding-roster",
              "topic": "Founding roster sign-up: one message with your Minecraft Java name, and your faction's "
                       "name if you have one. First come, first listed. Rules are pinned.",
-             "slowmode": 21600, "no_threads": True},
+             "slowmode": 21600, "no_threads": True, "post": "founding-roster"},
             {"name": "📜・smp-rules", "topic": "The Monkey SMP rulebook. Staff post here; answers are in "
-                                              "#smp-faq, and questions go in #smp-forum or a ticket.", "read_only": True},
+                                              "#smp-faq, and questions go in #smp-forum or a ticket.", "read_only": True,
+             "post": "smp-rules"},
             {"name": "❔・smp-faq", "topic": "Monkey SMP answers: the pass, the modpack, joining. Staff post "
-                                           "here; ask anything else in #smp-forum or a ticket.", "read_only": True},
+                                           "here; ask anything else in #smp-forum or a ticket.", "read_only": True,
+             "post": "smp-faq"},
             {
                 "name": "🚩・smp-forum",
                 "type": "forum",
@@ -333,6 +335,168 @@ POSTS = {
             ]
         ),
         "footer": "FRONT DESK · 03",
+    },
+    # Monkey SMP Season I. The source of truth is the SMP repo (gr8monk3ys/monkey-smp-server):
+    # docs/RULES.md for the rules, docs/PLAYERS.md and site/index.html for the FAQ, and the
+    # "Founding roster" section of docs/LAUNCH.md for the roster. Numbers in brackets are that
+    # rulebook's rule numbers. The full rulebook is too long for one message (Discord allows
+    # 6000 characters), so this is the condensed version and links the website's.
+    # No dates or times here: the season date is announced in #announcements.
+    "smp-rules": {
+        "title": "Monkey SMP rules",
+        "description": "\n".join(
+            [
+                "The Season I rules, condensed. The numbers match the full rulebook, so \"rule 35\" means "
+                "the same thing everywhere. Not sure something is allowed? Ask an admin before you do it (7).",
+                "",
+                "**Fights**",
+                "- You're in combat once a player has hit you. (2)",
+                "- No combat logging: don't log out in a fight, or 3 minutes into a chase. (3)",
+                "- No respawn or logout trapping, no killing freshly respawned (naked) or AFK players, "
+                "and no killing players who are lagging out. (4, 5, 13, 14)",
+                "- No rejoining a team fight until 10 minutes after it ends. No restocking mid-fight "
+                "from an ender chest, a base or a shulker box. (9, 11)",
+                "- Land elytra at least 50 blocks from a fight, and no elytra in combat. No lava PvP, "
+                "no Happy Ghast PvP, no leads on dolphins. (12, 15-18)",
+                "- No water running: stay within about 30 blocks of shore. No stream sniping without the "
+                "streamer's OK. (10, 19)",
+                "",
+                "**World**",
+                "- Spawn is sacred and a no-PvP zone. No TNT traps there. (8, 22, 26, B11)",
+                "- Every base needs one feature you can see from the surface. (1)",
+                "- The first hour after launch has no PvP, Nether or End; then PvP and only the Nether "
+                "open. (23)",
+                "- No Netherite armor until staff say so. Netherite tools and weapons are fine. (24)",
+                "- The world border is 2500 x 2500. Don't leave it or break it. (25)",
+                "- Your first 48 hours come with PvP grace. Attacking a player ends it, and using it to "
+                "scout, carry loot or block a fight is a loophole. (26)",
+                "- No stealing or killing pets in an offline owner's territory. (20)",
+                "- No holes into the void, no breaking the End's exit portal or gateways, nothing on the "
+                "Nether roof. (44-46)",
+                "",
+                "**Strength**",
+                "- Craft it only up to +3. Use Strength you're given right away unless you're at +5, and "
+                "don't ender-chest it below +5. (27, 28)",
+                "",
+                "**Factions and land**",
+                "- At most 4 players, public, with a banner. Alliances yes, confederations no. (29-32)",
+                "- Once you join a faction you stay in it; leaving needs an admin. (33)",
+                "- Territory is 2 x 2 chunks per member, marked with your banner: the inside of a base, or "
+                "an area walled at least 3 blocks high. Outside it, anything can be griefed. (35, 36)",
+                "- No starting KOS in an enemy's base or territory; in your own you may. Retreating into "
+                "yours doesn't end a fight. (34, 35, 38)",
+                "- Nobody griefs, robs or farms a territory without permission, and pranks must be fully "
+                "reversible. Admins roll back griefing; legal raids stay. (37, 39, 42)",
+                "- No insiding: never grief, raid or rob your own faction, or use what you had as a member "
+                "after you leave. (40)",
+                "- No teaming: stay out of fights between other factions, except at events. (41)",
+                "",
+                "**Trading**",
+                "- By hand, items for items. No scams, no renamed fakes, no changing a deal once it's "
+                "agreed. (43)",
+                "",
+                "**Banned**",
+                "- Brewing Strength or putting it on arrows or players, enchanted maces, ender pearls, Totems of "
+                "Undying, enchanted "
+                "golden apples (pearls and gapples are for crafting only), crystal PvP, bed bombing, Fire "
+                "Aspect and Flame, TNT minecarts, escape tunnels. (B1-B5, B7-B10, B12)",
+                "- Debuffs on others, except Slowness I, Weakness I, Poison I, Instant Harming I and Turtle "
+                "Master from a bow or crossbow. (B6)",
+                "- Exploits, hacked clients, x-ray (the cushion glitch, F3+A and reloading shaders count), "
+                "duping, CIT packs, health indicators, the view-bobbing glitch, Replay Mod or Flashback for an "
+                "edge. Other mods need "
+                "the owners' OK. No account sharing. (B13-B17, B19, 21)",
+                "",
+                "**Everyone**",
+                "- Respect people: no slurs, hate, harassment, threats or doxxing, in game, in voice or "
+                "here. Keep names, skins, builds and chat all-ages.",
+                "- No real-money trading.",
+                "- Questions go in {#smp-forum}. Payment problems, reports and appeals go in a ticket in "
+                "{#help}.",
+                "",
+                "A warning, then a temporary ban, then a permanent ban. Cheating, hate and doxxing can go "
+                "straight to a ban. One appeal per decision, in a ticket; a different admin reviews it.",
+                "",
+                "The short rules on the website: https://monkeysmp.lscaturchio.xyz/#rules",
+            ]
+        ),
+        "footer": "FRONT DESK · MONKEY SMP · RULES",
+    },
+    "smp-faq": {
+        "title": "Monkey SMP: questions",
+        "description": "\n".join(
+            [
+                "**What is it?**",
+                "A modded Minecraft Java server: factions of up to four, PvP outside spawn, and "
+                "trading by hand. Up to 30 players online at once.",
+                "",
+                "**What do I need?**",
+                "Minecraft Java Edition on a computer (Windows, macOS or Linux). 16 GB of RAM runs it well. "
+                "No Bedrock, console or mobile.",
+                "",
+                "**What is the pass?**",
+                "One price to play, the same for everyone. Supporter tiers are cosmetic only. Prices: "
+                "https://monkeysmp.lscaturchio.xyz/#pricing. Until the store opens, a pass is arranged in a "
+                "ticket in {#help}, and staff add your Minecraft Java name to the whitelist by hand.",
+                "",
+                "**How do I get the modpack?**",
+                "The server adds blocks, mobs and items, so plain Minecraft can't join. Easiest: the Modrinth "
+                "App, search for \"Monkey SMP\" and install it (about 560 MB), then give it 6 GB of memory. "
+                "Prism Launcher and an installer for the normal launcher work too: "
+                "https://monkeysmp.lscaturchio.xyz/#join",
+                "",
+                "**How do I join?**",
+                "Get a pass, install the pack, then Multiplayer, Add Server, `monkeysmp.lscaturchio.xyz`. "
+                "No port needed. When the pack updates, take the update before you play.",
+                "",
+                "**My computer is slow.**",
+                "Shaders, Distant Horizons and the resource packs are optional. Switch off Distant Horizons "
+                "first, and keep Sodium and the other speed mods on.",
+                "",
+                "**How do factions work?**",
+                "Up to four players, public, each with a banner. Register with one post in {#smp-forum}, "
+                "tagged Faction: the name, the members' Minecraft names, the banner and a charter. Playing "
+                "solo? Post with the Looking for faction tag and staff will find you one.",
+                "",
+                "**What is the founding roster?**",
+                "The list of players who are in on launch night, first come, first listed. Sign up in "
+                "{#founding-roster}. It's free, and it isn't a pass.",
+                "",
+                "**Refunds?**",
+                "If you can't get the pack running in your first 48 hours, open a ticket and you get your "
+                "money back.",
+                "",
+                "**Can I chat with the game from here?**",
+                "Yes, in {#monkey-smp}. `/smp link` connects your Minecraft name to your Discord name.",
+                "",
+                "**Where do I ask?**",
+                "This channel is read-only. Questions, suggestions and bugs go in {#smp-forum}. Payment "
+                "problems, reports and appeals go in a ticket in {#help}. The rules are in {#smp-rules}.",
+            ]
+        ),
+        "footer": "FRONT DESK · MONKEY SMP · FAQ",
+    },
+    "founding-roster": {
+        "title": "Founding roster",
+        "description": "\n".join(
+            [
+                "The founding roster is the list of players who are in on launch night.",
+                "",
+                "`01`  Post one message: your Minecraft Java name, and your faction's name if you have one.",
+                "`02`  One sign-up each. A second message is deleted and the first one counts. Delete yours "
+                "and post again, and you go to the back.",
+                "`03`  First come, first listed: the order is the time of your message. The first 30 are the "
+                "roster; after that there's a waitlist, in order.",
+                "`04`  Staff check each name is a real Java name and react with ✅. A wrong name gets a reply, "
+                "and you keep your place.",
+                "`05`  Can't make it? Tell staff in a ticket in {#help}, and the next on the waitlist moves up.",
+                "`06`  Signing up is free and isn't a pass: you still need one to play, at the same price as "
+                "everyone. Nobody can pay to be higher on the list.",
+                "",
+                "Factions register in {#smp-forum}. Questions go there or in a ticket in {#help}, not here.",
+            ]
+        ),
+        "footer": "FRONT DESK · MONKEY SMP · ROSTER",
     },
 }
 

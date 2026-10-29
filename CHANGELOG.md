@@ -98,6 +98,11 @@ All notable changes to this project are recorded here. The format follows
   Heard (SpotifyForge's listening log), Watched (Letterboxd RSS) and Played (the owner's game
   time), Sundays at 18:00, with a reply thread and one question through quiet rooms
   (`quiet:fieldnotes`). Staff `/fieldnotes preview`. Off until a `FIELD_NOTES_*` setting is set.
+- Monkey SMP season posts in `layout.POSTS`: the founding roster's sign-up rules in #founding-roster,
+  the condensed Season I rulebook in #smp-rules (rule numbers match the SMP repo's `docs/RULES.md`,
+  which is too long for one message, so it links the website's rules) and a short FAQ in #smp-faq.
+  `public_mode.py` posts and pins each once and edits it in place when the text changes, as it does
+  #rules and #welcome. The posts carry no dates.
 
 ### Security
 
