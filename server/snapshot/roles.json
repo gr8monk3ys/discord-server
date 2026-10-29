@@ -600,6 +600,14 @@
     "color": null,
     "hoist": false,
     "managed": false,
+    "mentionable": true,
+    "name": "Welcomer",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
     "mentionable": false,
     "name": "@everyone",
     "permissions": [
