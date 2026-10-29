@@ -32,7 +32,10 @@
   // Scroll motion: the pen rules the page (style.css, "motion"). Only what is still
   // below the fold is armed, so nothing on screen ever blinks out, and each piece is
   // inked once, when it arrives. Skipped when the reader asked for less motion or the
-  // browser has no IntersectionObserver; then the page is simply there.
+  // browser has no IntersectionObserver; then the page is simply there. arm() is
+  // also called on the live section when it opens, since it starts out hidden.
+  var arm = function () {};
+  var INKED = "main .ledger, .final-row, .ledger-body .rows, .ledger-body .days, .ledger-body > .rules, .faq, .games, .houses";
   var ink = function () {
     var calm = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (calm || !("IntersectionObserver" in window)) return;
@@ -47,16 +50,17 @@
         seen.unobserve(entry.target);
         settle(entry.target);
       });
-    }, { rootMargin: "0px 0px -12% 0px" });
-    var fold = window.innerHeight;
+    }, { rootMargin: "0px" });
     document.documentElement.classList.add("inks");
-    document.querySelectorAll(
-      "main .ledger, .final-row, .ledger-body > .days, .ledger-body > .rules, .faq, #games .games"
-    ).forEach(function (el) {
-      if (el.closest("[hidden]") || el.getBoundingClientRect().top < fold) return;
-      el.classList.add("armed");
-      seen.observe(el);
-    });
+    arm = function (scope) {
+      var fold = window.innerHeight;
+      scope.querySelectorAll(INKED).forEach(function (el) {
+        if (el.closest("[hidden]") || el.getBoundingClientRect().top < fold) return;
+        el.classList.add("armed");
+        seen.observe(el);
+      });
+    };
+    arm(document);
     // Paper gets the whole page, whatever has been scrolled past or not.
     window.addEventListener("beforeprint", function () {
       document.querySelectorAll(".armed").forEach(function (el) {
@@ -66,6 +70,51 @@
     });
   };
   ink();
+
+  // Where you are: the header link for the section crossing the reading line (a
+  // band just above the middle of the screen) carries the pen underline. This is
+  // state, not decoration, so it runs with reduced motion too (without the slide).
+  var spy = function () {
+    if (!("IntersectionObserver" in window)) return;
+    var links = {};
+    document.querySelectorAll(".sections a[href^='#']").forEach(function (a) {
+      links[a.getAttribute("href").slice(1)] = a;
+    });
+    var current = null;
+    var mark = function (id) {
+      if (id === current) return;
+      if (current) links[current].removeAttribute("aria-current");
+      current = links[id] ? id : null;
+      if (current) links[current].setAttribute("aria-current", "location");
+    };
+    var crossing = new Set();
+    var line = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) crossing.add(entry.target);
+        else crossing.delete(entry.target);
+      });
+      var last = null;
+      crossing.forEach(function (s) {
+        if (!last || last.compareDocumentPosition(s) & Node.DOCUMENT_POSITION_FOLLOWING) last = s;
+      });
+      mark(last ? last.id : null);
+    }, { rootMargin: "-38% 0px -58% 0px" });
+    document.querySelectorAll("main > section").forEach(function (s) { line.observe(s); });
+  };
+  spy();
+
+  // The Monkey SMP season line counts down to the opening, then says it is on.
+  // Without JavaScript it reads as the date, which is still true.
+  var season = function () {
+    var box = document.getElementById("season");
+    var start = box ? Date.parse(box.getAttribute("data-start") || "") : NaN;
+    if (isNaN(start)) return;
+    var left = start - Date.now();
+    var days = Math.floor(left / (24 * 3600 * 1000));
+    if (left <= 0) box.textContent = "Season I is open";
+    else if (days >= 2) box.textContent = days + " days to go\n" + box.textContent;
+  };
+  season();
 
   if (!window.fetch) return;
 
@@ -279,6 +328,8 @@
       var top = stats.houses[0].points;
       stats.houses.forEach(function (h) {
         var li = el("li");
+        // The pen goes to a clear leader only; a tie is drawn as a tie.
+        if (h === stats.houses[0] && (stats.houses.length < 2 || h.points > stats.houses[1].points)) li.className = "lead";
         li.appendChild(el("span", "card-title", h.name));
         li.appendChild(el("span", "label", fmt(h.points)));
         var bar = el("span", "bar");
@@ -339,6 +390,7 @@
       var top = next ? next.getBoundingClientRect().top : viewport;
       if (forced || top >= viewport) {
         section.hidden = false;
+        arm(section);
         return true;
       }
       var edge = header ? Math.max(header.getBoundingClientRect().bottom, 0) : 0;

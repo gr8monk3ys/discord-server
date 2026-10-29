@@ -45,7 +45,7 @@ def test_welcome_post_says_what_a_new_member_does():
     post = layout.POSTS["welcome"]
     text = post["description"]
     assert len(text) <= 4096 and len(post["title"]) <= 256  # Discord's embed limits
-    for want in ("co-op and PvE", "US Pacific", "{#rules}", "{#general}", "Lobby", "/smp link", *HOUSES):
+    for want in ("co-op and PvE", "US Pacific", "{#rules}", "{#general}", "Lobby", "Monkey SMP", "{#help}", *HOUSES):
         assert want in text, want
     clean(text, "the welcome post")
     # only placeholders setup_server.expand() knows how to fill, for roles that exist

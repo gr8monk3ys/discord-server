@@ -24,6 +24,21 @@ def test_render_games_escapes_html():
     assert "<b>" not in html
 
 
+def test_render_rules_takes_the_first_sentence_as_the_lead():
+    out = sitegen.render_rules("`01`  18+ only. If you're under 18, leave.\n`02`  No cheats, no exploits.")
+    assert out.splitlines() == [
+        "<li><span><strong>18+ only.</strong> If you're under 18, leave.</span></li>",
+        "<li><span><strong>No cheats, no exploits.</strong></span></li>",
+    ]
+
+
+def test_render_rules_drops_discord_markup():
+    out = sitegen.render_rules("`05`  Clips in {#clips}. Ping {@LFG}, use `/report`, hide ||spoilers||. <b>")
+    assert "#clips" in out and "@LFG" in out and "{" not in out and "||" not in out
+    assert "<code>/report</code>" in out
+    assert "<b>" not in out and "&lt;b&gt;" in out
+
+
 def test_replace_block_swaps_only_the_marked_region():
     page = "a\n<!-- games:start -->\nold\n<!-- games:end -->\nb"
     out = sitegen.replace_block(page, "games", "NEW")
@@ -63,6 +78,14 @@ def test_site_games_match_layout():
     page = (SITE / "index.html").read_text(encoding="utf-8")
     games = [(g.emoji, g.channel, g.role) for g in config.GAMES]
     assert sitegen.extract_block(page, "games").strip() == sitegen.render_games(games).strip()
+
+
+def test_site_rules_match_the_rules_embed():
+    """Run `python -m logic.sitegen` from bot/ after editing the rules in layout.POSTS."""
+    page = (SITE / "index.html").read_text(encoding="utf-8")
+    want = sitegen.render_rules(config.layout.POSTS["rules"]["description"])
+    assert sitegen.extract_block(page, "rules").strip() == want.strip()
+    assert want.count("<li>") == len(config.layout.POSTS["rules"]["description"].splitlines())
 
 
 def test_site_invite_code_lives_only_in_config_js():
@@ -186,7 +209,7 @@ def test_site_leads_with_what_a_new_member_does():
     features = re.search(r'<section id="features".*?</section>', _page(), re.S).group(0)
     assert len(re.findall(r'<li><h3 class="card-title">', features)) == 4
     assert len(re.findall(r"<li\b", features)) <= 8
-    for want in ("Lobby", "/lfg", "Fern, Kestrel or Otter", "Monkey SMP", "/smp link"):
+    for want in ("Lobby", "/lfg", "Fern, Kestrel or Otter", "Monkey SMP", "#smp"):
         assert want in features, want
 
 
@@ -223,7 +246,7 @@ def test_site_week_strip_and_faq_promise_only_what_happens():
     assert "puts a 9 PM game night on the calendar" in week and "Tournament night" not in week
     faq = re.search(r'<section id="faq".*?</section>', page, re.S).group(0)
     assert 5 <= faq.count("<details>") <= 8
-    for want in ("How busy is it?", "/smp link", "US Pacific"):
+    for want in ("How busy is it?", "Monkey SMP", "US Pacific"):
         assert want in faq, want
     for machinery in ("/partner", "Mythic", "/shop"):
         assert machinery not in faq, machinery

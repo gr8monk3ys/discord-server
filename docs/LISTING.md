@@ -14,7 +14,7 @@ Reddit templates live in [growth/listing.md](growth/listing.md); this file is th
 | **Icon** | `assets/server-icon.png` |
 | **Language** | English |
 | **Category** | Gaming |
-| **Age** | 18+: the chat channels are age-restricted, the server itself isn't; no NSFW content (don't tick a site's "NSFW" box) |
+| **Age** | All ages (since 2026-10-29); SFW, no NSFW content anywhere (don't tick a site's "NSFW" box or an 18+ box) |
 | **Time zone** | US Pacific; people are mostly on in the evening |
 
 Regenerate the images with `python assets/listing/make_banner.py` (needs Pillow).
@@ -60,13 +60,12 @@ Ranked: use the first N a site allows.
 4. `risk of rain 2`
 5. `minecraft`
 6. `pve`
-7. `adults`
+7. `friendly`
 8. `overwatch`
 9. `gears of war`
 10. `casual`
 
-The age limit is a rule, not a selling point, so it is not a tag. If a site rejects `adults`,
-use `mature` (never `nsfw`); use `ror2` where `risk of rain 2` is too long, and `coop` where a
+Never `nsfw`, `adults` or `mature`: the server is all-ages. Use `ror2` where `risk of rain 2` is too long, and `coop` where a
 hyphen is not allowed.
 
 ## Per site

@@ -24,6 +24,13 @@ tokens in `style.css`: the page follows `prefers-color-scheme` until the toggle 
 used, and `theme.js` remembers that choice in `localStorage` (guarded, so private windows just
 don't remember). Everything collapses under `prefers-reduced-motion`.
 
+Motion is scroll-driven and quiet. `app.js` arms the sections below the fold and inks them in as
+they arrive (headings and rows wipe in left to right with a short stagger, the house bars fill);
+whatever is already on screen at load is never hidden. The header pill keeps the pen under the
+section you are reading (`aria-current="location"`). On wide screens, browsers with
+`animation-timeline: view()` draw a reading line under each section's wall label. Without
+JavaScript nothing is armed, so nothing is hidden.
+
 ## Set the invite (once)
 
 Edit `config.js` and set `INVITE_CODE` to the bare invite code (the part after `discord.gg/`).
@@ -75,7 +82,7 @@ server-wide aggregates, with no member names, avatars or IDs:
 
 The section and the masthead line carry the `hidden` attribute in the HTML. If the fetch fails,
 the file is older than 48 hours, or JavaScript is off, they stay hidden and the page is the static
-page. The section opens between "This week" and "Games" without moving what the visitor is
+page. The section opens between "Monkey SMP" and "House rules" without moving what the visitor is
 looking at: below the fold it just appears, above the viewport the scroll position is corrected,
 and while that spot is on screen it waits. Set `STATS_URL` to `""` to turn it off.
 To try it locally, serve `site/` and point `STATS_URL` at a fixture file next to the page
@@ -154,10 +161,11 @@ Tests for the functions (no network, nothing to install), from the repo root:
 
 CI runs them the same way (`.github/workflows/ci.yml`).
 
-## Games list
+## Games list and rules
 
 The games block between `<!-- games:start -->` and `<!-- games:end -->` is generated from
-`server/layout.py` `GAMES`. After changing the games, run from `bot/`:
+`server/layout.py` `GAMES`, and the rules between `<!-- rules:start -->` and `<!-- rules:end -->`
+from the `#rules` embed in `layout.POSTS`. After changing either, run from `bot/`:
 
     ../server/.venv/Scripts/python -m logic.sitegen
 
