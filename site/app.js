@@ -217,14 +217,11 @@
     });
 
     var week = obj(raw.week);
-    var hall = obj(raw.hall);
     var mm = obj(raw.matchmaking);
     [
       [count(week.messages), "messages this week"],
-      [count(week.voice_hours), "hours in voice"],
-      [count(mm.matches_week), "squads matched"],
-      [count(hall.starred), "in the hall of fame"],
-      [count(hall.badges), "badges earned"],
+      [count(week.voice_hours), "hours in voice this week"],
+      [count(mm.matches_week), "squads matched this week"],
     ].forEach(function (row) {
       if (row[0]) out.tally.push(row);
     });

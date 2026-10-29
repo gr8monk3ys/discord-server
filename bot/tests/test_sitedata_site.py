@@ -81,7 +81,7 @@ def test_live_markup_is_hidden_until_script_fills_it():
     assert re.search(r'<p class="now label" id="now" hidden>', page)
     # between "Monkey SMP" and "House rules", outside the numbered sequence
     assert page.index('<section id="smp">') < page.index('<section id="live"') < page.index('<section id="rules">')
-    assert re.search(r'<div class="ledger-head">\s*<h2>Right now</h2>', live)
+    assert re.search(r'<div class="ledger-head">\s*<h2>This week</h2>', live)
     assert not re.search(r'<p class="label">\d\d\b', live)
     assert "<li" not in live and "<img" not in live  # no placeholder content, no avatars
     assert 'href="#live"' in page
