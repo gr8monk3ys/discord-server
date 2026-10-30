@@ -421,6 +421,7 @@ CHANNEL_NEEDS: list[Need] = [
     # faction registrations: one forum post each, the decision is a reply in the post
     Need("factions", config.SMP_FORUM, POST + ("send_messages_in_threads", "read_message_history"), "forum"),
     Need("tebex", config.MOD_CHANNEL, POST),  # "pass ending" alerts
+    Need("referral", config.MOD_CHANNEL, POST),  # referral unlocks (commands to run, or a note), refunds
     Need("botm", config.MONKEY_CHANNEL, POST + ("attach_files",), was=config.MONKEY_CHANNEL_WAS),  # the screenshots
 ]
 

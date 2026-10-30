@@ -37,6 +37,8 @@ _Last updated: 2026-10-29_
 | Watch parties you schedule (the event, you as host, the start time) | Reminders and the one-event-per-host limit |
 | Clips shortlisted for the server's YouTube: the message ID, your answer, who gave it and when, the name you asked to be credited as, and the video's YouTube ID once posted | Clipcast, proof of consent, taking a clip down |
 | A Minecraft name you link with `/smp link`, and how long you were online on the Minecraft server each day | Passing your in-game chat to the Monkey SMP channel, playtime coins, `/smp top` |
+| Only if you use them: your faction's recruitment pitch, tags and timezone; who pressed Request to join on which faction and when; your `/faction lfg` note and timezone | The recruitment board, the once-a-day request limit, `/faction seekers` |
+| Only if you run `/referral`: your code and the Minecraft name it was made for; for each purchase made with a code, the Tebex transaction ID, both Minecraft names and when | Giving the Kindred Band once per new player, refunds |
 | Only if you turn on `/smp nudges`: when you were last seen on the Minecraft server, when a nudge was sent, and whether Discord refused the DM | Sending you one "we miss you" DM after a week away |
 | When you last shared a Wrapped card, and your level on January 1 | The share cooldown, "levels gained" on next year's card |
 | When you were banned; a ban appeal you send (your user ID, your answers, the decision, who made it and their reason) | The waiting period before an appeal, staff review |
@@ -119,6 +121,14 @@ player is on too. With tracking off that time is not counted, and what was count
 at once. Your linked name stays until you unlink it. If you turn on `/smp nudges`, Front Desk also keeps when you
 were last on the server, to send you one DM after a week away; `/smp nudges off`, unlinking, leaving, a ban or
 turning tracking off deletes it.
+
+**Recruitment board and referrals.** A faction's board post shows what its leader wrote with
+`/faction pitch`. Request to join sends the leader your mention and, if linked, your Minecraft name.
+`/faction lfg` shows your note and timezone to faction leaders and staff for 14 days; `/faction lfg off`,
+leaving or a ban removes you, and leaving or a ban also deletes your join requests. `/referral` keeps
+your code with your linked name; leaving or a ban deletes the code. When a purchase uses a code, Front Desk
+keeps the Tebex transaction ID, both Minecraft names and the time, as the record of the cosmetic given, and
+staff see them in the mod channel. Front Desk receives no payment details beyond that.
 
 **Wrapped.** Your year-in-review card is drawn from the records above when you ask for it and
 is shown only to you unless you press Share, which works only in a channel you can post in

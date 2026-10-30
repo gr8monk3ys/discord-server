@@ -36,6 +36,8 @@ PORT_RANGE = (1024, 65535)
 ENV_SECRET, ENV_HOST, ENV_PORT = "TEBEX_WEBHOOK_SECRET", "TEBEX_WEBHOOK_HOST", "TEBEX_WEBHOOK_PORT"
 VALIDATION = "validation.webhook"
 CANCELLATION = "recurring-payment.cancellation.requested"
+# Handed to the referral cog when it is on (logic/referral.py).
+REFERRAL_TYPES = ("payment.completed", "payment.refunded", "payment.dispute.opened")
 
 
 @dataclass(frozen=True)
@@ -138,6 +140,11 @@ def when(value) -> int | None:
     if parsed.tzinfo is None:
         return None
     return int(parsed.timestamp())
+
+
+def transaction(subject: dict) -> str:
+    """A payment's Tebex transaction id, for the webhook record ("" when missing)."""
+    return _text(_get(subject, "transaction_id"), 60)
 
 
 @dataclass(frozen=True)

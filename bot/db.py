@@ -691,6 +691,57 @@ MIGRATIONS = [
         dm_closed_at INTEGER
     )""",
     ],
+    [
+        # Monkey SMP recruitment board (cogs/factions.py, logic/recruit.py): one row per faction whose
+        # leader set a pitch. tags: comma-separated playstyle tags. thread_id/message_id: its board post.
+        """CREATE TABLE faction_recruit (
+        faction_id INTEGER PRIMARY KEY,
+        pitch TEXT NOT NULL,
+        tags TEXT NOT NULL DEFAULT '',
+        timezone TEXT NOT NULL,
+        recruiting INTEGER NOT NULL DEFAULT 0,
+        thread_id INTEGER,
+        message_id INTEGER,
+        updated_at INTEGER NOT NULL
+    )""",
+        # The last "Request to join" per player per faction, for the cooldown.
+        """CREATE TABLE recruit_requests (
+        faction_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        at INTEGER NOT NULL,
+        PRIMARY KEY (faction_id, user_id)
+    )""",
+        # Solo players looking for a faction (/faction lfg on); off deletes the row.
+        """CREATE TABLE smp_seekers (
+        user_id INTEGER PRIMARY KEY,
+        note TEXT NOT NULL DEFAULT '',
+        timezone TEXT NOT NULL DEFAULT '',
+        since INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+    )""",
+        # Referral codes (cogs/referral.py): one per member. name: their linked Minecraft name when
+        # the code was last shown, used if the link is gone when a friend buys.
+        """CREATE TABLE referral_codes (
+        user_id INTEGER PRIMARY KEY,
+        code TEXT NOT NULL UNIQUE,
+        name TEXT,
+        created_at INTEGER NOT NULL
+    )""",
+        # Referrals that counted, one per Tebex transaction and one per buyer name, ever.
+        # status: granted (over RCON or posted for staff) | refunded.
+        """CREATE TABLE referral_claims (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        transaction_id TEXT NOT NULL UNIQUE,
+        code TEXT NOT NULL,
+        referrer_id INTEGER NOT NULL,
+        referrer_name TEXT NOT NULL,
+        buyer_name TEXT NOT NULL,
+        buyer_key TEXT NOT NULL UNIQUE,
+        status TEXT NOT NULL DEFAULT 'granted',
+        created_at INTEGER NOT NULL,
+        refunded_at INTEGER
+    )""",
+    ],
 ]
 
 

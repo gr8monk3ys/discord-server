@@ -13,7 +13,8 @@ What lives here:
   sockets and the timeouts.
 - Everything that crosses the bridge is hostile input. Minecraft names must match
   `NAME_RE` before they are stored; only `list` and `tellraw` are ever sent over RCON
-  (`sendable`), so the bot never changes the whitelist or anything else on the server;
+  (`sendable`), so the bot never changes the whitelist or anything else on the server, except
+  that with REFERRAL_GRANT=rcon the referral unlock may set two wardrobe scores (`grant_sendable`);
   chat going to Minecraft becomes a JSON text component built by `json.dumps` (so nothing
   a member types can end the string or start a command); text coming from Minecraft loses its formatting codes and control characters,
   is length-capped, filtered (logic/textfilter.py, links refused) and escaped.
@@ -372,6 +373,17 @@ def sendable(command: str) -> bool:
     (relayed chat). Anything else, `whitelist` above all, is refused before it is sent:
     Monkey SMP access is staff's to grant, never the bot's."""
     return isinstance(command, str) and (command == LIST_COMMAND or command.startswith(TELLRAW_PREFIX))
+
+
+# The referral unlock (logic/referral.py `grant_commands`): a wardrobe score on one player's name, the
+# same scoreboard commands the store and staff use. Only when the owner turns on REFERRAL_GRANT=rcon.
+GRANT_RE = re.compile(r"scoreboard players (?:set [A-Za-z0-9_]{3,16} rw\.kin 1|add [A-Za-z0-9_]{3,16} rw\.invites 1)")
+
+
+def grant_sendable(command: str) -> bool:
+    """The referral unlock's three shapes and nothing else: `scoreboard players set NAME rw.kin 1` and
+    `scoreboard players add NAME rw.invites 1`. Never a whitelist change or any other command."""
+    return isinstance(command, str) and GRANT_RE.fullmatch(command) is not None
 
 
 def parse_list(reply: str) -> list[str] | None:

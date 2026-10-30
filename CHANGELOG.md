@@ -8,6 +8,16 @@ All notable changes to this project are recorded here. The format follows
 
 ### Added
 
+- Faction recruitment board and referrals (migration 27, after #54's migration 26, adds
+  `faction_recruit`, `recruit_requests`, `smp_seekers`, `referral_codes` and `referral_claims`):
+  - `/faction pitch`, `/faction recruit on|off`: one board post per approved faction (pitch, playstyle
+    tags, timezone, status) with a Request to join button that DMs the leader. `/faction lfg on|off`
+    and `/faction seekers` for solo players and leaders. Off unless `RECRUIT_FORUM` names a forum.
+  - `/referral` and the Kindred Band: a personal code read from Tebex's `payment.completed` (a checkout
+    custom variable, or creator codes with `REFERRAL_CREATOR_CODES=on`) gives both players a wardrobe
+    helm and the referrer one `rw.invites`; refunds and chargebacks post the undo commands. Off unless
+    `REFERRALS=on`; delivery is a staff post unless `REFERRAL_GRANT=rcon`
+    (`docs/TEBEX_WEBHOOK.md`, "Referrals").
 - Monkey SMP nudges (migration 26 adds `monkey_nudges`): `/smp nudges on|off`. A linked member who
   opted in and hasn't been in the bridge's player-list poll for 7 days gets one DM with what happened
   since and how to hop back in; one per lapse, and a refused DM is recorded and not retried. Off

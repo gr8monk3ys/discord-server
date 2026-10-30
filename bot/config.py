@@ -255,4 +255,5 @@ WELCOMER_ROLE = "Welcomer"
 # role is made by the bot when it is missing. Tebex alerts (cogs/tebex.py) post in MOD_CHANNEL.
 SMP_FORUM = "🚩・smp-forum"
 FACTION_TAG = "Faction"
+RECRUITING_TAG = "Recruiting"  # the recruitment board's tag for a faction open to requests
 BOTM_ROLE = "Base of the Month"
