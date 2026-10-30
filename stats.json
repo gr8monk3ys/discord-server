@@ -1,0 +1,41 @@
+{
+ "events": [
+  {
+   "game": "Overwatch",
+   "kind": "gamenight",
+   "start": "2026-10-31T04:00:00Z",
+   "title": "Overwatch game night"
+  }
+ ],
+ "generated_at": "2026-10-30T19:24:59Z",
+ "hall": {
+  "badges": 31
+ },
+ "houses": [
+  {
+   "name": "Otter",
+   "points": 2
+  },
+  {
+   "name": "Kestrel",
+   "points": 2
+  },
+  {
+   "name": "Fern",
+   "points": 2
+  }
+ ],
+ "members": {
+  "online": 7,
+  "total": 33
+ },
+ "seasonal": {
+  "emoji": "🎃",
+  "ends": "2026-11-01T07:00:00Z",
+  "name": "Halloween"
+ },
+ "v": 1,
+ "week": {
+  "voice_hours": 8
+ }
+}
