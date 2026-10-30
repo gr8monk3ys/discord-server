@@ -8,6 +8,13 @@ All notable changes to this project are recorded here. The format follows
 
 ### Changed
 
+- The Minecraft bridge drops the server's old name, The Realms: the module is `monkey`
+  (`cogs/monkey.py`, `logic/monkey.py`, cog `MonkeySmp`), its settings are `MONKEY_ADDRESS`,
+  `MONKEY_RCON_HOST`, `MONKEY_RCON_PORT`, `MONKEY_RCON_PASSWORD` and `MONKEY_LOG_PATH` (the old
+  `REALMS_*` names still work when a new one is unset), and migration 24 renames its tables to
+  `monkey_links` and `monkey_playtime` and the status panel's meta key to `monkey:panel`, so links,
+  playtime and the pinned panel carry over. The playtime ledger reason and refs keep `realms`, so
+  past payouts still count and nothing is paid twice. The `/smp` commands are unchanged.
 - Monkey SMP has its own category, `04 · monkey smp`, right after `03 · games`: #smp-rules,
   #smp-faq, a new read-only #smp-commands (a pinned list of the player commands, in game and
   `/smp`), #monkey-smp, #founding-roster and #smp-forum. The categories after it are renumbered

@@ -3,9 +3,9 @@ server. Pure: no sockets, no files, no Discord I/O, no database, no clock of its
 
 What lives here:
 
-- Settings (`read_setup`): which of the three parts are on. Status needs REALMS_ADDRESS;
+- Settings (`read_setup`): which of the three parts are on. Status needs MONKEY_ADDRESS;
   Discord-to-Minecraft chat (and the RCON player list) needs RCON (host, port, password);
-  Minecraft-to-Discord chat needs REALMS_LOG_PATH. The RCON host must be this machine or
+  Minecraft-to-Discord chat needs MONKEY_LOG_PATH. The RCON host must be this machine or
   a private network (same rule as OLLAMA_URL in logic/catchup.py), and the password never
   appears in a repr, a problem line or an error.
 - The two wire codecs, as bytes in and bytes out: Server List Ping (VarInt framing,
@@ -57,9 +57,9 @@ def name_key(name: str) -> str:
 
 
 # ---------------------------------------------------------------- settings
-ENV_ADDRESS = "REALMS_ADDRESS"
-ENV_RCON_HOST, ENV_RCON_PORT, ENV_RCON_PASSWORD = "REALMS_RCON_HOST", "REALMS_RCON_PORT", "REALMS_RCON_PASSWORD"
-ENV_LOG_PATH = "REALMS_LOG_PATH"
+ENV_ADDRESS = "MONKEY_ADDRESS"
+ENV_RCON_HOST, ENV_RCON_PORT, ENV_RCON_PASSWORD = "MONKEY_RCON_HOST", "MONKEY_RCON_PORT", "MONKEY_RCON_PASSWORD"
+ENV_LOG_PATH = "MONKEY_LOG_PATH"
 ENV_NAMES = (ENV_ADDRESS, ENV_RCON_HOST, ENV_RCON_PORT, ENV_RCON_PASSWORD, ENV_LOG_PATH)
 DEFAULT_PORT = 25565
 DEFAULT_RCON_HOST = "127.0.0.1"
@@ -622,7 +622,7 @@ def poll_delay(failures: int) -> int:
 
 
 # ---------------------------------------------------------------- playtime and coins
-REASON = "realms"  # ledger reason
+REASON = "realms"  # ledger reason; stored on every past payout, so it keeps the server's old name
 SLOT_SECONDS = 30 * 60
 SLOT_COINS = 5  # per full 30 minutes online
 DAILY_SLOTS = 8  # hard cap: 40 coins (4 hours) a local day
@@ -646,6 +646,7 @@ def slots(seconds: int) -> int:
 
 
 def ref(user_id: int, day: str, slot: int) -> str:
+    # The old "realms:" prefix stays: a new one would let today's paid half hours be paid again.
     return f"realms:{user_id}:{day}:{slot}"
 
 

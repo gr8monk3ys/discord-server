@@ -34,8 +34,8 @@ looked up by name at run time, never by a stored ID.
    through helpers in `bot/config.py` or by the cog: `CREW_PING_MINUTES`, `CREW_QUIET_HOURS`
    (crew), `SUPPORT_URL` (supporter), `TOWNHALL_TIME` (events), `YOUTUBE_CLIENT_ID`,
    `YOUTUBE_CLIENT_SECRET`, `YOUTUBE_REFRESH_TOKEN`, `YOUTUBE_PRIVACY` (clipcast),
-   `REALMS_ADDRESS`, `REALMS_RCON_HOST`, `REALMS_RCON_PORT`, `REALMS_RCON_PASSWORD`,
-   `REALMS_LOG_PATH` (realms), `SITE_DATA` (sitedata), `TONIGHT` (tonight; `off` stops the
+   `MONKEY_ADDRESS`, `MONKEY_RCON_HOST`, `MONKEY_RCON_PORT`, `MONKEY_RCON_PASSWORD`,
+   `MONKEY_LOG_PATH` (monkey; each falls back to its old `REALMS_*` name), `SITE_DATA` (sitedata), `TONIGHT` (tonight; `off` stops the
    voice line, anything else or unset leaves it on), `SMP_WATCH`, `SMP_WATCH_ADDRESS`, `SMP_WATCH_MIN`
    (smpwatch; `off` stops the Monkey SMP ping), `FIELD_NOTES_GITHUB_USER`,
    `FIELD_NOTES_SPOTIFY_HISTORY`, `FIELD_NOTES_LETTERBOXD_USER`, `FIELD_NOTES_PLAYED` (fieldnotes;
@@ -155,13 +155,13 @@ jobs below). Times are local (Pacific unless `TZ` is set). Loops without a wall-
 | `supporter` | Supporter tier: thank-you, `/profile` flair, stipend, `/support`, staff `/supporter grant/revoke` | `supporters` | reconcile 5 min; stipend on the 1st 12:15 | 💬・general, 📋・mod-log; Supporter (only read, unless staff grant it by hand) |
 | `forums` | first reaction on guide and setup posts, delayed one-time post reward | `forum_posts` | settle sweep 10 min (a post is judged once it is a day old) | 📚・guides and 🖥・setups forums |
 | `clipcast` | weekly top clips to YouTube with per-clip consent, `/clipcast consent/remove` (coins are paid only after 7 days up), staff `/clipcast status/skip` | `clipcast`, `clipcast_prefs`, `achievements` (On the Channel) | 5 min tick: opt-out and crash sweep, 7-day payouts, ask Sun 18:30, post Tue 18:30 | 📸・clips, 📋・mod-log, DMs |
-| `realms` | Minecraft bridge: status panel, `/smp link/unlink/status/top`, mods `/smp remove/adopt`, two-way chat, playtime coins | `realms_links`, `realms_playtime` | 15 s tick (server poll every 2 min, backing off to 15 min while it is down; departed-member sweep 30 min); RCON sends only `list` and `tellraw`, never `whitelist`; chat flush 3 s | ⛏️・monkey-smp, 📋・mod-log |
+| `monkey` | Minecraft bridge: status panel, `/smp link/unlink/status/top`, mods `/smp remove/adopt`, two-way chat, playtime coins | `monkey_links`, `monkey_playtime` | 15 s tick (server poll every 2 min, backing off to 15 min while it is down; departed-member sweep 30 min); RCON sends only `list` and `tellraw`, never `whitelist`; chat flush 3 s | ⛏️・monkey-smp, 📋・mod-log |
 | `wrapped` | `/wrapped` cards (Dec 1 to Jan 15), server card, staff `/wrapped-preview` | `achievements` (`wrapped_YEAR`); `meta` only otherwise | 5 min tick: announcement Dec 1 10:00, reminder Dec 20 10:00, level snapshot once in January | 📣・announcements; wherever a member shares a card |
 | `sitedata` | aggregates file for the landing page, staff `/sitedata refresh` | none (writes `bot/data/site/stats.json`) | 1 min tick, rebuilds every 30 min | none |
 | `appeals` | ban appeals from the website: review cards with Accept/Deny, discussion threads, staff `/appeals list/code` | `appeals` | 5 min tick: re-reads the channel for webhook posts missed while down; expiry daily 09:00 (30 days untouched; answers blanked 180 days after a decision) | 🔒・appeals, 📋・mod-log |
 | `tonight` | one line in general while 2+ non-bot members are in a public voice channel (everyone can view and join; not AFK, not the staff category): counts, the shared game, a channel mention; edited in place, past tense when the rooms empty, never deleted. No commands, no coins | none (`meta` only: `tonight:state`, one JSON value with no member data, and `tonight:fired_at`) | 1 min tick: line after a room has held 3 min, edits at most every 2 min, same message reused for 45 min after a session ends, at most 3 new messages a local day; `TONIGHT=off` runs no tick and closes a standing "right now" line once | 💬・general |
 | `welcomers` | one line in general pinging the opt-in Welcomer role when a member who joined in the last 14 days first joins a public voice channel (`Tonight.public_room`) and stays 30 s; "first" is `voice_sessions` history (read only). Skipped for bots, tracking off, a Welcomer or staff already in the channel, nobody else holding the role, quiet hours (`crew.quiet_hours` of `CREW_QUIET_HOURS`). No commands, no coins | none (`meta` only: `welcomers:last_ping`, and `welcomers:pinged:<id>` per newcomer, pruned after 30 days) | 10 s tick (joins held 30 s); at most one ping per 15 min; prune hourly | 💬・general; Welcomer |
-| `smpwatch` | one line mentioning SMP Ping in the realms channel when 3+ are on Monkey SMP: a Server List Ping (the `realms` codec) of the public address, found through its SRV record by a minimal UDP DNS client in `logic/smpwatch.py`; reads the count only, no RCON, no names. No commands, no coins | none (`meta` only: `smpwatch:state`, when the last ping went out and whether the next may go) | 5 min tick; SRV answer cached 1 h; after a ping, none until the count drops below the minimum and 4 h pass; none 22:00 to 09:00 local; `SMP_WATCH=off` runs no tick | ⛏️・monkey-smp; SMP Ping |
+| `smpwatch` | one line mentioning SMP Ping in the Monkey SMP channel when 3+ are on Monkey SMP: a Server List Ping (the `monkey` codec) of the public address, found through its SRV record by a minimal UDP DNS client in `logic/smpwatch.py`; reads the count only, no RCON, no names. No commands, no coins | none (`meta` only: `smpwatch:state`, when the last ping went out and whether the next may go) | 5 min tick; SRV answer cached 1 h; after a ping, none until the count drops below the minimum and 4 h pass; none 22:00 to 09:00 local; `SMP_WATCH=off` runs no tick | ⛏️・monkey-smp; SMP Ping |
 | `fieldnotes` | the owner's weekly field notes: Built (GitHub search plus the owner's repo listing, public repos only, no token), Heard (SpotifyForge's `listening_history.jsonl`, read only; no Spotify token), Watched (Letterboxd RSS), Played (the guild owner's `game_sessions` rows, unless opted out); a reply thread; the closing question asks `quietgate` (kind `fieldnotes`); staff `/fieldnotes preview` (changes nothing) | none (`jobs` rows `fieldnotes:YYYY-Www`; `meta` `quiet:fieldnotes`) | 5 min tick: Sun 18:00 weekly; an empty week is marked done with no post; no `FIELD_NOTES_*` setting runs no tick | 📓・field-notes |
 
 Four of the `logic/` modules have no cog of their own: `linkedroles.py` validates
@@ -185,7 +185,7 @@ joined in 28 days, and a failure leaves the field out without breaking the diges
 `logic/sitedata.py` shares its schema with the publisher through `server/site_schema.py`.
 Cross-cog reads added with these modules, all by `bot.get_cog(...)` and all optional (a missing
 or failing cog just leaves its line out): `recap` asks `Forums.fresh_line` for the weekly recap
-and `Crew.digest_line` for the owner digest, `ops` asks `Realms.health_text` for `/status`,
+and `Crew.digest_line` for the owner digest, `ops` asks `MonkeySmp.health_text` for `/status`,
 `achievements` asks `Supporter.profile_flair`, and `sitedata` and `wrapped` read house standings
 and membership through `logic/houses.py`.
 
@@ -225,7 +225,7 @@ Staff applications use their own 90-day rule in `logic/staffapps.py`.
 Every recorder of activity (stats, coins, XP, quest steps, clips) checks it first; readers
 that rank or show members filter opted-out members out. `/privacy tracking:off` also deletes
 the member's voice, message and game history and XP. `opt_out()` in `cogs/stats.py` does
-all of it in one transaction, for the newer tables too: it deletes `realms_playtime`,
+all of it in one transaction, for the newer tables too: it deletes `monkey_playtime`,
 `forum_posts` and `crew_greetings` rows (either side), removes the member from the level
 snapshots in `meta`, deletes a Wrapped share time whose 6-hour cooldown is over, and then asks
 `clipcast` to withdraw consent for anything not posted (a posted video needs `/clipcast
@@ -233,7 +233,7 @@ remove`). The rule is "opting out removes the detail, never a limit": every cap,
 once-only reward is either counted from the ledger, which is never deleted (forum weekly cap,
 crew daily cap, playtime slots), or its bare row is kept (`crew_arrivals`, which tells a rejoin
 from a first join; a Wrapped share time still inside its cooldown). The cogs' own sweeps
-(`crew` hourly, `realms` at each poll, `clipcast` and `wrapped` every 5 minutes) remain as a
+(`crew` hourly, `monkey` at each poll, `clipcast` and `wrapped` every 5 minutes) remain as a
 second pass. A new table about members needs a line in `opt_out()`. Things a member does on purpose (a
 partner or staff application, Daily Word, a linked account, a house, a Minecraft link, a ban
 appeal) are not tracking and are not gated. If a change stores something new about members, update `PRIVACY.md`.
@@ -393,7 +393,7 @@ SQLite at `bot/data/front_desk.db` (gitignored). `MIGRATIONS` in `bot/db.py` is 
 | Forums | `forum_posts` (state: pending, paid, unpaid, skipped, deleted) | 18 |
 | Watch parties, Town Hall | `hosted_events` (kept out of `gamenights` so game-night counts leave them out) | 18 |
 | Clipcast | `clipcast` (one row per shortlisted clip; `status` is the state machine in `logic/clipcast.py`), `clipcast_prefs` | 19 |
-| Monkey SMP | `realms_links` (state: new links are always ok; add and remove are left from when linking ran the whitelist and are settled when the cog loads; unique index "one name per member"), `realms_playtime` (seconds per member per local day); `realms_links.managed` and `attempts` are unused since links stopped touching the whitelist (kept, since migrations are never edited) | 20; 22 |
+| Monkey SMP | `monkey_links` (state: new links are always ok; add and remove are left from when linking ran the whitelist and are settled when the cog loads; unique index "one name per member"), `monkey_playtime` (seconds per member per local day); `monkey_links.managed` and `attempts` are unused since links stopped touching the whitelist (kept, since migrations are never edited) | 20; 22; 24 (renamed from `realms_*`) |
 | Ban appeals | `appeals` (unique index "one open appeal per user"), `appeal_bans` (when a ban happened; written by `moderation`) | 21 |
 
 Wrapped, sitedata, Linked Roles, focus, tonight, smpwatch, welcomers and fieldnotes add no tables. Wrapped keeps its share cooldown and the

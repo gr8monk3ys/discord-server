@@ -10,8 +10,8 @@ OWNER, SOMEONE = 1, 2
 # Cogs whose staff check is the shared one. Deliberately different, and not listed:
 # helpdesk (by permission: Moderate Members or Administrator), and the methods Games.is_staff,
 # Moderation.is_staff and Ops.is_staff.
-SHARED = ("catchup", "clipcast", "creators", "crew", "econstats", "events", "gamelink", "houses", "levels", "news",
-          "partners", "realms", "sitedata", "staffapps", "supporter", "tournaments", "utility", "wrapped")
+SHARED = ("catchup", "clipcast", "creators", "crew", "econstats", "events", "gamelink", "houses", "levels", "monkey", "news",
+          "partners", "sitedata", "staffapps", "supporter", "tournaments", "utility", "wrapped")
 
 
 def member(uid=SOMEONE, roles=(), admin=False, **kw):

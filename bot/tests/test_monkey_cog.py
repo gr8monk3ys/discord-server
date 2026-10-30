@@ -1,6 +1,6 @@
-"""Offline tests for cogs.realms: in-memory SQLite, fake Discord objects, a fake RCON
+"""Offline tests for cogs.monkey: in-memory SQLite, fake Discord objects, a fake RCON
 client, a fake status pinger and a fake log reader. No sockets, no files, no real clock
-(the transports themselves are tested in test_realms.py)."""
+(the transports themselves are tested in test_monkey.py)."""
 
 import asyncio
 import json
@@ -15,10 +15,10 @@ import pytest
 import config
 import db as dbmod
 import economy
-from cogs import realms as cogmod
-from cogs.realms import MESSAGES, Realms
+from cogs import monkey as cogmod
+from cogs.monkey import MESSAGES, MonkeySmp
 from logic import quests
-from logic import realms as R
+from logic import monkey as R
 
 GUILD_ID = 999
 TZ = ZoneInfo("America/Los_Angeles")
@@ -160,10 +160,10 @@ class FakeGuild:
         self.id = gid
         self.owner_id = OWNER
         self.chunked = True
-        self.realms = FakeText(1, config.REALMS_CHANNEL, self)
+        self.smp = FakeText(1, config.MONKEY_CHANNEL, self)
         self.general = FakeText(2, config.GENERAL_CHANNEL, self)
         self.mod_log = FakeText(3, config.MOD_LOG_CHANNEL, self)
-        self.text_channels = [self.general, self.mod_log] + ([self.realms] if with_channel else [])
+        self.text_channels = [self.general, self.mod_log] + ([self.smp] if with_channel else [])
         self.members: dict[int, FakeMember] = {}
         self.uncached: dict[int, FakeMember] = {}  # in the server, but only the API knows
         self.fetches: list[int] = []
@@ -281,44 +281,44 @@ class Env:
         if wait:
             self.t += R.LINK_COOLDOWN
         inter = FakeInteraction(self.member(uid), self.guild)
-        await Realms.link.callback(self.cog, inter, name)
+        await MonkeySmp.link.callback(self.cog, inter, name)
         return inter.reply()
 
     async def unlink(self, uid):
         inter = FakeInteraction(self.member(uid), self.guild)
-        await Realms.unlink.callback(self.cog, inter)
+        await MonkeySmp.unlink.callback(self.cog, inter)
         return inter.reply()
 
     async def linked(self, uid, name):
         """A link the server confirmed, written directly (the relay tests aren't about linking)."""
         self.member(uid)
         await self.db.execute(
-            "INSERT INTO realms_links (name_key, name, user_id, state, attempts, linked_at, updated_at, managed)"
+            "INSERT INTO monkey_links (name_key, name, user_id, state, attempts, linked_at, updated_at, managed)"
             " VALUES (?, ?, ?, 'ok', 0, ?, ?, 1)", (R.name_key(name), name, uid, T0, T0))
 
     async def adopt(self, mod_uid, uid, name, roles=(config.MOD_ROLE,)):
         inter = FakeInteraction(self.member(mod_uid, roles=roles), self.guild)
-        await Realms.adopt.callback(self.cog, inter, self.member(uid), name)
+        await MonkeySmp.adopt.callback(self.cog, inter, self.member(uid), name)
         return inter.reply()
 
     async def remove(self, mod_uid, uid, roles=(config.MOD_ROLE,)):
         inter = FakeInteraction(self.member(mod_uid, roles=roles), self.guild)
-        await Realms.remove.callback(self.cog, inter, self.member(uid))
+        await MonkeySmp.remove.callback(self.cog, inter, self.member(uid))
         return inter.reply()
 
     async def status(self, uid, roles=()):
         inter = FakeInteraction(self.member(uid, roles=roles), self.guild)
-        await Realms.status_command.callback(self.cog, inter)
+        await MonkeySmp.status_command.callback(self.cog, inter)
         return inter.reply()
 
     async def top(self, uid):
         inter = FakeInteraction(self.member(uid), self.guild)
-        await Realms.top.callback(self.cog, inter)
+        await MonkeySmp.top.callback(self.cog, inter)
         return inter.reply()
 
     async def say(self, uid, content, channel=None, **extra):
         author = extra.pop("author", None) or self.member(uid)
-        msg = ChatMessage(author, channel or self.guild.realms, content, **extra)
+        msg = ChatMessage(author, channel or self.guild.smp, content, **extra)
         return await self.cog.relay_to_minecraft(msg), msg
 
     async def log(self, *lines, reset=False):
@@ -327,11 +327,11 @@ class Env:
 
     # ---- reading state back
     async def links(self):
-        rows = await self.db.fetchall("SELECT * FROM realms_links ORDER BY name_key")
+        rows = await self.db.fetchall("SELECT * FROM monkey_links ORDER BY name_key")
         return [(r["name"], r["user_id"], r["state"]) for r in rows]
 
     async def seconds(self, uid, day=DAY):
-        row = await self.db.fetchone("SELECT seconds FROM realms_playtime WHERE user_id = ? AND day = ?", (uid, day))
+        row = await self.db.fetchone("SELECT seconds FROM monkey_playtime WHERE user_id = ? AND day = ?", (uid, day))
         return row["seconds"] if row else None
 
     async def balance(self, uid):
@@ -345,7 +345,7 @@ class Env:
 
     @property
     def posts(self):
-        return self.guild.realms.messages
+        return self.guild.smp.messages
 
     def mod_lines(self):
         return [m.kwargs["embed"].description for m in self.guild.mod_log.messages]
@@ -359,7 +359,7 @@ def with_env(fn, monkeypatch, environ=None, with_channel=True):
         guild = FakeGuild(with_channel=with_channel)
         rcon = FakeRcon()
         env = Env(db, guild, None, rcon)
-        env.cog = Realms(FakeBot(db, guild), environ=ALL_ON if environ is None else environ,
+        env.cog = MonkeySmp(FakeBot(db, guild), environ=ALL_ON if environ is None else environ,
                          pinger=env.pinger, rcon=rcon, reader=env.reader)
         monkeypatch.setattr(cogmod, "now", lambda: env.t)
         try:
@@ -394,13 +394,13 @@ def test_without_settings_the_bridge_is_off_and_quiet(monkeypatch, caplog):
 
 def test_real_environment_without_settings_builds_no_client(monkeypatch):
     async def go():
-        for name in config.REALMS_ENV:
+        for name in (*config.MONKEY_ENV, *config.MONKEY_ENV_WAS.values()):
             monkeypatch.delenv(name, raising=False)
-        cog = Realms(FakeBot(None, FakeGuild()))
+        cog = MonkeySmp(FakeBot(None, FakeGuild()))
         assert not cog.setup.any_on and cog.rcon is None
         for name, value in ALL_ON.items():
             monkeypatch.setenv(name, value)
-        cog = Realms(FakeBot(None, FakeGuild()))  # nothing connects until a command is run
+        cog = MonkeySmp(FakeBot(None, FakeGuild()))  # nothing connects until a command is run
         assert isinstance(cog.rcon, cogmod.Rcon) and (cog.rcon.host, cog.rcon.port) == ("127.0.0.1", 25575)
         assert cog.rcon.writer is None and PASSWORD not in repr(cog.rcon) and PASSWORD not in repr(cog.setup)
         assert cog.pinger is cogmod.ping_server and cog.reader is cogmod.read_log
@@ -427,7 +427,7 @@ def test_bad_settings_are_reported_once_without_values(monkeypatch, caplog):
         with caplog.at_level(logging.INFO):
             await env.cog.cog_load()
             await env.cog.cog_unload()
-        assert "REALMS_RCON_HOST refused" in caplog.text
+        assert "MONKEY_RCON_HOST refused" in caplog.text
         assert PASSWORD not in caplog.text and "203.0.113.9" not in caplog.text
         assert env.cog.setup.status_on and not env.cog.setup.rcon_on
         # linking needs no RCON: the name is for chat from the game and for playtime
@@ -447,7 +447,7 @@ def test_panel_is_posted_once_then_edited_in_place(monkeypatch):
         assert "🟢 **Online** · 1 / 20 players" in panel.text and "Steve" in panel.text
         assert "/smp link" in panel.text and "Fabric 1.21.1" in panel.text
         assert f"You need a Monkey SMP pass: {R.PASS_URL}" in panel.text and "whitelist" not in panel.text
-        assert await env.cog.meta_get(cogmod.PANEL_KEY) == f"{env.guild.realms.id}:{panel.id}"
+        assert await env.cog.meta_get(cogmod.PANEL_KEY) == f"{env.guild.smp.id}:{panel.id}"
         await env.poll()
         await env.poll()
         assert panel.edits == [] and len(env.posts) == 1  # nothing changed: no API calls
@@ -462,7 +462,7 @@ def test_panel_survives_a_restart_and_a_deleted_message(monkeypatch):
     async def go(env):
         await env.poll()
         (panel,) = env.posts
-        again = Realms(env.cog.bot, environ=ALL_ON, pinger=env.pinger, rcon=env.rcon, reader=env.reader)
+        again = MonkeySmp(env.cog.bot, environ=ALL_ON, pinger=env.pinger, rcon=env.rcon, reader=env.reader)
         await again.poll_once()
         assert len(env.posts) == 1 and len(panel.edits) == 1  # same message, found through meta
         await again.poll_once()
@@ -471,7 +471,7 @@ def test_panel_survives_a_restart_and_a_deleted_message(monkeypatch):
         env.players("Steve")
         await again.poll_once()
         assert len(env.posts) == 2 and env.posts[1].pinned
-        assert await again.meta_get(cogmod.PANEL_KEY) == f"{env.guild.realms.id}:{env.posts[1].id}"
+        assert await again.meta_get(cogmod.PANEL_KEY) == f"{env.guild.smp.id}:{env.posts[1].id}"
     with_env(go, monkeypatch)
 
 
@@ -527,21 +527,21 @@ def test_no_panel_before_the_first_answer_and_none_without_a_channel(monkeypatch
 
 def test_panel_failures_are_quiet_and_retried(monkeypatch, caplog):
     async def go(env):
-        env.guild.realms.fail_send = forbidden()
+        env.guild.smp.fail_send = forbidden()
         with caplog.at_level(logging.INFO):
             await env.poll()
             await env.poll()
             await env.poll()
         assert len([r for r in caplog.records if "posting the status panel failed" in r.getMessage()]) == 1
-        env.guild.realms.fail_send = None
-        env.guild.realms.fail_pin = forbidden()
+        env.guild.smp.fail_send = None
+        env.guild.smp.fail_pin = forbidden()
         await env.poll()
         assert len(env.posts) == 1 and not env.posts[0].pinned  # the pin is a nicety
-        env.guild.realms.fail_edit = forbidden()
+        env.guild.smp.fail_edit = forbidden()
         env.players("Steve")
         await env.poll()
         assert len(env.posts) == 1  # a failed edit never becomes a second panel
-        env.guild.realms.fail_edit = None
+        env.guild.smp.fail_edit = None
         await env.poll()
         assert len(env.posts[0].edits) == 1 and "Steve" in env.posts[0].text
     with_env(go, monkeypatch)
@@ -661,7 +661,7 @@ def test_rows_left_from_the_whitelist_days_are_settled_without_a_command(monkeyp
         for key, name, uid, state, managed in rows:
             env.member(uid)
             await env.db.execute(
-                "INSERT INTO realms_links (name_key, name, user_id, state, attempts, linked_at, updated_at, managed)"
+                "INSERT INTO monkey_links (name_key, name, user_id, state, attempts, linked_at, updated_at, managed)"
                 " VALUES (?, ?, ?, ?, 3, ?, ?, ?)", (key, name, uid, state, T0, T0, managed))
         assert "hi from Herobrine" not in await chat(env, "Herobrine", "Ghost")  # not settled yet: no relay
         await env.cog.cog_load()
@@ -700,7 +700,7 @@ def test_adopt_refuses_bad_names_taken_names_and_bots(monkeypatch):
         assert await env.links() == [("Steve", U1, "ok")] and len(env.mod_lines()) == 1
         bot_member = env.member(999_000, bot=True)
         inter = FakeInteraction(env.member(MOD, roles=(config.MOD_ROLE,)), env.guild)
-        await Realms.adopt.callback(env.cog, inter, bot_member, "Alex")
+        await MonkeySmp.adopt.callback(env.cog, inter, bot_member, "Alex")
         assert "Bots" in inter.reply()["content"] and env.rcon.commands == []
     with_env(go, monkeypatch)
 
@@ -808,11 +808,11 @@ def test_discord_chat_reaches_minecraft_as_tellraw(monkeypatch):
 
 def test_bridge_uses_the_old_channel_name_until_the_rename(monkeypatch):
     async def go(env):
-        old = FakeText(98, config.REALMS_CHANNEL_WAS[0], env.guild)
+        old = FakeText(98, config.MONKEY_CHANNEL_WAS[0], env.guild)
         env.guild.text_channels.append(old)
         assert env.cog.channel() is old  # not renamed yet
-        env.guild.text_channels.append(env.guild.realms)
-        assert env.cog.channel() is env.guild.realms  # the new name wins once it exists
+        env.guild.text_channels.append(env.guild.smp)
+        assert env.cog.channel() is env.guild.smp  # the new name wins once it exists
     with_env(go, monkeypatch, with_channel=False)
 
 
@@ -823,13 +823,13 @@ def test_only_members_messages_in_the_bridge_channel_are_relayed(monkeypatch):
         assert (await env.say(U1, "hook", webhook_id=77))[0] == "bot"
         assert (await env.say(U1, "wrong room", channel=env.guild.general))[0] == "elsewhere"
         # Only the bridge channel itself, by ID: a same-named channel (or one under the old name) doesn't relay.
-        twin = FakeText(99, config.REALMS_CHANNEL, env.guild)
-        old = FakeText(98, config.REALMS_CHANNEL_WAS[0], env.guild)
+        twin = FakeText(99, config.MONKEY_CHANNEL, env.guild)
+        old = FakeText(98, config.MONKEY_CHANNEL_WAS[0], env.guild)
         env.guild.text_channels += [twin, old]
         assert (await env.say(U1, "twin", channel=twin))[0] == "elsewhere"
         assert (await env.say(U1, "old", channel=old))[0] == "elsewhere"
         other = FakeGuild(gid=555)
-        assert (await env.say(U1, "wrong server", channel=other.realms))[0] == "elsewhere"
+        assert (await env.say(U1, "wrong server", channel=other.smp))[0] == "elsewhere"
         assert (await env.say(U1, "pinned", type=discord.MessageType.pins_add))[0] == "system"
         assert (await env.say(U1, "   \n "))[0] == "empty"
         assert env.rcon.commands == []
@@ -1084,21 +1084,21 @@ def test_the_unlinked_hint_is_rare_bot_worded_and_names_nobody(monkeypatch):
     with_env(go, monkeypatch)
 
 
-def test_a_member_who_cannot_post_in_the_realms_channel_is_not_relayed(monkeypatch):
+def test_a_member_who_cannot_post_in_the_monkey_smp_channel_is_not_relayed(monkeypatch):
     """A timeout is not the only mute. What counts is Send Messages in the channel."""
     async def go(env):
         await env.link(U1, "Steve")
         await env.link(U2, "Alex")
-        env.guild.realms.muted = {U1}  # a channel overwrite or a muted role; no timeout involved
+        env.guild.smp.muted = {U1}  # a channel overwrite or a muted role; no timeout involved
         assert not env.member(U1).is_timed_out()
         text = await chat(env, "Steve", "Alex")
         assert "hi from Steve" not in text and "hi from Alex" in text
-        env.guild.realms.muted = set()
+        env.guild.smp.muted = set()
         assert "hi from Steve" in await chat(env, "Steve")
 
         def broken(member):
             raise RuntimeError("no permissions today")
-        env.guild.realms.permissions_for = broken  # can't tell: not relayed, and nothing blows up
+        env.guild.smp.permissions_for = broken  # can't tell: not relayed, and nothing blows up
         assert await chat(env, "Steve") == ""
     with_env(go, monkeypatch)
 
@@ -1207,12 +1207,12 @@ def test_log_lines_split_across_reads_rotation_and_a_missing_file(monkeypatch, c
 def test_minecraft_chat_without_a_channel_or_with_send_failures(monkeypatch, caplog):
     async def go(env):
         await env.linked(U1, "Steve")
-        env.guild.realms.fail_send = forbidden()
+        env.guild.smp.fail_send = forbidden()
         with caplog.at_level(logging.INFO):
             for i in range(3):
                 await env.log(P + f"<Steve> {i}")
         assert len([r for r in caplog.records if "posting Minecraft chat failed" in r.getMessage()]) == 1
-        env.guild.realms.fail_send = None
+        env.guild.smp.fail_send = None
         await env.log(P + "<Steve> works again")
         assert env.posts[-1].kwargs["content"] == "**<Steve>** works again"
     with_env(go, monkeypatch)
@@ -1304,7 +1304,7 @@ def test_playtime_comes_from_the_servers_list_only(monkeypatch):
         await env.link(U2, "Alex")
         await play(env, 10, "steve", "Stranger")  # the server's spelling may differ in case
         assert await env.seconds(U1) == 8 * 60 and await env.seconds(U2) is None
-        rows = await env.db.fetchall("SELECT user_id FROM realms_playtime")
+        rows = await env.db.fetchall("SELECT user_id FROM monkey_playtime")
         assert [r["user_id"] for r in rows] == [U1]  # an unlinked player is nobody
         # saying so in chat, or in the log, earns nothing
         await env.say(U2, "Alex joined the game")
@@ -1385,9 +1385,9 @@ def test_young_accounts_and_people_who_left_earn_nothing(monkeypatch):
     async def go(env):
         await env.link(U1, "Steve")
         env.member(YOUNG)
-        await env.db.execute("INSERT INTO realms_links (name_key, name, user_id, state, attempts, linked_at,"
+        await env.db.execute("INSERT INTO monkey_links (name_key, name, user_id, state, attempts, linked_at,"
                              " updated_at) VALUES ('newbie', 'Newbie', ?, 'ok', 0, ?, ?)", (YOUNG, T0, T0))
-        await env.db.execute("INSERT INTO realms_links (name_key, name, user_id, state, attempts, linked_at,"
+        await env.db.execute("INSERT INTO monkey_links (name_key, name, user_id, state, attempts, linked_at,"
                              " updated_at) VALUES ('ghost', 'Ghost', ?, 'ok', 0, ?, ?)", (U3, T0, T0))
         env.guild.chunked = False  # (so the sweep leaves the ghost's row for this test)
         await play(env, 70, "Steve", "Newbie", "Ghost")
@@ -1400,7 +1400,7 @@ def test_young_accounts_and_people_who_left_earn_nothing(monkeypatch):
 def test_leftover_rows_earn_nothing_until_they_are_settled(monkeypatch):
     async def go(env):
         env.member(U1)
-        await env.db.execute("INSERT INTO realms_links (name_key, name, user_id, state, attempts, linked_at,"
+        await env.db.execute("INSERT INTO monkey_links (name_key, name, user_id, state, attempts, linked_at,"
                              " updated_at) VALUES ('steve', 'Steve', ?, 'add', 0, ?, ?)", (U1, T0, T0))
         await play(env, 40, "Steve", PAL)
         assert await env.seconds(U1) is None
@@ -1412,7 +1412,7 @@ def test_leftover_rows_earn_nothing_until_they_are_settled(monkeypatch):
 
 def test_playtime_works_from_the_ping_sample_without_rcon(monkeypatch):
     async def go(env):
-        await env.db.execute("INSERT INTO realms_links (name_key, name, user_id, state, attempts, linked_at,"
+        await env.db.execute("INSERT INTO monkey_links (name_key, name, user_id, state, attempts, linked_at,"
                              " updated_at) VALUES ('steve', 'Steve', ?, 'ok', 0, ?, ?)", (U1, T0, T0))
         env.member(U1)
         await play(env, 34, "Steve", PAL)
@@ -1444,7 +1444,7 @@ def test_top_ranks_this_weeks_playtime(monkeypatch):
                 (U3, "2026-10-04", 90_000),  # last week
                 (MOD, "2026-10-05", 50_000)]  # not a member any more
         for uid, day, seconds in rows:
-            await env.db.execute("INSERT INTO realms_playtime (user_id, day, seconds) VALUES (?, ?, ?)",
+            await env.db.execute("INSERT INTO monkey_playtime (user_id, day, seconds) VALUES (?, ?, ?)",
                                  (uid, day, seconds))
         env.t = T0 + 2 * 86400
         reply = await env.top(U3)
@@ -1511,5 +1511,5 @@ def test_one_failing_step_does_not_stop_the_others(monkeypatch, caplog):
         env.cog.credit_playtime = boom
         with caplog.at_level(logging.ERROR):
             await env.poll()
-        assert "realms: playtime failed" in caplog.text and len(env.posts) == 1  # the panel still went out
+        assert "monkey: playtime failed" in caplog.text and len(env.posts) == 1  # the panel still went out
     with_env(go, monkeypatch)

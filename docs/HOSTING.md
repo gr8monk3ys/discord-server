@@ -254,7 +254,7 @@ its restart logic all live on the new host.
 
 - **Monkey SMP (Minecraft bridge).** The bot talks to the Minecraft server over RCON, which only
   accepts localhost or a private-network address, and reads the Minecraft server's log file from
-  disk (`REALMS_LOG_PATH`). After a move to a VPS neither is reachable. Leave the five `REALMS_*`
+  disk (`MONKEY_LOG_PATH`). After a move to a VPS neither is reachable. Leave the five `MONKEY_*` (or old `REALMS_*`)
   lines out of the new `server/.env` (the bridge then stays off and says so), or run the bot on a
   machine on the same network as the Minecraft server and accept that Minecraft-to-Discord chat
   needs the log file mounted into the container.

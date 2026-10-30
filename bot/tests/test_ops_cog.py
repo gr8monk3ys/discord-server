@@ -549,25 +549,25 @@ def test_status_lists_prompts_paused_by_the_quiet_rule(monkeypatch, tmp_path):
     with_env(go, monkeypatch, tmp_path)
 
 
-def test_status_shows_the_realms_bridge_when_that_module_is_loaded(monkeypatch, tmp_path):
-    from cogs import realms
+def test_status_shows_the_monkey_smp_bridge_when_that_module_is_loaded(monkeypatch, tmp_path):
+    from cogs import monkey
 
     async def go(env):
         async def fields():
             inter = FakeInteraction(FakeMember(OWNER, env.guild))
             await Ops.status.callback(env.cog, inter)
             return {f.name: f.value for f in inter.calls[0]["embed"].fields}
-        assert realms.HEALTH_NAME == "Monkey SMP bridge" and realms.Realms.__cog_name__ == "Realms"
-        assert realms.HEALTH_NAME not in await fields()  # this fake bot has no get_cog at all
+        assert monkey.HEALTH_NAME == "Monkey SMP bridge" and monkey.MonkeySmp.__cog_name__ == "MonkeySmp"
+        assert monkey.HEALTH_NAME not in await fields()  # this fake bot has no get_cog at all
         loaded = {}
         env.bot.get_cog = loaded.get
-        assert realms.HEALTH_NAME not in await fields()  # the module is off: no empty field
+        assert monkey.HEALTH_NAME not in await fields()  # the module is off: no empty field
         health = SimpleNamespace(health_text=lambda: "ok (status, chat to Minecraft)")
-        loaded["Realms"] = health
-        assert (await fields())[realms.HEALTH_NAME] == "ok (status, chat to Minecraft)"
+        loaded["MonkeySmp"] = health
+        assert (await fields())[monkey.HEALTH_NAME] == "ok (status, chat to Minecraft)"
         health.health_text = lambda: 1 / 0
         shown = await fields()
-        assert shown[realms.HEALTH_NAME] == "check failed, see bot.log" and shown["Uptime"]  # the rest still shows
+        assert shown[monkey.HEALTH_NAME] == "check failed, see bot.log" and shown["Uptime"]  # the rest still shows
     with_env(go, monkeypatch, tmp_path)
 
 
@@ -682,17 +682,17 @@ def test_permission_check_guild_level_roles_and_missing_channel(monkeypatch, tmp
 def test_permission_check_finds_a_channel_under_its_old_name(monkeypatch, tmp_path):
     # The bridge keeps working in #realms until public_mode.py renames it, so that is no problem.
     async def go(env):
-        g = perm_guild(env, loaded=("ops", "realms"))
-        chan(g, config.REALMS_CHANNEL).name = config.REALMS_CHANNEL_WAS[0]
+        g = perm_guild(env, loaded=("ops", "monkey"))
+        chan(g, config.MONKEY_CHANNEL).name = config.MONKEY_CHANNEL_WAS[0]
         assert await env.cog.check_permissions() == []
         assert g.mod_log.sent == []
         # ...but its permissions there still count, reported under the layout name
-        chan(g, config.REALMS_CHANNEL_WAS[0]).perms = without(pin_messages=True)
+        chan(g, config.MONKEY_CHANNEL_WAS[0]).perms = without(pin_messages=True)
         texts = {(p.where, p.text) for p in await env.cog.check_permissions()}
-        assert texts == {(config.REALMS_CHANNEL, "missing Pin Messages (realms)")}
-        g.text_channels.remove(chan(g, config.REALMS_CHANNEL_WAS[0]))
+        assert texts == {(config.MONKEY_CHANNEL, "missing Pin Messages (monkey)")}
+        g.text_channels.remove(chan(g, config.MONKEY_CHANNEL_WAS[0]))
         texts = {(p.where, p.text) for p in await env.cog.check_permissions()}
-        assert texts == {(config.REALMS_CHANNEL, "channel not found (needed by realms)")}
+        assert texts == {(config.MONKEY_CHANNEL, "channel not found (needed by monkey)")}
     with_env(go, monkeypatch, tmp_path)
 
 

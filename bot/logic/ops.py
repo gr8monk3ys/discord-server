@@ -406,10 +406,10 @@ CHANNEL_NEEDS: list[Need] = [
     Need("clipcast", config.CLIPS_CHANNEL, POST + ("read_message_history",)),  # consent fallback, "as seen on"
     Need("clipcast", config.MOD_LOG_CHANNEL, POST),  # picks, upload notes, takedown alerts
     # status panel (edited in place, pinned: Pin Messages) and the chat relay; reactions say "not relayed"
-    Need("realms", config.REALMS_CHANNEL, POST + ("read_message_history", "add_reactions", "pin_messages"),
-         was=config.REALMS_CHANNEL_WAS),
-    Need("realms", config.MOD_LOG_CHANNEL, POST),  # link changes
-    Need("smpwatch", config.REALMS_CHANNEL, POST, was=config.REALMS_CHANNEL_WAS),  # the SMP Ping line
+    Need("monkey", config.MONKEY_CHANNEL, POST + ("read_message_history", "add_reactions", "pin_messages"),
+         was=config.MONKEY_CHANNEL_WAS),
+    Need("monkey", config.MOD_LOG_CHANNEL, POST),  # link changes
+    Need("smpwatch", config.MONKEY_CHANNEL, POST, was=config.MONKEY_CHANNEL_WAS),  # the SMP Ping line
     # appeals: delete the raw webhook message, read missed ones after downtime, open a discussion thread
     Need("appeals", config.APPEALS_CHANNEL, POST + ("manage_messages", "read_message_history",
                                                     "create_public_threads", "send_messages_in_threads")),

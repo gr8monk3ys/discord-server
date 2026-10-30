@@ -12,7 +12,7 @@ import discord
 import config
 import db as dbmod
 from cogs import smpwatch as cogmod
-from cogs.realms import PingError
+from cogs.monkey import PingError
 from cogs.smpwatch import SmpWatch
 from logic import smpwatch as L
 
@@ -47,8 +47,8 @@ class FakeText:
 class FakeGuild:
     def __init__(self):
         self.id = GUILD_ID
-        self.realms = FakeText(config.REALMS_CHANNEL)
-        self.text_channels = [FakeText("💬・general"), self.realms]
+        self.smp = FakeText(config.MONKEY_CHANNEL)
+        self.text_channels = [FakeText("💬・general"), self.smp]
         self.role = SimpleNamespace(id=4242, name=config.SMP_PING_ROLE, mention="<@&4242>")
         self.roles = [SimpleNamespace(id=1, name="Game Night", mention="<@&1>"), self.role]
 
@@ -98,7 +98,7 @@ class Env:
 
     @property
     def sent(self):
-        return self.guild.realms.sent
+        return self.guild.smp.sent
 
     async def state(self):
         return L.load(await self.db.meta_get(L.STATE_KEY))
@@ -190,8 +190,8 @@ def test_no_role_or_no_channel_posts_and_saves_nothing_until_they_exist(monkeypa
 
 def test_the_channel_is_found_under_its_old_name(monkeypatch):
     async def body(env):
-        assert config.REALMS_CHANNEL_WAS
-        env.guild.realms.name = config.REALMS_CHANNEL_WAS[0]
+        assert config.MONKEY_CHANNEL_WAS
+        env.guild.smp.name = config.MONKEY_CHANNEL_WAS[0]
         env.online = 3
         await env.checks(1)
         assert len(env.sent) == 1
@@ -201,10 +201,10 @@ def test_the_channel_is_found_under_its_old_name(monkeypatch):
 def test_a_failed_send_is_retried_at_the_next_check(monkeypatch):
     async def body(env):
         env.online = 3
-        env.guild.realms.fail = discord.Forbidden(SimpleNamespace(status=403, reason="Forbidden"), "no")
+        env.guild.smp.fail = discord.Forbidden(SimpleNamespace(status=403, reason="Forbidden"), "no")
         await env.checks(2)
         assert env.sent == [] and await env.db.meta_get(L.STATE_KEY) is None
-        env.guild.realms.fail = None
+        env.guild.smp.fail = None
         await env.checks(1)
         assert len(env.sent) == 1
     with_env(body, monkeypatch)

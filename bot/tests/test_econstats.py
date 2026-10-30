@@ -41,10 +41,10 @@ def test_every_ledger_reason_in_the_code_has_a_label():
     import re
     from pathlib import Path
 
-    from logic import challenges, clipcast, crew, forums, houses, quests, realms, recap, seasonal, supporter
+    from logic import challenges, clipcast, crew, forums, houses, monkey, quests, recap, seasonal, supporter
     from logic import vibes, votehub, wordgame
     constants = {challenges.REASON, clipcast.REASON, crew.REASON, forums.REASON, houses.REASON, quests.REASON,
-                 realms.REASON, recap.CONTEST_REASON, seasonal.REASON, S.SHOP_REASON, S.SEASON_REASON,
+                 monkey.REASON, recap.CONTEST_REASON, seasonal.REASON, S.SHOP_REASON, S.SEASON_REASON,
                  S.RAFFLE_REASON, supporter.STIPEND_REASON, vibes.BOOST_REASON, vibes.STIPEND_REASON,
                  vibes.MOTM_REASON, votehub.REASON, wordgame.REASON}
     assert {"housecup", "forum_post", "realms", "crew", "supporterstipend", "clipcast"} <= constants

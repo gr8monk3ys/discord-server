@@ -495,7 +495,7 @@ POSTS = {
         "footer": "FRONT DESK · MONKEY SMP · FAQ",
     },
     # The player commands from the SMP repo's guide (site/src/content/guide/commands.tsx, "players"),
-    # condensed, plus Front Desk's /smp commands (bot/cogs/realms.py). The guide has every rank's.
+    # condensed, plus Front Desk's /smp commands (bot/cogs/monkey.py). The guide has every rank's.
     "smp-commands": {
         "title": "Monkey SMP commands",
         "description": "\n".join(
