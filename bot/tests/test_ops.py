@@ -376,7 +376,7 @@ def test_requirements_tables_cover_config():
     assert {"send_messages", "embed_links"} <= announce["events"] and {"send_messages", "embed_links"} <= announce[
         "seasonal"]
     assert (config.EVENT_ROLE, "seasonal") in ops.ROLE_NEEDS and "seasonal" in ops.ROLE_HOLDERS
-    assert "pin_messages" in by_channel[config.REALMS_CHANNEL]  # the status panel is pinned
+    assert "pin_messages" in by_channel[config.MONKEY_CHANNEL]  # the status panel is pinned
     assert ops.role_problems({}, 5, loaded={"seasonal"}) == [
         Problem(ops.ROLES, f"{config.EVENT_ROLE}: role not found (seasonal)")]
 

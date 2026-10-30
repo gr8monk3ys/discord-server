@@ -620,7 +620,7 @@ async def seed_wave9(env, uid, other):
     """What the newer modules keep about `uid` (and one row each about `other`)."""
     ex = env.db.execute
     for who in (uid, other):
-        await ex("INSERT INTO realms_playtime (user_id, day, seconds) VALUES (?, '2026-09-30', 600)", (who,))
+        await ex("INSERT INTO monkey_playtime (user_id, day, seconds) VALUES (?, '2026-09-30', 600)", (who,))
         await ex("INSERT INTO crew_arrivals (user_id, at, fresh) VALUES (?, ?, 1)", (who, T0))
         # one Wrapped share long ago, one an hour ago (its 6-hour cooldown is still running)
         await ex("INSERT INTO meta (key, value) VALUES (?, ?)", (W.share_key(2025, who), str(T0 - W.SHARE_COOLDOWN)))
@@ -649,7 +649,7 @@ def test_privacy_off_deletes_what_the_newer_modules_keep(monkeypatch):
             return (await env.db.fetchone(f"SELECT COUNT(*) AS n FROM {sql}", params))["n"]
         await seed_wave9(env, A, B)
         await Stats.privacy.callback(env.cog, env.inter(A), choice("off"))
-        assert await env.rows("realms_playtime", A) == [] and len(await env.rows("realms_playtime", B)) == 1
+        assert await env.rows("monkey_playtime", A) == [] and len(await env.rows("monkey_playtime", B)) == 1
         assert await count("forum_posts WHERE author_id = ?", A) == 0  # pending and settled alike
         assert await count("forum_posts WHERE author_id = ?", B) == 1
         greetings = await env.db.fetchall("SELECT newcomer_id, crew_id FROM crew_greetings")

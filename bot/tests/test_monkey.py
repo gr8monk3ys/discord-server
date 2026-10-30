@@ -1,5 +1,5 @@
-"""Tests for logic.realms (pure rules and both wire codecs) and for the transports in
-cogs.realms, which are driven against in-process fake servers on 127.0.0.1 with an
+"""Tests for logic.monkey (pure rules and both wire codecs) and for the transports in
+cogs.monkey, which are driven against in-process fake servers on 127.0.0.1 with an
 ephemeral port and against real files under tmp_path. Nothing leaves this machine."""
 
 import asyncio
@@ -10,8 +10,8 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from cogs import realms as net
-from logic import realms as R
+from cogs import monkey as net
+from logic import monkey as R
 
 TZ = ZoneInfo("America/Los_Angeles")
 SECTION = "\u00a7"
@@ -540,7 +540,7 @@ def test_health_line():
     assert "RCON refused the password" in noisy and "log file not found" in noisy
     assert "whitelist" not in noisy and PASSWORD not in noisy
     half = R.read_setup({R.ENV_ADDRESS: "127.0.0.1", R.ENV_RCON_HOST: "8.8.8.8", R.ENV_RCON_PASSWORD: PASSWORD})
-    assert R.health(half).startswith("ok (status); setting problem: REALMS_RCON_HOST refused")
+    assert R.health(half).startswith("ok (status); setting problem: MONKEY_RCON_HOST refused")
 
 
 # ---------------------------------------------------------------- ping transport against a fake server
@@ -634,7 +634,7 @@ def test_ping_times_out_on_a_silent_server_and_fails_fast_on_a_closed_port():
 
 # ---------------------------------------------------------------- RCON transport against a fake server
 def raw_packet(request_id: int, kind: int, body: str = "") -> bytes:
-    """Built by hand (not with logic.realms), so the test checks the codec, not itself."""
+    """Built by hand (not with logic.monkey), so the test checks the codec, not itself."""
     data = body.encode("utf-8")
     return struct.pack("<iii", len(data) + 10, request_id, kind) + data + b"\x00\x00"
 

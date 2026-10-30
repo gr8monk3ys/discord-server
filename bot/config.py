@@ -94,11 +94,14 @@ GUIDES_FORUM = "📚・guides"
 SETUPS_FORUM = "🖥・setups"
 STAGE_CHANNEL = "🎙・stage"  # watch parties, the monthly Town Hall
 # Monkey SMP (Minecraft bridge): status panel and two-way chat live in this channel.
-REALMS_CHANNEL = "⛏️・monkey-smp"
+MONKEY_CHANNEL = "⛏️・monkey-smp"
 # Its old names: until public_mode.py renames the channel in place, the bridge keeps using it.
-REALMS_CHANNEL_WAS = layout_old_names(REALMS_CHANNEL)
-REALMS_ENV = ("REALMS_ADDRESS", "REALMS_RCON_HOST", "REALMS_RCON_PORT", "REALMS_RCON_PASSWORD", "REALMS_LOG_PATH")
-# SMP watch (cogs/smpwatch.py): opt-in, pinged in the realms channel when 3+ are on Monkey SMP.
+MONKEY_CHANNEL_WAS = layout_old_names(MONKEY_CHANNEL)
+MONKEY_ENV = ("MONKEY_ADDRESS", "MONKEY_RCON_HOST", "MONKEY_RCON_PORT", "MONKEY_RCON_PASSWORD", "MONKEY_LOG_PATH")
+# The same settings under their names from before the rename (the server was The Realms); read
+# when the new name is unset, so an older server/.env keeps working.
+MONKEY_ENV_WAS = {name: "REALMS_" + name.removeprefix("MONKEY_") for name in MONKEY_ENV}
+# SMP watch (cogs/smpwatch.py): opt-in, pinged in the Monkey SMP channel when 3+ are on Monkey SMP.
 SMP_PING_ROLE = "SMP Ping"
 
 
@@ -182,11 +185,12 @@ def clipcast_env(environ=None) -> dict[str, str]:
     """The clipcast settings from the environment (or a mapping, in tests); missing ones are ''."""
     environ = os.environ if environ is None else environ
     return {key: str(environ.get(key) or "").strip() for key in CLIPCAST_ENV}
-def realms_environ(environ=None) -> dict[str, str]:
-    """The Minecraft bridge's settings (REALMS_ENV) as they are in the environment; server/.env
-    was loaded by load_settings(). logic/realms.py validates them; all empty means the bridge is off."""
+def monkey_environ(environ=None) -> dict[str, str]:
+    """The Minecraft bridge's settings (MONKEY_ENV) as they are in the environment; server/.env
+    was loaded by load_settings(). logic/monkey.py validates them; all empty means the bridge is off.
+    A MONKEY_* name that is unset falls back to its old REALMS_* name (MONKEY_ENV_WAS)."""
     environ = os.environ if environ is None else environ
-    return {name: environ.get(name) or "" for name in REALMS_ENV}
+    return {name: environ.get(name) or environ.get(MONKEY_ENV_WAS[name]) or "" for name in MONKEY_ENV}
 # Live site data (cogs/sitedata.py): aggregates for the landing page, written here every 30
 # minutes and pushed by server/publish_site_data.py. SITE_DATA=off stops the bot writing it.
 SITE_DATA_FILE = DATA_DIR / "site" / "stats.json"

@@ -69,7 +69,7 @@ MODULES = [
     ("cogs.supporter", {"members"}),  # Supporter tier: /support, thank-you, stipend, /supporter grant|revoke
     ("cogs.forums", {"message_content"}),  # guides + setups forums: reaction, one-time post reward, recap line
     ("cogs.clipcast", {"members", "message_content"}),  # consented weekly clips to YouTube Shorts, /clipcast
-    ("cogs.realms", {"members", "message_content"}),  # Minecraft bridge: status panel, name links, chat relay, playtime
+    ("cogs.monkey", {"members", "message_content"}),  # Minecraft bridge: status panel, name links, chat relay, playtime
     ("cogs.wrapped", {"members"}),  # /wrapped year-in-review cards (Dec 1 - Jan 15), /wrapped-preview (staff)
     ("cogs.sitedata", {"members", "presences"}),  # landing page live data: aggregates file every 30 min, /sitedata refresh
     ("cogs.appeals", {"message_content"}),  # ban appeals from the website: review cards, /appeals list|code
@@ -103,7 +103,7 @@ PERMISSIONS = discord.Permissions(
     # Moderation autopilot: timeouts and spam cleanup.
     moderate_members=True,
     manage_messages=True,
-    pin_messages=True,  # split from Manage Messages: the Spotlight and the Realms panel are pinned
+    pin_messages=True,  # split from Manage Messages: the Spotlight and the Monkey SMP panel are pinned
     # Stage events (watch parties, Town Hall): Discord asks for Manage Channels, Move Members
     # and Mute Members in the stage channel. The first two are above.
     mute_members=True,

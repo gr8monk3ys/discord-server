@@ -487,16 +487,16 @@ class Ops(commands.Cog):
             log.warning("ops: permission check for /status failed", exc_info=True)
             return "check failed, see bot.log"
 
-    def realms_text(self) -> str | None:
-        """The Minecraft bridge's own health line (cogs/realms.py), or None when that module is off."""
+    def monkey_text(self) -> str | None:
+        """The Minecraft bridge's own health line (cogs/monkey.py), or None when that module is off."""
         get_cog = getattr(self.bot, "get_cog", None)
-        realms = get_cog("Realms") if get_cog is not None else None
-        if realms is None:
+        monkey = get_cog("MonkeySmp") if get_cog is not None else None
+        if monkey is None:
             return None
         try:
-            return realms.health_text()
+            return monkey.health_text()
         except Exception:
-            log.warning("ops: the realms health line for /status failed", exc_info=True)
+            log.warning("ops: the Monkey SMP health line for /status failed", exc_info=True)
             return "check failed, see bot.log"
 
     async def quiet_text(self) -> str | None:
@@ -565,9 +565,9 @@ class Ops(commands.Cog):
         embed.add_field(name="Database", value=O.fmt_bytes(self.db_size()))
         embed.add_field(name="Last backup", value=await self.last_backup_text(), inline=False)
         embed.add_field(name="Permissions", value=self.permissions_text(), inline=False)
-        realms = self.realms_text()
-        if realms is not None:
-            embed.add_field(name="Monkey SMP bridge", value=realms[:1024], inline=False)
+        monkey = self.monkey_text()
+        if monkey is not None:
+            embed.add_field(name="Monkey SMP bridge", value=monkey[:1024], inline=False)
         quiet = await self.quiet_text()
         if quiet is not None:
             embed.add_field(name="Paused prompts", value=quiet[:1024], inline=False)

@@ -2,7 +2,7 @@
 database, no clock of its own (the cog passes `now`).
 
 - Every CHECK_EVERY the cog asks the Minecraft server how many are on, with a Server List Ping
-  (the codec in logic/realms.py) to the public address players join with (DEFAULT_ADDRESS),
+  (the codec in logic/monkey.py) to the public address players join with (DEFAULT_ADDRESS),
   found through its `_minecraft._tcp` SRV record as the game finds it. No RCON, no secrets, and
   no player names: only the count is read.
 - When MIN_ONLINE or more are on, it posts one line in ⛏️・monkey-smp mentioning the opt-in
@@ -24,7 +24,7 @@ from datetime import tzinfo
 
 import config
 from logic.crew import is_quiet
-from logic.realms import DEFAULT_PORT, HOSTNAME_RE, parse_address
+from logic.monkey import DEFAULT_PORT, HOSTNAME_RE, parse_address
 
 MINUTE = 60
 HOUR = 60 * MINUTE

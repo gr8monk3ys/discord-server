@@ -639,6 +639,15 @@ MIGRATIONS = [
         # ledger ref clipcast:<message_id> says which). NULL: still waiting out PAYOUT_DAYS.
         "ALTER TABLE clipcast ADD COLUMN payout_at INTEGER",
     ],
+    [
+        # The Minecraft server was renamed from The Realms to Monkey SMP: its tables, index and
+        # status-panel key follow. Ledger reasons and refs ("realms", "realms:...") keep the old name.
+        "ALTER TABLE realms_links RENAME TO monkey_links",
+        "DROP INDEX realms_links_user",
+        "CREATE UNIQUE INDEX monkey_links_user ON monkey_links (user_id) WHERE state != 'remove'",
+        "ALTER TABLE realms_playtime RENAME TO monkey_playtime",
+        "UPDATE meta SET key = 'monkey:panel' WHERE key = 'realms:panel'",
+    ],
 ]
 
 

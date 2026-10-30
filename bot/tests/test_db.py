@@ -96,3 +96,31 @@ def test_file_database_uses_wal_with_normal_sync(tmp_path):
         finally:
             await d.close()
     run(go())
+
+
+def test_the_realms_tables_and_panel_key_carry_over_to_monkey():
+    async def go():
+        d = dbmod.Database(":memory:")
+        await d.connect()
+        last = len(dbmod.MIGRATIONS) - 1  # the Monkey SMP rename
+        assert "RENAME TO monkey_links" in dbmod.MIGRATIONS[last][0]
+        dbmod.MIGRATIONS, real = dbmod.MIGRATIONS[:last], dbmod.MIGRATIONS
+        try:
+            await d.migrate()
+        finally:
+            dbmod.MIGRATIONS = real
+        await d.execute("INSERT INTO realms_links (name_key, name, user_id, state, linked_at, updated_at)"
+                        " VALUES ('alex', 'Alex', 1, 'ok', 0, 0)")
+        await d.execute("INSERT INTO realms_playtime (user_id, day, seconds) VALUES (1, '2026-10-29', 600)")
+        await d.meta_set("realms:panel", "10:20")
+        assert await d.migrate() == len(dbmod.MIGRATIONS)
+        assert (await d.fetchone("SELECT name FROM monkey_links WHERE user_id = 1"))["name"] == "Alex"
+        assert (await d.fetchone("SELECT seconds FROM monkey_playtime"))["seconds"] == 600
+        assert await d.meta_get("monkey:panel") == "10:20" and await d.meta_get("realms:panel") is None
+        names = {r["name"] for r in await d.fetchall("SELECT name FROM sqlite_master")}
+        assert "monkey_links_user" in names and not any(n.startswith("realms") for n in names)
+        with pytest.raises(Exception):  # one name per member still holds
+            await d.execute("INSERT INTO monkey_links (name_key, name, user_id, state, linked_at, updated_at)"
+                            " VALUES ('steve', 'Steve', 1, 'ok', 0, 0)")
+        await d.close()
+    run(go())

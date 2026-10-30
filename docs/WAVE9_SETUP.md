@@ -113,11 +113,13 @@ on the Minecraft server first.
 
 | Name | Where | Value | Turns on |
 |---|---|---|---|
-| `REALMS_ADDRESS` | `server/.env` | the Minecraft server as the bot's PC sees it, for example `127.0.0.1:25565` | the status panel |
-| `REALMS_RCON_PASSWORD` | `server/.env` | the `rcon.password` from step E | Discord-to-Minecraft chat and the player list |
-| `REALMS_RCON_HOST` | `server/.env` | optional; empty means `127.0.0.1`. Only this machine or a private-network address is accepted | |
-| `REALMS_RCON_PORT` | `server/.env` | optional; empty means `25575` | |
-| `REALMS_LOG_PATH` | `server/.env` | the full path of the Minecraft server's `logs\latest.log`. The bot only reads it | Minecraft-to-Discord chat |
+| `MONKEY_ADDRESS` | `server/.env` | the Minecraft server as the bot's PC sees it, for example `127.0.0.1:25565` | the status panel |
+| `MONKEY_RCON_PASSWORD` | `server/.env` | the `rcon.password` from step E | Discord-to-Minecraft chat and the player list |
+| `MONKEY_RCON_HOST` | `server/.env` | optional; empty means `127.0.0.1`. Only this machine or a private-network address is accepted | |
+| `MONKEY_RCON_PORT` | `server/.env` | optional; empty means `25575` | |
+| `MONKEY_LOG_PATH` | `server/.env` | the full path of the Minecraft server's `logs\latest.log`. The bot only reads it | Minecraft-to-Discord chat |
+
+An older `server/.env` may still use the names from before the server was renamed (`REALMS_ADDRESS` and so on); the bot reads one of those when its `MONKEY_*` name is unset.
 
 Check: a "Monkey SMP" panel appears in ⛏️・monkey-smp and is pinned. `/status` and `/smp status`
 (as staff) have a line "Monkey SMP bridge: ok (status, chat to Minecraft, chat from
@@ -261,7 +263,7 @@ On the Minecraft server, set these lines and restart it:
     white-list=true
 
 - `enable-status` is what the status panel asks. It is on by default.
-- `rcon.password` is the value for `REALMS_RCON_PASSWORD`. Use a long random one.
+- `rcon.password` is the value for `MONKEY_RCON_PASSWORD`. Use a long random one.
 - `white-list=true` keeps out anyone without a pass. Add yourself first (`whitelist add YourName`
   in the server console) so you are not locked out. Staff or the store add pass holders the same
   way; Front Desk never touches the whitelist.

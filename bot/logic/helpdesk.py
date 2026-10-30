@@ -52,7 +52,7 @@ MODULE_CATEGORY = {
     "news": "games", "seasonal": "community", "votehub": "community", "catchup": "utility",
     "gamelink": "stats",
     "crew": "community", "supporter": "community",
-    "realms": "games",
+    "monkey": "games",
     "creators": "creators", "clips": "creators",
     "utility": "utility", "moderation": "utility", "ops": "utility", "helpdesk": "utility", "heartbeat": "utility",
     "houses": "community",

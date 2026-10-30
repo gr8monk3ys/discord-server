@@ -3,11 +3,11 @@ logic/smpwatch.py).
 
 Every 5 minutes the cog looks the public join address up through its SRV record (cached for an
 hour, or until a ping through it fails; no record: the name itself on port 25565) and sends one
-Server List Ping (cogs/realms.py `ping_server`). It reads only the player count. When the logic
+Server List Ping (cogs/monkey.py `ping_server`). It reads only the player count. When the logic
 says so, it posts one line that mentions the opt-in SMP Ping role (members pick it in 🎭・roles;
 `server/public_mode.py --apply` creates it) and saves the state in `meta`.
 
-- Independent of the Minecraft bridge (cogs/realms.py): no REALMS_* settings, no RCON, no
+- Independent of the Minecraft bridge (cogs/monkey.py): no MONKEY_* settings, no RCON, no
   secrets. The address is public.
 - Mentions only that role: `AllowedMentions(roles=[role])`, never @everyone or members.
 - No role or no channel yet: nothing is posted and nothing is saved (logged once), so the first
@@ -29,8 +29,8 @@ import discord
 from discord.ext import commands, tasks
 
 import config
-from cogs.realms import PingError, ping_server
-from logic import realms as R
+from cogs.monkey import PingError, ping_server
+from logic import monkey as R
 from logic import smpwatch as L
 
 log = logging.getLogger(__name__)
@@ -147,21 +147,21 @@ class SmpWatch(commands.Cog):
         guild = self.bot.get_guild(self.bot.settings.guild_id)
         if guild is None:
             return None, None
-        channel = config.match_by_names(guild.text_channels, (config.REALMS_CHANNEL, *config.REALMS_CHANNEL_WAS))
+        channel = config.match_by_names(guild.text_channels, (config.MONKEY_CHANNEL, *config.MONKEY_CHANNEL_WAS))
         return channel, config.match_by_name(guild.roles, config.SMP_PING_ROLE)
 
     async def post(self, online: int) -> bool:
         channel, role = self.where()
         if channel is None or role is None:
             self.once("missing", "smpwatch: no %s %s yet (server/public_mode.py --apply creates it); not pinging",
-                      *(("channel", config.REALMS_CHANNEL) if channel is None else ("role", config.SMP_PING_ROLE)))
+                      *(("channel", config.MONKEY_CHANNEL) if channel is None else ("role", config.SMP_PING_ROLE)))
             return False
         self.said.discard("missing")
         try:
             await channel.send(L.ping_text(role.mention, online, self.settings.address),
                                allowed_mentions=discord.AllowedMentions(everyone=False, users=False, roles=[role]))
         except discord.HTTPException as exc:
-            self.once("send", "smpwatch: could not post in %s (%s)", config.REALMS_CHANNEL, type(exc).__name__)
+            self.once("send", "smpwatch: could not post in %s (%s)", config.MONKEY_CHANNEL, type(exc).__name__)
             return False
         self.said.discard("send")
         return True

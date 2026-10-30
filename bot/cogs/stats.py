@@ -42,7 +42,7 @@ async def opt_out(db, user_id: int, t: int) -> None:
     cooldown or a once-only rule must still hold after `/privacy off` then `on`, so each one
     is either counted in the ledger (never deleted) or its bare row is kept:
 
-    - realms_playtime: deleted. Half hours are paid by ledger ref (member, day, slot), so
+    - monkey_playtime: deleted. Half hours are paid by ledger ref (member, day, slot), so
       played time that starts again from zero re-earns nothing that was paid.
     - forum_posts: deleted. A post pays once by ledger ref and the weekly cap is counted in
       the ledger (cogs/forums.py); a deleted record is never judged again.
@@ -57,7 +57,7 @@ async def opt_out(db, user_id: int, t: int) -> None:
     row that holds a rejoin cooldown."""
     async with db.transaction() as tx:
         await tx.execute("INSERT OR IGNORE INTO privacy_optout (user_id, at) VALUES (?, ?)", (user_id, t))
-        for table in ("voice_sessions", "game_sessions", "message_counts", "xp", "realms_playtime"):
+        for table in ("voice_sessions", "game_sessions", "message_counts", "xp", "monkey_playtime"):
             await tx.execute(f"DELETE FROM {table} WHERE user_id = ?", (user_id,))
         # Starter-quest steps that came from tracking (logic/quests.py).
         await tx.execute("DELETE FROM quest_steps WHERE user_id = ? AND step IN ('say_hi', 'join_voice')",

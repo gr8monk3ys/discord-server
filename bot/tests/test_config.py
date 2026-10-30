@@ -36,7 +36,7 @@ def test_match_ignores_emoji_and_separators():
 
 
 def test_old_names_come_from_layout():
-    assert config.REALMS_CHANNEL_WAS == ("⛏️・realms",)
+    assert config.MONKEY_CHANNEL_WAS == ("⛏️・realms",)
     assert config.layout_old_names("01 · front desk") == ("Welcome",)  # categories too
     assert config.layout_old_names(config.GENERAL_CHANNEL) == ()
     assert config.layout_old_names("not in the layout") == ()
@@ -65,3 +65,14 @@ def test_retired_games_are_known_but_not_listed():
         assert config.known_game_by_key(g.key) is g
     assert config.known_game_by_key("tetris") is None
     assert config.known_game_by_key("valorant").channel_name == "🎯・valorant"
+
+
+def test_monkey_settings_fall_back_to_their_old_realms_names():
+    assert config.MONKEY_ENV_WAS["MONKEY_ADDRESS"] == "REALMS_ADDRESS"
+    old = {"REALMS_ADDRESS": "127.0.0.1:25565", "REALMS_LOG_PATH": "/srv/old.log"}
+    assert config.monkey_environ(old)["MONKEY_ADDRESS"] == "127.0.0.1:25565"
+    both = {**old, "MONKEY_LOG_PATH": "/srv/new.log", "MONKEY_RCON_PORT": ""}
+    got = config.monkey_environ(both)
+    assert got["MONKEY_LOG_PATH"] == "/srv/new.log"  # the new name wins
+    assert got["MONKEY_RCON_PORT"] == "" and got["MONKEY_RCON_PASSWORD"] == ""
+    assert set(got) == set(config.MONKEY_ENV)

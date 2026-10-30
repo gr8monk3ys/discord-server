@@ -1,10 +1,10 @@
 """Monkey SMP: a bridge between this server and the owner's Minecraft server.
 
 Three parts, each on only when its own settings are in the environment (see
-logic/realms.py `read_setup`); with none of them the cog loads, starts nothing and every
+logic/monkey.py `read_setup`); with none of them the cog loads, starts nothing and every
 command says the bridge is not set up.
 
-- Status panel (REALMS_ADDRESS): one message in the realms channel, edited in place when
+- Status panel (MONKEY_ADDRESS): one message in the Monkey SMP channel, edited in place when
   what it shows changes. The server is asked with the Server List Ping protocol every two
   minutes; while it does not answer the polls back off and the panel is edited once.
 - Links: `/smp link <name>` records which Minecraft name is whose (one name per member,
@@ -14,13 +14,13 @@ command says the bridge is not set up.
   changes the server (`R.sendable`). `/smp unlink`, leaving or a ban forget the link and
   nothing else, so a paying player keeps their access. Staff link a name for a member with
   `/smp adopt` and forget one with `/smp remove`.
-- Chat, both ways, in the realms channel. Discord to Minecraft is a `tellraw` over RCON,
+- Chat, both ways, in the Monkey SMP channel. Discord to Minecraft is a `tellraw` over RCON,
   rate limited, never for bots. Minecraft to Discord tails the server log read-only
-  (REALMS_LOG_PATH) in a worker thread and posts at most one batched message every few
+  (MONKEY_LOG_PATH) in a worker thread and posts at most one batched message every few
   seconds, with no pings. An allow-list decides what comes through: a player's words (chat,
   and death and advancement lines, whose text a player or a mod can shape) are relayed only
   when the name is linked to a member who is in the server, not timed out and able to
-  send messages in the realms channel. Everything else stays in the
+  send messages in the Monkey SMP channel. Everything else stays in the
   game. Join and leave lines are the bot's own words and show for anyone.
 - Playtime: a linked member seen in two player-list polls in a row, with at least one other
   player on in both (company, like voice coins: nobody is paid to idle alone), is credited
@@ -47,12 +47,12 @@ import style
 from cogkit import is_staff
 from logic import coins as coin_rules
 from logic import quests
-from logic import realms as R
+from logic import monkey as R
 
 log = logging.getLogger(__name__)
 
 NO_PINGS = discord.AllowedMentions.none()
-PANEL_KEY = "realms:panel"  # meta: "channel_id:message_id" of the status panel
+PANEL_KEY = "monkey:panel"  # meta: "channel_id:message_id" of the status panel
 HEALTH_NAME = "Monkey SMP bridge"  # field name for /status (see `health_text`)
 SLOW_DOWN, NOT_SENT = "⏳", "📴"
 # Posted (rarely) where a player's chat would have been; no name, none of their text.
@@ -135,7 +135,7 @@ async def ping_server(host: str, port: int, timeout: float = R.PING_TIMEOUT) -> 
 
 class Rcon:
     """A Source RCON client: one connection kept open, one command at a time. Packet sizes
-    are checked before anything is read (logic/realms.py), each command has one timeout
+    are checked before anything is read (logic/monkey.py), each command has one timeout
     for connecting, signing in and the reply, and a failure closes the connection."""
 
     def __init__(self, host: str, port: int, password: str, timeout: float = R.RCON_TIMEOUT):
@@ -244,12 +244,12 @@ def parse_ref(raw: str | None) -> tuple[int, int] | None:
         return None
 
 
-class Realms(commands.Cog):
-    realms = app_commands.Group(name="smp", description="Monkey SMP, our Minecraft server", guild_only=True)
+class MonkeySmp(commands.Cog):
+    smp = app_commands.Group(name="smp", description="Monkey SMP, our Minecraft server", guild_only=True)
 
     def __init__(self, bot, environ=None, pinger=None, rcon=None, reader=None):
         self.bot = bot
-        self.setup = R.read_setup(config.realms_environ(environ))
+        self.setup = R.read_setup(config.monkey_environ(environ))
         self.pinger = pinger or ping_server
         if rcon is None and self.setup.rcon_on:
             rcon = Rcon(*self.setup.rcon, self.setup.password)
@@ -283,19 +283,19 @@ class Realms(commands.Cog):
 
     async def cog_load(self) -> None:
         for problem in self.setup.problems:
-            log.warning("realms: %s", problem)
+            log.warning("monkey: %s", problem)
         if not self.setup.any_on:
-            log.info("realms: no REALMS_* settings, the bridge is off")
+            log.info("monkey: no MONKEY_* settings, the bridge is off")
         else:
-            log.info("realms: on (%s)", ", ".join(self.setup.parts()))
+            log.info("monkey: on (%s)", ", ".join(self.setup.parts()))
         try:
             await self.forget_opted_out()
         except Exception:
-            log.exception("realms: clearing opted-out playtime failed")
+            log.exception("monkey: clearing opted-out playtime failed")
         try:
             await self.settle_old_links()
         except Exception:
-            log.exception("realms: tidying links left from the whitelist days failed")
+            log.exception("monkey: tidying links left from the whitelist days failed")
         if self.setup.status_on or self.setup.rcon_on:
             self.poll_loop.start()
         if self.setup.log_on:
@@ -323,7 +323,7 @@ class Realms(commands.Cog):
         guild = self.guild()
         if guild is None:
             return None
-        return config.match_by_names(guild.text_channels, (config.REALMS_CHANNEL, *config.REALMS_CHANNEL_WAS))
+        return config.match_by_names(guild.text_channels, (config.MONKEY_CHANNEL, *config.MONKEY_CHANNEL_WAS))
 
     def once(self, key: str, level: int, text: str, *args) -> None:
         """Log a condition when it starts, not every time it is seen again."""
@@ -346,7 +346,7 @@ class Realms(commands.Cog):
         try:
             await channel.send(embed=style.embed(description=line), allowed_mentions=NO_PINGS)
         except Exception:
-            log.warning("realms: couldn't write to the mod log", exc_info=True)
+            log.warning("monkey: couldn't write to the mod log", exc_info=True)
 
     def help_ref(self) -> str:
         """The help channel as a mention, or its plain name when it can't be found."""
@@ -377,10 +377,10 @@ class Realms(commands.Cog):
             self.rcon_refused = isinstance(exc, RconRefused)
             self.rcon_down_since = self.rcon_down_since or now()
             self.rcon_retry_at = now() + R.RCON_RETRY
-            self.once("rcon", logging.WARNING, "realms: RCON is not answering: %s", exc)
+            self.once("rcon", logging.WARNING, "monkey: RCON is not answering: %s", exc)
             raise
         if self.rcon_down_since is not None:
-            log.info("realms: RCON is answering again")
+            log.info("monkey: RCON is answering again")
         self.rcon_down_since, self.rcon_refused = None, False
         self.said.discard("rcon")
         return reply
@@ -397,7 +397,7 @@ class Realms(commands.Cog):
                 status = R.read_status(await self.pinger(*self.setup.address))
                 reached = True
             except PingError as exc:
-                self.once("ping", logging.INFO, "realms: the server did not answer a status ping (%s)", exc)
+                self.once("ping", logging.INFO, "monkey: the server did not answer a status ping (%s)", exc)
         if self.setup.rcon_on and (reached or not self.setup.status_on):
             try:
                 names = R.parse_list(await self.rcon_call(R.LIST_COMMAND))
@@ -409,7 +409,7 @@ class Realms(commands.Cog):
 
         if reached:
             if self.down_since is not None:
-                log.info("realms: the server is back")
+                log.info("monkey: the server is back")
             self.failures, self.first_failure_at, self.down_since = 0, None, None
             self.said.discard("ping")
             self.status, self.names = status, names or []
@@ -419,7 +419,7 @@ class Realms(commands.Cog):
             if self.failures >= R.OFFLINE_AFTER and self.down_since is None:
                 self.down_since = self.first_failure_at
                 self.status, self.names = None, []
-                log.info("realms: the server is not answering; polling less often until it does")
+                log.info("monkey: the server is not answering; polling less often until it does")
         self.next_poll_at = t + R.poll_delay(self.failures)
 
         steps = [("playtime", self.credit_playtime(names if reached else None, t))]
@@ -432,7 +432,7 @@ class Realms(commands.Cog):
             try:
                 await step
             except Exception:
-                log.exception("realms: %s failed", what)
+                log.exception("monkey: %s failed", what)
 
     @tasks.loop(seconds=R.TICK)
     async def poll_loop(self) -> None:
@@ -440,7 +440,7 @@ class Realms(commands.Cog):
             if now() >= self.next_poll_at:
                 await self.poll_once()
         except Exception:
-            log.exception("realms: poll failed")
+            log.exception("monkey: poll failed")
 
     @poll_loop.before_loop
     async def before_poll(self) -> None:
@@ -451,8 +451,8 @@ class Realms(commands.Cog):
         """Post the panel or edit it in place. Returns missing / skipped / edited / posted / failed."""
         channel = self.channel()
         if channel is None:
-            self.once("channel", logging.INFO, "realms: no %s channel yet (server/public_mode.py creates it)",
-                      config.REALMS_CHANNEL)
+            self.once("channel", logging.INFO, "monkey: no %s channel yet (server/public_mode.py creates it)",
+                      config.MONKEY_CHANNEL)
             return "missing"
         signature = R.panel_signature(self.status, self.names, self.down_since)
         ref = parse_ref(await self.meta_get(PANEL_KEY))
@@ -473,12 +473,12 @@ class Realms(commands.Cog):
             except discord.NotFound:
                 pass  # deleted: post a fresh one
             except discord.HTTPException:
-                self.once("panel", logging.WARNING, "realms: editing the status panel failed")
+                self.once("panel", logging.WARNING, "monkey: editing the status panel failed")
                 return "failed"
         try:
             sent = await channel.send(embed=embed, allowed_mentions=NO_PINGS)
         except discord.HTTPException:
-            self.once("panel", logging.WARNING, "realms: posting the status panel failed")
+            self.once("panel", logging.WARNING, "monkey: posting the status panel failed")
             return "failed"
         await self.meta_set(PANEL_KEY, f"{channel.id}:{sent.id}")
         self.last_signature = signature
@@ -486,13 +486,13 @@ class Realms(commands.Cog):
         try:
             await sent.pin(reason="Monkey SMP status panel")  # chat shares the channel
         except Exception:
-            log.info("realms: couldn't pin the status panel")
+            log.info("monkey: couldn't pin the status panel")
         return "posted"
 
     # ------------------------------------------------------------ playtime and coins
     async def forget_opted_out(self) -> int:
         """Playtime is activity tracking: rows of members who turned tracking off go."""
-        return await self.db.execute("DELETE FROM realms_playtime WHERE user_id IN (SELECT user_id FROM privacy_optout)")
+        return await self.db.execute("DELETE FROM monkey_playtime WHERE user_id IN (SELECT user_id FROM privacy_optout)")
 
     async def credit_playtime(self, names, t: int) -> int:
         """Credit the time since the last good poll to linked members seen in both, and pay
@@ -514,7 +514,7 @@ class Realms(commands.Cog):
         guild = self.guild()
         day = R.day_key(t, self.tz)
         paid = 0
-        for row in await self.db.fetchall("SELECT user_id, name_key FROM realms_links WHERE state = 'ok'"):
+        for row in await self.db.fetchall("SELECT user_id, name_key FROM monkey_links WHERE state = 'ok'"):
             uid = row["user_id"]
             if row["name_key"] not in present or guild is None or guild.get_member(uid) is None:
                 continue
@@ -522,10 +522,10 @@ class Realms(commands.Cog):
                 # The opt-out check is part of the write (same reason as cogs/stats.py).
                 if await tx.fetchone("SELECT 1 FROM privacy_optout WHERE user_id = ?", (uid,)) is not None:
                     continue
-                old = await tx.fetchone("SELECT seconds FROM realms_playtime WHERE user_id = ? AND day = ?", (uid, day))
+                old = await tx.fetchone("SELECT seconds FROM monkey_playtime WHERE user_id = ? AND day = ?", (uid, day))
                 before = old["seconds"] if old else 0
                 after = before + seconds
-                await tx.execute("INSERT INTO realms_playtime (user_id, day, seconds) VALUES (?, ?, ?)"
+                await tx.execute("INSERT INTO monkey_playtime (user_id, day, seconds) VALUES (?, ?, ?)"
                                  " ON CONFLICT (user_id, day) DO UPDATE SET seconds = excluded.seconds",
                                  (uid, day, after))
                 if not R.established(uid, t):
@@ -541,21 +541,21 @@ class Realms(commands.Cog):
         forgotten, and an add that was still waiting is a plain link like any other. Nothing
         is sent to the server. Returns the rows changed (0 once done; safe on every load)."""
         async with self.db.transaction() as tx:
-            gone = await tx.execute("DELETE FROM realms_links WHERE state = 'remove'")
-            kept = await tx.execute("UPDATE realms_links SET state = 'ok', attempts = 0 WHERE state != 'ok'")
+            gone = await tx.execute("DELETE FROM monkey_links WHERE state = 'remove'")
+            kept = await tx.execute("UPDATE monkey_links SET state = 'ok', attempts = 0 WHERE state != 'ok'")
             changed = max(gone.rowcount, 0) + max(kept.rowcount, 0)
         if changed:
-            log.info("realms: tidied %s link row(s) left from the whitelist days", changed)
+            log.info("monkey: tidied %s link row(s) left from the whitelist days", changed)
         return changed
 
     async def forget_link(self, user_id: int) -> dict | None:
         """Delete the member's link and return it; None when they had none. That is all:
         their access to Monkey SMP is staff's business, not the bot's."""
         async with self.db.transaction() as tx:
-            row = await tx.fetchone("SELECT * FROM realms_links WHERE user_id = ?", (user_id,))
+            row = await tx.fetchone("SELECT * FROM monkey_links WHERE user_id = ?", (user_id,))
             if row is None:
                 return None
-            await tx.execute("DELETE FROM realms_links WHERE user_id = ?", (user_id,))
+            await tx.execute("DELETE FROM monkey_links WHERE user_id = ?", (user_id,))
         return dict(row)
 
     async def drop_member(self, user_id: int, why: str) -> bool:
@@ -575,7 +575,7 @@ class Realms(commands.Cog):
         if guild is None or not getattr(guild, "chunked", False):
             return 0
         gone = 0
-        for row in await self.db.fetchall("SELECT user_id FROM realms_links"):
+        for row in await self.db.fetchall("SELECT user_id FROM monkey_links"):
             if guild.get_member(row["user_id"]) is None:
                 gone += await self.drop_member(row["user_id"], "is no longer here")
         return gone
@@ -586,7 +586,7 @@ class Realms(commands.Cog):
             if member.guild.id == self.bot.settings.guild_id:
                 await self.drop_member(member.id, "left")
         except Exception:
-            log.exception("realms: handling a leave failed")
+            log.exception("monkey: handling a leave failed")
 
     @commands.Cog.listener()
     async def on_member_ban(self, guild, user) -> None:
@@ -594,24 +594,24 @@ class Realms(commands.Cog):
             if guild.id == self.bot.settings.guild_id:
                 await self.drop_member(user.id, "was banned")
         except Exception:
-            log.exception("realms: handling a ban failed")
+            log.exception("monkey: handling a ban failed")
 
     async def save_link(self, member_id: int, name: str) -> str | None:
         """Record `name` as the member's. None when it was saved; otherwise why not:
         "already" (this name is theirs), "have_one" (they linked another) or "taken"."""
         key, t = R.name_key(name), now()
         async with self.db.transaction() as tx:
-            mine = await tx.fetchone("SELECT name_key FROM realms_links WHERE user_id = ?", (member_id,))
+            mine = await tx.fetchone("SELECT name_key FROM monkey_links WHERE user_id = ?", (member_id,))
             if mine is not None:
                 return "already" if mine["name_key"] == key else "have_one"
-            if await tx.fetchone("SELECT 1 FROM realms_links WHERE name_key = ?", (key,)) is not None:
+            if await tx.fetchone("SELECT 1 FROM monkey_links WHERE name_key = ?", (key,)) is not None:
                 return "taken"
-            await tx.execute("INSERT INTO realms_links (name_key, name, user_id, state, attempts, linked_at,"
+            await tx.execute("INSERT INTO monkey_links (name_key, name, user_id, state, attempts, linked_at,"
                              " updated_at) VALUES (?, ?, ?, 'ok', 0, ?, ?)", (key, name, member_id, t, t))
         return None
 
     async def linked_name(self, user_id: int) -> str | None:
-        row = await self.db.fetchone("SELECT name FROM realms_links WHERE user_id = ?", (user_id,))
+        row = await self.db.fetchone("SELECT name FROM monkey_links WHERE user_id = ?", (user_id,))
         return row["name"] if row is not None else None
 
     async def link_member(self, member, name: str) -> str:
@@ -650,28 +650,28 @@ class Realms(commands.Cog):
         if problem == "have_one":
             return f"{member.mention} already has `{await self.linked_name(member.id)}` linked. `/smp remove` it first."
         if problem == "taken":
-            row = await self.db.fetchone("SELECT user_id FROM realms_links WHERE name_key = ?", (R.name_key(name),))
+            row = await self.db.fetchone("SELECT user_id FROM monkey_links WHERE name_key = ?", (R.name_key(name),))
             return f"`{name}` is linked to <@{row['user_id']}>. `/smp remove` that link first."
         if problem == "already":
             return f"`{name}` is already linked to {member.mention}."
-        log.info("realms: %s linked a name for %s", mod.id, member.id)
+        log.info("monkey: %s linked a name for %s", mod.id, member.id)
         await self.mod_log(f"<@{mod.id}> linked the Minecraft name `{name}` to <@{member.id}> (`/smp adopt`)")
         return (f"Linked `{name}` to {member.mention}. A link gives no access to Monkey SMP; that is a pass, "
                 "granted separately.")
 
     # ------------------------------------------------------------ commands
-    @realms.command(name="link", description="Connect your Minecraft name for Monkey SMP chat and playtime")
+    @smp.command(name="link", description="Connect your Minecraft name for Monkey SMP chat and playtime")
     @app_commands.describe(minecraft_name="Your Minecraft Java name (3 to 16 letters, digits or _)")
     async def link(self, interaction: discord.Interaction, minecraft_name: app_commands.Range[str, 1, 32]) -> None:
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
             text = await self.link_member(interaction.user, minecraft_name)
         except Exception:
-            log.exception("realms: link failed")
+            log.exception("monkey: link failed")
             text = MESSAGES["failed"]
         await interaction.followup.send(text, ephemeral=True, allowed_mentions=NO_PINGS)
 
-    @realms.command(name="unlink", description="Forget your linked Minecraft name (your server access stays)")
+    @smp.command(name="unlink", description="Forget your linked Minecraft name (your server access stays)")
     async def unlink(self, interaction: discord.Interaction) -> None:
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
@@ -682,11 +682,11 @@ class Realms(commands.Cog):
                 text = MESSAGES["unlinked"].format(name=row["name"])
                 await self.mod_log(f"<@{interaction.user.id}> unlinked the Minecraft name `{row['name']}`")
         except Exception:
-            log.exception("realms: unlink failed")
+            log.exception("monkey: unlink failed")
             text = MESSAGES["failed"]
         await interaction.followup.send(text, ephemeral=True, allowed_mentions=NO_PINGS)
 
-    @realms.command(name="remove", description="Forget a member's linked Minecraft name (mods)")
+    @smp.command(name="remove", description="Forget a member's linked Minecraft name (mods)")
     @app_commands.describe(member="Whose link to remove")
     async def remove(self, interaction: discord.Interaction, member: discord.Member) -> None:
         if not is_staff(interaction.user):
@@ -697,7 +697,7 @@ class Realms(commands.Cog):
         text = f"Removed {member.mention}'s Minecraft link." if had else f"{member.mention} has no Minecraft link."
         await interaction.followup.send(text, ephemeral=True, allowed_mentions=NO_PINGS)
 
-    @realms.command(name="adopt", description="Link a Minecraft name to a member (mods)")
+    @smp.command(name="adopt", description="Link a Minecraft name to a member (mods)")
     @app_commands.describe(member="Whose Minecraft name it is", minecraft_name="Their Minecraft Java name")
     async def adopt(self, interaction: discord.Interaction, member: discord.Member,
                     minecraft_name: app_commands.Range[str, 1, 32]) -> None:
@@ -708,16 +708,16 @@ class Realms(commands.Cog):
         try:
             text = await self.adopt_member(interaction.user, member, minecraft_name)
         except Exception:
-            log.exception("realms: adopt failed")
+            log.exception("monkey: adopt failed")
             text = MESSAGES["failed"]
         await interaction.followup.send(text, ephemeral=True, allowed_mentions=NO_PINGS)
 
     async def played(self, user_id: int, since_day: str) -> int:
-        row = await self.db.fetchone("SELECT COALESCE(SUM(seconds), 0) AS n FROM realms_playtime"
+        row = await self.db.fetchone("SELECT COALESCE(SUM(seconds), 0) AS n FROM monkey_playtime"
                                      " WHERE user_id = ? AND day >= ?", (user_id, since_day))
         return row["n"]
 
-    @realms.command(name="status", description="Is Monkey SMP up, who is on, and your own link and playtime")
+    @smp.command(name="status", description="Is Monkey SMP up, who is on, and your own link and playtime")
     async def status_command(self, interaction: discord.Interaction) -> None:
         if not self.setup.any_on:
             await interaction.response.send_message(MESSAGES["off"], ephemeral=True)
@@ -750,10 +750,10 @@ class Realms(commands.Cog):
         if is_staff(interaction.user):
             lines.append(f"\n**{HEALTH_NAME}**: {self.health_text()}")
         embed = style.embed(title="Monkey SMP", description="\n".join(lines)[:4000],
-                            footer=style.label("realms", "status"))
+                            footer=style.label("monkey-smp", "status"))
         await interaction.response.send_message(embed=embed, ephemeral=True, allowed_mentions=NO_PINGS)
 
-    @realms.command(name="top", description="Who played the most on Monkey SMP this week")
+    @smp.command(name="top", description="Who played the most on Monkey SMP this week")
     async def top(self, interaction: discord.Interaction) -> None:
         if not self.setup.any_on:
             await interaction.response.send_message(MESSAGES["off"], ephemeral=True)
@@ -761,14 +761,14 @@ class Realms(commands.Cog):
         guild = interaction.guild or self.guild()
         since = R.week_start(now(), self.tz).isoformat()
         rows = await self.db.fetchall(
-            "SELECT user_id, SUM(seconds) AS n FROM realms_playtime WHERE day >= ?"
+            "SELECT user_id, SUM(seconds) AS n FROM monkey_playtime WHERE day >= ?"
             " AND user_id NOT IN (SELECT user_id FROM privacy_optout) GROUP BY user_id HAVING n > 0"
             " ORDER BY n DESC, user_id LIMIT 50", (since,))
         here = [r for r in rows if guild is not None and guild.get_member(r["user_id"]) is not None][:R.TOP_SIZE]
         text = "\n".join(f"`{i:>2}` <@{r['user_id']}> · {R.fmt_duration(r['n'])}" for i, r in enumerate(here, 1))
         embed = style.embed(title="Monkey SMP · playtime this week",
                             description=text or "Nobody has played this week yet.",
-                            footer=style.label("realms", "top"))
+                            footer=style.label("monkey-smp", "top"))
         await interaction.response.send_message(embed=embed, allowed_mentions=NO_PINGS)
 
     # ------------------------------------------------------------ Discord -> Minecraft
@@ -824,7 +824,7 @@ class Realms(commands.Cog):
         try:
             await self.relay_to_minecraft(message)
         except Exception:
-            self.once("relay", logging.ERROR, "realms: relaying a message to Minecraft failed")
+            self.once("relay", logging.ERROR, "monkey: relaying a message to Minecraft failed")
 
     # ------------------------------------------------------------ Minecraft -> Discord
     async def speaker(self, name: str) -> int | None:
@@ -832,20 +832,20 @@ class Realms(commands.Cog):
         linked is None, and None is never relayed. (Only 'ok' rows count: anything else is a
         leftover from the whitelist days that `settle_old_links` has not tidied yet.)"""
         row = await self.db.fetchone(
-            "SELECT user_id FROM realms_links WHERE name_key = ? AND state = 'ok'", (R.name_key(name),))
+            "SELECT user_id FROM monkey_links WHERE name_key = ? AND state = 'ok'", (R.name_key(name),))
         return row["user_id"] if row is not None else None
 
     async def may_relay(self, name: str) -> bool:
         """The allow-list in front of everything a player can put words into: relayed only
         when the name is linked to a member who is in the server right now, not
-        timed out, and able to send messages in the realms channel. Everything else stays in
+        timed out, and able to send messages in the Monkey SMP channel. Everything else stays in
         the game, so a second or unlinked Minecraft account is no way around a mute, and
         claiming somebody's name changes nothing for them."""
         user_id = await self.speaker(name)
         return user_id is not None and await self.may_speak(user_id)
 
     async def may_speak(self, user_id: int) -> bool:
-        """Is this member in the server and allowed to send messages in the realms channel?
+        """Is this member in the server and allowed to send messages in the Monkey SMP channel?
         (discord.py's permissions_for takes Send Messages from a timed-out member, and covers
         channel overwrites and a muted role too.) Anything that can't be confirmed is a no."""
         try:
@@ -859,7 +859,7 @@ class Realms(commands.Cog):
                 return False
             return bool(channel.permissions_for(member).send_messages)
         except Exception:
-            log.debug("realms: couldn't work out what %s may do in the realms channel", user_id, exc_info=True)
+            log.debug("monkey: couldn't work out what %s may do in the Monkey SMP channel", user_id, exc_info=True)
             return False
 
     async def fetched_member(self, guild, user_id: int):
@@ -899,7 +899,7 @@ class Realms(commands.Cog):
         if result is None:
             if not self.log_missing:
                 self.log_missing = True
-                log.info("realms: the server log can't be read right now; chat from Minecraft is waiting")
+                log.info("monkey: the server log can't be read right now; chat from Minecraft is waiting")
         else:
             self.log_missing = False
             self.tail, data, reset = result
@@ -939,7 +939,7 @@ class Realms(commands.Cog):
         try:
             await channel.send(text[:2000], allowed_mentions=NO_PINGS)
         except discord.HTTPException:
-            self.once("send", logging.WARNING, "realms: posting Minecraft chat failed")
+            self.once("send", logging.WARNING, "monkey: posting Minecraft chat failed")
             return False
         self.said.discard("send")
         return True
@@ -949,7 +949,7 @@ class Realms(commands.Cog):
         try:
             await self.relay_once()
         except Exception:
-            self.once("tail", logging.ERROR, "realms: reading the server log failed")
+            self.once("tail", logging.ERROR, "monkey: reading the server log failed")
 
     @relay_loop.before_loop
     async def before_relay(self) -> None:
@@ -957,4 +957,4 @@ class Realms(commands.Cog):
 
 
 async def setup(bot) -> None:
-    await bot.add_cog(Realms(bot))
+    await bot.add_cog(MonkeySmp(bot))
