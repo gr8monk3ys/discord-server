@@ -538,6 +538,8 @@ POSTS = {
                 "`/smp unlink`  forgets your linked name",
                 "`/smp status`  is the server up, who's on, and your own link and playtime",
                 "`/smp top`  who played the most this week",
+                "`/smp nudges on`  one DM with what you missed if you're off the server for a week "
+                "(`off` stops it)",
                 "Only you see the answers, except `/smp top`. Take {@SMP Ping} in {#roles} for a ping when "
                 "three or more players are on.",
                 "",

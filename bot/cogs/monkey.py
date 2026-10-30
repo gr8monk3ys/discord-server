@@ -26,6 +26,9 @@ command says the bridge is not set up.
   player on in both (company, like voice coins: nobody is paid to idle alone), is credited
   the time between them; every full half hour pays a few coins up to a daily cap (refs keyed
   on member, day and slot). `/smp top` ranks the week; tracking opt-out is respected.
+- Nudges (SMP_NUDGES=on, off by default; rules in logic/smpnudge.py): a member who ran
+  `/smp nudges on` and hasn't been in a player-list poll for a week gets one DM about what
+  happened since. The same polls record when they were last seen; nobody else is recorded.
 
 This file owns the sockets and the file handle. Nothing here ever starts, stops or
 configures the Minecraft server or changes its whitelist, and the RCON password is never
@@ -36,6 +39,7 @@ import asyncio
 import logging
 import os
 import time
+from datetime import datetime
 
 import discord
 from discord import app_commands
@@ -45,9 +49,13 @@ import config
 import economy
 import style
 from cogkit import is_staff
+from logic import botm as B
 from logic import coins as coin_rules
 from logic import quests
 from logic import monkey as R
+from logic import smpnudge as N
+from logic import smpwatch as W
+from logic.crew import is_quiet
 
 log = logging.getLogger(__name__)
 
@@ -73,7 +81,20 @@ MESSAGES = {
     "none": "You haven't linked a Minecraft name. `/smp link` connects one for chat and playtime.",
     "unlinked": "Unlinked `{name}`. Your access to Monkey SMP doesn't change.",
     "failed": "Something went wrong on my side. Try again in a minute.",
+    "nudges_off_here": "Nudges aren't switched on for this server.",
+    "nudges_link": "Link your Minecraft name first (`/smp link`): that's how I can tell when you were last on.",
+    "nudges_privacy": ("You've turned tracking off (`/privacy`), so I don't keep when you were last on and "
+                       "can't tell when you've been away."),
+    "nudges_on": ("Nudges on. If you're off Monkey SMP for a week, I'll DM you once with what you missed, and not "
+                  "again until you've played and been away another week. Your DMs from server members need to be "
+                  "open. `/smp nudges off` stops them."),
+    "nudges_off": "Nudges off. I won't DM you about Monkey SMP.",
+    "nudges_were_off": "Nudges were already off.",
 }
+# Appended to the /smp link reply while nudges are switched on (logic/smpnudge.py).
+NUDGE_HINT = " Away for a while? `/smp nudges on` and I'll DM you once with what you missed."
+NUDGE_CHOICES = [app_commands.Choice(name="on: DM me once if I'm away a week", value="on"),
+                 app_commands.Choice(name="off: no DMs", value="off")]
 # How a member gets onto Monkey SMP. {help} is the help channel (a mention when it exists).
 ACCESS = f"for that you need a Monkey SMP pass, from <{R.PASS_URL}> or through a ticket in {{help}}."
 
@@ -236,6 +257,10 @@ def read_log(path: str, state: R.TailState) -> tuple[R.TailState, bytes, bool] |
     return R.TailState(info.st_ino, start + len(data)), data, reset
 
 
+def esc(text: str) -> str:
+    return discord.utils.escape_mentions(discord.utils.escape_markdown(text or ""))
+
+
 def parse_ref(raw: str | None) -> tuple[int, int] | None:
     try:
         channel_id, message_id = (raw or "").split(":")
@@ -255,6 +280,9 @@ class MonkeySmp(commands.Cog):
             rcon = Rcon(*self.setup.rcon, self.setup.password)
         self.rcon = rcon
         self.reader = reader or read_log
+        environ = os.environ if environ is None else environ
+        self.nudges_on = N.enabled(environ)
+        self.join_address = W.read_settings(environ).address  # the public address players type
         # Everything below is working state that may reset on restart; what must last
         # (links, playtime, the panel's message id) is in SQLite.
         self.next_poll_at = 0
@@ -280,6 +308,8 @@ class MonkeySmp(commands.Cog):
         self.fetched: dict[int, tuple[int, object | None, int]] = {}  # uid -> (asked at, member, good for)
         self.hinted: dict[str, int] = {}  # name key -> when "link to be heard here" was last said for it
         self.said: set[str] = set()  # log lines already written once (see `once`)
+        self.last_nudge_at = 0
+        self.blind_at: int | None = None  # last poll whose player list may have left someone out
 
     async def cog_load(self) -> None:
         for problem in self.setup.problems:
@@ -288,6 +318,8 @@ class MonkeySmp(commands.Cog):
             log.info("monkey: no MONKEY_* settings, the bridge is off")
         else:
             log.info("monkey: on (%s)", ", ".join(self.setup.parts()))
+        if self.nudges_on:
+            log.info("monkey: nudges on (%s=on)", N.ENV_ON)
         try:
             await self.forget_opted_out()
         except Exception:
@@ -404,8 +436,10 @@ class MonkeySmp(commands.Cog):
                 reached = True
             except RconError:
                 pass
+        complete = names is not None
         if names is None and status is not None:
             names = list(status.names)  # the ping's sample: complete on a small server
+            complete = len(names) >= status.online
 
         if reached:
             if self.down_since is not None:
@@ -423,6 +457,11 @@ class MonkeySmp(commands.Cog):
         self.next_poll_at = t + R.poll_delay(self.failures)
 
         steps = [("playtime", self.credit_playtime(names if reached else None, t))]
+        if self.nudges_on and reached:
+            steps.append(("last seen", self.record_seen(names or [], complete, t)))
+            if t - self.last_nudge_at >= N.CHECK_EVERY:
+                self.last_nudge_at = t
+                steps.append(("nudges", self.send_nudges(t)))
         if t - self.last_sweep_at >= R.SWEEP_EVERY:
             self.last_sweep_at = t
             steps.append(("member sweep", self.sweep_departed()))
@@ -491,7 +530,9 @@ class MonkeySmp(commands.Cog):
 
     # ------------------------------------------------------------ playtime and coins
     async def forget_opted_out(self) -> int:
-        """Playtime is activity tracking: rows of members who turned tracking off go."""
+        """Playtime is activity tracking: rows of members who turned tracking off go, and so
+        does their nudge row (it holds when they were last seen)."""
+        await self.db.execute("DELETE FROM monkey_nudges WHERE user_id IN (SELECT user_id FROM privacy_optout)")
         return await self.db.execute("DELETE FROM monkey_playtime WHERE user_id IN (SELECT user_id FROM privacy_optout)")
 
     async def credit_playtime(self, names, t: int) -> int:
@@ -556,6 +597,7 @@ class MonkeySmp(commands.Cog):
             if row is None:
                 return None
             await tx.execute("DELETE FROM monkey_links WHERE user_id = ?", (user_id,))
+            await tx.execute("DELETE FROM monkey_nudges WHERE user_id = ?", (user_id,))
         return dict(row)
 
     async def drop_member(self, user_id: int, why: str) -> bool:
@@ -634,7 +676,7 @@ class MonkeySmp(commands.Cog):
         if problem is not None:
             return MESSAGES[problem].format(name=await self.linked_name(member.id) or name, help=self.help_ref())
         await self.mod_log(f"<@{member.id}> linked the Minecraft name `{name}`")
-        return MESSAGES["linked"].format(name=name, access=self.access_text())
+        return MESSAGES["linked"].format(name=name, access=self.access_text()) + (NUDGE_HINT if self.nudges_on else "")
 
     async def adopt_member(self, mod, member, name: str) -> str:
         """/smp adopt: staff link a name for a member, without the account-age bar or the
@@ -658,6 +700,120 @@ class MonkeySmp(commands.Cog):
         await self.mod_log(f"<@{mod.id}> linked the Minecraft name `{name}` to <@{member.id}> (`/smp adopt`)")
         return (f"Linked `{name}` to {member.mention}. A link gives no access to Monkey SMP; that is a pass, "
                 "granted separately.")
+
+    # ------------------------------------------------------------ nudges (logic/smpnudge.py)
+    async def record_seen(self, names, complete: bool, t: int) -> int:
+        """Stamp the members in this poll's player list as seen now: only members who opted in to
+        nudges, are linked, and haven't turned tracking off. A list that may be missing names (a
+        status sample shorter than the count) holds nudges back for N.AWAY. Returns rows stamped."""
+        if not complete:
+            self.blind_at = t
+        keys = sorted({R.name_key(n) for n in names})
+        if not keys:
+            return 0
+        marks = ", ".join("?" * len(keys))
+        return await self.db.execute(
+            "UPDATE monkey_nudges SET last_seen_at = ? WHERE user_id IN"
+            f" (SELECT user_id FROM monkey_links WHERE state = 'ok' AND name_key IN ({marks}))"
+            " AND user_id NOT IN (SELECT user_id FROM privacy_optout)", (t, *keys))
+
+    async def nudge_candidates(self) -> list[N.Candidate]:
+        rows = await self.db.fetchall(
+            "SELECT n.user_id, n.last_seen_at, n.nudged_for, n.dm_closed_at,"
+            " l.user_id IS NOT NULL AS linked, p.user_id IS NULL AS tracking FROM monkey_nudges n"
+            " LEFT JOIN monkey_links l ON l.user_id = n.user_id AND l.state = 'ok'"
+            " LEFT JOIN privacy_optout p ON p.user_id = n.user_id")
+        return [N.Candidate(r["user_id"], r["last_seen_at"], r["nudged_for"], r["dm_closed_at"],
+                            bool(r["linked"]), bool(r["tracking"])) for r in rows]
+
+    async def nudge_digest(self, user_id: int, since: int, t: int) -> N.Digest:
+        """What happened on Monkey SMP since `since`, from what the bot already keeps: other members'
+        playtime (counts only, no names), approved factions, Base of the Month, upcoming events."""
+        guild = self.guild()
+        played = await self.db.fetchone(
+            "SELECT COUNT(DISTINCT user_id) AS players, COALESCE(SUM(seconds), 0) AS seconds FROM monkey_playtime"
+            " WHERE day > ? AND user_id != ? AND user_id NOT IN (SELECT user_id FROM privacy_optout)",
+            (R.day_key(since, self.tz), user_id))
+        factions = await self.db.fetchall(
+            "SELECT name FROM factions WHERE status = 'approved' AND decided_at > ? ORDER BY decided_at, id",
+            (since,))
+        botm = B.load(await self.db.meta_get(B.STATE_KEY))
+        seen_month = B.month_key(datetime.fromtimestamp(since, self.tz))
+        events = []
+        for event in getattr(guild, "scheduled_events", None) or []:
+            start = getattr(event, "start_time", None)
+            if start is not None and getattr(event, "status", None) == discord.EventStatus.scheduled:
+                events.append((esc(event.name), int(start.timestamp())))
+        channel = self.channel()
+        return N.Digest(
+            away_days=max((t - since) // N.DAY, 1),
+            players=played["players"], hours=played["seconds"] // 3600,
+            factions=tuple(esc(r["name"]) for r in factions[:N.SHOWN]), faction_count=len(factions),
+            botm_month=N.month_label(botm.month) if botm.winners and botm.month > seen_month else None,
+            events=tuple(N.smp_events(events, t)),
+            online_now=self.status.online if self.status is not None else len(self.names),
+            address=self.join_address,
+            channel=channel.mention if channel is not None else f"#{config.MONKEY_CHANNEL}")
+
+    async def send_nudges(self, t: int) -> int:
+        """One pass: DM the members whose nudge is due (logic/smpnudge.py). Returns DMs sent."""
+        if is_quiet(t, self.tz, N.QUIET) or self.down_since is not None:
+            return 0
+        if self.blind_at is not None and t - self.blind_at < N.AWAY:
+            self.once("nudge-blind", logging.INFO, "monkey: nudges wait: the player list may be incomplete "
+                      "(no RCON, and a status sample shorter than the count)")
+            return 0
+        guild = self.guild()
+        if guild is None:
+            return 0
+        sent = 0
+        for c in N.pick(await self.nudge_candidates(), t):
+            member = guild.get_member(c.user_id) or await self.fetched_member(guild, c.user_id)
+            if member is None:
+                continue
+            # Claim the lapse first, so a crash mid-send can never mean a second DM for it.
+            claimed = await self.db.execute(
+                "UPDATE monkey_nudges SET nudged_for = last_seen_at, nudged_at = ? WHERE user_id = ?"
+                " AND last_seen_at = ? AND dm_closed_at IS NULL", (t, c.user_id, c.last_seen_at))
+            if not claimed:
+                continue
+            try:
+                text = N.message(await self.nudge_digest(c.user_id, c.last_seen_at, t))
+                await member.send(text[:2000], allowed_mentions=NO_PINGS)
+            except discord.Forbidden:
+                # DMs closed (or the bot is blocked): record it and stop trying.
+                await self.db.execute("UPDATE monkey_nudges SET dm_closed_at = ? WHERE user_id = ?", (t, c.user_id))
+                continue
+            except Exception:
+                # Not their doing (Discord had a moment): give the lapse back for the next pass.
+                await self.db.execute("UPDATE monkey_nudges SET nudged_for = ?, nudged_at = NULL WHERE user_id = ?",
+                                      (c.nudged_for, c.user_id))
+                log.warning("monkey: a nudge DM failed; trying again next pass", exc_info=True)
+                continue
+            sent += 1
+        if sent:
+            log.info("monkey: sent %s nudge(s)", sent)
+        return sent
+
+    async def set_nudges(self, member, on: bool) -> str:
+        """/smp nudges on|off: returns the reply."""
+        if not self.nudges_on:
+            return MESSAGES["nudges_off_here"]
+        if not on:
+            gone = await self.db.execute("DELETE FROM monkey_nudges WHERE user_id = ?", (member.id,))
+            return MESSAGES["nudges_off"] if gone else MESSAGES["nudges_were_off"]
+        if not await self.db.tracking_allowed(member.id):
+            return MESSAGES["nudges_privacy"]
+        if await self.linked_name(member.id) is None:
+            return MESSAGES["nudges_link"]
+        t = now()
+        last = await self.db.fetchone("SELECT MAX(day) AS day FROM monkey_playtime WHERE user_id = ?", (member.id,))
+        seen, nudged = N.opt_in_state(last["day"] if last else None, t, self.tz)
+        # Turning it on again keeps what is known and clears a DM refusal (they may have opened DMs).
+        await self.db.execute(
+            "INSERT INTO monkey_nudges (user_id, opted_at, last_seen_at, nudged_for) VALUES (?, ?, ?, ?)"
+            " ON CONFLICT (user_id) DO UPDATE SET dm_closed_at = NULL", (member.id, t, seen, nudged))
+        return MESSAGES["nudges_on"]
 
     # ------------------------------------------------------------ commands
     @smp.command(name="link", description="Connect your Minecraft name for Monkey SMP chat and playtime")
@@ -770,6 +926,18 @@ class MonkeySmp(commands.Cog):
                             description=text or "Nobody has played this week yet.",
                             footer=style.label("monkey-smp", "top"))
         await interaction.response.send_message(embed=embed, allowed_mentions=NO_PINGS)
+
+    @smp.command(name="nudges", description="Get one DM about what you missed if you're off Monkey SMP for a week")
+    @app_commands.describe(choice="on: one DM after a week away; off: none")
+    @app_commands.choices(choice=NUDGE_CHOICES)
+    async def nudges(self, interaction: discord.Interaction, choice: app_commands.Choice[str]) -> None:
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            text = await self.set_nudges(interaction.user, choice.value == "on")
+        except Exception:
+            log.exception("monkey: nudges setting failed")
+            text = MESSAGES["failed"]
+        await interaction.followup.send(text, ephemeral=True, allowed_mentions=NO_PINGS)
 
     # ------------------------------------------------------------ Discord -> Minecraft
     async def notice(self, message, emoji: str) -> None:

@@ -677,6 +677,20 @@ MIGRATIONS = [
         received_at INTEGER NOT NULL
     )""",
     ],
+    [
+        # Monkey SMP "we miss you" nudges (logic/smpnudge.py), one row per member who ran
+        # `/smp nudges on`; `off`, unlinking, leaving or a ban deletes it. last_seen_at: the last
+        # player-list poll they were on in. nudged_for: the last_seen_at the last nudge went out
+        # for (one per lapse). dm_closed_at: Discord refused the DM, so none is tried again.
+        """CREATE TABLE monkey_nudges (
+        user_id INTEGER PRIMARY KEY,
+        opted_at INTEGER NOT NULL,
+        last_seen_at INTEGER,
+        nudged_for INTEGER,
+        nudged_at INTEGER,
+        dm_closed_at INTEGER
+    )""",
+    ],
 ]
 
 

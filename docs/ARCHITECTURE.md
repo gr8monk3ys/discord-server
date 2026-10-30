@@ -37,7 +37,7 @@ looked up by name at run time, never by a stored ID.
    `MONKEY_ADDRESS`, `MONKEY_RCON_HOST`, `MONKEY_RCON_PORT`, `MONKEY_RCON_PASSWORD`,
    `MONKEY_LOG_PATH` (monkey; each falls back to its old `REALMS_*` name), `SITE_DATA` (sitedata), `TONIGHT` (tonight; `off` stops the
    voice line, anything else or unset leaves it on), `SMP_WATCH`, `SMP_WATCH_ADDRESS`, `SMP_WATCH_MIN`
-   (smpwatch; `off` stops the Monkey SMP ping), `FIELD_NOTES_GITHUB_USER`,
+   (smpwatch; `off` stops the Monkey SMP ping), `SMP_NUDGES` (monkey; `on` turns the nudge DMs on, anything else or unset leaves them off), `FIELD_NOTES_GITHUB_USER`,
    `FIELD_NOTES_SPOTIFY_HISTORY`, `FIELD_NOTES_LETTERBOXD_USER`, `FIELD_NOTES_PLAYED` (fieldnotes;
    none set runs no tick), `QUIET` (`bot/quietgate.py`; `off` posts
    every question and poll whether or not anyone answers, anything else or unset leaves the
@@ -155,7 +155,7 @@ jobs below). Times are local (Pacific unless `TZ` is set). Loops without a wall-
 | `supporter` | Supporter tier: thank-you, `/profile` flair, stipend, `/support`, staff `/supporter grant/revoke` | `supporters` | reconcile 5 min; stipend on the 1st 12:15 | 💬・general, 📋・mod-log; Supporter (only read, unless staff grant it by hand) |
 | `forums` | first reaction on guide and setup posts, delayed one-time post reward | `forum_posts` | settle sweep 10 min (a post is judged once it is a day old) | 📚・guides and 🖥・setups forums |
 | `clipcast` | weekly top clips to YouTube with per-clip consent, `/clipcast consent/remove` (coins are paid only after 7 days up), staff `/clipcast status/skip` | `clipcast`, `clipcast_prefs`, `achievements` (On the Channel) | 5 min tick: opt-out and crash sweep, 7-day payouts, ask Sun 18:30, post Tue 18:30 | 📸・clips, 📋・mod-log, DMs |
-| `monkey` | Minecraft bridge: status panel, `/smp link/unlink/status/top`, mods `/smp remove/adopt`, two-way chat, playtime coins | `monkey_links`, `monkey_playtime` | 15 s tick (server poll every 2 min, backing off to 15 min while it is down; departed-member sweep 30 min); RCON sends only `list` and `tellraw`, never `whitelist`; chat flush 3 s | ⛏️・monkey-smp, 📋・mod-log |
+| `monkey` | Minecraft bridge: status panel, `/smp link/unlink/status/top/nudges`, mods `/smp remove/adopt`, two-way chat, playtime coins, opt-in "we miss you" DMs (`logic/smpnudge.py`) | `monkey_links`, `monkey_playtime`, `monkey_nudges` | 15 s tick (server poll every 2 min, backing off to 15 min while it is down; departed-member sweep 30 min; with `SMP_NUDGES=on` the poll stamps opted-in members' last-seen time and a nudge pass runs at most hourly, 10:00 to 21:00 local, 5 DMs a pass); RCON sends only `list` and `tellraw`, never `whitelist`; chat flush 3 s | ⛏️・monkey-smp, 📋・mod-log |
 | `wrapped` | `/wrapped` cards (Dec 1 to Jan 15), server card, staff `/wrapped-preview` | `achievements` (`wrapped_YEAR`); `meta` only otherwise | 5 min tick: announcement Dec 1 10:00, reminder Dec 20 10:00, level snapshot once in January | 📣・announcements; wherever a member shares a card |
 | `sitedata` | aggregates file for the landing page, staff `/sitedata refresh` | none (writes `bot/data/site/stats.json`) | 1 min tick, rebuilds every 30 min | none |
 | `appeals` | ban appeals from the website: review cards with Accept/Deny, discussion threads, staff `/appeals list/code` | `appeals` | 5 min tick: re-reads the channel for webhook posts missed while down; expiry daily 09:00 (30 days untouched; answers blanked 180 days after a decision) | 🔒・appeals, 📋・mod-log |

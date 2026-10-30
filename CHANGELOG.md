@@ -8,6 +8,10 @@ All notable changes to this project are recorded here. The format follows
 
 ### Added
 
+- Monkey SMP nudges (migration 26 adds `monkey_nudges`): `/smp nudges on|off`. A linked member who
+  opted in and hasn't been in the bridge's player-list poll for 7 days gets one DM with what happened
+  since and how to hop back in; one per lapse, and a refused DM is recorded and not retried. Off
+  unless `SMP_NUDGES=on`.
 - Monkey SMP retention tools (migration 25 adds `factions` and `tebex_webhooks`):
   - `/faction register` and `/faction charter`: the faction sign-up form from the SMP's SEASONS.md,
     one post per faction in #smp-forum tagged Faction, approved or rejected by staff with buttons.
