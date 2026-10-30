@@ -79,6 +79,7 @@ MODULES = [
     ("cogs.welcomers", {"members"}),  # one @Welcomer ping when a newcomer first joins a public voice channel
     ("cogs.factions", set()),  # /faction register|charter: Monkey SMP faction sign-up posts, staff approve
     ("cogs.tebex", set()),  # Tebex webhook receiver: "pass ending" alerts in mod (off without TEBEX_WEBHOOK_SECRET)
+    ("cogs.referral", set()),  # /referral codes; a Tebex purchase carrying one unlocks a wardrobe skin (off without REFERRALS=on)
     ("cogs.botm", {"members"}),  # /botm award: Base of the Month role and announcement (staff)
 ]
 

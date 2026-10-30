@@ -11,8 +11,10 @@ command says the bridge is not set up.
   one member per name), for the chat relay and playtime. A link is only that: it never
   gives anyone access to Monkey SMP. Access is a paid pass that staff grant by hand or
   through the store, and this bot never sends `whitelist` or any other command that
-  changes the server (`R.sendable`). `/smp unlink`, leaving or a ban forget the link and
-  nothing else, so a paying player keeps their access. Staff link a name for a member with
+  changes the server (`R.sendable`); the one exception is opt-in, REFERRAL_GRANT=rcon, and
+  covers only the referral's two wardrobe scores (`R.grant_sendable`, `grant_call`).
+  `/smp unlink`, leaving or a ban forget the link and nothing else, so a paying player keeps
+  their access. Staff link a name for a member with
   `/smp adopt` and forget one with `/smp remove`.
 - Chat, both ways, in the Monkey SMP channel. Discord to Minecraft is a `tellraw` over RCON,
   rate limited, never for bots. Minecraft to Discord tails the server log read-only
@@ -403,6 +405,18 @@ class MonkeySmp(commands.Cog):
             raise RconError("RCON is not set up")
         if not R.sendable(command):
             raise RconError("that command is not one this bot sends")
+        return await self._rcon_send(command)
+
+    async def grant_call(self, command: str) -> str:
+        """The referral unlock (cogs/referral.py, only with REFERRAL_GRANT=rcon): a wardrobe score on one
+        player's name. Only the shapes `R.grant_sendable` allows get past here. Raises RconError."""
+        if self.rcon is None or not self.setup.rcon_on:
+            raise RconError("RCON is not set up")
+        if not R.grant_sendable(command):
+            raise RconError("that command is not one this bot sends")
+        return await self._rcon_send(command)
+
+    async def _rcon_send(self, command: str) -> str:
         try:
             reply = await self.rcon.command(command)
         except RconError as exc:

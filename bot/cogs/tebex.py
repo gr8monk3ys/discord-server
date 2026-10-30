@@ -11,6 +11,9 @@ docs/TEBEX_WEBHOOK.md.
 - `recurring-payment.cancellation.requested`: one post in 🛡️・mod with the player, the package and the
   end date. The webhook id is stored first, so Tebex's retries post once; if the post fails the id
   is dropped again and the answer is 500, so Tebex retries later.
+- `payment.completed`, `payment.refunded` and `payment.dispute.opened`, only while the referral cog is
+  on (REFERRALS=on, cogs/referral.py): handed to it once per webhook id, the same way; it answers
+  whether to retry.
 - Other types: 200, ignored.
 """
 
@@ -96,26 +99,46 @@ class Tebex(commands.Cog):
             return web.Response(status=400, text="bad body")
         if event.type == L.VALIDATION:
             return web.json_response({"id": event.id})
-        if event.type != L.CANCELLATION:
+        referrals = self.referrals()
+        if event.type != L.CANCELLATION and not (referrals is not None and event.type in L.REFERRAL_TYPES):
             return web.Response(status=200, text="ignored")
         try:
-            posted = await self.alert(event)
+            if event.type == L.CANCELLATION:
+                posted = await self.alert(event)
+            else:
+                posted = await self.once(event, L.transaction(event.subject),
+                                         lambda: referrals.handle(event.type, event.subject))
         except Exception:
             log.exception("tebex: handling webhook %s failed", event.id)
             posted = False
         return web.Response(status=200, text="ok") if posted else web.Response(status=500, text="try again")
 
+    def referrals(self):
+        """The referral cog when it is loaded and on (REFERRALS=on), else None."""
+        cog = self.bot.get_cog("Referrals") if hasattr(self.bot, "get_cog") else None
+        return cog if cog is not None and getattr(cog, "on", False) else None
+
     async def alert(self, event: L.Event) -> bool:
         """True once the alert is out (or was already sent for this webhook id)."""
         ending = L.ending(event.subject)
+        return await self.once(event, ending.reference, lambda: self.post(L.alert_text(ending, esc)))
+
+    async def once(self, event: L.Event, reference: str, act) -> bool:
+        """Runs `act` once per webhook id. The id is stored first, so Tebex's retries do nothing; if `act`
+        says False the id is dropped again so the next retry runs it."""
         async with self.db.transaction() as tx:
             seen = await tx.fetchone("SELECT 1 FROM tebex_webhooks WHERE webhook_id = ?", (event.id,))
             if seen is None:
                 await tx.execute("INSERT INTO tebex_webhooks (webhook_id, type, reference, received_at)"
-                                 " VALUES (?, ?, ?, ?)", (event.id, event.type, ending.reference or None, now()))
+                                 " VALUES (?, ?, ?, ?)", (event.id, event.type, reference or None, now()))
         if seen is not None:
             return True
-        if await self.post(L.alert_text(ending, esc)):
+        try:
+            done = await act()
+        except BaseException:
+            await self.db.execute("DELETE FROM tebex_webhooks WHERE webhook_id = ?", (event.id,))
+            raise
+        if done:
             return True
         await self.db.execute("DELETE FROM tebex_webhooks WHERE webhook_id = ?", (event.id,))
         return False
