@@ -6,6 +6,18 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Monkey SMP retention tools (migration 25 adds `factions` and `tebex_webhooks`):
+  - `/faction register` and `/faction charter`: the faction sign-up form from the SMP's SEASONS.md,
+    one post per faction in #smp-forum tagged Faction, approved or rejected by staff with buttons.
+    `FACTIONS_FORUM`, `FACTIONS_RESERVED` and `FACTIONS_SEASON` are optional.
+  - Tebex "pass ending" alerts: a signed-webhook receiver for
+    `recurring-payment.cancellation.requested` that posts in #mod. Off unless
+    `TEBEX_WEBHOOK_SECRET` is set (`docs/TEBEX_WEBHOOK.md`).
+  - `/botm award` (staff): moves the Base of the Month role to this month's builders and announces it
+    in #monkey-smp; makes the role when it is missing and never moves roles.
+
 ### Changed
 
 - The Minecraft bridge drops the server's old name, The Realms: the module is `monkey`

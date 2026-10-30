@@ -77,6 +77,9 @@ MODULES = [
     ("cogs.smpwatch", set()),  # one @SMP Ping when 3+ are on Monkey SMP (SMP_WATCH=off)
     ("cogs.fieldnotes", set()),  # the owner's weekly field notes, Sundays (FIELD_NOTES_* sources)
     ("cogs.welcomers", {"members"}),  # one @Welcomer ping when a newcomer first joins a public voice channel
+    ("cogs.factions", set()),  # /faction register|charter: Monkey SMP faction sign-up posts, staff approve
+    ("cogs.tebex", set()),  # Tebex webhook receiver: "pass ending" alerts in mod (off without TEBEX_WEBHOOK_SECRET)
+    ("cogs.botm", {"members"}),  # /botm award: Base of the Month role and announcement (staff)
 ]
 
 PERMISSIONS = discord.Permissions(
