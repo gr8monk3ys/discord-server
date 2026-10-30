@@ -418,6 +418,10 @@ CHANNEL_NEEDS: list[Need] = [
     Need("houses", config.ANNOUNCEMENTS_CHANNEL, POST),  # House Cup results, the one-time introduction
     # the weekly post, its reply thread, and the quiet-rooms check that reads the post back
     Need("fieldnotes", config.FIELD_NOTES_CHANNEL, POST + ("create_public_threads", "read_message_history")),
+    # faction registrations: one forum post each, the decision is a reply in the post
+    Need("factions", config.SMP_FORUM, POST + ("send_messages_in_threads", "read_message_history"), "forum"),
+    Need("tebex", config.MOD_CHANNEL, POST),  # "pass ending" alerts
+    Need("botm", config.MONKEY_CHANNEL, POST + ("attach_files",), was=config.MONKEY_CHANNEL_WAS),  # the screenshots
 ]
 
 # Modules with no row above, and why. A test fails when a module in main.MODULES is in neither,
@@ -433,7 +437,7 @@ NO_CHANNEL: dict[str, str] = {
 }
 
 ROLE_HOLDERS = ("clips", "engagement", "growth", "levels", "selfroles", "shop", "tournaments", "crew", "supporter",
-                "houses", "seasonal")
+                "houses", "seasonal", "botm")
 # Cogs that call add_roles/remove_roles and are left out of ROLE_HOLDERS on purpose, and why.
 NO_ROLE_HOLDER: dict[str, str] = {
     "staffapps": "gives Moderator only if it sits below the bot, and otherwise says to give it by hand",

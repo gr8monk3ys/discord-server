@@ -648,6 +648,35 @@ MIGRATIONS = [
         "ALTER TABLE realms_playtime RENAME TO monkey_playtime",
         "UPDATE meta SET key = 'monkey:panel' WHERE key = 'realms:panel'",
     ],
+    [
+        # Monkey SMP faction registrations (cogs/factions.py). members: JSON list of Minecraft names.
+        # status: pending | approved | rejected. A rejected one frees its name and its leader.
+        """CREATE TABLE factions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        season TEXT NOT NULL,
+        name TEXT NOT NULL,
+        name_key TEXT NOT NULL,
+        leader_id INTEGER NOT NULL,
+        members TEXT NOT NULL,
+        banner TEXT NOT NULL,
+        charter TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        thread_id INTEGER,
+        message_id INTEGER,
+        created_at INTEGER NOT NULL,
+        decided_by INTEGER,
+        decided_at INTEGER
+    )""",
+        "CREATE UNIQUE INDEX factions_name ON factions (season, name_key) WHERE status != 'rejected'",
+        "CREATE UNIQUE INDEX factions_leader ON factions (season, leader_id) WHERE status != 'rejected'",
+        # Tebex webhooks already handled (cogs/tebex.py), so a retried delivery posts once.
+        """CREATE TABLE tebex_webhooks (
+        webhook_id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        reference TEXT,
+        received_at INTEGER NOT NULL
+    )""",
+    ],
 ]
 
 

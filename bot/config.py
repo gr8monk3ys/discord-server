@@ -249,3 +249,10 @@ FIELD_NOTES_CHANNEL = "📓・field-notes"
 # Welcomers (cogs/welcomers.py): opt-in on the 🎭・roles panel; pinged in general when someone new
 # joins a public voice channel for the first time.
 WELCOMER_ROLE = "Welcomer"
+
+# Monkey SMP retention. Factions (cogs/factions.py): /faction register posts in this forum, tagged
+# Faction (FACTIONS_FORUM in server/.env names another forum). Base of the Month (cogs/botm.py): the
+# role is made by the bot when it is missing. Tebex alerts (cogs/tebex.py) post in MOD_CHANNEL.
+SMP_FORUM = "🚩・smp-forum"
+FACTION_TAG = "Faction"
+BOTM_ROLE = "Base of the Month"

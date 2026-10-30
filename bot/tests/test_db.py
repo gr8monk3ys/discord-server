@@ -102,8 +102,8 @@ def test_the_realms_tables_and_panel_key_carry_over_to_monkey():
     async def go():
         d = dbmod.Database(":memory:")
         await d.connect()
-        last = len(dbmod.MIGRATIONS) - 1  # the Monkey SMP rename
-        assert "RENAME TO monkey_links" in dbmod.MIGRATIONS[last][0]
+        # the Monkey SMP rename (later migrations may follow it)
+        last = next(i for i, m in enumerate(dbmod.MIGRATIONS) if "RENAME TO monkey_links" in m[0])
         dbmod.MIGRATIONS, real = dbmod.MIGRATIONS[:last], dbmod.MIGRATIONS
         try:
             await d.migrate()
