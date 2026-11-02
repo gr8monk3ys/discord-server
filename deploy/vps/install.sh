@@ -33,6 +33,13 @@ if [ ! -d "$REPO/.git" ]; then
     chown -Rh "$BOT_USER:$BOT_USER" "$REPO/bot/data"
 fi
 
+# Everything below trusts the checkout, so refuse one that anyone but root could have changed.
+not_root=$(find "$REPO" -path "$REPO/bot/data" -prune -o ! -user root -print -quit)
+if [ -n "$not_root" ]; then
+    echo "Refusing to continue: $not_root is not owned by root, so this checkout can't be trusted." >&2
+    exit 1
+fi
+
 # The database lives in the checkout's gitignored bot/data, so that watchdog.py and
 # publish_site_data.py find it the same way they do on any other host. docker-compose.yml reads
 # this setting from the repo root's .env (gitignored; not the secrets file, that is server/.env).
