@@ -13,6 +13,7 @@ address, on any of them.
 | Bot | Container `front-desk` (`docker-compose.yml`). `restart: unless-stopped` and Docker's own start at boot bring it back after a crash or a reboot; `bot/run_container.sh` stops a bot whose heartbeat is 10 minutes old |
 | Downtime alerts | `front-desk-watchdog.timer`, every 5 minutes: `server/watchdog.py --alert-only` posts to #mod-log |
 | Site data | `front-desk-site-data.timer`, every 30 minutes: `server/publish_site_data.py`, pushing to `site-data` with `frontdesk`'s SSH key, a deploy key with write access on this repository |
+| Listening log | `front-desk-spotify-history.timer`, hourly: SpotifyForge's `history sync` in a one-shot container (`deploy/vps/spotify-history`), appending to `/srv/spotifyforge/data/listening_history.jsonl`. The bot mounts that folder read-only at `/spotify` for the field notes' Heard section. The Spotify login is `/srv/spotifyforge/login` (user `spotifyforge`, uid 10002, mode 700) and `client.env` (root's, mode 600), neither in reach of the bot |
 | Backups | The bot's nightly 04:00 backup, 14 kept, in `bot/data/backups`. **Same disk as the database**: see "Off-box backups" |
 | Neighbours | Monkey SMP owns `/srv/monkey`, the `monkey` user and the `monkey-*` timers. Front Desk shares only Docker and the machine, and is capped at 512 MB. Nothing here needs a port opened |
 
@@ -29,6 +30,8 @@ bot left): run those through the container, as the restore below does.
 | Stop on purpose | `runuser -u frontdesk -- python3 server/watchdog.py --alert-only --pause 60`, then `docker compose stop` |
 | Run a setup script | `docker compose exec bot python /app/server/public_mode.py` (a dry run; add `--apply` to change Discord) |
 | Timers | `systemctl list-timers 'front-desk-*'`; `journalctl -u front-desk-site-data -n 20` |
+| Is the listening log moving? | `systemctl status front-desk-spotify-history`; `tail -n 1 /srv/spotifyforge/data/listening_history.jsonl` |
+| Spotify login gone or revoked | In `deploy/vps/spotify-history`: `docker compose run --rm history spotifyforge auth login`. It prints a URL for a browser and asks for the address the browser lands on |
 | Restore a nightly backup | `docker compose stop`, then `docker compose run --rm --no-deps bot sh -c 'cp data/front_desk.db data/front_desk.db.bad && cp data/backups/front_desk-YYYY-MM-DD.db data/front_desk.db && rm -f data/front_desk.db-wal data/front_desk.db-shm'`, then `docker compose start` |
 
 Never run `git clean` in that checkout: `bot/data` is gitignored and holds the database.
@@ -41,7 +44,8 @@ Docker must be installed. The steps are ordered so that two bots never run at on
    checkout, the key and the units and builds the image. It starts nothing.
 2. Add the key it prints to the repository (Settings, Deploy keys, write access on).
 3. Copy the secrets, from wherever the old host is, with no Windows paths in them and no CRs:
-   `tr -d '\r' < server/.env | grep -v '^FIELD_NOTES_SPOTIFY_HISTORY=' | ssh root@VPS 'install -m 600 -o root -g root /dev/stdin /srv/front-desk/repo/server/.env'`
+   `tr -d '\r' < server/.env | ssh root@VPS 'install -m 600 -o root -g root /dev/stdin /srv/front-desk/repo/server/.env'`.
+   `FIELD_NOTES_SPOTIFY_HISTORY` is `/spotify/listening_history.jsonl`, the path inside the container.
 4. Stop the old host and make sure it stays stopped (on the PC, step 1 of the cut-over checklist).
 5. Pack on the old host, then install the archive here. The bot has never run on this box yet, so
    the data directory has no lock to wait for:
@@ -53,11 +57,13 @@ Docker must be installed. The steps are ordered so that two bots never run at on
 
 6. `docker compose up -d`, wait for `healthy`, read #mod-log, and only then
    `systemctl enable --now front-desk-watchdog.timer front-desk-site-data.timer`.
+7. Bring the listening log and its login over from the old host, or the Heard section starts empty.
+   Stop `front-desk-spotify-history.timer` there first, then copy `/srv/spotifyforge`, keeping owners
+   and modes, and `systemctl enable --now front-desk-spotify-history.timer`. The log has no other
+   copy, and Spotify itself remembers only the last 50 plays.
 
 What is deliberately not here: the Windows tasks (`Front Desk bot`, `Front Desk watchdog`,
-`Front Desk site data`), and `FIELD_NOTES_SPOTIFY_HISTORY`, because the SpotifyForge log it reads is
-written by a job on the PC. Field notes post without their Heard section until that log has a home
-this box can read. `/catchup` stays off unless `ANTHROPIC_API_KEY` is set, as it was on the PC.
+`Front Desk site data`). `/catchup` stays off unless `ANTHROPIC_API_KEY` is set, as it was on the PC.
 
 ## Which option?
 

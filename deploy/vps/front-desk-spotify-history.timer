@@ -1,0 +1,9 @@
+[Unit]
+Description=Keep the listening log current every hour (Spotify remembers only the last 50 plays)
+
+[Timer]
+OnCalendar=*:35
+Persistent=true
+
+[Install]
+WantedBy=timers.target

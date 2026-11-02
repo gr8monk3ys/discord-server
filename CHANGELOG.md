@@ -8,6 +8,9 @@ All notable changes to this project are recorded here. The format follows
 
 ### Changed
 
+- The field notes' Heard section is back on the VPS: `deploy/vps/spotify-history` runs SpotifyForge's
+  `history sync` hourly in its own container (`front-desk-spotify-history.timer`), and the bot reads
+  the log through a read-only mount (`FRONT_DESK_SPOTIFY`). The Spotify login stays out of its reach.
 - Front Desk moved from the owner's PC to the VPS (`docs/HOSTING.md`, "The live VPS"): Docker with a
   restart policy, `deploy/vps/` for the install script and the systemd timers that replace the Windows
   watchdog and site-data tasks. `docker-compose.yml` takes its data path from `FRONT_DESK_DATA`.

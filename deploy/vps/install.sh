@@ -17,6 +17,9 @@ BOT_USER=frontdesk
 BOT_UID=10001   # the uid in the Dockerfile
 ORIGIN=https://github.com/gr8monk3ys/discord-server.git
 BRANCH=${1:-main}
+SPOTIFY=/srv/spotifyforge
+SPOTIFY_USER=spotifyforge
+SPOTIFY_UID=10002   # the uid in deploy/vps/spotify-history/Dockerfile
 
 as_bot() { runuser -u "$BOT_USER" -- "$@"; }
 
@@ -43,7 +46,7 @@ fi
 # The database lives in the checkout's gitignored bot/data, so that watchdog.py and
 # publish_site_data.py find it the same way they do on any other host. docker-compose.yml reads
 # this setting from the repo root's .env (gitignored; not the secrets file, that is server/.env).
-printf 'FRONT_DESK_DATA=./bot/data\n' > "$REPO/.env"
+printf 'FRONT_DESK_DATA=./bot/data\nFRONT_DESK_SPOTIFY=%s/data\n' "$SPOTIFY" > "$REPO/.env"
 chmod 644 "$REPO/.env"
 
 # publish_site_data.py pushes over SSH with this key. Its public half goes on GitHub by hand, as
@@ -56,11 +59,22 @@ curl -fsSL https://api.github.com/meta \
     | python3 -c 'import json,sys; print("\n".join("github.com " + k for k in json.load(sys.stdin)["ssh_keys"]))' \
     | as_bot tee "$ROOT/.ssh/known_hosts" >/dev/null
 
+# The listening-log job has its own user, so that the bot's can't read the Spotify login. The bot
+# reads data/ through a read-only mount; login/ holds the token and is this user's alone.
+if ! getent passwd "$SPOTIFY_USER" >/dev/null; then
+    useradd --system --uid "$SPOTIFY_UID" --home-dir "$SPOTIFY" --no-create-home \
+        --user-group --shell /usr/sbin/nologin "$SPOTIFY_USER"
+fi
+install -d -o root -g root -m 755 "$SPOTIFY"
+install -d -o "$SPOTIFY_USER" -g "$SPOTIFY_USER" -m 755 "$SPOTIFY/data"
+install -d -o "$SPOTIFY_USER" -g "$SPOTIFY_USER" -m 700 "$SPOTIFY/login"
+
 install -m 644 "$REPO"/deploy/vps/front-desk-*.service "$REPO"/deploy/vps/front-desk-*.timer /etc/systemd/system/
 systemctl daemon-reload
 
 cd "$REPO"
 docker compose build
+(cd deploy/vps/spotify-history && docker compose build)
 
 [ -f server/.env ] || echo "Next: copy server/.env here (mode 600, owner root). It is never in git or the image."
 echo "Deploy key to add on GitHub: $(cat "$ROOT/.ssh/id_ed25519.pub")"
