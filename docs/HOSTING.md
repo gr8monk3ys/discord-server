@@ -9,26 +9,27 @@ address, on any of them.
 
 | | |
 |---|---|
-| Code and data | `/srv/front-desk/repo`, a checkout owned by the system user `frontdesk` (uid 10001, the container's user). Data is its gitignored `bot/data`; secrets are `server/.env`, mode 600 |
+| Code and data | `/srv/front-desk/repo`, a checkout owned by root. Data is its gitignored `bot/data`, the one part owned by the system user `frontdesk` (uid 10001, the container's user); secrets are `server/.env`, root's, mode 600 |
 | Bot | Container `front-desk` (`docker-compose.yml`). `restart: unless-stopped` and Docker's own start at boot bring it back after a crash or a reboot; `bot/run_container.sh` stops a bot whose heartbeat is 10 minutes old |
 | Downtime alerts | `front-desk-watchdog.timer`, every 5 minutes: `server/watchdog.py --alert-only` posts to #mod-log |
 | Site data | `front-desk-site-data.timer`, every 30 minutes: `server/publish_site_data.py`, pushing to `site-data` with `frontdesk`'s SSH key, a deploy key with write access on this repository |
 | Backups | The bot's nightly 04:00 backup, 14 kept, in `bot/data/backups`. **Same disk as the database**: see "Off-box backups" |
 | Neighbours | Monkey SMP owns `/srv/monkey`, the `monkey` user and the `monkey-*` timers. Front Desk shares only Docker and the machine, and is capped at 512 MB. Nothing here needs a port opened |
 
-Everything below is run as root in `/srv/front-desk/repo`. Run git as `frontdesk`
-(`runuser -u frontdesk -- git ...`): as root it fails with "dubious ownership".
+Everything below is run as root in `/srv/front-desk/repo`. The container can write to `bot/data`,
+so don't work on files in there as root (`cp`, `chown` and friends follow any symlink a compromised
+bot left): run those through the container, as the restore below does.
 
 | Situation | Do this |
 |---|---|
 | Is it up? | `docker compose ps` (`healthy` = heartbeat under 3 minutes old) |
 | Read the log | `docker compose logs --tail 100`, or `bot/data/bot.log` |
 | Restart | `docker compose restart` |
-| Update to the latest code | `runuser -u frontdesk -- git pull --ff-only && docker compose up -d --build` |
+| Update to the latest code | `git pull --ff-only && docker compose up -d --build` |
 | Stop on purpose | `runuser -u frontdesk -- python3 server/watchdog.py --alert-only --pause 60`, then `docker compose stop` |
 | Run a setup script | `docker compose exec bot python /app/server/public_mode.py` (a dry run; add `--apply` to change Discord) |
 | Timers | `systemctl list-timers 'front-desk-*'`; `journalctl -u front-desk-site-data -n 20` |
-| Restore a nightly backup | `docker compose stop`, then `cp bot/data/front_desk.db bot/data/front_desk.db.bad && cp bot/data/backups/front_desk-YYYY-MM-DD.db bot/data/front_desk.db && rm -f bot/data/front_desk.db-wal bot/data/front_desk.db-shm && chown frontdesk: bot/data/front_desk.db`, then `docker compose start` |
+| Restore a nightly backup | `docker compose stop`, then `docker compose run --rm --no-deps bot sh -c 'cp data/front_desk.db data/front_desk.db.bad && cp data/backups/front_desk-YYYY-MM-DD.db data/front_desk.db && rm -f data/front_desk.db-wal data/front_desk.db-shm'`, then `docker compose start` |
 
 Never run `git clean` in that checkout: `bot/data` is gitignored and holds the database.
 
@@ -40,7 +41,7 @@ Docker must be installed. The steps are ordered so that two bots never run at on
    checkout, the key and the units and builds the image. It starts nothing.
 2. Add the key it prints to the repository (Settings, Deploy keys, write access on).
 3. Copy the secrets, from wherever the old host is, with no Windows paths in them and no CRs:
-   `tr -d '\r' < server/.env | grep -v '^FIELD_NOTES_SPOTIFY_HISTORY=' | ssh root@VPS 'install -m 600 -o frontdesk -g frontdesk /dev/stdin /srv/front-desk/repo/server/.env'`
+   `tr -d '\r' < server/.env | grep -v '^FIELD_NOTES_SPOTIFY_HISTORY=' | ssh root@VPS 'install -m 600 -o root -g root /dev/stdin /srv/front-desk/repo/server/.env'`
 4. Stop the old host and make sure it stays stopped (on the PC, step 1 of the cut-over checklist).
 5. Pack on the old host, then install the archive here. The bot has never run on this box yet, so
    the data directory has no lock to wait for:

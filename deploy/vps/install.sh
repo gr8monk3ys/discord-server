@@ -5,9 +5,10 @@
 #
 #   sh install.sh [branch]      branch to check out on the first run (default: main)
 #
-# Everything lives under /srv/front-desk and belongs to the system user `frontdesk`, whose uid is
-# the same as the container's bot user, so the bot's files stay readable by the host's timers
-# without putting anyone in the docker group.
+# Root runs Compose and installs the units from this checkout, so the checkout, its compose file,
+# units and .env files belong to root. The system user `frontdesk` (the same uid as the container's
+# bot user) owns only bot/data, which the container also writes to, and its own ~/.ssh. Root must
+# not work on files in bot/data directly: a compromised bot could have left symlinks there.
 set -eu
 
 ROOT=/srv/front-desk
@@ -23,19 +24,20 @@ if ! getent passwd "$BOT_USER" >/dev/null; then
     useradd --system --uid "$BOT_UID" --home-dir "$ROOT" --no-create-home \
         --user-group --shell /usr/sbin/nologin "$BOT_USER"
 fi
-install -d -o "$BOT_USER" -g "$BOT_USER" -m 750 "$ROOT"
+install -d -o root -g "$BOT_USER" -m 750 "$ROOT"
 install -d -o "$BOT_USER" -g "$BOT_USER" -m 700 "$ROOT/.ssh"
 
-cd "$ROOT"
 if [ ! -d "$REPO/.git" ]; then
-    as_bot git clone --quiet --branch "$BRANCH" "$ORIGIN" "$REPO"
+    git clone --quiet --branch "$BRANCH" "$ORIGIN" "$REPO"
+    # Only on the first run, when bot/data holds nothing but the two tracked question banks.
+    chown -Rh "$BOT_USER:$BOT_USER" "$REPO/bot/data"
 fi
 
 # The database lives in the checkout's gitignored bot/data, so that watchdog.py and
 # publish_site_data.py find it the same way they do on any other host. docker-compose.yml reads
 # this setting from the repo root's .env (gitignored; not the secrets file, that is server/.env).
-printf 'FRONT_DESK_DATA=./bot/data\n' | as_bot tee "$REPO/.env" >/dev/null
-as_bot mkdir -p "$REPO/bot/data"
+printf 'FRONT_DESK_DATA=./bot/data\n' > "$REPO/.env"
+chmod 644 "$REPO/.env"
 
 # publish_site_data.py pushes over SSH with this key. Its public half goes on GitHub by hand, as
 # a deploy key with write access on this repository only (the checkout itself pulls over https).
@@ -53,6 +55,6 @@ systemctl daemon-reload
 cd "$REPO"
 docker compose build
 
-[ -f server/.env ] || echo "Next: copy server/.env here (mode 600, owner $BOT_USER). It is never in git or the image."
+[ -f server/.env ] || echo "Next: copy server/.env here (mode 600, owner root). It is never in git or the image."
 echo "Deploy key to add on GitHub: $(cat "$ROOT/.ssh/id_ed25519.pub")"
 echo "Not started. Finish with the cut-over checklist in docs/HOSTING.md."

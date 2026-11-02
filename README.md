@@ -260,7 +260,7 @@ All times are Pacific. Every scheduled job catches up once after downtime and ne
 | Situation | Do this |
 |---|---|
 | Restart the bot | On the VPS, in `/srv/front-desk/repo`: `docker compose restart` |
-| Update the bot | `runuser -u frontdesk -- git pull --ff-only && docker compose up -d --build` |
+| Update the bot | `git pull --ff-only && docker compose up -d --build` |
 | Bot offline | `docker compose ps`, then `docker compose logs --tail 100`, then restart. "already running" means another copy holds `bot.lock` |
 | Restore the database | `docs/HOSTING.md`, "The live VPS" |
 | A role won't be given out | The role must sit **below Front Desk** in Server Settings → Roles. Only the owner can move roles above the bot |
