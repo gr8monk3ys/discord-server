@@ -12,5 +12,7 @@ WorkingDirectory=/srv/front-desk/repo/deploy/vps/spotify-history
 ExecStart=/usr/bin/flock --wait 300 /run/lock/spotifyforge.lock /usr/bin/docker compose run --name spotify-weekly --rm -T weekly
 # A timeout kills the compose client, not the container; don't leave it running without the lock.
 ExecStopPost=-/usr/bin/docker rm -f spotify-weekly
+# It only runs once a week, so the first failure goes to #mod-log.
+ExecStopPost=-/bin/sh /srv/front-desk/repo/deploy/vps/front-desk-spotify-alert.sh front-desk-spotify-weekly "weekly playlist maintenance" 1
 TimeoutStartSec=1h
 TimeoutStopSec=30s

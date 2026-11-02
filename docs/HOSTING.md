@@ -33,6 +33,7 @@ bot left): run those through the container, as the restore below does.
 | Timers | `systemctl list-timers 'front-desk-*'`; `journalctl -u front-desk-site-data -n 20` |
 | Is the listening log moving? | `systemctl status front-desk-spotify-history`; `tail -n 1 /srv/spotifyforge/data/listening_history.jsonl` |
 | Did the playlist maintenance run? | `journalctl -u front-desk-spotify-weekly -n 40` (a `step '...' exited N` line names what failed); `tail -c 200 /srv/spotifyforge/data/stats_history.jsonl` |
+| An alert from a Spotify job in #mod-log | `front-desk-spotify-alert.sh` posts when the weekly job fails, when the hourly one fails 3 times in a row, and once when either works again. A weekly run that only partly worked posts its failed count each time. The journal line in the alert says where to look |
 | Run the playlist maintenance now | `systemctl start --no-block front-desk-spotify-weekly`: it writes to Spotify, so only when a run is due |
 | Spotify login gone or revoked | In `deploy/vps/spotify-history`: `docker compose run --rm history spotifyforge auth login`. It prints a URL for a browser and asks for the address the browser lands on |
 | Restore a nightly backup | `docker compose stop`, then `docker compose run --rm --no-deps bot sh -c 'cp data/front_desk.db data/front_desk.db.bad && cp data/backups/front_desk-YYYY-MM-DD.db data/front_desk.db && rm -f data/front_desk.db-wal data/front_desk.db-shm'`, then `docker compose start` |

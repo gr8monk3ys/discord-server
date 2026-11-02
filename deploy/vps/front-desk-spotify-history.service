@@ -12,6 +12,8 @@ WorkingDirectory=/srv/front-desk/repo/deploy/vps/spotify-history
 ExecStart=/usr/bin/flock --wait 240 --conflict-exit-code 75 /run/lock/spotifyforge.lock /usr/bin/docker compose run --name spotify-history --rm -T history
 # A timeout kills the compose client, not the container; don't leave it running without the lock.
 ExecStopPost=-/usr/bin/docker rm -f spotify-history
+# Three in a row before #mod-log hears of it: one bad hour loses nothing, Spotify keeps 50 plays.
+ExecStopPost=-/bin/sh /srv/front-desk/repo/deploy/vps/front-desk-spotify-alert.sh front-desk-spotify-history "hourly listening log" 3
 SuccessExitStatus=75
 TimeoutStartSec=5min
 TimeoutStopSec=30s
