@@ -1,5 +1,5 @@
-# SpotifyForge's `history sync`, one run at a time, for the field notes' Heard section. Built and
-# run from compose.yml beside this file; see docs/HOSTING.md, "The live VPS".
+# SpotifyForge's `history sync` (the field notes' Heard section) and its weekly playlist maintenance,
+# one run at a time. Built and run from compose.yml beside this file; see docs/HOSTING.md, "The live VPS".
 FROM python:3.11-slim
 
 # A headless Linux box has no OS keyring, so the token goes to a keyrings.alt file in /login,
@@ -30,6 +30,8 @@ RUN pip install uv \
     && cd /app \
     && uv sync --quiet --frozen --no-dev \
     && uv pip install --quiet --python .venv/bin/python keyrings.alt==5.0.2
+
+COPY weekly.sh /weekly.sh
 
 WORKDIR /app
 USER 10002:10002

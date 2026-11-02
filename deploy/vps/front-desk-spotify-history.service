@@ -7,5 +7,11 @@ Requires=docker.service
 [Service]
 Type=oneshot
 WorkingDirectory=/srv/front-desk/repo/deploy/vps/spotify-history
-ExecStart=/usr/bin/docker compose run --rm -T history
+# Never alongside front-desk-spotify-weekly: they share one Spotify grant. If the weekly job outlasts
+# the wait, skip this hour (75): the next sync still gets the last 50 plays.
+ExecStart=/usr/bin/flock --wait 240 --conflict-exit-code 75 /run/lock/spotifyforge.lock /usr/bin/docker compose run --name spotify-history --rm -T history
+# A timeout kills the compose client, not the container; don't leave it running without the lock.
+ExecStopPost=-/usr/bin/docker rm -f spotify-history
+SuccessExitStatus=75
 TimeoutStartSec=5min
+TimeoutStopSec=30s

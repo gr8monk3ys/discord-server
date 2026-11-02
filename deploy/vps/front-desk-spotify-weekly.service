@@ -1,0 +1,16 @@
+[Unit]
+Description=Rotate, re-sequence and describe the Spotify playlists (SpotifyForge's weekly maintenance)
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/front-desk/repo/deploy/vps/spotify-history
+# Never alongside front-desk-spotify-history: they share one Spotify grant. A sync takes seconds, so
+# the wait only ever covers one in progress.
+ExecStart=/usr/bin/flock --wait 300 /run/lock/spotifyforge.lock /usr/bin/docker compose run --name spotify-weekly --rm -T weekly
+# A timeout kills the compose client, not the container; don't leave it running without the lock.
+ExecStopPost=-/usr/bin/docker rm -f spotify-weekly
+TimeoutStartSec=1h
+TimeoutStopSec=30s

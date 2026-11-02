@@ -14,6 +14,7 @@ address, on any of them.
 | Downtime alerts | `front-desk-watchdog.timer`, every 5 minutes: `server/watchdog.py --alert-only` posts to #mod-log |
 | Site data | `front-desk-site-data.timer`, every 30 minutes: `server/publish_site_data.py`, pushing to `site-data` with `frontdesk`'s SSH key, a deploy key with write access on this repository |
 | Listening log | `front-desk-spotify-history.timer`, hourly: SpotifyForge's `history sync` in a one-shot container (`deploy/vps/spotify-history`), appending to `/srv/spotifyforge/data/listening_history.jsonl`. The bot mounts that folder read-only at `/spotify` for the field notes' Heard section. The Spotify login is `/srv/spotifyforge/login` (user `spotifyforge`, uid 10002, mode 700) and `client.env` (root's, mode 600), neither in reach of the bot |
+| Playlist maintenance | `front-desk-spotify-weekly.timer`, Mondays 08:00 Pacific: SpotifyForge's `curate stats`, `refresh`, `reflow`, `describe` in the same image and login (`weekly.sh`). `reflow` and `describe` write to the owner's Spotify playlists. Its state (`expansions.json` and the other sidecars) is in `/srv/spotifyforge/data`, so keep secrets out of that folder. It and the hourly job share one Spotify grant, so both take `/run/lock/spotifyforge.lock` and never overlap |
 | Backups | The bot's nightly 04:00 backup, 14 kept, in `bot/data/backups`, on the same disk as the database. `front-desk-backup.timer` sends an encrypted copy off this machine at 05:00: see "Off-site backups" |
 | Neighbours | Monkey SMP owns `/srv/monkey`, the `monkey` user and the `monkey-*` timers. Front Desk shares only Docker and the machine, and is capped at 512 MB. Nothing here needs a port opened |
 
@@ -31,6 +32,8 @@ bot left): run those through the container, as the restore below does.
 | Run a setup script | `docker compose exec bot python /app/server/public_mode.py` (a dry run; add `--apply` to change Discord) |
 | Timers | `systemctl list-timers 'front-desk-*'`; `journalctl -u front-desk-site-data -n 20` |
 | Is the listening log moving? | `systemctl status front-desk-spotify-history`; `tail -n 1 /srv/spotifyforge/data/listening_history.jsonl` |
+| Did the playlist maintenance run? | `journalctl -u front-desk-spotify-weekly -n 40` (a `step '...' exited N` line names what failed); `tail -c 200 /srv/spotifyforge/data/stats_history.jsonl` |
+| Run the playlist maintenance now | `systemctl start --no-block front-desk-spotify-weekly`: it writes to Spotify, so only when a run is due |
 | Spotify login gone or revoked | In `deploy/vps/spotify-history`: `docker compose run --rm history spotifyforge auth login`. It prints a URL for a browser and asks for the address the browser lands on |
 | Restore a nightly backup | `docker compose stop`, then `docker compose run --rm --no-deps bot sh -c 'cp data/front_desk.db data/front_desk.db.bad && cp data/backups/front_desk-YYYY-MM-DD.db data/front_desk.db && rm -f data/front_desk.db-wal data/front_desk.db-shm'`, then `docker compose start` |
 
@@ -54,8 +57,8 @@ A dead disk or a deleted VPS takes `bot/data/backups` with the database, so once
 
 The deploy key in `/etc/front-desk-backup` has to be able to force-push, so someone who takes over the VPS
 could erase the branch. They would already have the live database, but not the older copies: clone the
-branch to a disk at home now and then if that matters. Only the database is copied: `server/.env` and the
-listening log are not.
+branch to a disk at home now and then if that matters. Only the database is copied: `server/.env` and
+`/srv/spotifyforge` are not.
 
 | Situation | Do this |
 |---|---|
@@ -107,10 +110,13 @@ Docker must be installed. The steps are ordered so that two bots never run at on
 
 6. `docker compose up -d`, wait for `healthy`, read #mod-log, and only then
    `systemctl enable --now front-desk-watchdog.timer front-desk-site-data.timer`.
-7. Bring the listening log and its login over from the old host, or the Heard section starts empty.
-   Stop `front-desk-spotify-history.timer` there first, then copy `/srv/spotifyforge`, keeping owners
-   and modes, and `systemctl enable --now front-desk-spotify-history.timer`. The log has no other
-   copy, and Spotify itself remembers only the last 50 plays.
+7. Bring SpotifyForge's folder over from the old host, or the Heard section starts empty and the
+   playlist maintenance has nothing to work from.
+   Stop `front-desk-spotify-history.timer` and `front-desk-spotify-weekly.timer` there first, then copy
+   `/srv/spotifyforge`, keeping owners and modes, and
+   `systemctl enable --now front-desk-spotify-history.timer front-desk-spotify-weekly.timer`. The log
+   and the playlists' pinned tracks (`expansions.json`) have no other current copy, and Spotify itself
+   remembers only the last 50 plays.
 8. Write `/etc/front-desk-backup/settings` (mode 600), with the key from the `# public key:` line of the
    private key file. Neither value is a secret:
 
