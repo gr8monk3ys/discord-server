@@ -19,7 +19,7 @@ from test_server_scripts import NS, _wave9_guild, _wave9_steps
 ROSTER, FORUM, RULES, FAQ = "📝・founding-roster", "🚩・smp-forum", "📜・smp-rules", "❔・smp-faq"
 SMP, CMDS = "⛏️・monkey-smp", "⌨️・smp-commands"
 SMP_CHANNELS = [RULES, FAQ, CMDS, SMP, ROSTER, FORUM]  # the category's order: read first, then talk
-OPENED_BY_MINECRAFT = [SMP, ROSTER, FORUM, RULES, CMDS]
+OPENED_BY_MINECRAFT = [SMP, ROSTER, FORUM, RULES, CMDS, FAQ]
 DISCORD_MAX_SLOWMODE = 21600
 MAX_TAG_NAME = 20
 
@@ -85,9 +85,9 @@ def test_minecraft_opens_the_smp_channels_and_hands_out_no_smp_ping():
         assert "SMP Ping" not in {o.get("role") for o in prompt["options"]}
     for row in public_mode.ONBOARDING_PROMPTS:
         assert "SMP Ping" not in {o.get("role") for o in row["options"]}
-    group = next(g for g in layout.FOCUS_GROUPS if g["title"] == "Minecraft")
-    assert set(OPENED_BY_MINECRAFT) <= set(group["channels"])
-    assert FAQ in group["channels"]  # every public channel needs a home (focus_mode.classify)
+    # A newcomer sees the whole category without answering anything.
+    assert set(SMP_CHANNELS) <= set(layout.ONBOARDING_DEFAULT_CHANNELS)
+    assert not any(g["title"] == "Minecraft" for g in layout.FOCUS_GROUPS)
 
 
 def test_extra_answer_channels_are_public_layout_channels():
@@ -228,7 +228,6 @@ def test_a_full_run_makes_the_channels_and_opens_them_from_the_minecraft_answer(
     made = {name for kind, name, _ in guild.calls if kind in ("text", "forum")}
     assert {ROSTER, RULES, FAQ, FORUM} <= made
     assert channel_ids(guild, OPENED_BY_MINECRAFT) <= set(minecraft_answer(guild).channel_ids)
-    assert channel_ids(guild, [FAQ]).isdisjoint(minecraft_answer(guild).channel_ids)
 
 
 def test_polish_server_first_build_gives_the_minecraft_answer_every_channel():

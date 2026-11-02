@@ -597,6 +597,8 @@ ONBOARDING_DEFAULT_CHANNELS = [
     "📌・rules", "📣・announcements", "💬・general", "🆘・help", "🕹️・gaming", "🎮・lfg", "📸・clips",
     "🔊 Lobby", "➕ New Squad",
     "📓・field-notes",  # one post a week, quiet otherwise
+    # Monkey SMP, whole: as an opt-in group nobody found it, and it's what the server is pointing people at.
+    "📜・smp-rules", "❔・smp-faq", "⌨️・smp-commands", "⛏️・monkey-smp", "📝・founding-roster", "🚩・smp-forum",
 ]
 # The default list before the core was cut down, word for word: what --revert restores.
 ONBOARDING_EVERYTHING = [
@@ -607,6 +609,7 @@ ONBOARDING_EVERYTHING = [
     "📚・guides", "🖥・setups",
     "⛏️・monkey-smp",
     "📓・field-notes",  # added after the cut, as a default from the start
+    "📜・smp-rules", "❔・smp-faq", "⌨️・smp-commands", "📝・founding-roster", "🚩・smp-forum",  # likewise, later
 ]
 # Opt-in groups: one question under Channels & Roles (asked after joining, so it does not
 # count against Discord's cap on pre-join questions). Every public channel that is not a
@@ -630,10 +633,6 @@ FOCUS_GROUPS = [
     {"title": "Off topic", "emoji": "🤣",
      "description": "Memes, art, code, fashion and chess.",
      "channels": ["🤣・memes", "🎨・art", "💻・code", "👗・fashion", "♟️・chess"]},
-    {"title": "Minecraft", "emoji": "⛏️",
-     "description": "Monkey SMP: rules, FAQ, commands, in-game chat, the founding roster and the faction forum.",
-     "channels": ["⛏️・monkey-smp", "📝・founding-roster", "🚩・smp-forum", "📜・smp-rules", "❔・smp-faq",
-                  "⌨️・smp-commands"]},
     {"title": "Roles and arrivals", "emoji": "🎭",
      "description": "The roles panel, and who just joined.",
      "channels": ["👋・welcome", "🎭・roles"]},
@@ -657,7 +656,8 @@ FOCUS_RESERVE = ["🤣・memes", "🤖・bot-commands"]
 # Minecraft opens Monkey SMP too; it hands out the @Minecraft role only, never @SMP Ping (that
 # ping stays opt-in, on the 🎭・roles panel).
 GAME_EXTRA_CHANNELS = {
-    "Minecraft": ["⛏️・monkey-smp", "📝・founding-roster", "🚩・smp-forum", "📜・smp-rules", "⌨️・smp-commands"],
+    "Minecraft": ["⛏️・monkey-smp", "📝・founding-roster", "🚩・smp-forum", "📜・smp-rules", "⌨️・smp-commands",
+                  "❔・smp-faq"],
 }
 # Private ("private_to") channels never go in any of these lists.
 ONBOARDING_PROMPTS = [

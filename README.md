@@ -101,7 +101,7 @@ in `layout.ROLES`, and every bot gets `@Bots` so they're grouped in the member l
   every channel it would hide).
 - To give newcomers a short channel list, run `focus_mode.py` (`--plan` prints the plan from
   `layout.py` alone, no arguments is a dry run against the server, then `--apply`). The
-  Onboarding default channels become the nine in `ONBOARDING_DEFAULT_CHANNELS`, and the other
+  Onboarding default channels become the ones in `ONBOARDING_DEFAULT_CHANNELS`, and the other
   public channels become answers to one optional question, "What else do you want to see?".
   No permission changes and nothing is deleted: every channel stays open to @everyone and
   current members keep the list they have. `--revert` makes every channel a default again.
