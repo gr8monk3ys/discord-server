@@ -416,7 +416,7 @@ POSTS = {
                 "**Banned**",
                 "- Brewing Strength or putting it on arrows or players, enchanted maces, ender pearls, Totems of "
                 "Undying, enchanted "
-                "golden apples (pearls and gapples are for crafting only), crystal PvP, bed bombing, Fire "
+                "golden apples (pearls and enchanted gapples are for crafting only), crystal PvP, bed bombing, Fire "
                 "Aspect and Flame, TNT minecarts, escape tunnels. (B1-B5, B7-B10, B12)",
                 "- Debuffs on others, except Slowness I, Weakness I, Poison I, Instant Harming I and Turtle "
                 "Master from a bow or crossbow. (B6)",
