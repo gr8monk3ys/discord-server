@@ -1,10 +1,62 @@
 # Hosting Front Desk
 
-Front Desk runs on the owner's home PC. When that PC is off, the bot is off. This guide covers
-three ways to fix that, from "free, 20 minutes" to "the bot no longer depends on the house".
+Front Desk runs on a rented VPS, the same one as Monkey SMP (next section). Until 2026-11 it ran
+on the owner's home PC, and the options further down are the guide that move came from. The bot
+only makes outgoing connections to Discord. It needs no domain, no open ports and no public IP
+address, on any of them.
 
-The bot only makes outgoing connections to Discord. It needs no domain, no open ports and no
-public IP address, on any of the options below.
+## The live VPS
+
+| | |
+|---|---|
+| Code and data | `/srv/front-desk/repo`, a checkout owned by the system user `frontdesk` (uid 10001, the container's user). Data is its gitignored `bot/data`; secrets are `server/.env`, mode 600 |
+| Bot | Container `front-desk` (`docker-compose.yml`). `restart: unless-stopped` and Docker's own start at boot bring it back after a crash or a reboot; `bot/run_container.sh` stops a bot whose heartbeat is 10 minutes old |
+| Downtime alerts | `front-desk-watchdog.timer`, every 5 minutes: `server/watchdog.py --alert-only` posts to #mod-log |
+| Site data | `front-desk-site-data.timer`, every 30 minutes: `server/publish_site_data.py`, pushing to `site-data` with `frontdesk`'s SSH key, a deploy key with write access on this repository |
+| Backups | The bot's nightly 04:00 backup, 14 kept, in `bot/data/backups`. **Same disk as the database**: see "Off-box backups" |
+| Neighbours | Monkey SMP owns `/srv/monkey`, the `monkey` user and the `monkey-*` timers. Front Desk shares only Docker and the machine, and is capped at 512 MB. Nothing here needs a port opened |
+
+Everything below is run as root in `/srv/front-desk/repo`. Run git as `frontdesk`
+(`runuser -u frontdesk -- git ...`): as root it fails with "dubious ownership".
+
+| Situation | Do this |
+|---|---|
+| Is it up? | `docker compose ps` (`healthy` = heartbeat under 3 minutes old) |
+| Read the log | `docker compose logs --tail 100`, or `bot/data/bot.log` |
+| Restart | `docker compose restart` |
+| Update to the latest code | `runuser -u frontdesk -- git pull --ff-only && docker compose up -d --build` |
+| Stop on purpose | `runuser -u frontdesk -- python3 server/watchdog.py --alert-only --pause 60`, then `docker compose stop` |
+| Run a setup script | `docker compose exec bot python /app/server/public_mode.py` (a dry run; add `--apply` to change Discord) |
+| Timers | `systemctl list-timers 'front-desk-*'`; `journalctl -u front-desk-site-data -n 20` |
+| Restore a nightly backup | `docker compose stop`, then `cp bot/data/front_desk.db bot/data/front_desk.db.bad && cp bot/data/backups/front_desk-YYYY-MM-DD.db bot/data/front_desk.db && rm -f bot/data/front_desk.db-wal bot/data/front_desk.db-shm && chown frontdesk: bot/data/front_desk.db`, then `docker compose start` |
+
+Never run `git clean` in that checkout: `bot/data` is gitignored and holds the database.
+
+### Setting it up again (a new VPS)
+
+Docker must be installed. The steps are ordered so that two bots never run at once:
+
+1. Copy `deploy/vps/install.sh` over and run `sh install.sh` as root. It makes the user, the
+   checkout, the key and the units and builds the image. It starts nothing.
+2. Add the key it prints to the repository (Settings, Deploy keys, write access on).
+3. Copy the secrets, from wherever the old host is, with no Windows paths in them and no CRs:
+   `tr -d '\r' < server/.env | grep -v '^FIELD_NOTES_SPOTIFY_HISTORY=' | ssh root@VPS 'install -m 600 -o frontdesk -g frontdesk /dev/stdin /srv/front-desk/repo/server/.env'`
+4. Stop the old host and make sure it stays stopped (on the PC, step 1 of the cut-over checklist).
+5. Pack on the old host, then install the archive here. The bot has never run on this box yet, so
+   the data directory has no lock to wait for:
+
+   ```bash
+   docker compose run --rm -v "$PWD/migrate.tar.gz:/tmp/migrate.tar.gz:ro" bot \
+     python /app/server/migrate_host.py unpack /tmp/migrate.tar.gz --apply
+   ```
+
+6. `docker compose up -d`, wait for `healthy`, read #mod-log, and only then
+   `systemctl enable --now front-desk-watchdog.timer front-desk-site-data.timer`.
+
+What is deliberately not here: the Windows tasks (`Front Desk bot`, `Front Desk watchdog`,
+`Front Desk site data`), and `FIELD_NOTES_SPOTIFY_HISTORY`, because the SpotifyForge log it reads is
+written by a job on the PC. Field notes post without their Heard section until that log has a home
+this box can read. `/catchup` stays off unless `ANTHROPIC_API_KEY` is set, as it was on the PC.
 
 ## Which option?
 
@@ -206,8 +258,9 @@ Never run `docker compose down -v` or `docker volume rm`: `-v` deletes the datab
 | `bot.lock` (one copy per machine) | unchanged, inside the data volume |
 | Task "Front Desk watchdog": restart when the heartbeat is 10 minutes old, at most 3 times an hour | `bot/run_container.sh` does the same inside the container: it stops a bot whose heartbeat is 10 minutes old and Docker starts a fresh one, at most 3 times an hour |
 | `watchdog.py --check` | `docker compose ps`: the health check reads `bot/data/heartbeat` and reports `unhealthy` when it is older than 3 minutes |
-| Watchdog alert in 📋・mod-log while the bot is down | **not replaced.** The bot still posts its own "back online" note after every restart. `WATCHDOG_WEBHOOK_URL` and `WATCHDOG_PING_USER_ID` in `.env` are simply unused |
+| Watchdog alert in 📋・mod-log while the bot is down | `server/watchdog.py --alert-only` from a host timer (`deploy/vps/`; on another box, a cron line does the same). The bot also posts its own "back online" note after every restart |
 | `watchdog.py --pause` before stopping on purpose | not needed: `docker compose down` or `stop` stays stopped |
+| Task "Front Desk site data" | `front-desk-site-data.timer` (`deploy/vps/`) |
 | Backups in `D:\Backups\front-desk` | the same nightly 04:00 backup, 14 kept, lands in `backups/` inside the data volume (the bot falls back there because `D:\` does not exist) |
 
 ### Off-box backups

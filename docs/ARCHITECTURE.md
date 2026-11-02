@@ -492,12 +492,12 @@ section with fresh, stale and failed data). CI runs both in the "Site" job.
 
 | Piece | Today | Notes |
 |---|---|---|
-| Bot | Windows Task Scheduler task "Front Desk bot" runs `pythonw main.py` in `bot/` from the shared `server/.venv`, at boot and logon | Stop the task (and pause the watchdog) before running `main.py` by hand; the lock file refuses a second copy |
-| Watchdog | Task "Front Desk watchdog", `server/watchdog.py` every 5 minutes | Installed by `server/install_watchdog.ps1` |
+| Bot | Docker on the VPS (`docker-compose.yml`, `/srv/front-desk/repo`, `restart: unless-stopped`), since 2026-11 | `docs/HOSTING.md`, "The live VPS". Never run a second copy with the same token; the lock file only protects one machine |
+| Watchdog | Restarts: `bot/run_container.sh` inside the container. Alerts: `front-desk-watchdog.timer` runs `server/watchdog.py --alert-only` every 5 minutes | Units in `deploy/vps/`. `server/install_watchdog.ps1` is the Windows version (restarts and alerts), kept for a rollback |
 | Backups | `ops` daily 04:00, SQLite online backup, integrity-checked, newest 14 kept | `config.BACKUP_DIR`, falling back to `bot/data/backups` when that drive is missing |
-| Container kit | `Dockerfile`, `docker-compose.yml`, `bot/run_container.sh` | Not the live deployment. Read-only root, non-root user, data volume, heartbeat healthcheck and an in-container monitor with the watchdog's thresholds. Steps and cut-over checklist: `docs/HOSTING.md` |
+| Container kit | `Dockerfile`, `docker-compose.yml`, `bot/run_container.sh` | The live deployment. Read-only root, non-root user, data volume, heartbeat healthcheck and an in-container monitor with the watchdog's thresholds. Steps and cut-over checklist: `docs/HOSTING.md` |
 | Site | Vercel project rooted at `site/`, production branch `main` | Next.js, set by `site/vercel.json` (`bun install --frozen-lockfile`, `bun run build`). The route handlers read their settings from the Vercel project's environment variables |
-| Site data | A scheduled task the owner creates runs `server/publish_site_data.py --apply --quiet` every 30 minutes | Needs git push access to `origin` on that machine; exits 0 without output when there is nothing to do |
+| Site data | `front-desk-site-data.timer` runs `server/publish_site_data.py --apply --quiet` every 30 minutes | Pushes with a deploy key of `frontdesk` on the VPS (`deploy/vps/`); exits 0 without output when there is nothing to do |
 
 Never run the bot on two machines with the same token: the lock is per machine. The
 `front-desk-bot` branch must be kept, because the bot's public privacy link points at

@@ -6,6 +6,8 @@
 #   docker compose down              stop (the data volume is kept)
 #
 # Secrets come from server/.env (same file as on Windows; it is never copied into the image).
+name: front-desk
+
 services:
   bot:
     build: .
@@ -15,7 +17,9 @@ services:
     init: true
     env_file: server/.env
     volumes:
-      - front-desk-data:/app/bot/data   # database, nightly backups, log, lock, heartbeat
+      # database, nightly backups, log, lock, heartbeat. A named volume unless the repo root's .env
+      # sets FRONT_DESK_DATA (the live VPS keeps it in the checkout's gitignored bot/data).
+      - ${FRONT_DESK_DATA:-front-desk-data}:/app/bot/data
     mem_limit: 512m
     read_only: true                  # the bot writes only to its data volume
     tmpfs:

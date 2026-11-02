@@ -1,0 +1,14 @@
+[Unit]
+Description=Push the landing page's live data to the site-data branch (server/publish_site_data.py)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=frontdesk
+WorkingDirectory=/srv/front-desk/repo/server
+ExecStart=/usr/bin/python3 /srv/front-desk/repo/server/publish_site_data.py --apply --quiet --remote git@github.com:gr8monk3ys/discord-server.git
+TimeoutStartSec=5min
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
