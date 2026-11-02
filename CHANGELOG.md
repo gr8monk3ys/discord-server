@@ -8,6 +8,8 @@ All notable changes to this project are recorded here. The format follows
 
 ### Changed
 
+- SpotifyForge's two VPS jobs now post to #mod-log when they start failing and when they work
+  again (`deploy/vps/front-desk-spotify-alert.sh`). After the PC's C: wipe nothing else would notice.
 - SpotifyForge's weekly playlist maintenance moved from the owner's PC to the VPS
   (`front-desk-spotify-weekly.timer`, `deploy/vps/spotify-history/weekly.sh`). It and the hourly
   listening-log job now take one lock, because they share a Spotify grant.
