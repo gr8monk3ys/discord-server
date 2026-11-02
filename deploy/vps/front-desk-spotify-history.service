@@ -1,0 +1,11 @@
+[Unit]
+Description=Append Spotify's recent plays to the listening log the field notes read (SpotifyForge)
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/front-desk/repo/deploy/vps/spotify-history
+ExecStart=/usr/bin/docker compose run --rm -T history
+TimeoutStartSec=5min

@@ -1,0 +1,28 @@
+# The hourly listening-log job (front-desk-spotify-history.timer), a one-shot beside the bot:
+#
+#   docker compose run --rm -T history     one sync by hand, from this folder
+#   docker compose build                   after changing the Dockerfile's pinned commit
+#
+# The bot sees only /srv/spotifyforge/data, read-only (docker-compose.yml at the repo root). The
+# Spotify login is in login/ (the job's user only) and client.env (root only): see docs/HOSTING.md.
+name: spotify-history
+
+services:
+  history:
+    build: .
+    image: spotify-history
+    env_file:
+      - path: /srv/spotifyforge/client.env
+        required: false              # `docker compose build` runs before the secrets are copied
+    volumes:
+      - /srv/spotifyforge/data:/data
+      - /srv/spotifyforge/login:/login
+    network_mode: bridge             # no network of its own for a one-shot
+    mem_limit: 256m
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true

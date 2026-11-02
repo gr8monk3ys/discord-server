@@ -20,6 +20,9 @@ services:
       # database, nightly backups, log, lock, heartbeat. A named volume unless the repo root's .env
       # sets FRONT_DESK_DATA (the live VPS keeps it in the checkout's gitignored bot/data).
       - ${FRONT_DESK_DATA:-front-desk-data}:/app/bot/data
+      # SpotifyForge's listening log, read only, for the field notes' Heard section. An empty volume
+      # unless the repo root's .env sets FRONT_DESK_SPOTIFY (the live VPS: deploy/vps/spotify-history).
+      - ${FRONT_DESK_SPOTIFY:-front-desk-no-spotify}:/spotify:ro
     mem_limit: 512m
     read_only: true                  # the bot writes only to its data volume
     tmpfs:
@@ -38,3 +41,4 @@ services:
 
 volumes:
   front-desk-data:
+  front-desk-no-spotify:
