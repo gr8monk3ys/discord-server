@@ -111,7 +111,7 @@ Docker must be installed. The steps are ordered so that two bots never run at on
    Stop `front-desk-spotify-history.timer` there first, then copy `/srv/spotifyforge`, keeping owners
    and modes, and `systemctl enable --now front-desk-spotify-history.timer`. The log has no other
    copy, and Spotify itself remembers only the last 50 plays.
-8. Write `/etc/front-desk-backup/settings` (mode 600), with the public key from the first line of the
+8. Write `/etc/front-desk-backup/settings` (mode 600), with the key from the `# public key:` line of the
    private key file. Neither value is a secret:
 
    ```sh
