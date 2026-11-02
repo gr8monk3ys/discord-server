@@ -14,9 +14,13 @@ Each run:
 A disabled bot task, or a pause set with --pause, means "down on purpose": no restarts, no
 alerts. The webhook URL is a secret: it is never printed or logged.
 
+On Linux Docker does the restarting (bot/run_container.sh and the restart policy) and a systemd
+timer runs this with --alert-only: same heartbeat, alerts and --pause, no task to read or restart.
+
 Usage: pythonw watchdog.py            one check (what the scheduled task runs)
        python watchdog.py --check     print the status, change nothing
        python watchdog.py --pause 60  no restarts/alerts for 60 minutes (--resume ends it)
+       python3 watchdog.py --alert-only   one check that only alerts (the VPS timer)
 """
 
 from __future__ import annotations
@@ -90,7 +94,10 @@ def post_webhook(url: str, payload: dict) -> int:
 
 
 def real_env() -> dict:
-    from dotenv import load_dotenv
+    try:
+        from dotenv import load_dotenv
+    except ImportError:  # the VPS timer runs on the host's Python; systemd passes server/.env
+        return dict(os.environ)
 
     load_dotenv(SERVER_DIR / ".env")
     return dict(os.environ)
@@ -102,6 +109,7 @@ class Deps:
     run: Runner = run_powershell
     post: Poster = post_webhook
     env: Mapping = field(default_factory=dict)
+    alert_only: bool = False  # Docker restarts the bot; never touch a scheduled task
 
 
 # ---------------------------------------------------------------- pure helpers
@@ -221,7 +229,8 @@ def minutes(seconds: float) -> str:
     return f"{max(0, int(seconds // 60))} min"
 
 
-def message(plan: Plan, kind: str, state: dict, now: int, hb_ts, task, restart_result) -> str:
+def message(plan: Plan, kind: str, state: dict, now: int, hb_ts, task, restart_result,
+            alert_only: bool = False) -> str:
     since = hb_ts if hb_ts is not None else state["down_since"] or now
     if kind == "up":
         start = state["down_since"] or since
@@ -233,6 +242,8 @@ def message(plan: Plan, kind: str, state: dict, now: int, hb_ts, task, restart_r
     first = "Front Desk looks down" if kind == "down" else "Front Desk is still down"
     if kind == "remind" and state["down_since"]:
         first += f" (for {minutes(now - state['down_since'])})"
+    if alert_only:
+        return f"{first}: {head}. Docker restarts it on its own; if this keeps coming, check `docker compose ps` on the VPS."
     parts = [f"{first}: {head}; task '{TASK_NAME}' is {task or 'unknown (not found?)'}."]
     if restart_result is not None:
         ok, detail = restart_result
@@ -310,13 +321,13 @@ def _run_once(paths: Paths, deps: Deps, act: bool) -> dict:
     now = int(deps.clock())
     hb_ts = parse_heartbeat(read_text(paths.heartbeat))
     state = load_state(read_text(paths.state))
-    task = task_state(deps.run)
+    task = None if deps.alert_only else task_state(deps.run)
     plan = decide(state, now, hb_ts, task)
     url, _, problem = webhook_config(deps.env)
     status = {
         "now": now, "heartbeat_age": None if hb_ts is None else now - hb_ts, "fresh": plan.fresh,
         "task": task, "would_restart": plan.restart, "would_alert": plan.alert, "capped": plan.capped,
-        "skip": plan.skip, "webhook": "configured" if url else problem,
+        "skip": plan.skip, "webhook": "configured" if url else problem, "alert_only": deps.alert_only,
         "restarts_last_hour": len(recent_restarts(state, now)), "state": state,
     }
     if not act:
@@ -343,9 +354,9 @@ def _run_once(paths: Paths, deps: Deps, act: bool) -> dict:
             log.warning("heartbeat stale (task %s); restart %s", task,
                         "ok" if restart_result[0] else f"failed: {restart_result[1]}")
         else:
-            log.warning("heartbeat stale (task %s); not restarting%s", task,
+            log.warning("heartbeat stale (task %s); not restarting%s", "n/a, alert only" if deps.alert_only else task,
                         " (restart limit)" if plan.capped else "")
-        if plan.alert and send(deps, message(plan, plan.alert, state, now, hb_ts, task, restart_result)):
+        if plan.alert and send(deps, message(plan, plan.alert, state, now, hb_ts, task, restart_result, deps.alert_only)):
             state.update(alerted=True, last_alert=now)
     state["restarts"] = recent_restarts(state, now)
     write_json_atomic(paths.state, state)
@@ -366,7 +377,10 @@ def print_status(status: dict) -> None:
     age = status["heartbeat_age"]
     hb = "missing" if age is None else f"{age} s old"
     print(f"heartbeat:   {hb} ({'fresh' if status['fresh'] else 'STALE'})")
-    print(f"bot task:    {status['task'] or 'unknown (not found or not readable)'}")
+    if status["alert_only"]:
+        print("bot task:    none, alert only (Docker restarts the bot)")
+    else:
+        print(f"bot task:    {status['task'] or 'unknown (not found or not readable)'}")
     print(f"webhook:     {status['webhook']}")
     st = status["state"]
     print(f"alerted:     {st['alerted']}  down since: {st['down_since'] or '-'}")
@@ -393,9 +407,11 @@ def main(argv: list | None = None, paths: Paths | None = None, deps: Deps | None
     ap.add_argument("--check", action="store_true", help="print the status without acting")
     ap.add_argument("--pause", type=int, metavar="MINUTES", help="no restarts or alerts for MINUTES")
     ap.add_argument("--resume", action="store_true", help="end a pause")
+    ap.add_argument("--alert-only", action="store_true", help="never read or restart a scheduled task (Linux)")
     args = ap.parse_args(argv)
     paths = paths or default_paths()
     deps = deps or Deps(env=real_env())
+    deps.alert_only = deps.alert_only or args.alert_only
     if args.check:
         print_status(run_once(paths, deps, act=False))
         return 0

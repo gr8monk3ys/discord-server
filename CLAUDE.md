@@ -83,10 +83,14 @@ CI (`.github/workflows/ci.yml`) runs ruff, both Python test suites and the site 
   categories by their "was" names, makes a category marked `public_mode_creates`, moves a layout
   channel sitting in another layout category into its own, drops the Onboarding options of retired
   games and archives their channels; read its dry run first). Roles the bot hands out must sit below it.
-- The live bot runs from a scheduled task and holds `bot/data/bot.lock`; stop the task before
-  running `main.py` by hand (README runbook).
-- The "Front Desk watchdog" task restarts the bot if `bot/data/heartbeat` goes stale; run
-  `python server/watchdog.py --pause 60` before stopping the bot on purpose.
+- The live bot runs on the VPS in Docker (`/srv/front-desk/repo`, `docs/HOSTING.md`, "The live VPS"),
+  not on a PC. Never start a second copy anywhere with the same token: `bot/data/bot.lock` only
+  protects one machine. On Windows, `run_bot.bat` and `server/install_watchdog.ps1` are for a
+  rollback only.
+- On the VPS the checkout is root's and only `bot/data` is `frontdesk`'s, which the container writes
+  to too: don't work on files in there as root (it follows symlinks), go through the container. Leave
+  the server's Minecraft files and containers alone. Before a long stop there, run
+  `python3 server/watchdog.py --alert-only --pause 60` as `frontdesk`, or it alerts #mod-log.
 - Keep the `front-desk-bot` branch: the bot's public privacy-policy link points at `PRIVACY.md`
   on that branch. After changing `PRIVACY.md` on `main`, fast-forward that branch to `main`.
 - The `site-data` branch is not a code branch: it holds one force-pushed, parentless commit

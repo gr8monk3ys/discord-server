@@ -242,29 +242,30 @@ All times are Pacific. Every scheduled job catches up once after downtime and ne
 - **Task Scheduler task "Front Desk bot"** runs `server\.venv\Scripts\pythonw.exe main.py` in
   `bot\`, at boot (no sign-in needed) and at logon, and restarts it if it crashes. A lock file
   (`bot\data\bot.lock`) stops a second copy.
-- **Logs:** `bot\data\bot.log` (rotated). **Database:** `bot\data\front_desk.db`.
-  **Backups:** `D:\Backups\front-desk\`, 14 days kept, integrity-checked.
+- **Where it runs:** Docker on the VPS, in `/srv/front-desk/repo` (`docs/HOSTING.md`, "The live VPS").
+- **Logs:** `bot/data/bot.log` (rotated). **Database:** `bot/data/front_desk.db`.
+  **Backups:** `bot/data/backups/`, 14 days kept, integrity-checked, on the same disk as the database.
 - **Health:** errors and "back online" notes are posted in 📋・mod-log; `/status` (staff only)
   shows uptime, latency, last backup and error counts.
-- **Watchdog:** Task Scheduler task "Front Desk watchdog" runs `server\watchdog.py` every 5
-  minutes. If the heartbeat is older than 10 minutes it restarts the bot task (at most 3 times an
-  hour) and alerts 📋・mod-log through the webhook in `server\.env` (`WATCHDOG_WEBHOOK_URL`,
-  `WATCHDOG_PING_USER_ID`). Install or update it with `server\install_watchdog.ps1`.
-- **Live site data:** the bot only writes `bot\data\site\stats.json`. A scheduled task you create
-  runs `server\.venv\Scripts\pythonw.exe publish_site_data.py --apply --quiet` in `server\` every
-  30 minutes and pushes the file to the `site-data` branch (`docs/WAVE9_SETUP.md`).
+- **Watchdog:** inside the container `bot/run_container.sh` stops a bot whose heartbeat is older
+  than 10 minutes (at most 3 times an hour) and Docker starts a fresh one. `front-desk-watchdog.timer`
+  on the host alerts 📋・mod-log through the webhook in `server/.env` (`WATCHDOG_WEBHOOK_URL`,
+  `WATCHDOG_PING_USER_ID`).
+- **Live site data:** the bot only writes `bot/data/site/stats.json`. `front-desk-site-data.timer`
+  on the host runs `publish_site_data.py --apply --quiet` every 30 minutes and pushes the file to
+  the `site-data` branch (`docs/WAVE9_SETUP.md`).
 
 ### Runbook
 
 | Situation | Do this |
 |---|---|
-| Restart the bot | `Stop-ScheduledTask 'Front Desk bot'; Start-ScheduledTask 'Front Desk bot'` |
-| Bot offline | Check `bot\data\bot.log` (last lines), then restart. "already running" means another copy holds `bot.lock` |
-| Change the task | Needs an **elevated** PowerShell (the task runs as S4U) |
-| Restore the database | Stop the task, copy the newest `D:\Backups\front-desk\front_desk-*.db` over `bot\data\front_desk.db`, start the task |
+| Restart the bot | On the VPS, in `/srv/front-desk/repo`: `docker compose restart` |
+| Update the bot | `git pull --ff-only && docker compose up -d --build` |
+| Bot offline | `docker compose ps`, then `docker compose logs --tail 100`, then restart. "already running" means another copy holds `bot.lock` |
+| Restore the database | `docs/HOSTING.md`, "The live VPS" |
 | A role won't be given out | The role must sit **below Front Desk** in Server Settings → Roles. Only the owner can move roles above the bot |
-| Run by hand (debugging) | `python server\watchdog.py --pause 60` first (or it restarts the task), stop the task, then `bot\run_bot.bat`; `--resume` afterwards |
-| Watchdog status | `python server\watchdog.py --check` |
+| Run by hand (debugging) | Stop the VPS copy first (`docker compose stop`; `runuser -u frontdesk -- python3 server/watchdog.py --alert-only --pause 60` so it doesn't alert), and never leave two copies on one token |
+| Watchdog status | `runuser -u frontdesk -- python3 server/watchdog.py --alert-only --check` (it needs `WATCHDOG_WEBHOOK_URL` from `server/.env` to report the webhook) |
 | Tests | `cd bot`, then `..\server\.venv\Scripts\python -m pytest -q` (about 4,200 tests); `cd server`, then `.venv\Scripts\python -m pytest -q tests` (275); `cd site`, then `bun install --frozen-lockfile`, `bun run lint`, `bun run typecheck`, `bun run test` and `bun run build` (the Next.js site; `bun run test:e2e` for Playwright). CI runs all three |
 | New roles or channels in `layout.py` | `cd server`, then `.venv\Scripts\python public_mode.py` (dry run) and `--apply`. It adds what is missing and never deletes; the one thing it takes away is a retired game's channel, which it moves to the staff-only archive (next row). The permission self-check lists what is still missing in 📋・mod-log |
 | Add or retire a game | In `server\layout.py`, move the game's tuple line between `GAMES` and `RETIRED_GAMES` (a brand-new game is a new line in `GAMES`). Then `cd bot` and `..\server\.venv\Scripts\python -m logic.sitegen` (the site's games block), `cd server` and `.venv\Scripts\python public_mode.py` (dry run: read what it would hide) then `--apply`, and restart the bot. Retiring keeps the role and every member's copy of it and moves the channel, messages included, into `99 · archive`; moving the line back and re-running undoes it |

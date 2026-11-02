@@ -3,6 +3,7 @@ nothing touches Task Scheduler or the network."""
 
 import json
 import logging
+import sys
 
 import pytest
 
@@ -381,6 +382,51 @@ def test_main_check_uses_injected_deps(tmp_path, capsys):
     assert W.main(["--check"], paths=paths, deps=deps) == 0
     assert "fresh" in capsys.readouterr().out.lower()
     assert deps.post.sent == [] and deps.run.restarts == []
+
+
+def test_alert_only_alerts_without_touching_a_task(tmp_path):
+    paths, deps = make(tmp_path, hb_age=11 * MIN)
+    assert W.main(["--alert-only"], paths=paths, deps=deps) == 0
+    assert deps.run.calls == []
+    assert len(deps.post.sent) == 1
+    text = deps.post.sent[0][1]["content"]
+    assert "looks down" in text and "Docker" in text
+    assert "task" not in text
+    assert saved(paths)["alerted"] is True and saved(paths)["restarts"] == []
+
+
+def test_alert_only_reminds_then_reports_back_up(tmp_path):
+    state = {"alerted": True, "down_since": NOW - 2 * HOUR, "last_alert": NOW - 2 * HOUR}
+    paths, deps = make(tmp_path, hb_age=2 * HOUR, state=state)
+    deps.alert_only = True
+    W.run_once(paths, deps)
+    assert "still down" in deps.post.sent[-1][1]["content"]
+    paths.heartbeat.write_text(json.dumps({"ts": NOW - 30, "latency": 0.05}))
+    W.run_once(paths, deps)
+    assert "back up" in deps.post.sent[-1][1]["content"]
+    assert saved(paths)["alerted"] is False
+    assert deps.run.calls == []
+
+
+def test_alert_only_respects_a_pause(tmp_path):
+    paths, deps = make(tmp_path, hb_age=HOUR, state={"paused_until": NOW + HOUR})
+    deps.alert_only = True
+    W.run_once(paths, deps)
+    assert deps.post.sent == [] and deps.run.calls == []
+
+
+def test_alert_only_check_says_so(tmp_path, capsys):
+    paths, deps = make(tmp_path, hb_age=30)
+    assert W.main(["--alert-only", "--check"], paths=paths, deps=deps) == 0
+    assert "alert only" in capsys.readouterr().out
+    assert deps.run.calls == []
+
+
+def test_real_env_works_without_dotenv(monkeypatch):
+    """The VPS timer runs on the host's Python, with server/.env passed in by systemd."""
+    monkeypatch.setitem(sys.modules, "dotenv", None)  # makes `from dotenv import ...` raise ImportError
+    monkeypatch.setenv("WATCHDOG_PING_USER_ID", OWNER)
+    assert W.real_env()["WATCHDOG_PING_USER_ID"] == OWNER
 
 
 def test_main_configures_rotating_log(tmp_path):

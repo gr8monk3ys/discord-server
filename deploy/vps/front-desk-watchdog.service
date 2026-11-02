@@ -1,0 +1,16 @@
+[Unit]
+Description=Front Desk downtime alert (server/watchdog.py)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=frontdesk
+WorkingDirectory=/srv/front-desk/repo/server
+# WATCHDOG_WEBHOOK_URL and WATCHDOG_PING_USER_ID; the host's Python has no python-dotenv.
+EnvironmentFile=/srv/front-desk/repo/server/.env
+ExecStart=/usr/bin/python3 /srv/front-desk/repo/server/watchdog.py --alert-only
+TimeoutStartSec=3min
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full

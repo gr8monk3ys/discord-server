@@ -3,7 +3,7 @@
 Front Desk is the bot for one Discord server, Lorenzo's Server. It isn't offered to other
 servers. This page says what it stores, why, and how to get it deleted.
 
-_Last updated: 2026-10-29_
+_Last updated: 2026-11-01_
 
 ## What Front Desk stores
 
@@ -49,7 +49,8 @@ of a guide or setup post, and the answers on a ban appeal.
 
 ## Where it's kept
 
-In a database on the server owner's own computer. It isn't sold or shared with anyone. Nothing
+In a database on a private server the server owner rents in the United States, the same one that
+runs Monkey SMP. It isn't sold or shared with anyone. Nothing
 about you is sent anywhere except Discord itself, apart from the cases this page names: a clip
 you agreed to have posted (YouTube), a Minecraft name and chat in the Minecraft channel (the
 server's own Minecraft server), server-wide totals with no names (the public website), and the
@@ -61,8 +62,8 @@ account's public Steam profile.
 **AI summaries.** When a member runs `/catchup`, recent messages from that one public channel
 are summarised for that member only. Messages from bots and from members who turned tracking
 off (`/privacy tracking:off`) are left out, and Front Desk does not keep the messages or the
-summary. The summary is written either by a model running on the server owner's own computer
-(nothing leaves it) or, if the owner has set that up instead, by Anthropic's API, in which
+summary. The summary is written either by a model running on a machine the server owner controls
+(no outside service sees it) or, if the owner has set that up instead, by Anthropic's API, in which
 case those messages are sent to Anthropic. The summary's footer says which one wrote it.
 
 **Houses.** Front Desk sorts members into one of three houses and keeps which house you are in.
@@ -109,7 +110,7 @@ otherwise tells the owner to remove it by hand. The record of the clip and your 
 either way, because it is the proof of what you agreed to.
 
 **Monkey SMP (Minecraft).** The Minecraft server belongs to the server owner and runs on the
-owner's own computer or home network. `/smp link` keeps the Minecraft name you give with your Discord ID; it is
+same rented server as Front Desk. `/smp link` keeps the Minecraft name you give with your Discord ID; it is
 not sent to the Minecraft server, and Front Desk never changes who may join it (that is a pass staff grant).
 `/smp unlink`, leaving or a ban deletes the link. What you type in the Monkey SMP channel is
 shown to players in the game with your display name, whatever your `/privacy` setting, and what
@@ -140,7 +141,7 @@ so that turning tracking off and on cannot skip the wait between shares.
 
 **The website's live numbers.** Every 30 minutes Front Desk writes a small file of server-wide
 totals (members, messages and voice hours this week, most played games, upcoming events, house
-scores) and the owner's computer publishes it to a public branch of this repository, where the
+scores) and that server publishes it to a public branch of this repository, where the
 landing page reads it. It holds no names, avatars or IDs. A number that describes fewer than
 three members is left out, the rest are rounded, and members with tracking off are left out of
 every total that comes from a per-member record. House scores appear only when every house
@@ -192,7 +193,7 @@ Authorized Apps > Front Desk > Deauthorize. Details: `docs/LINKED_ROLES.md`.
 
 **The weekly field notes.** Once a week Front Desk posts the server owner's own notebook: pull
 requests merged in the owner's public GitHub repositories (read from GitHub's public API), the
-owner's top artists and repeated tracks from a listening log kept on the owner's computer, the
+owner's top artists and repeated tracks from a listening log the owner keeps, the
 owner's Letterboxd diary entries from its public feed, and the owner's own game time from the
 records above. It reads nothing about any member for this post and stores nothing new; the
 question at the end goes through the same "questions nobody answers" check, and replies go in

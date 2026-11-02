@@ -6,8 +6,17 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Front Desk moved from the owner's PC to the VPS (`docs/HOSTING.md`, "The live VPS"): Docker with a
+  restart policy, `deploy/vps/` for the install script and the systemd timers that replace the Windows
+  watchdog and site-data tasks. `docker-compose.yml` takes its data path from `FRONT_DESK_DATA`.
+  PRIVACY.md now says where the data is kept. The field notes' Heard section is off until the
+  SpotifyForge log has a home the VPS can read.
+
 ### Added
 
+- `server/watchdog.py --alert-only`: the same heartbeat alerts without a scheduled task to manage.
 - Faction recruitment board and referrals (migration 27, after #54's migration 26, adds
   `faction_recruit`, `recruit_requests`, `smp_seekers`, `referral_codes` and `referral_claims`):
   - `/faction pitch`, `/faction recruit on|off`: one board post per approved faction (pitch, playstyle
