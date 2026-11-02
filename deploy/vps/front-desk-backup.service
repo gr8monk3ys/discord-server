@@ -1,0 +1,18 @@
+[Unit]
+Description=Send an encrypted copy of Front Desk's database off this machine (front-desk-backup.sh)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Root: Compose and the deploy key in /etc/front-desk-backup. It opens nothing in bot/data.
+User=root
+ExecStart=/bin/sh /srv/front-desk/repo/deploy/vps/front-desk-backup.sh
+StateDirectory=front-desk-backup
+TimeoutStartSec=15min
+Nice=19
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full

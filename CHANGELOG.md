@@ -22,6 +22,9 @@ All notable changes to this project are recorded here. The format follows
 
 ### Added
 
+- Off-site database backups on the VPS (`front-desk-backup.timer`, `docs/HOSTING.md`, "Off-site backups"): once a
+  day an `age`-encrypted copy goes to a private GitHub repository, newest 14 kept. The VPS holds only the
+  public key. PRIVACY.md now says so.
 - `server/watchdog.py --alert-only`: the same heartbeat alerts without a scheduled task to manage.
 - Faction recruitment board and referrals (migration 27, after #54's migration 26, adds
   `faction_recruit`, `recruit_requests`, `smp_seekers`, `referral_codes` and `referral_claims`):

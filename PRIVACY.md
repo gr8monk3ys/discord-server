@@ -59,6 +59,12 @@ Front Desk reads that channel's public page, feed or stream status from YouTube 
 it sends them only the channel's ID or handle, nothing about you. If you link a Steam account, Front Desk reads that
 account's public Steam profile.
 
+**Backups.** The database is copied once a day, to the same server and, encrypted, to a private GitHub
+repository, in case the server is lost. GitHub holds only the encrypted file: the key that opens it is the
+server owner's, and is on neither the server nor GitHub. Both keep the last 14 days, so something deleted
+from the database can stay in a backup for up to 14 days after that, and GitHub may hold a dropped file,
+still encrypted, for a while longer.
+
 **AI summaries.** When a member runs `/catchup`, recent messages from that one public channel
 are summarised for that member only. Messages from bots and from members who turned tracking
 off (`/privacy tracking:off`) are left out, and Front Desk does not keep the messages or the

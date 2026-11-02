@@ -1,0 +1,9 @@
+[Unit]
+Description=Send Front Desk's database off this machine once a day
+
+[Timer]
+OnCalendar=*-*-* 05:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

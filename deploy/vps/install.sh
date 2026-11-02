@@ -17,6 +17,7 @@ BOT_USER=frontdesk
 BOT_UID=10001   # the uid in the Dockerfile
 ORIGIN=https://github.com/gr8monk3ys/discord-server.git
 BRANCH=${1:-main}
+BACKUP_CONF=/etc/front-desk-backup
 SPOTIFY=/srv/spotifyforge
 SPOTIFY_USER=spotifyforge
 SPOTIFY_UID=10002   # the uid in deploy/vps/spotify-history/Dockerfile
@@ -55,9 +56,19 @@ if [ ! -f "$ROOT/.ssh/id_ed25519" ]; then
     as_bot ssh-keygen -q -t ed25519 -N '' -C "front-desk-site-data" -f "$ROOT/.ssh/id_ed25519"
 fi
 # GitHub's host keys, from its API over TLS rather than trusting whatever answers on port 22.
-curl -fsSL https://api.github.com/meta \
-    | python3 -c 'import json,sys; print("\n".join("github.com " + k for k in json.load(sys.stdin)["ssh_keys"]))' \
-    | as_bot tee "$ROOT/.ssh/known_hosts" >/dev/null
+github_hosts=$(curl -fsSL https://api.github.com/meta \
+    | python3 -c 'import json,sys; print("\n".join("github.com " + k for k in json.load(sys.stdin)["ssh_keys"]))')
+printf '%s\n' "$github_hosts" | as_bot tee "$ROOT/.ssh/known_hosts" >/dev/null
+
+# The off-site backup runs as root and pushes with its own key, to its own private repository, so
+# this key can't reach the code and frontdesk's can't reach the backups. See docs/HOSTING.md,
+# "Off-site backups"; the settings file is written by hand.
+command -v age >/dev/null || apt-get install -y --no-install-recommends age
+install -d -o root -g root -m 700 "$BACKUP_CONF"
+if [ ! -f "$BACKUP_CONF/id_ed25519" ]; then
+    ssh-keygen -q -t ed25519 -N '' -C "front-desk-backup" -f "$BACKUP_CONF/id_ed25519"
+fi
+printf '%s\n' "$github_hosts" > "$BACKUP_CONF/known_hosts"
 
 # The listening-log job has its own user, so that the bot's can't read the Spotify login. The bot
 # reads data/ through a read-only mount; login/ holds the token and is this user's alone.
@@ -78,4 +89,5 @@ docker compose build
 
 [ -f server/.env ] || echo "Next: copy server/.env here (mode 600, owner root). It is never in git or the image."
 echo "Deploy key to add on GitHub: $(cat "$ROOT/.ssh/id_ed25519.pub")"
+echo "Deploy key for the backup repository: $(cat "$BACKUP_CONF/id_ed25519.pub")"
 echo "Not started. Finish with the cut-over checklist in docs/HOSTING.md."
