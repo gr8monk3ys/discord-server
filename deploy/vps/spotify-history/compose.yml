@@ -1,14 +1,18 @@
-# The hourly listening-log job (front-desk-spotify-history.timer), a one-shot beside the bot:
+# SpotifyForge's one-shots beside the bot. The hourly listening log (front-desk-spotify-history.timer)
+# and the Monday playlist maintenance (front-desk-spotify-weekly.timer) share one Spotify grant, so
+# they must never overlap. Both timers take /run/lock/spotifyforge.lock; by hand, take it too:
 #
-#   docker compose run --rm -T history     one sync by hand, from this folder
-#   docker compose build                   after changing the Dockerfile's pinned commit
+#   flock /run/lock/spotifyforge.lock docker compose run --rm -T history     one sync, from this folder
+#   flock /run/lock/spotifyforge.lock docker compose run --rm -T weekly      one maintenance run (writes to Spotify)
+#   docker compose build                                                     after changing the Dockerfile's pinned commit
 #
-# The bot sees only /srv/spotifyforge/data, read-only (docker-compose.yml at the repo root). The
-# Spotify login is in login/ (the job's user only) and client.env (root only): see docs/HOSTING.md.
+# The bot sees only /srv/spotifyforge/data, read-only (docker-compose.yml at the repo root), so nothing
+# secret goes in there. The Spotify login is in login/ (the job's user only) and client.env (root
+# only): see docs/HOSTING.md.
 name: spotify-history
 
 services:
-  history:
+  history: &job
     build: .
     image: spotify-history
     env_file:
@@ -26,3 +30,8 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+
+  weekly:
+    <<: *job
+    command: ["sh", "/weekly.sh"]
+    mem_limit: 1g                    # plans the whole catalogue from every liked song

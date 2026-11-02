@@ -498,6 +498,7 @@ section with fresh, stale and failed data). CI runs both in the "Site" job.
 | Container kit | `Dockerfile`, `docker-compose.yml`, `bot/run_container.sh` | The live deployment. Read-only root, non-root user, data volume, heartbeat healthcheck and an in-container monitor with the watchdog's thresholds. Steps and cut-over checklist: `docs/HOSTING.md` |
 | Site | Vercel project rooted at `site/`, production branch `main` | Next.js, set by `site/vercel.json` (`bun install --frozen-lockfile`, `bun run build`). The route handlers read their settings from the Vercel project's environment variables |
 | Listening log | `front-desk-spotify-history.timer` runs SpotifyForge's `history sync` hourly in a one-shot container (`deploy/vps/spotify-history`) | The bot mounts `/srv/spotifyforge/data` read-only at `/spotify`, for the field notes' Heard section. The Spotify login is not in that folder |
+| Playlist maintenance | `front-desk-spotify-weekly.timer` runs SpotifyForge's `curate stats`, `refresh`, `reflow`, `describe` on Mondays in the same image and login (`deploy/vps/spotify-history/weekly.sh`) | The bot has no part in it. Its state shares the read-only folder; a lock keeps it from overlapping the hourly job |
 | Site data | `front-desk-site-data.timer` runs `server/publish_site_data.py --apply --quiet` every 30 minutes | Pushes with a deploy key of `frontdesk` on the VPS (`deploy/vps/`); exits 0 without output when there is nothing to do |
 
 Never run the bot on two machines with the same token: the lock is per machine. The
