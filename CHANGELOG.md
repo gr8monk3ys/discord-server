@@ -8,6 +8,9 @@ All notable changes to this project are recorded here. The format follows
 
 ### Changed
 
+- SpotifyForge's weekly playlist maintenance moved from the owner's PC to the VPS
+  (`front-desk-spotify-weekly.timer`, `deploy/vps/spotify-history/weekly.sh`). It and the hourly
+  listening-log job now take one lock, because they share a Spotify grant.
 - The field notes' Heard section is back on the VPS: `deploy/vps/spotify-history` runs SpotifyForge's
   `history sync` hourly in its own container (`front-desk-spotify-history.timer`), and the bot reads
   the log through a read-only mount (`FRONT_DESK_SPOTIFY`). The Spotify login stays out of its reach.
