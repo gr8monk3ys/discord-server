@@ -1,15 +1,21 @@
 {
   "default_channels": [
+    "⌨️・smp-commands",
+    "⛏️・monkey-smp",
+    "❔・smp-faq",
     "➕ New Squad",
     "🆘・help",
     "🎮・lfg",
     "💬・general",
     "📌・rules",
     "📓・field-notes",
+    "📜・smp-rules",
+    "📝・founding-roster",
     "📣・announcements",
     "📸・clips",
     "🔊 Lobby",
-    "🕹️・gaming"
+    "🕹️・gaming",
+    "🚩・smp-forum"
   ],
   "enabled": true,
   "mode": "default",
@@ -63,8 +69,10 @@
         },
         {
           "channels": [
+            "⌨️・smp-commands",
             "⛏️・minecraft",
             "⛏️・monkey-smp",
+            "❔・smp-faq",
             "📜・smp-rules",
             "📝・founding-roster",
             "🚩・smp-forum"
@@ -325,19 +333,6 @@
           "emoji": "🤣",
           "roles": [],
           "title": "Off topic"
-        },
-        {
-          "channels": [
-            "⛏️・monkey-smp",
-            "❔・smp-faq",
-            "📜・smp-rules",
-            "📝・founding-roster",
-            "🚩・smp-forum"
-          ],
-          "description": "Monkey SMP: status, in-game chat, the founding roster, rules, FAQ and the faction forum.",
-          "emoji": "⛏️",
-          "roles": [],
-          "title": "Minecraft"
         },
         {
           "channels": [
