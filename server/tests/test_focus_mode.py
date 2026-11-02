@@ -22,7 +22,7 @@ TODAY = [
     "⛏️・monkey-smp",
 ]
 # Default channels added to ONBOARDING_EVERYTHING after that day, so --revert keeps them too.
-ADDED_SINCE = ["📓・field-notes"]
+ADDED_SINCE = ["📓・field-notes", "📜・smp-rules", "❔・smp-faq", "⌨️・smp-commands", "📝・founding-roster", "🚩・smp-forum"]
 PRIVATE = ["💜・supporters", "🛡️・mod", "🔒・admin", "📋・mod-log", "🔒・appeals", "🔒・squad-chat", "🔒 Squad Only"]
 
 
@@ -53,8 +53,7 @@ def test_every_public_channel_is_in_the_core_or_exactly_one_group():
     assert len(public) == len(set(public))
     assert set(public) == set(listed) | games  # total: nothing public is left out
     assert not set(listed) & games  # game channels belong to "What do you play?"
-    # Everything that is a default today is still a default or one click away; channels added
-    # since (the Monkey SMP season channels) are opt-in from the start.
+    # Everything that is a default today is still a default or one click away.
     assert {slug(n) for n in TODAY} <= set(core) | set(groups)
 
 
@@ -76,7 +75,7 @@ def test_statuses_and_event_channels():
         assert rows[name]["status"] == focus_mode.CORE
     assert {n for n, r in rows.items() if r["status"] == focus_mode.EVENT} == set(layout.FOCUS_EVENT_CHANNELS)
     assert rows["🏆・tournaments"]["group"] == "Events and tournaments"
-    assert rows["⛏️・monkey-smp"]["group"] == "Minecraft"
+    assert rows["⛏️・monkey-smp"]["status"] == focus_mode.CORE
     assert rows["🎙・stage"]["status"] == focus_mode.UNLISTED
     assert rows["⛏️・minecraft"]["status"] == focus_mode.GAME
 
@@ -105,7 +104,7 @@ def test_the_core_and_the_question_fit_discords_limits():
     assert focus_mode.limit_problems() == []
     rows = {slug(r["name"]): r for r in focus_mode.layout_rows()}
     core = [rows[slug(n)] for n in layout.ONBOARDING_DEFAULT_CHANNELS]
-    assert focus_mode.MIN_DEFAULTS <= len(core) <= 10  # Discord's floor; and still a short list
+    assert focus_mode.MIN_DEFAULTS <= len(core) <= 16  # Discord's floor; and still a short list
     assert len(focus_mode.postable(core)) >= focus_mode.MIN_POSTABLE
     assert all(r["type"] in ("text", "forum", "voice") for r in core)
     # If Discord counts only plain text channels, the reserve makes up the difference.
@@ -183,7 +182,7 @@ def test_dry_run_prints_the_whole_plan_and_changes_nothing(capsys):
     assert "DRY RUN" in out
     for line in focus_mode.plan_lines():
         assert line in out
-    assert "default channels: 29 -> 10" in out
+    assert "default channels: 29 -> 16" in out
     assert 'add     question "What else do you want to see?"' in out
     assert "🤣 Off topic: 🤣・memes, 🎨・art, 💻・code, 👗・fashion, ♟️・chess" in out
 
@@ -212,7 +211,7 @@ def test_rerun_is_a_noop(capsys):
     assert run(guild, apply=True) is True
     assert len(guild.edits) == 1
     out = capsys.readouterr().out
-    assert "ok      default channels (10)" in out and 'ok      question "What else do you want to see?"' in out
+    assert "ok      default channels (16)" in out and 'ok      question "What else do you want to see?"' in out
 
 
 def test_revert_restores_todays_defaults_exactly_and_keeps_the_question():
