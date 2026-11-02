@@ -14,7 +14,7 @@ address, on any of them.
 | Downtime alerts | `front-desk-watchdog.timer`, every 5 minutes: `server/watchdog.py --alert-only` posts to #mod-log |
 | Site data | `front-desk-site-data.timer`, every 30 minutes: `server/publish_site_data.py`, pushing to `site-data` with `frontdesk`'s SSH key, a deploy key with write access on this repository |
 | Listening log | `front-desk-spotify-history.timer`, hourly: SpotifyForge's `history sync` in a one-shot container (`deploy/vps/spotify-history`), appending to `/srv/spotifyforge/data/listening_history.jsonl`. The bot mounts that folder read-only at `/spotify` for the field notes' Heard section. The Spotify login is `/srv/spotifyforge/login` (user `spotifyforge`, uid 10002, mode 700) and `client.env` (root's, mode 600), neither in reach of the bot |
-| Backups | The bot's nightly 04:00 backup, 14 kept, in `bot/data/backups`. **Same disk as the database**: see "Off-box backups" |
+| Backups | The bot's nightly 04:00 backup, 14 kept, in `bot/data/backups`, on the same disk as the database. `front-desk-backup.timer` sends an encrypted copy off this machine at 05:00: see "Off-site backups" |
 | Neighbours | Monkey SMP owns `/srv/monkey`, the `monkey` user and the `monkey-*` timers. Front Desk shares only Docker and the machine, and is capped at 512 MB. Nothing here needs a port opened |
 
 Everything below is run as root in `/srv/front-desk/repo`. The container can write to `bot/data`,
@@ -36,13 +36,63 @@ bot left): run those through the container, as the restore below does.
 
 Never run `git clean` in that checkout: `bot/data` is gitignored and holds the database.
 
+### Off-site backups
+
+A dead disk or a deleted VPS takes `bot/data/backups` with the database, so once a day
+`front-desk-backup.timer` runs `deploy/vps/front-desk-backup.sh`, which pushes an encrypted copy to the
+`backups` branch of the private repository `gr8monk3ys/front-desk-backups`:
+
+- The container makes the copy and sends it through a pipe, so root opens nothing in `bot/data`. It is
+  integrity-checked first and is independent of the 04:00 backup. A stopped bot means a failed run.
+- `age` encrypts it to a public key. **The private key isn't on the VPS or on GitHub: the owner keeps it,
+  and without it the backups can't be read by anyone.** A copy in a password manager is what makes this
+  survive losing a machine. The VPS can write backups but not read them.
+- The branch holds the newest 14 copies as one commit with no parent, so older copies leave it and it
+  doesn't grow (a copy was 76 KB in November 2026). `PRIVACY.md` promises that limit: raising `KEEP`
+  means changing that page too. GitHub may hold a dropped file for a while longer, still encrypted.
+- It posts to #mod-log once when backups start failing and once when they work again.
+
+The deploy key in `/etc/front-desk-backup` has to be able to force-push, so someone who takes over the VPS
+could erase the branch. They would already have the live database, but not the older copies: clone the
+branch to a disk at home now and then if that matters. Only the database is copied: `server/.env` and the
+listening log are not.
+
+| Situation | Do this |
+|---|---|
+| Did it run? | `systemctl list-timers front-desk-backup.timer`; `journalctl -u front-desk-backup -n 20` |
+| Run one now | `systemctl start front-desk-backup` |
+| What is off-site? | `gh api repos/gr8monk3ys/front-desk-backups/git/trees/backups --jq '.tree[].path'` |
+
+To restore, on a machine with `age` and the private key (a Linux shell or Git Bash), never on the VPS:
+
+```bash
+git clone --depth 1 --branch backups git@github.com:gr8monk3ys/front-desk-backups.git
+age -d -i KEY.txt -o front_desk.db.gz front-desk-backups/front_desk-YYYY-MM-DD-HHMM.db.gz.age
+gzip -d front_desk.db.gz
+```
+
+That file can be opened as it is. To put it back, stop the bot and send it in through the container, as
+root on the VPS from `/srv/front-desk/repo` (`cat` it over `ssh`; on a new VPS, do this at step 5 below instead
+of `migrate_host.py`):
+
+```bash
+docker compose stop
+docker compose run --rm --no-deps -T bot sh -c 'cat > data/front_desk.db.restore' < front_desk.db
+docker compose run --rm --no-deps bot sh -c 'cp data/front_desk.db data/front_desk.db.bad; mv data/front_desk.db.restore data/front_desk.db && rm -f data/front_desk.db-wal data/front_desk.db-shm'
+docker compose start
+```
+
+Try the first three commands once every few months, so a bad key shows up while there is still a database
+to copy.
+
 ### Setting it up again (a new VPS)
 
 Docker must be installed. The steps are ordered so that two bots never run at once:
 
 1. Copy `deploy/vps/install.sh` over and run `sh install.sh` as root. It makes the user, the
    checkout, the key and the units and builds the image. It starts nothing.
-2. Add the key it prints to the repository (Settings, Deploy keys, write access on).
+2. Add the key it prints to the repository (Settings, Deploy keys, write access on), and the backup key
+   it prints to `gr8monk3ys/front-desk-backups` the same way (a new VPS needs a new one; delete the old).
 3. Copy the secrets, from wherever the old host is, with no Windows paths in them and no CRs:
    `tr -d '\r' < server/.env | ssh root@VPS 'install -m 600 -o root -g root /dev/stdin /srv/front-desk/repo/server/.env'`.
    `FIELD_NOTES_SPOTIFY_HISTORY` is `/spotify/listening_history.jsonl`, the path inside the container.
@@ -61,6 +111,16 @@ Docker must be installed. The steps are ordered so that two bots never run at on
    Stop `front-desk-spotify-history.timer` there first, then copy `/srv/spotifyforge`, keeping owners
    and modes, and `systemctl enable --now front-desk-spotify-history.timer`. The log has no other
    copy, and Spotify itself remembers only the last 50 plays.
+8. Write `/etc/front-desk-backup/settings` (mode 600), with the public key from the first line of the
+   private key file. Neither value is a secret:
+
+   ```sh
+   BACKUP_REMOTE=git@github.com:gr8monk3ys/front-desk-backups.git
+   AGE_RECIPIENT=age1...
+   ```
+
+   Then `systemctl start front-desk-backup`, check it with `journalctl -u front-desk-backup -n 20`, and
+   `systemctl enable --now front-desk-backup.timer`.
 
 What is deliberately not here: the Windows tasks (`Front Desk bot`, `Front Desk watchdog`,
 `Front Desk site data`). `/catchup` stays off unless `ANTHROPIC_API_KEY` is set, as it was on the PC.
@@ -272,6 +332,7 @@ Never run `docker compose down -v` or `docker volume rm`: `-v` deletes the datab
 
 ### Off-box backups
 
+The live VPS has its own way of doing this ("Off-site backups" above); this is for any other box.
 The nightly backups sit on the same disk as the database. If the VPS is deleted, both are gone.
 Copy them somewhere else once a day. Run `crontab -e` on the VPS and add one line (cron uses the
 server's clock, normally UTC; 13:00 UTC is after the 04:00 Pacific backup all year):

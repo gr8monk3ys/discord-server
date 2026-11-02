@@ -244,7 +244,8 @@ All times are Pacific. Every scheduled job catches up once after downtime and ne
   (`bot\data\bot.lock`) stops a second copy.
 - **Where it runs:** Docker on the VPS, in `/srv/front-desk/repo` (`docs/HOSTING.md`, "The live VPS").
 - **Logs:** `bot/data/bot.log` (rotated). **Database:** `bot/data/front_desk.db`.
-  **Backups:** `bot/data/backups/`, 14 days kept, integrity-checked, on the same disk as the database.
+  **Backups:** `bot/data/backups/`, 14 days kept, integrity-checked, on the same disk as the database;
+  an encrypted copy goes off the machine daily, 14 kept (`docs/HOSTING.md`, "Off-site backups").
 - **Health:** errors and "back online" notes are posted in 📋・mod-log; `/status` (staff only)
   shows uptime, latency, last backup and error counts.
 - **Watchdog:** inside the container `bot/run_container.sh` stops a bot whose heartbeat is older
