@@ -64,6 +64,7 @@ ROLES = [
     {"name": "Captcha.bot", "keep": True},
     {"name": "MEE6", "keep": True},
     {"name": "GiveawayBot", "keep": True},
+    {"name": "Tebex", "keep": True},  # the Monkey SMP store's bot; gives @SMP Member, so it stays above it
     {"name": "Squad", "color": MOSS, "hoist": True, "was": ["Member"]},
     {"name": "Verified"},  # given by Captcha.bot after the captcha; unlocks media
     {"name": "Guest", "color": MUTED},
@@ -81,6 +82,7 @@ ROLES = [
     {"name": "Bumper", "mentionable": True},  # opt-in: /bumpping on
     {"name": "Game Night", "mentionable": True},  # opt-in: pinged when a game night starts
     {"name": "SMP Ping", "mentionable": True},  # opt-in: pinged when 3+ are on Monkey SMP
+    {"name": "SMP Member"},  # holds a Monkey SMP pass; Tebex's bot gives it and takes it back
     # Level rewards (Front Desk, from XP).
     {"name": "Mythic"}, {"name": "Legend"}, {"name": "Elite"}, {"name": "Veteran"}, {"name": "Regular"},
     # Self-assign: platform, region, play time (#roles panel and Onboarding).
