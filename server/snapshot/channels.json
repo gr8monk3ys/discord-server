@@ -915,7 +915,7 @@
           "overwrites": {},
           "slowmode": 2,
           "synced": true,
-          "topic": "The Realms, our Minecraft server. Status is pinned; chat here reaches the game, and linked players' chat comes back. /realms link gets you on the whitelist.",
+          "topic": "Monkey SMP, our Minecraft server. Status is pinned; chat here reaches the game, and linked players' chat comes back. /smp link connects your Minecraft name for chat and playtime.",
           "type": "text"
         },
         {
