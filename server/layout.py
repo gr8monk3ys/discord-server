@@ -387,7 +387,7 @@ POSTS = {
                 "- The first hour after launch has no PvP, Nether or End; then PvP and only the Nether "
                 "open. (23)",
                 "- No Netherite armor until staff say so. Netherite tools and weapons are fine. (24)",
-                "- The world border is 2500 x 2500. Don't leave it or break it. (25)",
+                "- The world border is 5000 x 5000. Don't leave it or break it. (25)",
                 "- Your first 48 hours come with PvP grace. Attacking a player ends it, and using it to "
                 "scout, carry loot or block a fight is a loophole. (26)",
                 "- No stealing or killing pets in an offline owner's territory. (20)",
