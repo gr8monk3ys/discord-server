@@ -609,6 +609,50 @@
     "hoist": false,
     "managed": false,
     "mentionable": false,
+    "name": "Admin",
+    "permissions": [
+      "administrator"
+    ]
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
+    "name": "Inviter",
+    "permissions": [
+      "create_instant_invite"
+    ]
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": true,
+    "mentionable": false,
+    "name": "Tebex",
+    "permissions": [
+      "change_nickname",
+      "create_instant_invite",
+      "manage_nicknames",
+      "manage_roles",
+      "read_messages",
+      "send_messages",
+      "use_application_commands"
+    ]
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
+    "name": "SMP Member",
+    "permissions": []
+  },
+  {
+    "color": null,
+    "hoist": false,
+    "managed": false,
+    "mentionable": false,
     "name": "@everyone",
     "permissions": [
       "add_reactions",
