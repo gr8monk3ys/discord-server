@@ -276,6 +276,8 @@ class PublicMode:
                 if not voice:
                     kwargs["topic"] = spec.get("topic", "")
                     kwargs["slowmode_delay"] = spec.get("slowmode", 0)
+                elif spec.get("user_limit"):
+                    kwargs["user_limit"] = spec["user_limit"]
                 if spec.get("read_only"):
                     ow = {
                         self.guild.default_role: discord.PermissionOverwrite(
@@ -289,6 +291,7 @@ class PublicMode:
                 elif spec.get("no_threads") and not voice:
                     kwargs["overwrites"] = no_thread_overwrites(self.guild, cat)
                 notes = [*(["read-only"] if spec.get("read_only") else []),
+                         *([f"{spec['user_limit']} seats"] if voice and spec.get("user_limit") else []),
                          *(["no threads"] if spec.get("no_threads") and not voice else []),
                          *([f"slow mode {spec['slowmode']} s"] if spec.get("slowmode") and not voice else [])]
                 create = self.guild.create_voice_channel if voice else self.guild.create_text_channel

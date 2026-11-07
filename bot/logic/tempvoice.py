@@ -21,7 +21,8 @@ RENAME_LIMIT = 2  # Discord allows about 2 renames...
 RENAME_WINDOW = 10 * 60  # ...per channel per 10 minutes
 
 # A temp channel must never look like a permanent one to config.match_by_name.
-RESERVED = {slug(n) for n in (config.NEW_SQUAD_VOICE, config.SQUAD_VOICE, config.LOBBY_VOICE)}
+RESERVED = {slug(n) for n in (config.NEW_SQUAD_VOICE, config.NEW_PRIVATE_VOICE, config.SQUAD_VOICE,
+                              config.LOBBY_VOICE)}
 
 
 # ---------------------------------------------------------------- names
@@ -134,7 +135,7 @@ class Denied(Enum):
     OWNER_PRESENT = "owner_present"
 
 
-OWNER_ACTIONS = {"name", "limit"}
+OWNER_ACTIONS = {"name", "limit", "lock", "unlock", "invite", "kick"}
 
 
 def authorize(action: str, *, user_id: int, owner_id: int | None, owner_present: bool) -> Denied | None:

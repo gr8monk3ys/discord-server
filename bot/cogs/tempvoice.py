@@ -1,6 +1,9 @@
 """Module 5: Join-to-create voice. Joining ➕ New Squad makes a temporary voice
-channel named after your game (or you) and moves you in. You own it bot-side
-(no Discord permissions are granted): /squad name, /squad limit, /squad claim.
+channel named after your game (or you) and moves you in; joining 🔒 New Private Squad
+does the same but locked (@everyone can't connect, you can). You own it bot-side
+(no Discord permissions are granted to you): /squad name, /squad limit, /squad claim,
+/squad lock, /squad unlock, /squad invite, /squad kick. Locking only changes Connect,
+so a locked channel stays visible and Discord shows it with a lock.
 It's deleted 30 seconds after it empties; startup removes any left behind."""
 
 import asyncio
@@ -12,6 +15,7 @@ from discord import app_commands
 from discord.ext import commands
 
 import config
+from cogkit import is_staff
 from cogs.stats import playing
 from logic import tempvoice as T
 
@@ -26,8 +30,46 @@ DENIED = {
 }
 
 
+PRIVATE_HELLO = ("This channel is locked: only you and the people you let in can join. "
+                 "`/squad invite` lets a friend in, `/squad unlock` opens it to everyone.")
+CANT_KICK = "You can't kick yourself, a bot or a mod."
+
+
 def now() -> float:
     return time.time()
+
+
+# ---------------------------------------------------------------- overwrites
+def with_connect(overwrite: discord.PermissionOverwrite | None, value: bool | None) -> discord.PermissionOverwrite:
+    """A copy of `overwrite` (or an empty one) with Connect set to `value` (None = inherit)."""
+    pairs = dict(overwrite or discord.PermissionOverwrite())
+    pairs["connect"] = value
+    return discord.PermissionOverwrite(**pairs)
+
+
+def locked(overwrites: dict, everyone, allowed) -> dict:
+    """`overwrites` plus: @everyone can't connect, everyone in `allowed` can. The input isn't changed."""
+    out = dict(overwrites)
+    out[everyone] = with_connect(out.get(everyone), False)
+    for target in allowed:
+        out[target] = with_connect(out.get(target), True)
+    return out
+
+
+def unlocked(overwrites: dict, everyone) -> dict:
+    """`overwrites` with @everyone's Connect back to inherited. Per-member overwrites stay."""
+    out = dict(overwrites)
+    ow = with_connect(out.get(everyone), None)
+    if ow.is_empty():
+        out.pop(everyone, None)
+    else:
+        out[everyone] = ow
+    return out
+
+
+def is_locked(channel) -> bool:
+    ow = channel.overwrites.get(channel.guild.default_role)
+    return ow is not None and ow.connect is False
 
 
 class TempVoice(commands.Cog):
@@ -60,7 +102,8 @@ class TempVoice(commands.Cog):
         return self.bot.get_guild(self.bot.settings.guild_id)
 
     def places(self, guild: discord.Guild):
-        """(category, hub), or None (logged once) if either is missing."""
+        """(category, hub, private hub or None), or None (logged once) if the category or the hub
+        is missing. The private hub is optional: without it, temp voice works as before."""
         category = config.match_by_names(guild.categories, config.VOICE_CATEGORY_NAMES)
         hubs = [c for c in guild.voice_channels if c.id not in self.owners]
         hub = config.match_by_name(hubs, config.NEW_SQUAD_VOICE)
@@ -71,7 +114,7 @@ class TempVoice(commands.Cog):
                 self.warned_missing = True
             return None
         self.warned_missing = False
-        return category, hub
+        return category, hub, config.match_by_name(hubs, config.NEW_PRIVATE_VOICE)
 
     def humans(self, channel) -> list[int]:
         """User ids in a voice channel, minus known bots (unknown members count as people)."""
@@ -174,8 +217,12 @@ class TempVoice(commands.Cog):
         places = self.places(member.guild)
         if places is None:
             return
-        category, hub = places
-        if channel.id != hub.id:
+        category, hub, private_hub = places
+        if channel.id == hub.id:
+            private = False
+        elif private_hub is not None and channel.id == private_hub.id:
+            private, hub = True, private_hub
+        else:
             return
         if not self.cooldown.take(member.id, now()):
             # Rejoined the hub right away: back to the channel they already own, if any.
@@ -188,9 +235,12 @@ class TempVoice(commands.Cog):
                     pass
             return
         name = T.channel_name(playing(member), member.display_name)
+        overwrites = category.overwrites
+        if private:
+            overwrites = locked(overwrites, member.guild.default_role, [member])
         new = await category.create_voice_channel(
-            name, position=hub.position, overwrites=category.overwrites,
-            reason=f"Temp voice for {member} ({member.id})")
+            name, position=hub.position, overwrites=overwrites,
+            reason=f"{'Private temp' if private else 'Temp'} voice for {member} ({member.id})")
         # Row first: if the bot dies right now, startup cleanup still finds the channel.
         self.owners[new.id] = member.id
         await self.db.execute("INSERT OR REPLACE INTO temp_voice (channel_id, owner_id, created_at) VALUES (?, ?, ?)",
@@ -202,7 +252,12 @@ class TempVoice(commands.Cog):
             await self.remove(new)
             return
         self.joined.setdefault(new.id, {}).setdefault(member.id, now())
-        log.info("temp voice %s (%s) for %s", new.id, name, member.id)
+        log.info("%stemp voice %s (%s) for %s", "private " if private else "", new.id, name, member.id)
+        if private:
+            try:
+                await new.send(PRIVATE_HELLO, allowed_mentions=discord.AllowedMentions.none())
+            except discord.HTTPException:
+                pass
 
     @commands.Cog.listener()
     async def on_guild_channel_delete(self, channel) -> None:
@@ -302,6 +357,77 @@ class TempVoice(commands.Cog):
         await self.set_owner(channel, interaction.user.id)
         await interaction.response.send_message("This channel is yours now (`/squad name`, `/squad limit`).",
                                                 ephemeral=True)
+
+    @squad.command(name="lock", description="Lock your squad channel: only the people in it and people you invite can join")
+    async def squad_lock(self, interaction: discord.Interaction) -> None:
+        channel = await self.my_channel(interaction, "lock")
+        if channel is None:
+            return
+        if is_locked(channel):
+            await interaction.response.send_message("It's already locked. `/squad invite` lets someone in.",
+                                                    ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        # Everyone in it now keeps their way back in, so a dropped connection doesn't lock them out.
+        present = [m for uid in self.humans(channel) if (m := channel.guild.get_member(uid)) is not None]
+        await channel.edit(overwrites=locked(channel.overwrites, channel.guild.default_role, present),
+                           reason=f"/squad lock by {interaction.user.id}")
+        await interaction.followup.send("Locked. Only the people in here now and anyone you `/squad invite` can join.",
+                                        ephemeral=True)
+
+    @squad.command(name="unlock", description="Unlock your squad channel so anyone can join")
+    async def squad_unlock(self, interaction: discord.Interaction) -> None:
+        channel = await self.my_channel(interaction, "unlock")
+        if channel is None:
+            return
+        if not is_locked(channel):
+            await interaction.response.send_message("It isn't locked.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await channel.edit(overwrites=unlocked(channel.overwrites, channel.guild.default_role),
+                           reason=f"/squad unlock by {interaction.user.id}")
+        await interaction.followup.send("Unlocked: anyone can join.", ephemeral=True)
+
+    @squad.command(name="invite", description="Let someone into your squad channel, even when it's locked")
+    @app_commands.describe(member="Who to let in")
+    async def squad_invite(self, interaction: discord.Interaction, member: discord.Member) -> None:
+        channel = await self.my_channel(interaction, "invite")
+        if channel is None:
+            return
+        if member.bot or member.id == interaction.user.id:
+            await interaction.response.send_message("Pick someone else.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await channel.set_permissions(member, overwrite=with_connect(channel.overwrites.get(member), True),
+                                      reason=f"/squad invite by {interaction.user.id}")
+        try:
+            await channel.send(f"{member.mention}, you're invited: join this channel any time.",
+                               allowed_mentions=discord.AllowedMentions(everyone=False, roles=False, users=[member]))
+        except discord.HTTPException:
+            pass
+        await interaction.followup.send(f"{member.mention} can join now.", ephemeral=True,
+                                        allowed_mentions=discord.AllowedMentions.none())
+
+    @squad.command(name="kick", description="Remove someone from your squad channel and keep them out")
+    @app_commands.describe(member="Who to remove")
+    async def squad_kick(self, interaction: discord.Interaction, member: discord.Member) -> None:
+        channel = await self.my_channel(interaction, "kick")
+        if channel is None:
+            return
+        if member.bot or member.id == interaction.user.id or is_staff(member):
+            await interaction.response.send_message(CANT_KICK, ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await channel.set_permissions(member, overwrite=with_connect(channel.overwrites.get(member), False),
+                                      reason=f"/squad kick by {interaction.user.id}")
+        voice = getattr(member, "voice", None)
+        if voice is not None and voice.channel is not None and voice.channel.id == channel.id:
+            try:
+                await member.move_to(None, reason=f"/squad kick by {interaction.user.id}")
+            except discord.HTTPException:
+                pass
+        await interaction.followup.send(f"{member.mention} is out and can't rejoin this channel.", ephemeral=True,
+                                        allowed_mentions=discord.AllowedMentions.none())
 
 
 async def setup(bot) -> None:

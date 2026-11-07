@@ -617,7 +617,14 @@ def test_public_mode_creates_new_forums_and_the_stage_once(capsys):
     kind, kw = made["stage"]
     assert kind == "stage" and kw["category"].name == "06 · voice"
     assert made["general"][0] == "text" and made["lobby"][0] == "voice"  # the stage isn't mistaken for either
-    assert "can't schedule Stage events without Manage Channels, Mute Members, Move Members" in capsys.readouterr().out
+    # Voice rooms get the layout's seat limit; the rest stay unlimited.
+    kind, kw = made[slug("🎮 Duo")]
+    assert kind == "voice" and kw["user_limit"] == 2 and kw["category"].name == "06 · voice"
+    assert made[slug("🎮 Trio")][1]["user_limit"] == 3 and made[slug("🎮 Squad")][1]["user_limit"] == 5
+    assert "user_limit" not in made[slug("🔊 Lobby 2")][1] and "user_limit" not in made[slug("🔒 New Private Squad")][1]
+    out = capsys.readouterr().out
+    assert "🎮 Duo in 06 · voice (2 seats)" in out
+    assert "can't schedule Stage events without Manage Channels, Mute Members, Move Members" in out
 
     # Second run with everything in place: nothing is created, moved or edited.
     for kind, name, kw in guild.calls:

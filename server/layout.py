@@ -274,11 +274,17 @@ CATEGORIES = [
         "was": ["Voice Channels", "05 · voice"],
         "channels": [
             {"name": "🔊 Lobby", "type": "voice", "was": ["General"]},
+            {"name": "🔊 Lobby 2", "type": "voice"},
             {"name": "➕ New Squad", "type": "voice"},  # join to get your own channel
+            # Join to get your own locked channel: only you and the people you /squad invite can join.
+            {"name": "🔒 New Private Squad", "type": "voice"},
+            {"name": "🎮 Duo", "type": "voice", "user_limit": 2},
+            {"name": "🎮 Trio", "type": "voice", "user_limit": 3},
             {"name": "🎮 Squad", "type": "voice", "user_limit": 5, "was": ["🎮 Squad I", "General 2"]},
-            {"name": "💤 AFK", "type": "voice", "afk": True},
+            {"name": "📺 Watch Party", "type": "voice"},  # screen shares and movies, no event needed
             # Watch parties and the monthly Town Hall (Front Desk schedules both as Stage events).
             {"name": "🎙・stage", "type": "stage"},
+            {"name": "💤 AFK", "type": "voice", "afk": True},
         ],
     },
     {
@@ -597,7 +603,7 @@ COMMUNITY = {
 # there, and it is a plain text channel that certainly counts towards Discord's five.
 ONBOARDING_DEFAULT_CHANNELS = [
     "📌・rules", "📣・announcements", "💬・general", "🆘・help", "🕹️・gaming", "🎮・lfg", "📸・clips",
-    "🔊 Lobby", "➕ New Squad",
+    "🔊 Lobby", "🔊 Lobby 2", "➕ New Squad", "🔒 New Private Squad",
     "📓・field-notes",  # one post a week, quiet otherwise
     # Monkey SMP, whole: as an opt-in group nobody found it, and it's what the server is pointing people at.
     "📜・smp-rules", "❔・smp-faq", "⌨️・smp-commands", "⛏️・monkey-smp", "📝・founding-roster", "🚩・smp-forum",
@@ -612,6 +618,7 @@ ONBOARDING_EVERYTHING = [
     "⛏️・monkey-smp",
     "📓・field-notes",  # added after the cut, as a default from the start
     "📜・smp-rules", "❔・smp-faq", "⌨️・smp-commands", "📝・founding-roster", "🚩・smp-forum",  # likewise, later
+    "🔊 Lobby 2", "🔒 New Private Squad",  # likewise, later still
 ]
 # Opt-in groups: one question under Channels & Roles (asked after joining, so it does not
 # count against Discord's cap on pre-join questions). Every public channel that is not a
@@ -639,8 +646,8 @@ FOCUS_GROUPS = [
      "description": "The roles panel, and who just joined.",
      "channels": ["👋・welcome", "🎭・roles"]},
     {"title": "More voice rooms", "emoji": "🔊",
-     "description": "The five-seat squad room and the AFK room.",
-     "channels": ["🎮 Squad", "💤 AFK"]},
+     "description": "Duo, trio and five-seat rooms, the watch party room and the AFK room.",
+     "channels": ["🎮 Duo", "🎮 Trio", "🎮 Squad", "📺 Watch Party", "💤 AFK"]},
 ]
 # Event-driven channels (a default only while something is live): none. The bot module that
 # moved the tournaments and realms channels in and out of the defaults was removed, because a

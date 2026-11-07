@@ -53,6 +53,7 @@ def test_game_named_like_a_permanent_channel_uses_fallback():
     # A temp "🎮 Squad" would be mistaken for the permanent 🎮 Squad by name lookups.
     assert T.channel_name("Squad", "Bob") == "🎮 Bob's squad"
     assert T.channel_name("New Squad", "Bob") == "🎮 Bob's squad"
+    assert T.channel_name("New Private Squad", "Bob") == "🎮 Bob's squad"
     assert T.channel_name("Lobby", "Bob") == "🎮 Bob's squad"
 
 
@@ -142,7 +143,7 @@ def test_authorize_not_in_temp():
     assert T.authorize("claim", user_id=1, owner_id=None, owner_present=False) is T.Denied.NOT_IN_TEMP
 
 
-@pytest.mark.parametrize("action", ["name", "limit"])
+@pytest.mark.parametrize("action", ["name", "limit", "lock", "unlock", "invite", "kick"])
 def test_authorize_owner_only(action):
     assert T.authorize(action, user_id=1, owner_id=1, owner_present=True) is None
     assert T.authorize(action, user_id=2, owner_id=1, owner_present=True) is T.Denied.NOT_OWNER
