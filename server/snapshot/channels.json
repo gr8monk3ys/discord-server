@@ -395,7 +395,7 @@
         },
         {
           "bitrate": 64000,
-          "name": "👥 Members: 25",
+          "name": "👥 Members: 32",
           "nsfw": false,
           "overwrites": {
             "member:Front Desk": {
@@ -422,7 +422,7 @@
         },
         {
           "bitrate": 64000,
-          "name": "🟢 Online: 5",
+          "name": "🟢 Online: 8",
           "nsfw": false,
           "overwrites": {
             "member:Front Desk": {
@@ -585,7 +585,14 @@
         {
           "name": "🕹️・gaming",
           "nsfw": false,
-          "overwrites": {},
+          "overwrites": {
+            "role:@everyone": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            }
+          },
           "slowmode": 0,
           "synced": true,
           "topic": "General gaming chat.",
@@ -596,7 +603,14 @@
           "layout": "list_view",
           "name": "🎮・lfg",
           "nsfw": false,
-          "overwrites": {},
+          "overwrites": {
+            "role:@everyone": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            }
+          },
           "require_tag": true,
           "slowmode": 0,
           "sort_order": null,
@@ -695,19 +709,17 @@
         {
           "name": "🪖・wardogs",
           "nsfw": false,
-          "overwrites": {},
+          "overwrites": {
+            "role:@everyone": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            }
+          },
           "slowmode": 0,
           "synced": true,
           "topic": "Wardogs talk, squads, and strats. Ping @Wardogs.",
-          "type": "text"
-        },
-        {
-          "name": "⛏️・minecraft",
-          "nsfw": false,
-          "overwrites": {},
-          "slowmode": 0,
-          "synced": true,
-          "topic": "Minecraft talk, squads, and strats. Ping @Minecraft.",
           "type": "text"
         },
         {
@@ -715,7 +727,14 @@
           "layout": "list_view",
           "name": "📚・guides",
           "nsfw": false,
-          "overwrites": {},
+          "overwrites": {
+            "role:@everyone": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            }
+          },
           "require_tag": false,
           "slowmode": 600,
           "sort_order": "latest_activity",
@@ -822,55 +841,32 @@
           "type": "forum"
         },
         {
-          "default_reaction": null,
-          "layout": "list_view",
-          "name": "🚩・smp-forum",
+          "name": "⛏️・minecraft",
           "nsfw": false,
-          "overwrites": {},
-          "require_tag": false,
-          "slowmode": 0,
-          "sort_order": "latest_activity",
-          "synced": true,
-          "tags": [
-            {
-              "emoji": "🐛",
-              "moderated": false,
-              "name": "Bug"
-            },
-            {
-              "emoji": "🏰",
-              "moderated": false,
-              "name": "Faction"
-            },
-            {
-              "emoji": "🔎",
-              "moderated": false,
-              "name": "Looking for faction"
-            },
-            {
-              "emoji": "📯",
-              "moderated": false,
-              "name": "Recruiting"
-            },
-            {
-              "emoji": "💡",
-              "moderated": false,
-              "name": "Suggestion"
-            },
-            {
-              "emoji": "⚖️",
-              "moderated": false,
-              "name": "Trading"
+          "overwrites": {
+            "role:@everyone": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
             }
-          ],
-          "thread_slowmode": 0,
-          "topic": "Monkey SMP factions, recruiting, suggestions, bugs and trading.\nRegister a faction (up to four players) with one post: the name, the members' Minecraft names, the banner and a charter. One post per faction, tagged Faction.\nPlaying solo? Post with the Looking for faction tag and staff will find you one.\nPayment problems, reports and appeals go in a ticket, not here.",
-          "type": "forum"
+          },
+          "slowmode": 0,
+          "synced": true,
+          "topic": "Minecraft talk, squads, and strats. Ping @Minecraft.",
+          "type": "text"
         },
         {
           "name": "🔺・apex-legends",
           "nsfw": false,
-          "overwrites": {},
+          "overwrites": {
+            "role:@everyone": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            }
+          },
           "slowmode": 0,
           "synced": true,
           "topic": "Apex Legends talk, squads, and strats. Ping @Apex Legends.",
@@ -910,18 +906,16 @@
           "type": "text"
         },
         {
-          "name": "⛏️・monkey-smp",
-          "nsfw": false,
-          "overwrites": {},
-          "slowmode": 2,
-          "synced": true,
-          "topic": "The Realms, our Minecraft server. Status is pinned; chat here reaches the game, and linked players' chat comes back. /realms link gets you on the whitelist.",
-          "type": "text"
-        },
-        {
           "name": "🌧️・risk-of-rain-2",
           "nsfw": false,
-          "overwrites": {},
+          "overwrites": {
+            "role:@everyone": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            }
+          },
           "slowmode": 0,
           "synced": true,
           "topic": "Risk of Rain 2 talk, squads, and strats. Ping @Risk of Rain 2.",
@@ -930,7 +924,14 @@
         {
           "name": "🪚・gears-of-war",
           "nsfw": false,
-          "overwrites": {},
+          "overwrites": {
+            "role:@everyone": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            }
+          },
           "slowmode": 0,
           "synced": true,
           "topic": "Gears of War talk, squads, and strats. Ping @Gears of War.",
@@ -939,7 +940,14 @@
         {
           "name": "🦍・overwatch",
           "nsfw": false,
-          "overwrites": {},
+          "overwrites": {
+            "role:@everyone": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            }
+          },
           "slowmode": 0,
           "synced": true,
           "topic": "Overwatch talk, squads, and strats. Ping @Overwatch.",
@@ -948,7 +956,14 @@
         {
           "name": "🦸・marvel-rivals",
           "nsfw": false,
-          "overwrites": {},
+          "overwrites": {
+            "role:@everyone": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            }
+          },
           "slowmode": 0,
           "synced": true,
           "topic": "Marvel Rivals talk, squads, and strats. Ping @Marvel Rivals.",
@@ -957,27 +972,47 @@
         {
           "name": "🃏・tabletop-simulator",
           "nsfw": false,
-          "overwrites": {},
+          "overwrites": {
+            "role:@everyone": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            }
+          },
           "slowmode": 0,
           "synced": true,
           "topic": "Tabletop Simulator talk, squads, and strats. Ping @Tabletop Simulator.",
           "type": "text"
-        },
+        }
+      ],
+      "name": "03 · games",
+      "overwrites": {
+        "role:@everyone": {
+          "allow": [
+            "read_messages"
+          ],
+          "deny": []
+        }
+      },
+      "type": "category"
+    },
+    {
+      "channels": [
         {
-          "name": "📝・founding-roster",
+          "name": "⛏️・monkey-smp",
           "nsfw": false,
           "overwrites": {
             "role:@everyone": {
-              "allow": [],
-              "deny": [
-                "create_private_threads",
-                "create_public_threads"
-              ]
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
             }
           },
-          "slowmode": 21600,
-          "synced": false,
-          "topic": "Founding roster sign-up: one message with your Minecraft Java name, and your faction's name if you have one. First come, first listed. Rules are pinned.",
+          "slowmode": 2,
+          "synced": true,
+          "topic": "Monkey SMP, our Minecraft server. Status is pinned; chat here reaches the game, and linked players' chat comes back. /smp link connects your Minecraft name for chat and playtime.",
           "type": "text"
         },
         {
@@ -1045,10 +1080,120 @@
           "synced": false,
           "topic": "Monkey SMP answers: the pass, the modpack, joining. Staff post here; ask anything else in #smp-forum or a ticket.",
           "type": "text"
+        },
+        {
+          "name": "⌨️・smp-commands",
+          "nsfw": false,
+          "overwrites": {
+            "member:Front Desk": {
+              "allow": [
+                "embed_links",
+                "send_messages"
+              ],
+              "deny": []
+            },
+            "role:@everyone": {
+              "allow": [
+                "add_reactions"
+              ],
+              "deny": [
+                "create_private_threads",
+                "create_public_threads",
+                "send_messages"
+              ]
+            },
+            "role:Keeper": {
+              "allow": [
+                "send_messages"
+              ],
+              "deny": []
+            }
+          },
+          "slowmode": 0,
+          "synced": false,
+          "topic": "Monkey SMP commands, in game and here. Staff post here; ask in #smp-forum or a ticket.",
+          "type": "text"
+        },
+        {
+          "name": "📝・founding-roster",
+          "nsfw": false,
+          "overwrites": {
+            "role:@everyone": {
+              "allow": [],
+              "deny": [
+                "create_private_threads",
+                "create_public_threads"
+              ]
+            }
+          },
+          "slowmode": 21600,
+          "synced": false,
+          "topic": "Founding roster sign-up: one message with your Minecraft Java name, and your faction's name if you have one. First come, first listed. Rules are pinned.",
+          "type": "text"
+        },
+        {
+          "default_reaction": null,
+          "layout": "list_view",
+          "name": "🚩・smp-forum",
+          "nsfw": false,
+          "overwrites": {
+            "role:@everyone": {
+              "allow": [
+                "read_messages"
+              ],
+              "deny": []
+            }
+          },
+          "require_tag": false,
+          "slowmode": 0,
+          "sort_order": "latest_activity",
+          "synced": true,
+          "tags": [
+            {
+              "emoji": "🐛",
+              "moderated": false,
+              "name": "Bug"
+            },
+            {
+              "emoji": "🏰",
+              "moderated": false,
+              "name": "Faction"
+            },
+            {
+              "emoji": "🔎",
+              "moderated": false,
+              "name": "Looking for faction"
+            },
+            {
+              "emoji": "📯",
+              "moderated": false,
+              "name": "Recruiting"
+            },
+            {
+              "emoji": "💡",
+              "moderated": false,
+              "name": "Suggestion"
+            },
+            {
+              "emoji": "⚖️",
+              "moderated": false,
+              "name": "Trading"
+            }
+          ],
+          "thread_slowmode": 0,
+          "topic": "Monkey SMP factions, recruiting, suggestions, bugs and trading.\nRegister a faction (up to four players) with one post: the name, the members' Minecraft names, the banner and a charter. One post per faction, tagged Faction.\nPlaying solo? Post with the Looking for faction tag and staff will find you one.\nPayment problems, reports and appeals go in a ticket, not here.",
+          "type": "forum"
         }
       ],
-      "name": "03 · games",
-      "overwrites": {},
+      "name": "04 · monkey smp",
+      "overwrites": {
+        "role:@everyone": {
+          "allow": [
+            "read_messages"
+          ],
+          "deny": []
+        }
+      },
       "type": "category"
     },
     {
@@ -1211,7 +1356,7 @@
           "type": "text"
         }
       ],
-      "name": "04 · off topic",
+      "name": "05 · off topic",
       "overwrites": {},
       "type": "category"
     },
@@ -1220,6 +1365,76 @@
         {
           "bitrate": 64000,
           "name": "🔊 Lobby",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "type": "voice",
+          "user_limit": 0
+        },
+        {
+          "bitrate": 64000,
+          "name": "🔊 Lobby 2",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "type": "voice",
+          "user_limit": 0
+        },
+        {
+          "bitrate": 64000,
+          "name": "➕ New Squad",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "type": "voice",
+          "user_limit": 0
+        },
+        {
+          "bitrate": 64000,
+          "name": "🔒 New Private Squad",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "type": "voice",
+          "user_limit": 0
+        },
+        {
+          "bitrate": 64000,
+          "name": "🎮 Duo",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "type": "voice",
+          "user_limit": 2
+        },
+        {
+          "bitrate": 64000,
+          "name": "🎮 Trio",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "type": "voice",
+          "user_limit": 3
+        },
+        {
+          "bitrate": 64000,
+          "name": "🎮 Squad",
+          "nsfw": false,
+          "overwrites": {},
+          "slowmode": 0,
+          "synced": true,
+          "type": "voice",
+          "user_limit": 5
+        },
+        {
+          "bitrate": 64000,
+          "name": "📺 Watch Party",
           "nsfw": false,
           "overwrites": {},
           "slowmode": 0,
@@ -1239,27 +1454,7 @@
         },
         {
           "bitrate": 64000,
-          "name": "🎮 Squad",
-          "nsfw": false,
-          "overwrites": {},
-          "slowmode": 0,
-          "synced": true,
-          "type": "voice",
-          "user_limit": 5
-        },
-        {
-          "bitrate": 64000,
           "name": "💤 AFK",
-          "nsfw": false,
-          "overwrites": {},
-          "slowmode": 0,
-          "synced": true,
-          "type": "voice",
-          "user_limit": 0
-        },
-        {
-          "bitrate": 64000,
-          "name": "➕ New Squad",
           "nsfw": false,
           "overwrites": {},
           "slowmode": 0,
@@ -1268,7 +1463,7 @@
           "user_limit": 0
         }
       ],
-      "name": "05 · voice",
+      "name": "06 · voice",
       "overwrites": {},
       "type": "category"
     },
@@ -1350,7 +1545,7 @@
           "user_limit": 0
         }
       ],
-      "name": "06 · squad",
+      "name": "07 · squad",
       "overwrites": {
         "member:Front Desk": {
           "allow": [
