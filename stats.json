@@ -1,0 +1,33 @@
+{
+ "events": [
+  {
+   "kind": "event",
+   "start": "2026-11-07T20:00:00Z",
+   "title": "Town Hall"
+  },
+  {
+   "game": "Risk of Rain 2",
+   "kind": "tournament",
+   "start": "2026-11-08T03:00:00Z",
+   "title": "Risk of Rain 2 tournament"
+  }
+ ],
+ "generated_at": "2026-11-07T08:16:16Z",
+ "hall": {
+  "badges": 32
+ },
+ "members": {
+  "online": 10,
+  "total": 41
+ },
+ "tournaments": {
+  "finished": 0,
+  "open": 1,
+  "running": 0
+ },
+ "v": 1,
+ "week": {
+  "messages": 10,
+  "voice_hours": 6
+ }
+}
