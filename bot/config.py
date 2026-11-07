@@ -53,6 +53,7 @@ VOICE_CATEGORY = "06 · voice"
 VOICE_CATEGORY_WAS = layout_old_names(VOICE_CATEGORY)
 VOICE_CATEGORY_NAMES = (VOICE_CATEGORY, *VOICE_CATEGORY_WAS)
 NEW_SQUAD_VOICE = "➕ New Squad"  # join to get your own temporary voice channel
+NEW_PRIVATE_VOICE = "🔒 New Private Squad"  # the same, but locked: only people you /squad invite can join
 HYPE_ROLE = "Hype"  # shop: 24 h hoisted role
 SEASON_ROLE = "Season Champ"  # top 3 of the last finished season
 # Phase 3 (autopilot)

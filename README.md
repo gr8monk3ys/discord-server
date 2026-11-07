@@ -174,7 +174,7 @@ day-to-day attention. Design and history:
 | Community | welcome after Onboarding, `/report` and "Report message", mod log |
 | Hall of fame | 3 ⭐ from other members (accounts 30+ days old) reposts to ⭐・hall-of-fame (public channels only) |
 | Clips | clip of the week poll Sundays 18:05 (retried, not skipped, while 📸・clips is missing); winner gets Clip of the Week (only votes from accounts 30+ days old count, and not the clip author's own) |
-| Voice | join ➕ New Squad for your own channel; `/squad name`, `/squad limit`, `/squad claim` |
+| Voice | join ➕ New Squad for your own channel, or 🔒 New Private Squad for a locked one; `/squad name`, `/squad limit`, `/squad claim`, `/squad lock`, `/squad unlock`, `/squad invite`, `/squad kick` |
 | Events | `/gamenight`; `/watchparty` (a Stage event in 🎙・stage, or a voice event in the Lobby when the bot can't schedule on the stage; accounts 30+ days old; shares the game-night limits; its reminder pings the Game Night role only when staff host it); a Town Hall on the first Saturday of each month at 12:00 (`TOWNHALL_TIME`), created a week ahead and announced once; 15-min reminders; free Epic/Steam games Thursdays 18:00 |
 | Economy | `/daily`, `/balance`, `/give` (accounts 30+ days old), `/coinflip`, `/richest`; coins for voice, chat, clips, squads |
 | Games | `/slots`, `/blackjack`, `/trivia`, `/predict` |

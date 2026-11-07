@@ -31,16 +31,25 @@ def http_error(status=400):
 
 
 # ---------------------------------------------------------------- fakes
+class FakeRole:
+    def __init__(self, name):
+        self.name = name
+
+    def __repr__(self):
+        return f"<role {self.name}>"
+
+
 class FakeCategory:
     def __init__(self, guild, cid, name):
         self.guild = guild
         self.id = cid
         self.name = name
-        self.overwrites = {"@everyone": "category overwrites"}
+        self.overwrites = {guild.default_role: discord.PermissionOverwrite(view_channel=True)}
         self.created = []
 
     async def create_voice_channel(self, name, **kwargs):
         ch = FakeVoice(self.guild, self.guild.next_id(), name, self, position=kwargs.get("position", 0))
+        ch.overwrites = dict(kwargs.get("overwrites", {}))
         self.created.append(dict(name=name, **kwargs))
         self.guild.voice_channels.append(ch)
         return ch
@@ -55,9 +64,15 @@ class FakeVoice:
         self.position = position
         self.voice_states = {}
         self.user_limit = 0
+        self.overwrites = {}
         self.deleted = False
         self.edits = []
+        self.perm_calls = []
         self.sent = []
+
+    async def set_permissions(self, target, *, overwrite=None, reason=None):
+        self.perm_calls.append((target, overwrite))
+        self.overwrites[target] = overwrite
 
     async def delete(self, reason=None):
         if self.deleted:
@@ -85,6 +100,9 @@ class FakeMember:
         self.bot = bot
         self.guild = env.guild
         self.display_name = f"user{uid}"
+        self.mention = f"<@{uid}>"
+        self.guild_permissions = None  # not an admin; a test sets administrator=True for a mod
+        self.roles = []
         self.activities = [discord.Game(game)] if game else []
         self.voice = None
         self.moves = []
@@ -101,15 +119,18 @@ class FakeMember:
 
 
 class FakeGuild:
-    def __init__(self, with_hub=True, with_category=True):
+    def __init__(self, with_hub=True, with_category=True, with_private=True):
         self.id = GUILD_ID
         self._next = 5000
+        self.default_role = FakeRole("@everyone")
         self.category = FakeCategory(self, 902, config.VOICE_CATEGORY)
         self.categories = [self.category] if with_category else []
         self.hub = FakeVoice(self, 100, config.NEW_SQUAD_VOICE, self.category, position=1)
         self.squad = FakeVoice(self, 101, config.SQUAD_VOICE, self.category, position=2)
         self.lobby = FakeVoice(self, 102, config.LOBBY_VOICE, self.category, position=3)
-        self.voice_channels = ([self.hub] if with_hub else []) + [self.squad, self.lobby]
+        self.private_hub = FakeVoice(self, 103, config.NEW_PRIVATE_VOICE, self.category, position=4)
+        self.voice_channels = (([self.hub] if with_hub else []) + [self.squad, self.lobby]
+                               + ([self.private_hub] if with_private else []))
         self.members = []
 
     def next_id(self):
@@ -501,7 +522,9 @@ async def squad_in_temp(env):
 
 def test_commands_outside_temp_channel(monkeypatch):
     async def go(env):
-        for cmd, args in ((TempVoice.squad_name, ("x",)), (TempVoice.squad_limit, (3,)), (TempVoice.squad_claim, ())):
+        for cmd, args in ((TempVoice.squad_name, ("x",)), (TempVoice.squad_limit, (3,)), (TempVoice.squad_claim, ()),
+                          (TempVoice.squad_lock, ()), (TempVoice.squad_unlock, ()),
+                          (TempVoice.squad_invite, (env.member(C),)), (TempVoice.squad_kick, (env.member(C),))):
             inter = env.inter(A)  # not in voice at all
             await cmd.callback(env.cog, inter, *args)
             assert "inside your squad channel" in inter.reply() and inter.ephemeral()
@@ -585,4 +608,136 @@ def test_claim(monkeypatch):
         inter = env.inter(B)
         await TempVoice.squad_limit.callback(env.cog, inter, 5)
         assert temp.user_limit == 5
+    with_env(go, monkeypatch)
+
+
+# ---------------------------------------------------------------- private squads
+def test_overwrite_helpers_copy_and_tidy():
+    everyone, a = FakeRole("@everyone"), FakeRole("a")
+    base = {everyone: discord.PermissionOverwrite(view_channel=True)}
+    out = cogmod.locked(base, everyone, [a])
+    assert base[everyone].connect is None  # the input is not changed
+    assert out[everyone].connect is False and out[everyone].view_channel is True and out[a].connect is True
+    back = cogmod.unlocked(out, everyone)
+    assert back[everyone].connect is None and back[everyone].view_channel is True and back[a].connect is True
+    # An @everyone overwrite that only existed for the lock goes away again.
+    assert everyone not in cogmod.unlocked(cogmod.locked({}, everyone, []), everyone)
+
+
+def test_join_private_hub_creates_a_locked_channel(monkeypatch):
+    async def go(env):
+        await env.voice(A, env.guild.private_hub)
+        [temp] = env.temps()
+        created = env.guild.category.created[0]
+        assert created["position"] == env.guild.private_hub.position
+        everyone = env.guild.default_role
+        ow = created["overwrites"]
+        assert ow[everyone].connect is False and ow[everyone].view_channel is True  # locked, still visible
+        assert ow[env.member(A)].connect is True
+        assert env.guild.category.overwrites[everyone].connect is None  # the category is untouched
+        assert cogmod.is_locked(temp) and env.member(A).moves == [temp]
+        assert temp.sent == [cogmod.PRIVATE_HELLO]
+        assert await env.rows() == {temp.id: A}
+    with_env(go, monkeypatch)
+
+
+def test_public_hub_still_works_without_a_private_hub(monkeypatch):
+    async def go(env):
+        await env.voice(A, env.guild.hub)
+        [temp] = env.temps()
+        assert not cogmod.is_locked(temp) and temp.sent == []
+    with_env(go, monkeypatch, guild=FakeGuild(with_private=False))
+
+
+def test_lock_and_unlock(monkeypatch):
+    async def go(env):
+        temp = await squad_in_temp(env)  # A owns it, B is in it
+        everyone = env.guild.default_role
+        inter = env.inter(A)
+        await TempVoice.squad_lock.callback(env.cog, inter)
+        assert inter.reply().startswith("Locked.") and inter.ephemeral()
+        assert cogmod.is_locked(temp) and temp.overwrites[everyone].view_channel is True
+        # Everyone in it when it locked can get back in after a dropped connection.
+        assert temp.overwrites[env.member(A)].connect is True and temp.overwrites[env.member(B)].connect is True
+        inter = env.inter(A)
+        await TempVoice.squad_lock.callback(env.cog, inter)
+        assert "already locked" in inter.reply()
+        inter = env.inter(A)
+        await TempVoice.squad_unlock.callback(env.cog, inter)
+        assert inter.reply() == "Unlocked: anyone can join." and not cogmod.is_locked(temp)
+        assert temp.overwrites[everyone].connect is None and temp.overwrites[everyone].view_channel is True
+        inter = env.inter(A)
+        await TempVoice.squad_unlock.callback(env.cog, inter)
+        assert inter.reply() == "It isn't locked."
+        assert len([e for e in temp.edits if "overwrites" in e]) == 2
+    with_env(go, monkeypatch)
+
+
+def test_invite_lets_someone_into_a_locked_channel(monkeypatch):
+    async def go(env):
+        await env.voice(A, env.guild.private_hub)
+        [temp] = env.temps()
+        c = env.member(C)
+        inter = env.inter(A)
+        await TempVoice.squad_invite.callback(env.cog, inter, c)
+        assert inter.reply() == "<@3> can join now." and inter.ephemeral()
+        assert temp.overwrites[c].connect is True and cogmod.is_locked(temp)
+        assert temp.sent[-1].startswith("<@3>, you're invited")
+        for who in (env.member(A), env.member(BOTUSER, bot=True)):
+            inter = env.inter(A)
+            await TempVoice.squad_invite.callback(env.cog, inter, who)
+            assert inter.reply() == "Pick someone else."
+        assert [t for t, _ in temp.perm_calls] == [c]
+    with_env(go, monkeypatch)
+
+
+def test_kick_disconnects_and_keeps_them_out(monkeypatch):
+    async def go(env):
+        temp = await squad_in_temp(env)
+        b = env.member(B)
+        inter = env.inter(A)
+        await TempVoice.squad_kick.callback(env.cog, inter, b)
+        assert inter.reply() == "<@2> is out and can't rejoin this channel." and inter.ephemeral()
+        assert temp.overwrites[b].connect is False and B not in temp.voice_states and b.voice is None
+        await env.settle()  # Discord reports the disconnect
+        assert await env.rows() == {temp.id: A} and not temp.deleted
+        inter = env.inter(A)
+        await TempVoice.squad_invite.callback(env.cog, inter, b)  # changed their mind
+        assert temp.overwrites[b].connect is True
+    with_env(go, monkeypatch)
+
+
+def test_kick_someone_not_in_the_channel_only_keeps_them_out(monkeypatch):
+    async def go(env):
+        temp = await squad_in_temp(env)
+        await env.voice(C, env.guild.lobby)
+        c = env.member(C)
+        inter = env.inter(A)
+        await TempVoice.squad_kick.callback(env.cog, inter, c)
+        assert temp.overwrites[c].connect is False and c.moves == [] and C in env.guild.lobby.voice_states
+    with_env(go, monkeypatch)
+
+
+def test_kick_refuses_yourself_bots_and_mods(monkeypatch):
+    async def go(env):
+        temp = await squad_in_temp(env)
+        mod = env.member(C)
+        mod.guild_permissions = SimpleNamespace(administrator=True)
+        for who in (env.member(A), env.member(BOTUSER, bot=True), mod):
+            inter = env.inter(A)
+            await TempVoice.squad_kick.callback(env.cog, inter, who)
+            assert inter.reply() == cogmod.CANT_KICK and inter.ephemeral()
+        assert temp.perm_calls == []
+    with_env(go, monkeypatch)
+
+
+def test_lock_unlock_invite_kick_are_owner_only(monkeypatch):
+    async def go(env):
+        temp = await squad_in_temp(env)
+        for cmd, args in ((TempVoice.squad_lock, ()), (TempVoice.squad_unlock, ()),
+                          (TempVoice.squad_invite, (env.member(C),)), (TempVoice.squad_kick, (env.member(A),))):
+            inter = env.inter(B)
+            await cmd.callback(env.cog, inter, *args)
+            assert "Only the channel owner" in inter.reply() and inter.ephemeral()
+        assert temp.edits == [] and temp.perm_calls == []
     with_env(go, monkeypatch)
