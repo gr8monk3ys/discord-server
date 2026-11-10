@@ -8,6 +8,13 @@ All notable changes to this project are recorded here. The format follows
 
 ### Changed
 
+- Thirteen bot modules are parked: still in the repo with their data, but not loaded, so their
+  commands, buttons and scheduled posts are off (`PARKED` in `bot/main.py`). They are the ones a
+  member has to start and nobody had used by 2026-11-09: games (`/slots`, `/blackjack`, `/trivia`,
+  `/predict`), tournaments, creators, partners, weekly challenges, the word game, matchmaking,
+  staff applications, Steam links, `/catchup`, supporter, the forums module and clipcast.
+  `PARKED_MODULES` in `server/.env` replaces the list without a code change. The bot's status
+  line and the seasonal daily quest no longer name a parked module.
 - Monkey SMP rule 25 now says the world border is 5000 x 5000, matching release 3.1.0.
 - SpotifyForge's two VPS jobs now post to #mod-log when they start failing and when they work
   again (`deploy/vps/front-desk-spotify-alert.sh`). After the PC's C: wipe nothing else would notice.

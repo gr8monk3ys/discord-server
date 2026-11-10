@@ -119,7 +119,11 @@ class FakeBot:
     def get_guild(self, gid):
         return self.guild if gid == GUILD_ID else None
 
+    loaded = ("Matchmaking", "WordGame")  # the other cogs the presence asks about
+
     def get_cog(self, name):
+        if name in self.loaded:
+            return object()
         return self.quests if name == "Quests" else None
 
     async def change_presence(self, activity=None):
@@ -329,6 +333,17 @@ def test_presence_rotates_through_the_lines(monkeypatch):
         number = W.puzzle_number(W.local_day(ts, TZ))
         assert number == 8 and a[3].name == f"Daily Word #{number}"
         assert a[4].name == "321 members"
+    run(go())
+
+
+def test_presence_skips_parked_modules(monkeypatch):
+    async def go():
+        monkeypatch.setattr(cogmod, "now", lambda: 1_800_000_000)
+        guild, bot, cog = env()
+        bot.loaded = ()
+        for _ in range(3):
+            await cog.rotate()
+        assert [a.name for a in bot.presences] == ["321 members", "/help", "321 members"]
     run(go())
 
 

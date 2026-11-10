@@ -315,13 +315,18 @@ QUESTS: tuple[Quest, ...] = (
     Quest("word", "🔤", "solve today's word game (`/word`)", 1),
 )
 QUEST_BY_KEY = {q.key: q for q in QUESTS}
+# The cog (by its name) a quest needs loaded; a quest whose module is parked leaves the pool.
+QUEST_NEEDS = {"squad": "Lfg", "win_game": "Games", "word": "WordGame"}
 
 
-def quest_for(run: Run, day: date, tz: tzinfo) -> Quest:
+def quest_for(run: Run, day: date, tz: tzinfo, missing: frozenset[str] = frozenset()) -> Quest:
     """The day's quest: the pool in an order shuffled once per run, cycled by day, so the same
-    quest never comes two days running and no quest is skipped."""
+    quest never comes two days running and no quest is skipped. `missing` holds the cog names
+    that are not loaded; their quests are dropped from the shuffled order (with none missing the
+    picks are what they always were)."""
     order = list(QUESTS)
     random.Random(f"seasonal:{run.id}:quests").shuffle(order)
+    order = [q for q in order if QUEST_NEEDS.get(q.key) not in missing]
     index = (day - local_day(run.start, tz)).days
     return order[index % len(order)]
 

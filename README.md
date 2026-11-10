@@ -284,6 +284,15 @@ nights and tournament events fail with 403. Pin Messages is separate from Manage
 without it the Spotlight and the Monkey SMP panel cannot be pinned. Mute Members is for Stage events, Ban Members
 for `/ban` and ban appeals).
 
+### Parked modules
+
+A module listed in `PARKED` (`bot/main.py`) stays in `MODULES` and in the tests, but the bot does
+not load it: no commands, no buttons, no scheduled posts. Its tables and data stay. The list holds
+the modules a member has to start that nobody had used by 2026-11-09; the feature table above
+still describes them. To bring one back, delete its line from `PARKED` and restart the bot, or set
+`PARKED_MODULES` in `server/.env` to the comma-separated short names that should stay parked
+(`none` loads everything).
+
 ### Adding a module
 
 1. Add tables as a **new** entry in `MIGRATIONS` (`bot/db.py`); never edit a shipped one.
