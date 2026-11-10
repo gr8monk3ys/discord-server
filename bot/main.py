@@ -7,6 +7,7 @@
 import argparse
 import base64
 import logging
+import os
 import sys
 from logging.handlers import RotatingFileHandler
 
@@ -83,6 +84,44 @@ MODULES = [
     ("cogs.botm", {"members"}),  # /botm award: Base of the Month role and announcement (staff)
 ]
 
+# Modules that stay in the repo but are not loaded: their commands, buttons and scheduled posts are
+# off. Each one is something a member has to start, and none had been used once by 2026-11-09 (the
+# server is small, and a bot that talks to nobody makes a quiet server look quieter). The tables and
+# the data stay. Bring one back by deleting its line here, or set PARKED_MODULES in server/.env to
+# the comma-separated list that should stay parked (short names; "none" loads everything).
+PARKED = frozenset({
+    "cogs.games",  # /slots, /blackjack, /trivia, /predict
+    "cogs.tournaments",
+    "cogs.creators",
+    "cogs.partners",
+    "cogs.challenges",  # the Monday challenge board
+    "cogs.wordgame",
+    "cogs.matchmaking",
+    "cogs.staffapps",
+    "cogs.gamelink",
+    "cogs.catchup",
+    "cogs.supporter",
+    "cogs.forums",
+    "cogs.clipcast",
+})
+
+
+def parked(environ=None) -> frozenset[str]:
+    """The extensions not to load: PARKED, or what PARKED_MODULES names instead."""
+    environ = os.environ if environ is None else environ
+    raw = str(environ.get("PARKED_MODULES") or "").strip()
+    if not raw:
+        return PARKED
+    names = {"cogs." + part.strip().removeprefix("cogs.") for part in raw.split(",") if part.strip()}
+    return frozenset(names & {ext for ext, _ in MODULES})
+
+
+def loaded_modules(environ=None) -> list[tuple[str, set[str]]]:
+    """MODULES without the parked ones, in build order."""
+    skip = parked(environ)
+    return [(ext, needs) for ext, needs in MODULES if ext not in skip]
+
+
 PERMISSIONS = discord.Permissions(
     view_channel=True,
     send_messages=True,
@@ -119,7 +158,7 @@ def build_intents(privileged: bool = True) -> discord.Intents:
     still connects before they're switched on in the Developer Portal."""
     intents = discord.Intents.default()
     if privileged:
-        for _, needs in MODULES:
+        for _, needs in loaded_modules():
             for name in needs:
                 setattr(intents, name, True)
     return intents
@@ -142,7 +181,10 @@ class FrontDesk(commands.Bot):
         version = await self.db.migrate()
         log.info("database ready (schema v%s)", version)
         self.tree.on_error = self.on_app_command_error
-        for extension, _ in MODULES:
+        skipped = sorted(ext.removeprefix("cogs.") for ext in parked())
+        if skipped:
+            log.info("parked modules, not loaded: %s", ", ".join(skipped))
+        for extension, _ in loaded_modules():
             await self.load_extension(extension)
         if self.sync_commands:  # the fallback restart reuses the commands just synced
             self.tree.copy_global_to(guild=self.guild_ref)

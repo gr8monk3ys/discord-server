@@ -404,9 +404,16 @@ class Seasonal(commands.Cog):
         log.info("seasonal: %s finished the %s quest of %s", user_id, run.id, day)
         return True
 
+    def missing_cogs(self) -> frozenset[str]:
+        """The cogs a daily quest can need that are not loaded (parked in main.PARKED)."""
+        get_cog = getattr(self.bot, "get_cog", None)
+        if get_cog is None:
+            return frozenset()
+        return frozenset(name for name in set(S.QUEST_NEEDS.values()) if get_cog(name) is None)
+
     async def settle_day(self, guild, run: S.Run, day, t: int, ids=None) -> list[int]:
         """Grant one day's quest to everyone (or `ids`) who did it. Returns who was paid now."""
-        quest = S.quest_for(run, day, self.tz)
+        quest = S.quest_for(run, day, self.tz, self.missing_cogs())
         values = await self.measure(quest, day, ids, t)
         if not values:
             return []
@@ -447,7 +454,7 @@ class Seasonal(commands.Cog):
             return 0
         paid: list[tuple[int, S.Quest]] = []
         for day in S.quest_days(run, t, self.tz):
-            quest = S.quest_for(run, day, self.tz)
+            quest = S.quest_for(run, day, self.tz, self.missing_cogs())
             paid += [(uid, quest) for uid in await self.settle_day(guild, run, day, t)]
         if not paid:
             return 0
@@ -563,7 +570,7 @@ class Seasonal(commands.Cog):
         e = run.event
         guild = self.guild()
         day = S.local_day(t, self.tz)
-        quest = S.quest_for(run, day, self.tz)
+        quest = S.quest_for(run, day, self.tz, self.missing_cogs())
         if guild is not None:
             try:  # pay today's quest now if it's done, instead of making them wait for the sweep
                 await self.settle_day(guild, run, day, t, ids={member.id})

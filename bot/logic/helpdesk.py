@@ -259,19 +259,22 @@ def usage(entry: Entry) -> str:
 
 # ------------------------------------------------------------ presence
 
-def presence_lines(members: int, word_no: int) -> list[tuple[str, str]]:
-    """(activity kind, text) in rotation order. Kinds: watching, playing, listening."""
+def presence_lines(members: int, word_no: int, queue: bool = True, word: bool = True) -> list[tuple[str, str]]:
+    """(activity kind, text) in rotation order. Kinds: watching, playing, listening.
+    `queue` and `word` say whether matchmaking and the word game are loaded: a parked module's
+    line is left out."""
     noun = "member" if members == 1 else "members"
-    return [
-        ("watching", f"{members:,} {noun}"),
-        ("playing", "/queue to find a squad"),
-        ("listening", "/help"),
-        ("playing", f"Daily Word #{word_no}"),
-    ]
+    lines = [("watching", f"{members:,} {noun}")]
+    if queue:
+        lines.append(("playing", "/queue to find a squad"))
+    lines.append(("listening", "/help"))
+    if word:
+        lines.append(("playing", f"Daily Word #{word_no}"))
+    return lines
 
 
-def presence_at(tick: int, members: int, word_no: int) -> tuple[str, str]:
-    lines = presence_lines(members, word_no)
+def presence_at(tick: int, members: int, word_no: int, queue: bool = True, word: bool = True) -> tuple[str, str]:
+    lines = presence_lines(members, word_no, queue, word)
     return lines[tick % len(lines)]
 
 

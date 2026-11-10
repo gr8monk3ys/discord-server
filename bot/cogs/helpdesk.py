@@ -242,7 +242,9 @@ class Helpdesk(commands.Cog):
         guild = self.guild()
         members = (guild.member_count or len(guild.members)) if guild is not None else 0
         word_no = W.puzzle_number(W.local_day(now(), self.bot.settings.tz))
-        kind, text = H.presence_at(self.tick, members, word_no)
+        has = getattr(self.bot, "get_cog", None) or (lambda name: None)
+        kind, text = H.presence_at(self.tick, members, word_no, queue=has("Matchmaking") is not None,
+                                   word=has("WordGame") is not None)
         self.tick += 1
         await self.bot.change_presence(activity=activity(kind, text))
 

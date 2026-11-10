@@ -145,7 +145,7 @@ class FakeBot:
         self.db = db
         self.guild = guild
         self.settings = SimpleNamespace(guild_id=GUILD_ID, tz=TZ)
-        self.cogs = {}
+        self.cogs = {name: object() for name in S.QUEST_NEEDS.values()}  # the quest pool's modules are loaded
         self.dynamic = []
 
     def get_guild(self, guild_id):
@@ -290,7 +290,7 @@ def with_env(fn, monkeypatch, quest="squad", events=EVENTS):
         env = Env(db, guild, bot, cog)
         monkeypatch.setattr(cogmod, "now", lambda: env.t)
         if quest is not None:
-            monkeypatch.setattr(S, "quest_for", lambda run, day, tz: S.QUEST_BY_KEY[quest])
+            monkeypatch.setattr(S, "quest_for", lambda run, day, tz, missing=frozenset(): S.QUEST_BY_KEY[quest])
         try:
             await fn(env)
         finally:
@@ -1033,3 +1033,11 @@ def test_tick_steps_fail_independently(monkeypatch):
         await env.cog.run_tick()
         assert len(env.guild.news.sent) == 1  # the opening still went out
     with_env(body, monkeypatch)
+
+
+def test_missing_cogs_names_the_quest_modules_that_are_parked():
+    bot = FakeBot.__new__(FakeBot)
+    bot.cogs = {"Lfg": object()}
+    cog = Seasonal.__new__(Seasonal)
+    cog.bot = bot
+    assert cog.missing_cogs() == frozenset({"Games", "WordGame"})
