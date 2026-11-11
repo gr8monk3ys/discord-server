@@ -31,7 +31,7 @@ const ROUTE_FLOOR_OVERRIDES = {
 // grows the HTML shell (inlined CSS, serialized data, a new section) is invisible to the scores
 // until it moves LCP, so the size is gated directly. About 25% above the measured value; the
 // measured number is printed on every run so drift shows before it fails.
-const HOME_DOCUMENT_BYTE_CAP = 22_000; // measured 17,691 on 2026-11-10
+const HOME_DOCUMENT_BYTE_CAP = 16_000; // measured 12,948 on the CI runner, 2026-11-11 (Windows curl reads ~17.7 KB)
 
 const MAX_ATTEMPTS = 4;
 const isWindows = process.platform === "win32";
