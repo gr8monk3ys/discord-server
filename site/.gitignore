@@ -11,6 +11,7 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 /coverage/
+/artifacts/
 
 # env files (secrets live in Vercel only)
 .env*
