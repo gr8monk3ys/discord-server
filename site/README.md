@@ -55,7 +55,8 @@ axe-core in Playwright, Lighthouse score floors with a compressed-HTML byte cap 
 (`scripts/check-lighthouse-score.mjs`; every floor is a measured value, desktop preset), and
 CodeQL (`.github/workflows/codeql.yml`). Measured on 2026-11-10: 100 in all four categories on
 `/`; `/appeal` scores SEO 66 only because it is `noindex` on purpose; the home document is about
-17.7 KB compressed against a 22 KB cap. Sentry, analytics and the uptime/deploy watchdogs were
+12.9 KB compressed on the CI runner against a 16 KB cap (Windows curl measures about 17.7 KB, so
+run the byte check on Linux or WSL). Sentry, analytics and the uptime/deploy watchdogs were
 left out: this site has no trackers by design, and its deploys follow bot commits too.
 
 CI (`.github/workflows/ci.yml`, jobs "Site" and "Site Lighthouse") runs the same steps with bun 1.3.9. The lockfile is
