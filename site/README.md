@@ -40,12 +40,25 @@ From `site/`, with bun 1.3 or later:
     bun install --frozen-lockfile
     bun run dev          # http://localhost:3000 (development CSP: allows eval and inline styles)
     bun run lint
+    bun run knip            # dead code, unused exports and dependencies (knip.json)
     bun run typecheck
-    bun run test         # Vitest: handlers, page markup and metadata, the live-data check
+    bun run test            # Vitest: handlers, page markup and metadata, the live-data check
+    bun run test:coverage   # the same, failing below the coverage ratchet in vitest.config.mts
     bun run build
-    bun run test:e2e     # builds, starts on 127.0.0.1:4173, runs Playwright (locally on Edge)
+    bun run test:e2e        # builds, starts on 127.0.0.1:4173, runs Playwright (locally on Edge),
+                            # including e2e/a11y.spec.ts: axe-core on every template, light and dark
+    bun run lighthouse:ci   # against `bun run start` on port 3000: Lighthouse score floors + byte cap
 
-CI (`.github/workflows/ci.yml`, job "Site") runs the same steps with bun 1.3.9. The lockfile is
+The quality gates are the ones lscaturchio.xyz runs, ported on 2026-11-10 at the owner's request:
+knip, a Vitest coverage ratchet (raise the numbers when coverage goes up, never lower them),
+axe-core in Playwright, Lighthouse score floors with a compressed-HTML byte cap for the home page
+(`scripts/check-lighthouse-score.mjs`; every floor is a measured value, desktop preset), and
+CodeQL (`.github/workflows/codeql.yml`). Measured on 2026-11-10: 100 in all four categories on
+`/`; `/appeal` scores SEO 66 only because it is `noindex` on purpose; the home document is about
+17.7 KB compressed against a 22 KB cap. Sentry, analytics and the uptime/deploy watchdogs were
+left out: this site has no trackers by design, and its deploys follow bot commits too.
+
+CI (`.github/workflows/ci.yml`, jobs "Site" and "Site Lighthouse") runs the same steps with bun 1.3.9. The lockfile is
 the version-1 text format that bun 1.3 reads; regenerate it with `bunx bun@1.3.9 install`
 if a newer bun rewrites it.
 

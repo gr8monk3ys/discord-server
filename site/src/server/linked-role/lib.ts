@@ -18,7 +18,6 @@ export const CALLBACK_PATH = "/api/linked-role/callback";
 // Every redirect this feature sends goes to AUTHORIZE_URL or to RESULT_PAGE + one of FLAGS.
 export const RESULT_PAGE = "/linked-role?r=";
 export const FLAGS = ["ok", "cancelled", "expired", "busy", "failed"] as const;
-export type Flag = (typeof FLAGS)[number];
 
 // __Host-: the browser only accepts it with Secure, Path=/ and no Domain, so a sibling
 // subdomain cannot plant one.

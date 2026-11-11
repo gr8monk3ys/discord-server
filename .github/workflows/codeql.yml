@@ -1,0 +1,36 @@
+# CodeQL on the landing page's TypeScript (site/), as on lscaturchio.xyz: on pushes to main and
+# weekly, so new queries run even without pushes. The repo is public, so Actions minutes are free.
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+    paths: ["site/**", ".github/workflows/codeql.yml"]
+  schedule:
+    - cron: "41 9 * * 1"
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    name: Analyze (javascript-typescript)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript
+          queries: +security-extended,security-and-quality
+          config: |
+            paths:
+              - site
+
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:javascript-typescript"
