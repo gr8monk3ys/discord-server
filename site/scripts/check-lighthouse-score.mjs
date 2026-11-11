@@ -60,6 +60,13 @@ try {
       const reportPath = join(outputDir, `${artifactStem(route)}-attempt-${attempt}.json`);
       const scores = runLighthouse(url, reportPath);
 
+      // Lighthouse itself sometimes fails to record a run on a shared runner (NO_NAVSTART,
+      // NO_FCP): that says nothing about the site, so it costs an attempt, not the check.
+      if (!scores) {
+        console.log(`[lighthouse] ${route} attempt ${attempt} -> Lighthouse produced no report, retrying`);
+        continue;
+      }
+
       console.log(`[lighthouse] ${route} attempt ${attempt} -> ${JSON.stringify(scores)}`);
 
       if (!bestAttempt || totalScore(scores) > totalScore(bestAttempt.scores)) {
@@ -69,6 +76,11 @@ try {
       if (Object.entries(scores).every(([k, score]) => score >= (floors[k] ?? 100))) {
         break;
       }
+    }
+
+    if (!bestAttempt) {
+      console.error(`[lighthouse] ${route}: Lighthouse produced no report in ${attemptsRun} attempts`);
+      process.exit(1);
     }
 
     const failures = Object.entries(bestAttempt.scores).filter(([k, score]) => score < (floors[k] ?? 100));
@@ -121,11 +133,20 @@ function runLighthouse(url, reportPath) {
     if (result.stdout) process.stdout.write(result.stdout);
     if (result.stderr) process.stderr.write(result.stderr);
     // Lighthouse on Windows can exit non-zero when it fails to delete Chrome's temp profile
-    // (EPERM) after writing a good report; trust the report when there is one.
-    if (!isWindows) process.exit(result.status ?? 1);
+    // (EPERM) after writing a good report; trust the report there when there is one.
+    if (!isWindows) return null;
   }
 
-  const report = JSON.parse(readFileSync(reportPath, "utf-8"));
+  let report;
+  try {
+    report = JSON.parse(readFileSync(reportPath, "utf-8"));
+  } catch {
+    return null;
+  }
+  if (report.runtimeError) {
+    console.error(`[lighthouse] runtime error: ${report.runtimeError.code}`);
+    return null;
+  }
   return {
     performance: Math.round(report.categories.performance.score * 100),
     accessibility: Math.round(report.categories.accessibility.score * 100),
