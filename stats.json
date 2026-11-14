@@ -1,0 +1,25 @@
+{
+ "games": [
+  {
+   "hours": 46,
+   "name": "Minecraft"
+  },
+  {
+   "hours": 12,
+   "name": "Tabletop Simulator"
+  }
+ ],
+ "generated_at": "2026-11-14T10:40:57Z",
+ "hall": {
+  "badges": 36
+ },
+ "members": {
+  "online": 8,
+  "total": 43
+ },
+ "v": 1,
+ "week": {
+  "messages": 40,
+  "voice_hours": 105
+ }
+}
