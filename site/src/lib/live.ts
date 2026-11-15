@@ -40,11 +40,6 @@ export function loadStats(): Promise<Loaded | null> {
   return statsReady;
 }
 
-/** Test hook: forget the cached fetch. */
-export function resetStats(): void {
-  statsReady = null;
-}
-
 // Ink motion (PageMotion) installs the real arm(); until then, and when the reader asked
 // for less motion, it does nothing.
 let armImpl: (scope: ParentNode) => void = () => {};
