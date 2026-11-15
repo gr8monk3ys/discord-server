@@ -169,8 +169,8 @@ def test_site_dependencies_are_the_framework_only():
 def test_site_assets_referenced_exist():
     refs = set()
     for path in site_files((".ts", ".tsx")):
-        refs |= set(re.findall(r'/(img/[\w.-]+\.(?:png|svg))["`]', path.read_text(encoding="utf-8")))
-    assert {"img/cursive.svg", "img/favicon.png", "img/server-icon.png", "img/og.png"} <= refs
+        refs |= set(re.findall(r'/(img/[\w.-]+\.(?:png|svg|webp))["`]', path.read_text(encoding="utf-8")))
+    assert {"img/cursive.svg", "img/favicon.png", "img/server-icon.png", "img/server-icon.webp", "img/og.png"} <= refs
     for ref in refs:
         assert (SITE / "public" / ref).is_file(), ref
 

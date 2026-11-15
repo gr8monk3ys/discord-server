@@ -127,7 +127,7 @@ export default function Home() {
             <figure className="plate" aria-hidden="true">
               <div className="plate-frame">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className="icon" src="/img/server-icon.png" alt="" width="256" height="256" />
+                <img className="icon" src="/img/server-icon.webp" alt="" width="256" height="256" />
               </div>
             </figure>
             <NowLine />

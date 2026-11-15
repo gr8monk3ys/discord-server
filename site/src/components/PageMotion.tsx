@@ -34,17 +34,20 @@ function ink(): () => void {
     },
     { rootMargin: "0px" },
   );
-  document.documentElement.classList.add("inks");
   setArm((scope) => {
     const fold = window.innerHeight;
-    scope.querySelectorAll(INKED).forEach((el) => {
-      if (el.closest("[hidden]") || el.getBoundingClientRect().top < fold) return;
+    // Measure every piece before marking any, so the page is laid out once, not once per piece.
+    const below = Array.from(scope.querySelectorAll(INKED)).filter(
+      (el) => !el.closest("[hidden]") && el.getBoundingClientRect().top >= fold,
+    );
+    for (const el of below) {
       el.classList.add("armed");
       seen.observe(el);
-    });
+    }
   });
   // The live section is armed again when it opens, since it starts out hidden.
   arm(document);
+  document.documentElement.classList.add("inks");
   // Paper gets the whole page, whatever has been scrolled past or not.
   const print = () => {
     document.querySelectorAll(".armed").forEach((el) => {
