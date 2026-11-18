@@ -249,7 +249,7 @@ def test_tailwind_maps_the_house_tokens_and_adds_no_reset():
 
 def test_house_type_and_motion_rules():
     css = _css()
-    for var in ("--font-fraunces", "--font-instrument-sans", "--font-plex-mono"):
+    for var in ("--font-lorenzo-hand", "--font-fraunces", "--font-instrument-sans", "--font-plex-mono"):
         assert f"var({var})" in css, var
     assert "letter-spacing: 0.16em" in css  # the wall label
     assert ":focus-visible { outline: 2px solid var(--pen); outline-offset: 2px; }" in css
@@ -266,14 +266,18 @@ def test_house_type_and_motion_rules():
 def test_fonts_are_the_main_sites_cuts_and_first_party():
     """next/font, as on lscaturchio.xyz: self-hosted at build time (the browser never talks to
     Google), Fraunces without the opsz axis (asking for it draws visibly thinner display type
-    than the main site) and the metric-matched fallbacks next/font generates."""
+    than the main site) and the metric-matched fallbacks next/font generates. The display face
+    is the owner's own handwriting, a file in the repo."""
     fonts = read("src/app/fonts.ts")
     assert 'from "next/font/google"' in fonts
     for face in ("Fraunces(", "Instrument_Sans(", "IBM_Plex_Mono("):
         assert face in fonts, face
+    assert 'from "next/font/local"' in fonts
+    assert 'src: "../fonts/LorenzoHand-Bold.woff2"' in fonts
+    assert (SITE / "src" / "fonts" / "LorenzoHand-Bold.woff2").is_file()
     assert "opsz" not in fonts and "axes" not in fonts
     assert 'weight: ["400", "500", "600"]' in fonts  # Plex Mono's cuts
-    assert fonts.count('display: "swap"') == 3
+    assert fonts.count('display: "swap"') == 4
     assert "fontVariables" in read("src/app/layout.tsx")
     for path in site_files((".ts", ".tsx", ".css")):
         text = path.read_text(encoding="utf-8")
