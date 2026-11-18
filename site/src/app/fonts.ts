@@ -1,7 +1,8 @@
-// The three faces, self-hosted by next/font at build time: the browser never talks to
-// Google, and the CSP's font-src can stay 'self'. The CSS variables feed --display, --body
-// and --mono in field-notebook.css.
+// The four faces, self-hosted by next/font at build time: the browser never talks to
+// Google, and the CSP's font-src can stay 'self'. The CSS variables feed --display, --body,
+// --mono and --hand in field-notebook.css.
 import { Fraunces, IBM_Plex_Mono, Instrument_Sans } from "next/font/google";
+import localFont from "next/font/local";
 
 export const fraunces = Fraunces({ subsets: ["latin"], display: "swap", variable: "--font-fraunces" });
 export const instrumentSans = Instrument_Sans({ subsets: ["latin"], display: "swap", variable: "--font-instrument-sans" });
@@ -12,4 +13,12 @@ export const plexMono = IBM_Plex_Mono({
   variable: "--font-plex-mono",
 });
 
-export const fontVariables = `${fraunces.variable} ${instrumentSans.variable} ${plexMono.variable}`;
+// The owner's own print handwriting: the promise in the headline.
+export const lorenzoHand = localFont({
+  src: "../fonts/LorenzoHand-Bold.woff2",
+  weight: "700",
+  display: "swap",
+  variable: "--font-lorenzo-hand",
+});
+
+export const fontVariables = `${fraunces.variable} ${instrumentSans.variable} ${plexMono.variable} ${lorenzoHand.variable}`;

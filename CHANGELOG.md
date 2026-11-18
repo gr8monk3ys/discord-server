@@ -8,6 +8,10 @@ All notable changes to this project are recorded here. The format follows
 
 ### Changed
 
+- Site: the promise in the headline ("No tryhards, no toxicity.") is set in the owner's own print
+  handwriting, on its own line under "Chill gamers." (owner, 2026-11-18). The face is
+  `site/src/fonts/LorenzoHand-Bold.woff2`, self-hosted by next/font like the other three, so the
+  CSP is unchanged; the write-on animation still runs along its lines.
 - The server's surface is cut to fit about ten active people (owner, 2026-11-17): 49 public
   channels and 10 voice rooms become 26 and 4. `layout.RETIRED_CHANNELS` lists the sixteen
   channels that go (six voice rooms, the six whose bot modules are parked, and art, code, fashion

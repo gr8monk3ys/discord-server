@@ -27,6 +27,7 @@
   --display: var(--font-fraunces), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
   --body: var(--font-instrument-sans), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
   --mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular", "Menlo", monospace;
+  --hand: var(--font-lorenzo-hand), var(--display);
 
   --fast: 150ms;
   --default: 200ms;
@@ -178,7 +179,11 @@ h1, h2, h3, h4 {
 }
 /* Display: the masthead and nothing else. */
 h1 { font-size: clamp(2.4rem, 5.2vw, 4.9rem); font-weight: 720; line-height: 1.02; letter-spacing: -0.035em; font-variant-numeric: oldstyle-nums; text-wrap: balance; }
-h1 em { font-style: normal; color: var(--pen); }
+/* The promise is in the owner's hand. Its x-height is 0.35em against Fraunces' 0.44em, so it is
+   set a step larger than the print beside it. */
+h1 em { font-family: var(--hand); font-style: normal; font-weight: 700; font-size: 1.25em; letter-spacing: 0; color: var(--pen); }
+/* It starts its own line, and stays an inline box so the pen can write along its lines (see `write`). */
+h1 em::before { content: "\A"; white-space: pre; }
 /* Section title. */
 h2, .group-head h3 { font-size: clamp(1.55rem, 2.4vw, 2.25rem); font-weight: 650; line-height: 1.18; letter-spacing: -0.026em; }
 /* Card title. */
