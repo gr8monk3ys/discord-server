@@ -8,6 +8,15 @@ All notable changes to this project are recorded here. The format follows
 
 ### Changed
 
+- PRIVACY.md now lists everything Front Desk stores, including birthdays, moderation cases,
+  reminders, AFK notes, help tickets, staff applications, matchmaking, factions and Tebex pass
+  cancellations, says how long records are kept, and says that a full deletion is done by the
+  owner by hand. `bot/tests/test_privacy_policy.py` fails for any new table the policy does not
+  cover. A reminder is now deleted once delivered or cancelled instead of being kept; a migration
+  drops the old ones.
+- The permission self-check also reports Administrator on Front Desk's role (it needs only what
+  `main.py --invite` asks for) and any Administrator role sitting below a role with Manage Roles but
+  not Administrator, since a bot holding that role could hand Administrator to anyone.
 - Thirteen bot modules are parked: still in the repo with their data, but not loaded, so their
   commands, buttons and scheduled posts are off (`PARKED` in `bot/main.py`). They are the ones a
   member has to start and nobody had used by 2026-11-09: games (`/slots`, `/blackjack`, `/trivia`,
@@ -59,6 +68,12 @@ All notable changes to this project are recorded here. The format follows
     `TEBEX_WEBHOOK_SECRET` is set (`docs/TEBEX_WEBHOOK.md`).
   - `/botm award` (staff): moves the Base of the Month role to this month's builders and announces it
     in #monkey-smp; makes the role when it is missing and never moves roles.
+
+### Fixed
+
+- `polish_server.py` sets up Onboarding only while it is off and has no questions, so re-running it
+  (for the media lock, say) no longer replaces the questions and default channels set by
+  `focus_mode.py` or `public_mode.py`.
 
 ### Changed
 
@@ -243,6 +258,9 @@ All notable changes to this project are recorded here. The format follows
 
 ### Fixed
 
+- The site's privacy-policy link points at `PRIVACY.md` on `main`. It pointed at the deleted
+  `front-desk-bot` branch, so it was dead. The bot's Privacy Policy URL in the Discord
+  Developer Portal is not in the repo and has to be changed to the same `main` URL by hand.
 - Scheduled jobs no longer mark a period done when the server or their channel is missing at
   the scheduled time. The weekly MVP (`stats`), the clip of the week poll (`clips`) and the
   clipcast ask, publish and staff hand-over (`clipcast`) retry on each tick until the next

@@ -15,8 +15,7 @@
 - [ ] Schema changes are a **new** entry appended to `MIGRATIONS` in `bot/db.py`; no shipped
       migration was edited
 - [ ] `README.md` is updated if behaviour, commands, schedules or the runbook changed
-- [ ] `PRIVACY.md` is updated if what the bot stores about members changed (and the
-      `front-desk-bot` branch is fast-forwarded after merge)
+- [ ] `PRIVACY.md` is updated if what the bot stores about members changed
 - [ ] `CHANGELOG.md` has a line under Unreleased
 
 <!-- Delete the lines that do not apply to this change. -->

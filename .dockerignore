@@ -1,7 +1,9 @@
-# Allowlist: the image needs only bot/ and server/ (layout.py, names.py, snapshot/).
+# Allowlist: the image needs only bot/ and server/ (layout.py, names.py, snapshot/), plus the
+# site config the text filter reads the server's own invite code from (bot/logic/textfilter.py).
 *
 !bot/
 !server/
+!site/src/data/site-config.json
 
 # Never in the image: secrets, the live database, logs, the lock file.
 **/.env

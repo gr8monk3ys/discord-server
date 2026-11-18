@@ -12,7 +12,8 @@ anything from `bot/data/` (the SQLite DB, logs and lock file live there and are 
 
 - `server/layout.py` source of truth for games, roles, channels and their emoji names; the bot
   imports it (via `bot/config.py`), so the setup scripts and the bot always agree
-- `server/setup_server.py` (first build), `polish_server.py` (Community, Onboarding, AutoMod),
+- `server/setup_server.py` (first build), `polish_server.py` (Community, AutoMod, media lock; Onboarding only
+  while it is off with no questions, so a re-run never replaces the live questions and default channels),
   `public_mode.py` (later changes; adds what is missing and never deletes, but for games in
   `layout.RETIRED_GAMES` it drops their options from the "What do you play?" question, in
   `game_options` when that step adds a new game and otherwise in `retire_games`, and
@@ -56,7 +57,8 @@ The bot and scripts share one virtualenv at `server/.venv` (gitignored); it runs
 - Every server script dry-runs by default and changes Discord only with `--apply`.
 - `python main.py --invite` (in `bot/`) prints the invite link with the permissions the bot needs.
 
-CI (`.github/workflows/ci.yml`) runs ruff, both Python test suites and the site job (the bun steps above) on every pull request and push to
+CI (`.github/workflows/ci.yml`) runs ruff, both Python test suites, a build of the bot's Docker image with a smoke check
+inside it, and the site job (the bun steps above) on every pull request and push to
 `main`; still run them locally before pushing.
 
 ## Conventions
@@ -91,8 +93,6 @@ CI (`.github/workflows/ci.yml`) runs ruff, both Python test suites and the site 
   to too: don't work on files in there as root (it follows symlinks), go through the container. Leave
   the server's Minecraft files and containers alone. Before a long stop there, run
   `python3 server/watchdog.py --alert-only --pause 60` as `frontdesk`, or it alerts #mod-log.
-- Keep the `front-desk-bot` branch: the bot's public privacy-policy link points at `PRIVACY.md`
-  on that branch. After changing `PRIVACY.md` on `main`, fast-forward that branch to `main`.
 - The `site-data` branch is not a code branch: it holds one force-pushed, parentless commit
   with the single file `stats.json`, written only by `server/publish_site_data.py`. Never
   commit to it, merge it, rebase onto it or delete it; the landing page reads it.

@@ -742,6 +742,10 @@ MIGRATIONS = [
         refunded_at INTEGER
     )""",
     ],
+    [
+        # Reminders are now deleted once delivered or cancelled (cogs/utility.py); drop the old ones.
+        "DELETE FROM reminders WHERE done = 1",
+    ],
 ]
 
 

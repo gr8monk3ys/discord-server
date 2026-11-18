@@ -469,14 +469,15 @@ def test_remind_caps_active_reminders_at_ten(monkeypatch):
         assert "10 reminders" in inter.replies()[0][0]
         assert len(await env.rows("reminders")) == 10
         await env.remind(B, "1d", "someone else is fine")
-        await env.db.execute("UPDATE reminders SET done = 1 WHERE text = 'r0'")
+        rid = (await env.rows("reminders", "text = 'r0'"))[0]["id"]
+        await Utility.reminders.callback(env.cog, env.inter(A), rid)
         await env.remind(A, "1d", "room again")
-        assert len(await env.rows("reminders", "user_id = 11 AND done = 0")) == 10
+        assert len(await env.rows("reminders", "user_id = 11")) == 10
     with_env(go, monkeypatch)
 
 
 # ---------------------------------------------------------------- delivery
-def test_delivery_pings_only_the_owner_and_marks_done(monkeypatch):
+def test_delivery_pings_only_the_owner_and_deletes_the_row(monkeypatch):
     async def go(env):
         await env.remind(A, "10m", "<@&5> @everyone check the oven")
         await env.remind(B, "1h", "later")
@@ -486,7 +487,7 @@ def test_delivery_pings_only_the_owner_and_marks_done(monkeypatch):
         assert sent["content"].startswith(f"⏰ <@{A}>") and "check the oven" in sent["content"]
         am = sent["allowed_mentions"]
         assert am.everyone is False and am.roles is False and [u.id for u in am.users] == [A]
-        assert [r["done"] for r in await env.rows("reminders")] == [1, 0]
+        assert [r["text"] for r in await env.rows("reminders")] == ["later"]
         await env.cog.deliver_due()  # nothing twice
         assert len(env.guild.general.sent) == 1
     with_env(go, monkeypatch)
@@ -511,7 +512,7 @@ def test_delivery_retries_on_errors_then_gives_up_after_a_day(monkeypatch):
         assert (await env.rows("reminders"))[0]["done"] == 0
         env.t += DAY + MIN
         await env.cog.deliver_due()
-        assert (await env.rows("reminders"))[0]["done"] == 1
+        assert await env.rows("reminders") == []
     with_env(go, monkeypatch)
 
 
@@ -523,7 +524,7 @@ def test_delivery_falls_back_to_dm_when_channel_is_gone(monkeypatch):
         await env.cog.deliver_due()
         (dm,) = env.member(A).dms
         assert "dm me" in dm["content"]
-        assert (await env.rows("reminders"))[0]["done"] == 1
+        assert await env.rows("reminders") == []
     with_env(go, monkeypatch)
 
 
@@ -533,7 +534,7 @@ def test_delivery_forbidden_channel_uses_dm(monkeypatch):
         env.guild.general.fail = http_error(discord.Forbidden, 403)
         env.t += 10 * MIN
         await env.cog.deliver_due()
-        assert env.member(A).dms and (await env.rows("reminders"))[0]["done"] == 1
+        assert env.member(A).dms and await env.rows("reminders") == []
     with_env(go, monkeypatch)
 
 
@@ -564,6 +565,7 @@ def test_reminders_list_and_cancel(monkeypatch):
         inter = env.inter(A)
         await Utility.reminders.callback(env.cog, inter, rid)
         assert f"Cancelled reminder `#{rid}`" in inter.replies()[0][0]
+        assert await env.rows("reminders", "text = 'first'") == []
         env.t += 2 * HOUR
         await env.cog.deliver_due()
         assert [s["content"] for s in env.guild.general.sent if "first" in s["content"]] == []

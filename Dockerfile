@@ -22,9 +22,9 @@ RUN pip install -r bot/requirements.txt
 
 COPY bot/ bot/
 COPY server/ server/
+COPY site/src/data/site-config.json site/src/data/site-config.json
 
 # - The code stays owned by root and read-only for the bot: only bot/data is writable.
-#   (That is also what makes the nightly backup fall back to bot/data/backups on Linux.)
 # - bot/data is a volume, which hides the question/poll banks shipped in the repo, so keep a
 #   copy in /app/seed for run_container.sh to refresh on every start.
 # - sed strips CR in case the repo was checked out on Windows with CRLF line endings.

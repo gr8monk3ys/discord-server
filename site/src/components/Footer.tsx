@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { SECTIONS } from "@/components/Header";
 
-export const PRIVACY_URL = "https://github.com/gr8monk3ys/discord-server/blob/front-desk-bot/PRIVACY.md";
+export const PRIVACY_URL = "https://github.com/gr8monk3ys/discord-server/blob/main/PRIVACY.md";
 export const SMP_URL = "https://monkeysmp.lscaturchio.xyz";
 
 /** The arrow after an outbound link (U+FE0E keeps it text, never an emoji). */

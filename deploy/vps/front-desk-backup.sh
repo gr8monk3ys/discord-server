@@ -13,7 +13,7 @@
 #      stays small. A failure at any step leaves the branch as it was.
 #
 # It posts to WATCHDOG_WEBHOOK_URL (#mod-log) once when backups start failing and once when they
-# work again, not every day.
+# work again, not every day. A post that doesn't go through is tried again on the next run.
 #
 # Settings are in /etc/front-desk-backup/settings: BACKUP_REMOTE and AGE_RECIPIENT, and optionally KEEP.
 set -eu
@@ -40,7 +40,7 @@ alert() {
     printf 'url = "%s"\n' "$url" | curl -fsS --max-time 20 --config - -o /dev/null \
         -H 'Content-Type: application/json' \
         --data "{\"content\":\"$1\",\"allowed_mentions\":{\"parse\":[]}}" ||
-        echo "front-desk-backup: couldn't post to the webhook" >&2
+        { echo "front-desk-backup: couldn't post to the webhook" >&2; return 1; }
 }
 
 on_exit() {
@@ -49,13 +49,14 @@ on_exit() {
     mkdir -p "$STATE"
     if [ -n "$ok" ]; then
         if [ -e "$STATE/failing" ]; then
-            rm -f "$STATE/failing"
-            alert "Front Desk's off-site backups work again."
+            alert "Front Desk's off-site backups work again." && rm -f "$STATE/failing"
         fi
     elif [ "$rc" != 0 ] && [ ! -e "$STATE/failing" ]; then
-        touch "$STATE/failing"
-        alert "Front Desk's off-site backup FAILED: $why. It tries again tomorrow. Check: journalctl -u front-desk-backup"
+        alert "Front Desk's off-site backup FAILED: $why. It tries again tomorrow. Check: journalctl -u front-desk-backup" &&
+            touch "$STATE/failing"
     fi
+    # The unit's result is the backup's, whether or not the post went through.
+    exit "$rc"
 }
 trap on_exit EXIT
 trap 'exit 143' TERM INT HUP

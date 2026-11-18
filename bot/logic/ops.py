@@ -6,7 +6,7 @@
 - The "back online" decision.
 - Config drift: comparing snapshot dicts built by server/snapshot_lib.py.
 - Permission self-check: what each cog needs (channels, permissions, roles) and which
-  of those the bot is missing.
+  of those the bot is missing; Administrator on the bot or within reach of a Manage Roles bot.
 """
 
 import hashlib
@@ -296,7 +296,7 @@ def fmt_uptime(seconds: int) -> str:
 VIEW = ("view_channel",)
 POST = ("view_channel", "send_messages", "embed_links")
 SERVER = "Server"  # problem group for server-wide permissions
-ROLES = "Roles"  # problem group for roles the bot hands out
+ROLES = "Roles"  # problem group for roles the bot hands out and the role order
 OK_DIGEST = "ok"
 
 
@@ -546,6 +546,44 @@ def role_problems(role_positions, top_position: int, needs=None, loaded=None) ->
             out.append(Problem(ROLES, f"{name}: role not found ({_who(cogs)})"))
         elif position >= top_position:
             out.append(Problem(ROLES, f"{name}: has to sit below Front Desk's role ({_who(cogs)})"))
+    return out
+
+
+@dataclass(frozen=True)
+class RoleGrant:
+    name: str
+    position: int
+    administrator: bool
+    manage_roles: bool
+    mine: bool = False  # one of the bot's own roles
+    managed: bool = False  # another integration's (bot's) own role
+
+
+def admin_problems(roles, bot_admin: bool) -> list[Problem]:
+    """`roles`: every role but @everyone. Reports Administrator on the bot, on any other bot's
+    role, and every Administrator role sitting below a role with Manage Roles but not
+    Administrator: a holder of that role can give any role below its own top role, so a
+    compromised bot could hand out Administrator."""
+    out = []
+    mine = [r.name for r in roles if r.mine and r.administrator]
+    if bot_admin or mine:
+        out.append(Problem(SERVER, f"has Administrator: Server Settings -> Roles -> {' / '.join(mine or ['Front Desk'])}"
+                                   " -> turn off Administrator. The bot needs only the permissions printed by"
+                                   " python main.py --invite"))
+    managers = [r for r in roles if r.manage_roles and not r.administrator]
+    for role in roles:
+        if not role.administrator or role.mine:
+            continue
+        if role.managed:
+            out.append(Problem(ROLES, f"{role.name}: a bot's role with Administrator, so a leak of that bot's token"
+                                      f" hands over the server. Server Settings -> Roles -> {role.name} -> turn off"
+                                      " Administrator and give it only what that bot needs"))
+            continue
+        above = sorted(r.name for r in managers if r.position > role.position)  # reordering bots keeps the text
+        if above:
+            out.append(Problem(ROLES, f"{role.name}: grants Administrator but sits below {', '.join(above)}, which"
+                                      " can manage roles and so give it to anyone. Server Settings -> Roles: drag"
+                                      f" {role.name} above them, or turn off its Administrator"))
     return out
 
 

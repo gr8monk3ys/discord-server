@@ -329,6 +329,45 @@ def test_role_problems_missing_and_not_below_the_bot():
     assert ops.role_problems({}, 10, needs, loaded={"lfg"}) == []
 
 
+def test_admin_problems_on_the_bot():
+    grant = ops.RoleGrant
+    fine = [grant("Keeper", 9, True, False), grant("Front Desk", 5, False, True, mine=True)]
+    assert ops.admin_problems(fine, bot_admin=False) == []
+    hint = (" -> turn off Administrator. The bot needs only the permissions printed by python main.py --invite")
+    assert ops.admin_problems([grant("Keeper", 9, True, False), grant("FD", 5, True, True, mine=True)], False) == [
+        Problem(ops.SERVER, "has Administrator: Server Settings -> Roles -> FD" + hint)]
+    assert ops.admin_problems(fine, bot_admin=True) == [
+        Problem(ops.SERVER, "has Administrator: Server Settings -> Roles -> Front Desk" + hint)]
+
+
+def test_admin_problems_admin_role_below_a_role_manager():
+    grant = ops.RoleGrant
+    roles = [grant("Keeper", 9, True, False), grant("Tebex", 6, False, True), grant("Front Desk", 5, False, True, mine=True),
+             grant("Moderator", 4, False, False), grant("Captcha.bot", 3, False, True), grant("Admin", 2, True, False),
+             grant("Regular", 1, False, False)]
+    assert ops.admin_problems(roles, bot_admin=False) == [
+        Problem(ops.ROLES, "Admin: grants Administrator but sits below Captcha.bot, Front Desk, Tebex, which can manage"
+                           " roles and so give it to anyone. Server Settings -> Roles: drag Admin above"
+                           " them, or turn off its Administrator")]
+    # Keeper sits above every role manager; a manager that has Administrator itself adds nothing
+    roles = [grant("Keeper", 9, True, False), grant("Owner bot", 8, True, True), grant("Admin", 7, True, False),
+             grant("Captcha.bot", 3, False, True)]
+    assert ops.admin_problems(roles, bot_admin=False) == []
+    # the bot's own Administrator role is reported once, as the bot's, not again by position
+    roles = [grant("Captcha.bot", 9, False, True), grant("Front Desk", 5, True, True, mine=True)]
+    assert [p.where for p in ops.admin_problems(roles, bot_admin=True)] == [ops.SERVER]
+
+
+def test_admin_problems_on_another_bots_role():
+    grant = ops.RoleGrant
+    # Captcha.bot's own role holds Administrator: reported wherever it sits, once
+    roles = [grant("Captcha.bot", 9, True, True, managed=True), grant("Tebex", 6, False, True, managed=True),
+             grant("Discadia", 3, True, False, managed=True)]
+    problems = ops.admin_problems(roles, bot_admin=False)
+    assert [(p.where, p.text.split(":")[0]) for p in problems] == [(ops.ROLES, "Captcha.bot"), (ops.ROLES, "Discadia")]
+    assert "turn off Administrator" in problems[0].text
+
+
 def test_requirements_tables_cover_config():
     import config
     by_channel = {}

@@ -88,6 +88,20 @@ def test_load_own_invites_handles_missing_and_placeholder(tmp_path):
     assert F.load_own_invites(placeholder) == frozenset({"abc-12"})
 
 
+def test_load_own_invites_warns_when_the_file_is_missing(tmp_path, caplog):
+    with caplog.at_level("WARNING", logger=F.log.name):
+        F.load_own_invites(tmp_path / "nope.json")
+    assert "nope.json" in caplog.text and "blocked" in caplog.text
+
+
+def test_load_own_invites_warns_on_a_placeholder_code(tmp_path, caplog):
+    path = tmp_path / "site-config.json"
+    path.write_text('{"inviteCode": "REPLACE_ME"}', encoding="utf-8")
+    with caplog.at_level("WARNING", logger=F.log.name):
+        assert F.load_own_invites(path) == frozenset()
+    assert "REPLACE_ME" in caplog.text and "blocked" in caplog.text
+
+
 # ---------------------------------------------------------------- links
 @pytest.mark.parametrize("text", [
     "https://example.org/x",

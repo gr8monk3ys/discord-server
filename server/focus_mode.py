@@ -342,7 +342,8 @@ class FocusMode:
             print(f"  skip    ({e.text or e})")
             return False
         if not ob.enabled:
-            print("  skip    Onboarding is off on this server (polish_server.py turns it on)")
+            print("  skip    Onboarding is off on this server (polish_server.py turns it on for a new server; "
+                  "otherwise switch it on in Server Settings > Onboarding)")
             return False
         current = list(ob.default_channels)
         defaults, missing = self.wanted_defaults(current)

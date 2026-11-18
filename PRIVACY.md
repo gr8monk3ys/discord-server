@@ -3,21 +3,37 @@
 Front Desk is the bot for one Discord server, Lorenzo's Server. It isn't offered to other
 servers. This page says what it stores, why, and how to get it deleted.
 
-_Last updated: 2026-11-01_
+_Last updated: 2026-11-17_
 
 ## What Front Desk stores
+
+Unless a row, or a paragraph further down, says how long, a record is kept until you ask for it to
+be deleted (see "Your choices").
 
 | Data | Why |
 |---|---|
 | Your Discord user ID | To tie the records below to you |
+| That you turned tracking off, and when | The `/privacy` setting; `/privacy tracking:on` deletes it |
 | Voice time: which voice channel and when you joined/left | `/stats`, leaderboards, weekly MVP, voice coins |
 | How many messages you sent per day (**a count only, never the text**) | `/stats`, leaderboards, message coins |
 | Which game Discord shows you playing, and for how long | Top games in `/stats` |
 | Which invite you joined with, and whether you left | `/invites`, the Recruiter role |
 | Links to clips you post in the clips channel | Clip of the week |
 | Stars on messages that reach the hall of fame | The hall of fame |
-| Coins, purchases and game results | The coin economy |
-| Squad-up posts, game nights, reports you file | Those features |
+| Coins and every coin payment or charge, purchases and timed perks (a perk's row goes when it runs out), bets, game results, each month's season winners | The coin economy |
+| Predictions you create: the question and both options you typed | `/predict` |
+| Squad-up posts you make (the game, size and mode, and the time and note you typed) and who joined them; game nights you host | Those features |
+| While you are in the matchmaking queue, the game, mode and team size you picked (removed when you are matched, leave the queue or the server, or the wait runs out); each match made, with its members | Matchmaking, Wrapped, the website's totals |
+| A temporary voice channel you open, with you as its owner (deleted with the channel) | Join-to-create voice |
+| Who counted last in the counting channel, each member's current run, and the best counter | The counting game |
+| That you were welcomed in general, and when | Welcoming each member once |
+| Reports you file, and reports filed about you: who reported whom, which message, the reason typed and what staff did | Moderator review |
+| Moderation cases about you: warnings, timeouts (by a moderator, or automatic ones such as anti-spam), their removal and bans, each with the moderator, the reason they typed, the time and the length | Staff review, `/cases`, the warning limits, the staff-application check |
+| Your birthday, if you save it with `/birthday set` (month and day, no year) | The birthday shout-out, role and coins; `/birthday remove` deletes it |
+| A reminder you set with `/remind`: its text, the channel and when it is due | Delivering it. It is deleted once it is delivered or you cancel it (or a day after it was due, if it still could not be sent) |
+| Your `/afk` note and since when | Telling people who mention you; deleted when you next send a message |
+| Help tickets you open: the private thread, you, and when it was opened and closed (the conversation itself stays in the Discord thread) | One open ticket at a time |
+| Staff applications you submit: your answers, the decision, who made it and when | Staff review, the wait after a denial |
 | XP and level (from the message and voice counts above) | Levels, `/rank`, level roles |
 | Badges you've earned, tournament entries and results | Achievements, `/profile`, tournaments |
 | Starter-quest steps you've done | `/quest` and its one-time reward |
@@ -37,15 +53,23 @@ _Last updated: 2026-11-01_
 | Watch parties you schedule (the event, you as host, the start time) | Reminders and the one-event-per-host limit |
 | Clips shortlisted for the server's YouTube: the message ID, your answer, who gave it and when, the name you asked to be credited as, and the video's YouTube ID once posted | Clipcast, proof of consent, taking a clip down |
 | A Minecraft name you link with `/smp link`, and how long you were online on the Minecraft server each day | Passing your in-game chat to the Monkey SMP channel, playtime coins, `/smp top` |
+| A faction you register: the name, banner and charter its leader wrote, the leader, the members' Minecraft names, and the staff decision and who made it | The faction list, staff review |
 | Only if you use them: your faction's recruitment pitch, tags and timezone; who pressed Request to join on which faction and when; your `/faction lfg` note and timezone | The recruitment board, the once-a-day request limit, `/faction seekers` |
 | Only if you run `/referral`: your code and the Minecraft name it was made for; for each purchase made with a code, the Tebex transaction ID, both Minecraft names and when | Giving the Kindred Band once per new player, refunds |
+| If you cancel a Monkey SMP pass: the notice Tebex sends (your Minecraft name, the package, when it ends and any reason you gave Tebex) is posted in the staff channel; Front Desk keeps only the notice's ID, its type and Tebex's reference for the pass | Posting each notice once, so staff can thank you or ask what would have kept you |
 | Only if you turn on `/smp nudges`: when you were last seen on the Minecraft server, when a nudge was sent, and whether Discord refused the DM | Sending you one "we miss you" DM after a week away |
 | When you last shared a Wrapped card, and your level on January 1 | The share cooldown, "levels gained" on next year's card |
 | When you were banned; a ban appeal you send (your user ID, your answers, the decision, who made it and their reason) | The waiting period before an appeal, staff review |
+| Small notes against your ID: the last year your birthday and your join anniversary were celebrated, that a server boost of yours was thanked, that the starter-quest reminder DM was sent, member levels at the last weekly recap, that your matchmaking wait ran out (kept 7 days), a welcome card still being retried (up to a day), when your Birthday role comes off, that you are pinned in the spotlight (until it expires), and whether you won one of the last two Base of the Month awards | Doing each of those once |
 
-Front Desk does **not** store the text of your messages. The only exceptions are a message you
-report (a short quote goes to the moderators), a message copied to the hall of fame, the title
-of a guide or setup post, and the answers on a ban appeal.
+Front Desk does **not** store the text of your chat messages. A message you report is quoted to
+the moderators and a starred message is copied to the hall of fame, but those copies are Discord
+messages; Front Desk keeps only their IDs. What it does keep is text you type into its own
+commands and forms, for the feature it belongs to: a `/remind` reminder, an `/afk` note, the
+reason on a report, a squad-up note, a prediction, a guide or setup post's title, a Clipcast
+credit name, Daily Word guesses, a partner, staff or faction application, a faction pitch or
+`/faction lfg` note, and the answers on a ban appeal. It also keeps the reason a moderator gives
+for a warning, timeout or ban.
 
 ## Where it's kept
 
@@ -64,6 +88,11 @@ repository, in case the server is lost. GitHub holds only the encrypted file: th
 server owner's, and is on neither the server nor GitHub. Both keep the last 14 days, so something deleted
 from the database can stay in a backup for up to 14 days after that, and GitHub may hold a dropped file,
 still encrypted, for a while longer.
+
+**Logs.** Front Desk writes a log of what it did and what went wrong, on the same server. A line
+can name a member by user ID (for example, a reminder it could not deliver). Only the newest lines
+are kept (about 4 MB in Front Desk's own log and 30 MB in the container's console log); older lines
+are overwritten.
 
 **AI summaries.** When a member runs `/catchup`, recent messages from that one public channel
 are summarised for that member only. Messages from bots and from members who turned tracking
@@ -104,7 +133,8 @@ themselves are yours and stay in the forum.
 
 **Clipcast (YouTube).** A clip of yours leaves Discord only after you press yes for that clip,
 or if you set `/clipcast consent always` yourself. Then the video file, a title made from your
-caption and a description go to the server's YouTube channel. The description has your display
+caption and a description go to the server's YouTube channel. The file is held in a temporary
+file only while it uploads. The description has your display
 name if you chose to be credited, or no name if you chose anonymous. Front Desk keeps your
 answer, who gave it and when. Deleting the clip, leaving, a ban or `/privacy tracking:off`
 withdraws your yes for anything not posted yet, at once, and a standing "always" goes back to
@@ -210,20 +240,23 @@ the post's thread like any other message.
 - `/privacy tracking:off` stops voice, message and game tracking and **deletes** your
   voice, message and game history and your XP right away. `/privacy tracking:on` starts it again.
 - Turning tracking off also acts on the newer features, in the same moment: your Minecraft
-  playtime, the records of your guide and setup posts and your Welcome Crew greetings are
-  deleted, your level is removed from the Wrapped snapshot, and your yes is withdrawn for any
-  clip not yet posted.
+  playtime, the records of your guide and setup posts, your Welcome Crew greetings and the
+  starter-quest steps that came from tracking (saying hi, joining voice) are deleted, your level is removed from the Wrapped and weekly-recap snapshots, and your yes is
+  withdrawn for any clip not yet posted.
 - It removes the detail, never a limit. Coins you were paid stay in the coin ledger, which is
   not deleted, and daily and weekly caps are counted from it, so turning tracking off and on
   again does not let anyone earn a reward twice. For the same reason three bare records are kept:
   when you first arrived (so a rejoin is not treated as a first join), for up to 6 hours,
   when you last shared a Wrapped card, and, for up to 30 days, the note that the Welcomers were
   pinged about you.
-- Not touched by it: your house, a linked Minecraft name, Supporter dates, clipcast answers, a
-  clip already on YouTube, bans and appeals. Use the command named in each paragraph above
-  (`/house leave`, `/smp unlink`, `/clipcast remove`), or ask.
+- Not touched by it: everything else in the table above, such as your house, a linked Minecraft
+  name, Supporter dates, clipcast answers, a clip already on YouTube, your birthday, reminders,
+  tickets, applications, moderation cases, bans and appeals. Use the command named in its row or
+  paragraph (`/house leave`, `/smp unlink`, `/clipcast remove`, `/birthday remove`,
+  `/reminders cancel`), or ask.
 - To have everything about you deleted (including coins and invite records), message a
-  Keeper or Moderator on the server and it'll be removed.
+  Keeper or Moderator on the server. There is no command for it: the server owner deletes the
+  records from the database by hand. Copies already in a backup go as **Backups** above says.
 - Leaving the server stops all tracking.
 
 ## Contact
