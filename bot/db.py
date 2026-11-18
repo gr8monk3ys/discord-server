@@ -746,6 +746,29 @@ MIGRATIONS = [
         # Reminders are now deleted once delivered or cancelled (cogs/utility.py); drop the old ones.
         "DELETE FROM reminders WHERE done = 1",
     ],
+    [
+        # Monkey SMP link claims (cogs/monkey.py): `/smp link` stores one here with a code the
+        # player must say in the game's chat; proven, it moves to monkey_links. A claim holds
+        # no name (several members may claim one) and lapses after logic/monkey.py CLAIM_TTL.
+        # Every row already in monkey_links stays a proven link.
+        """CREATE TABLE monkey_claims (
+        user_id INTEGER PRIMARY KEY,
+        name_key TEXT NOT NULL,
+        name TEXT NOT NULL,
+        code TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+    )""",
+        "CREATE INDEX monkey_claims_name ON monkey_claims (name_key)",
+        # A banned or departed member's linked name, which nobody else may link meanwhile
+        # (logic/monkey.py LEAVE_HOLD). `until` NULL: until the ban is lifted. A lapsed row is
+        # kept for LATE_BAN_WINDOW so a later ban can turn it back into a hold.
+        """CREATE TABLE monkey_held (
+        name_key TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        user_id INTEGER NOT NULL,
+        until INTEGER
+    )""",
+    ],
 ]
 
 

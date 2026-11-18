@@ -3,7 +3,8 @@ website (site/appeal). The site's function checks their appeal code and posts a 
 JSON payload through a webhook into the staff-only appeals channel; this cog turns it
 into a review card.
 
-Trust: only messages in that channel that were sent by a webhook are read, and the code
+Trust: only messages in that channel that were sent by a webhook (not replies to
+interactions, which carry a webhook_id too) are read, and the code
 (an HMAC of the user ID, see logic/appeals.py) is verified again here, so a leaked
 webhook URL alone can't put a fake appeal in front of staff. The user must really be
 banned, may have one open appeal, must have waited out the cooling-off period and, after
@@ -295,6 +296,8 @@ class Appeals(commands.Cog):
         if channel is None or message.channel.id != channel.id:
             return None
         if message.webhook_id is None:  # staff talking, or my own cards: never an appeal
+            return None
+        if message.interaction_metadata is not None:  # an interaction reply also has a webhook_id
             return None
         settings = config.appeal_settings()
         if settings is None or message.id in self.handled:

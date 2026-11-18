@@ -6,16 +6,19 @@ import math
 import re
 import unicodedata
 from collections import deque
-from collections.abc import Mapping, Sequence
+from collections.abc import Hashable, Mapping, Sequence
 from enum import Enum
 
 import config
+from logic import textfilter
 from names import slug
 
 PREFIX = "🎮 "
 SUFFIX = "'s squad"
 NAME_MAX = 100  # Discord's channel name limit (counted here in UTF-16 units, the strict reading)
 CREATE_COOLDOWN = 30  # seconds between channel creations per member
+INVITE_COOLDOWN = 15  # seconds between /squad invites per owner (each one pings)
+INVITE_PING_COOLDOWN = 10 * 60  # seconds between invite pings to one member for one channel
 EMPTY_DELAY = 30  # seconds an empty channel lives before it's deleted
 RENAME_LIMIT = 2  # Discord allows about 2 renames...
 RENAME_WINDOW = 10 * 60  # ...per channel per 10 minutes
@@ -45,14 +48,20 @@ def fit(text: str, limit: int) -> str:
     return text.rstrip()
 
 
+def postable(name: str) -> bool:
+    """AutoMod never sees channel names, so a name with an invite, link or blocked word isn't used."""
+    return textfilter.check(name, allow_links=False)[0]
+
+
 def channel_name(game: str | None, display_name: str) -> str:
-    """'🎮 Valorant' while playing, else '🎮 Bob's squad'; always 1-100 characters."""
+    """'🎮 Valorant' while playing, else '🎮 Bob's squad', else '🎮 Someone's squad' when the
+    game and the display name both fail the text filter; always 1-100 characters."""
     game = clean(game)
-    if game and slug(game) not in RESERVED:
-        return fit(PREFIX + game, NAME_MAX)
-    who = clean(display_name) or "Someone"
+    if game and slug(game) not in RESERVED and postable(name := fit(PREFIX + game, NAME_MAX)):
+        return name
     room = NAME_MAX - _units(PREFIX) - _units(SUFFIX)
-    return PREFIX + fit(who, room) + SUFFIX
+    name = PREFIX + fit(clean(display_name) or "Someone", room) + SUFFIX
+    return name if postable(name) else PREFIX + "Someone" + SUFFIX
 
 
 def clean_rename(text: str) -> str | None:
@@ -69,13 +78,13 @@ class Cooldown:
 
     def __init__(self, seconds: float):
         self.seconds = seconds
-        self.last: dict[int, float] = {}
+        self.last: dict[Hashable, float] = {}
 
-    def active(self, key: int, now: float) -> bool:
+    def active(self, key: Hashable, now: float) -> bool:
         last = self.last.get(key)
         return last is not None and now - last < self.seconds
 
-    def take(self, key: int, now: float) -> bool:
+    def take(self, key: Hashable, now: float) -> bool:
         """True (and starts the cooldown) if the key is free."""
         if self.active(key, now):
             return False

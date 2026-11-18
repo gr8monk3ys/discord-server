@@ -18,6 +18,7 @@ import style
 from errors import reply_error
 from logic.selfroles import has_dangerous_permissions
 from logic import growth as G
+from logic.quests import MIN_ACCOUNT_DAYS
 from logic import stats as S
 
 log = logging.getLogger(__name__)
@@ -424,7 +425,7 @@ class Growth(commands.Cog):
         scores = G.stayed_counts(await self.joins(), t, since=t - WINDOW)
         embed = style.embed(title="Recruiters · Past 30 days",
                             description=self.board_text(scores, interaction.user.id, "stayed"),
-                            footer=style.label("recruiters", f"stayed = {G.STAY_SECONDS // G.DAY}+ days"))
+                            footer=style.label("recruiters", f"stayed = {G.STAY_SECONDS // G.DAY}+ days, accounts {MIN_ACCOUNT_DAYS}+ days old"))
         await interaction.response.send_message(embed=embed, allowed_mentions=discord.AllowedMentions.none())
 
     @app_commands.command(name="bumpers", description="Who bumped the server on Disboard most (past 30 days)")

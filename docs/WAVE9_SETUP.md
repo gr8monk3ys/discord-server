@@ -133,8 +133,21 @@ Things to know when testing links:
   (https://monkeysmp.lscaturchio.xyz). Front Desk never adds anyone to the whitelist or removes
   anyone from it, whatever happens in Discord.
 - `/smp link` works for accounts 30+ days old and only records which Minecraft name is whose, for
-  the chat bridge and playtime. `/smp adopt <member> <name>` (mods) links a name for a member
-  without the account-age bar. `/smp unlink`, leaving and a ban just forget the link.
+  the chat bridge and playtime. It gives a one-time code; the link counts once that player says
+  the code in the game's chat (read from the server log, so it needs `MONKEY_LOG_PATH`), and an
+  unproven claim lapses after 24 hours. The proof trusts the server log's `<Name> message` lines, so
+  it holds only while the server runs with `online-mode=true` (Mojang checks who each player is) and
+  no chat or nickname plugin writes a chosen nickname in place of the player's name there.
+  `/smp adopt <member> <name>` (mods) links a name for a member without the account-age bar, and
+  overrides a hold. `/smp unlink`, leaving and a ban forget the link; after a ban the name stays held
+  for the banned member until the ban is lifted (also for a ban up to 14 days after the leave), and
+  after leaving for an hour (or to the end of a timeout), so nobody else can take it over to carry
+  that player's chat back into Discord. A player who hands their name to a friend before a ban (the
+  friend links it and the player proves it) still gets through: the proof shows the player agreed,
+  not who the linker is. `/smp remove` alone doesn't stop it (the friend can link the name again), so
+  time out or ban the friend: a linked member who can't post in the channel carries no chat, and a
+  ban holds the name for them. Without Ban Members on Front Desk (step B.1) a member who left while
+  the bot was off counts as having left even if they were banned.
 - Playtime and its coins count only while at least two players are online, so nothing shows
   while you test alone.
 - Chat in the game reaches the channel only from players whose name is linked to a member who

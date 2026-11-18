@@ -20,6 +20,8 @@ What lives here:
   is length-capped, filtered (logic/textfilter.py, links refused) and escaped.
 - The server log parser for vanilla-format lines (chat, join, leave, death, advancement),
   the line splitter and the tail position rules (rotation, truncation, falling behind).
+- Link proof: a link counts once its player says the claim's code in the game's chat
+  (`proves`), the one place the log shows a line only that player can write.
 - Batching and rate limits in both directions, playtime and its coins, poll back-off and
   the health line.
 """
@@ -36,6 +38,7 @@ from discord.utils import escape_markdown, escape_mentions
 
 from logic import textfilter
 from logic.catchup import local_host
+from logic.creators import code_in
 from logic.quests import established  # noqa: F401 (re-exported: the cog gates coins and links on it)
 
 # Monkey SMP access is a paid pass that staff grant (by hand or through the store). A link
@@ -474,6 +477,18 @@ def parse_line(line: str) -> Event | None:
     return None
 
 
+def proves(code: str, event: Event) -> bool:
+    """Does this log event carry `code` in the named player's own words? Only a chat line
+    does: a death or an advancement line can hold text somebody else chose (a renamed weapon)."""
+    return event.kind == CHAT and code_in(code, [event.text])
+
+
+def leave_hold_until(t: int, timed_out_until: int | None) -> int:
+    """Until when a member who left at `t` keeps their linked name: LEAVE_HOLD, or to the end
+    of a timeout they left with, whichever is later."""
+    return max(t + LEAVE_HOLD, timed_out_until or 0)
+
+
 def discord_line(event: Event) -> str | None:
     """The line to post in Discord for an event, or None when it must not be relayed: an
     empty message, an echo of our own relay, or text the filter refuses (invites, any
@@ -621,6 +636,16 @@ OFFLINE_AFTER = 2  # failed polls in a row before the panel says offline (one bl
 BACKOFF = (30, 120, 240, 480, 900)  # delay after the 1st, 2nd, ... failed poll in a row
 SWEEP_EVERY = 30 * 60  # how often linked members are checked against the member list
 LINK_COOLDOWN = 30  # seconds between one member's /smp link attempts
+# A link is proven by its player: /smp link gives a code (FD-XXXXXX, as /creator's) to say in the
+# game's chat as that name. Until then it is a claim that holds no name and lapses after CLAIM_TTL.
+CLAIM_TTL = 24 * 3600
+# A departed member's linked name stays theirs for a while, so nobody can take it over to carry
+# that player's chat past a ban (held until it is lifted) or a timeout (held until it ends).
+# LEAVE_HOLD also covers Discord sending the leave before the ban.
+LEAVE_HOLD = 3600
+# A lapsed leave hold is kept (holding nothing) this long, so a ban that comes after it, as when
+# a player rage-quits and staff ban them later, still holds the name until the ban is lifted.
+LATE_BAN_WINDOW = 14 * 86400
 # A player's words reach Discord only for a confirmed link whose member may talk there now.
 # When that member isn't in the gateway cache the API is asked, and its answer reused for:
 MEMBER_GONE_FOR = 5 * 60  # "not a member"

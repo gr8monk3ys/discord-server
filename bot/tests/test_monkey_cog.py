@@ -5,6 +5,7 @@ client, a fake status pinger and a fake log reader. No sockets, no files, no rea
 import asyncio
 import json
 import logging
+import re
 from datetime import datetime
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
@@ -51,6 +52,10 @@ def not_found():
 
 def forbidden():
     return discord.Forbidden(SimpleNamespace(status=403, reason="Forbidden"), "Missing Permissions")
+
+
+def server_error():
+    return discord.HTTPException(SimpleNamespace(status=500, reason="Internal Server Error"), "Try again")
 
 
 class FakeRcon:
@@ -150,6 +155,7 @@ class FakeMember:
         # in the server since `joined_days` before the tests' clock starts (None: Discord didn't say)
         self.joined_at = None if joined_days is None else datetime.fromtimestamp(T0 - joined_days * 86400, TZ)
         self.timed_out = False
+        self.timed_out_until = None
 
     def is_timed_out(self):
         return self.timed_out
@@ -168,6 +174,8 @@ class FakeGuild:
         self.uncached: dict[int, FakeMember] = {}  # in the server, but only the API knows
         self.fetches: list[int] = []
         self.fetch_fail = None
+        self.bans: set[int] = set()
+        self.ban_fail = None
 
     def get_member(self, uid):
         return self.members.get(uid)
@@ -179,6 +187,13 @@ class FakeGuild:
         if uid not in self.uncached:
             raise not_found()
         return self.uncached[uid]
+
+    async def fetch_ban(self, user):
+        if self.ban_fail is not None:
+            raise self.ban_fail
+        if user.id not in self.bans:
+            raise not_found()
+        return SimpleNamespace(user=user, reason=None)
 
 
 class FakeBot:
@@ -277,12 +292,16 @@ class Env:
         self.t += advance
         await self.cog.poll_once()
 
-    async def link(self, uid, name, wait=True):
+    async def link(self, uid, name, wait=True, prove=True):
+        """/smp link, then (unless `prove` is False) the player says the code it gave in the game."""
         if wait:
             self.t += R.LINK_COOLDOWN
         inter = FakeInteraction(self.member(uid), self.guild)
         await MonkeySmp.link.callback(self.cog, inter, name)
-        return inter.reply()
+        reply = inter.reply()
+        if prove and (code := code_in(reply)) is not None:
+            await self.log(P + f"<{name}> {code}")
+        return reply
 
     async def unlink(self, uid):
         inter = FakeInteraction(self.member(uid), self.guild)
@@ -349,6 +368,11 @@ class Env:
 
     def mod_lines(self):
         return [m.kwargs["embed"].description for m in self.guild.mod_log.messages]
+
+
+def code_in(reply) -> str | None:
+    found = re.search(r"`(FD-[0-9A-Z]{6})`", reply.get("content") or "")
+    return found.group(1) if found else None
 
 
 def with_env(fn, monkeypatch, environ=None, with_channel=True):
@@ -430,9 +454,10 @@ def test_bad_settings_are_reported_once_without_values(monkeypatch, caplog):
         assert "MONKEY_RCON_HOST refused" in caplog.text
         assert PASSWORD not in caplog.text and "203.0.113.9" not in caplog.text
         assert env.cog.setup.status_on and not env.cog.setup.rcon_on
-        # linking needs no RCON: the name is for chat from the game and for playtime
-        assert (await env.link(U1, "Steve"))["content"].startswith("Linked `Steve`")
-        assert env.rcon.commands == []
+        # linking needs no RCON, but the proof is in the server log, which isn't set up here
+        assert (await env.link(U1, "Steve"))["content"] == MESSAGES["no_log"].format(help="#help")
+        assert env.rcon.commands == [] and await env.links() == []
+        assert (await env.adopt(MOD, U1, "Steve"))["content"].startswith("Linked `Steve`")  # staff still can
     with_env(go, monkeypatch, environ={R.ENV_ADDRESS: "127.0.0.1", R.ENV_RCON_HOST: "203.0.113.9",
                                        R.ENV_RCON_PASSWORD: PASSWORD})
 
@@ -562,14 +587,15 @@ def test_panel_never_shows_hostile_status_text(monkeypatch):
 
 
 # ---------------------------------------------------------------- /smp link
-def linked_reply(env, name):
-    return MESSAGES["linked"].format(name=name, access=env.cog.access_text())
+def linked_reply(env, name, reply):
+    """The /smp link reply for `name`, with the code that `reply` gave."""
+    return MESSAGES["claimed"].format(name=name, code=code_in(reply), access=env.cog.access_text())
 
 
 def test_link_records_the_name_and_sends_nothing_to_the_server(monkeypatch):
     async def go(env):
         reply = await env.link(U1, "Steve_01")
-        assert reply["content"] == linked_reply(env, "Steve_01")
+        assert reply["content"] == linked_reply(env, "Steve_01", reply)
         assert reply["ephemeral"] is True and reply["allowed_mentions"].users is False
         # the truth: a link is not access, and the reply says where access comes from
         assert "doesn't get you onto the server" in reply["content"] and f"<{R.PASS_URL}>" in reply["content"]
@@ -619,9 +645,11 @@ def test_link_needs_no_time_in_the_server(monkeypatch):
     """The two-week wait only guarded the whitelist; a link gives no access, so it is gone."""
     async def go(env):
         env.member(U1, joined_days=0)
-        assert (await env.link(U1, "Steve"))["content"] == linked_reply(env, "Steve")
+        reply = await env.link(U1, "Steve")
+        assert reply["content"] == linked_reply(env, "Steve", reply)
         env.member(U2, joined_days=None)  # Discord didn't say when they joined: no matter now
-        assert (await env.link(U2, "Alex"))["content"] == linked_reply(env, "Alex")
+        reply = await env.link(U2, "Alex")
+        assert reply["content"] == linked_reply(env, "Alex", reply)
         assert await env.links() == [("Alex", U2, "ok"), ("Steve", U1, "ok")]
         assert "new_here" not in MESSAGES and not hasattr(R, "LINK_MEMBER_DAYS")
     with_env(go, monkeypatch)
@@ -631,7 +659,8 @@ def test_link_works_whatever_the_minecraft_server_is_doing(monkeypatch):
     async def go(env):
         env.rcon.down = True
         env.ping = cogmod.PingError("TimeoutError")
-        assert (await env.link(U1, "Steve"))["content"] == linked_reply(env, "Steve")
+        reply = await env.link(U1, "Steve")
+        assert reply["content"] == linked_reply(env, "Steve", reply)
         await env.poll()
         await env.poll(30)
         assert await env.links() == [("Steve", U1, "ok")]
@@ -710,17 +739,100 @@ def test_one_name_per_member_and_one_member_per_name(monkeypatch):
         await env.link(U1, "Steve")
         assert (await env.link(U2, "STEVE"))["content"] == MESSAGES["taken"].format(help="#help")  # names ignore case
         assert (await env.link(U1, "Alex"))["content"] == MESSAGES["have_one"].format(name="Steve")
-        assert (await env.link(U2, "Alex"))["content"] == linked_reply(env, "Alex")
+        reply = await env.link(U2, "Alex")
+        assert reply["content"] == linked_reply(env, "Alex", reply)
         assert await env.links() == [("Alex", U2, "ok"), ("Steve", U1, "ok")] and env.rcon.commands == []
     with_env(go, monkeypatch)
 
 
 def test_link_has_a_cooldown(monkeypatch):
     async def go(env):
-        assert (await env.link(U1, "Typo1"))["content"] == linked_reply(env, "Typo1")
+        reply = await env.link(U1, "Typo1")
+        assert reply["content"] == linked_reply(env, "Typo1", reply)
         await env.unlink(U1)
         assert (await env.link(U1, "Steve", wait=False))["content"] == MESSAGES["cooldown"]
-        assert (await env.link(U1, "Steve"))["content"] == linked_reply(env, "Steve")
+        reply = await env.link(U1, "Steve")
+        assert reply["content"] == linked_reply(env, "Steve", reply)
+    with_env(go, monkeypatch)
+
+
+# ---------------------------------------------------------------- proving a link in the game
+async def claims(env):
+    rows = await env.db.fetchall("SELECT user_id, name, code FROM monkey_claims ORDER BY user_id")
+    return [(r["user_id"], r["name"], r["code"]) for r in rows]
+
+
+def test_a_claim_is_nothing_until_its_player_says_the_code_in_the_game(monkeypatch):
+    """Claiming a name proves nothing: anyone can type one. Until the player says the code in
+    the game's chat, the name relays nothing, earns nobody playtime and is free to claim."""
+    async def go(env):
+        reply = await env.link(U1, "Steve", prove=False)
+        code = code_in(reply)
+        assert reply["content"] == linked_reply(env, "Steve", reply) and "within 24 hours" in reply["content"]
+        assert await env.links() == [] and env.mod_lines() == []
+        assert f"`Steve` is waiting: say `{code}`" in (await env.status(U1))["embed"].description
+        # a claim holds no name: the real Steve can claim it too, with a code of their own
+        other = code_in(await env.link(U2, "steve", prove=False))
+        assert other != code and await env.links() == []
+        await play(env, 34, "Steve", PAL)
+        assert await env.seconds(U1) is None and await env.balance(U1) == 0
+        assert "hi from Steve" not in await chat(env, "Steve")
+        # only Steve's own chat line proves Steve: not another player saying it, not a death
+        # line carrying it (a renamed weapon), not an advancement title
+        await env.log(P + f"<Alex> {code}", P + f"Steve was slain by Alex using [{code}]",
+                      P + f"Steve has made the advancement [{code}]")
+        assert await env.links() == [] and all(code not in p.text for p in env.posts)
+        # the real Steve proves theirs first: the name is theirs, the other claim is done
+        await env.log(P + f"<Steve> {other.lower()} that's me")
+        assert await env.links() == [("Steve", U2, "ok")] and await claims(env) == []
+        assert env.mod_lines() == [f"<@{U2}> linked the Minecraft name `Steve`"]
+        assert all(other.lower() not in p.text for p in env.posts)  # the code line stays in the game
+        assert (await env.link(U1, "Steve", prove=False))["content"] == MESSAGES["taken"].format(help="#help")
+        await env.log(P + f"<Steve> {code}")  # the first claimant's old code proves nothing now
+        assert await env.links() == [("Steve", U2, "ok")] and len(env.mod_lines()) == 1
+        assert "hi from Steve" in await chat(env, "Steve")
+    with_env(go, monkeypatch)
+
+
+def test_claims_lapse_and_one_member_has_one(monkeypatch):
+    async def go(env):
+        first = code_in(await env.link(U1, "Steve", prove=False))
+        assert code_in(await env.link(U1, "STEVE", prove=False)) == first  # asking again: the same code
+        second = code_in(await env.link(U1, "Alex", prove=False))  # another name replaces the claim
+        assert second != first and await claims(env) == [(U1, "Alex", second)]
+        await env.log(P + f"<Steve> {first}")
+        assert await env.links() == []
+        env.t += R.CLAIM_TTL  # a day on, the code is spent
+        await env.log(P + f"<Alex> {second}")
+        assert await env.links() == [] and env.mod_lines() == []
+        await env.poll(R.SWEEP_EVERY)  # and the tidy-up deletes it
+        assert await claims(env) == []
+        assert R.CLAIM_TTL == 24 * 3600
+        # asking again for the same name restarts the 24 hours the reply promises
+        code = code_in(await env.link(U1, "Steve", prove=False))
+        env.t += R.CLAIM_TTL - 120
+        reply = await env.link(U1, "Steve", prove=False)
+        assert code_in(reply) == code and "within 24 hours" in reply["content"]
+        env.t += 300
+        await env.log(P + f"<Steve> {code}")
+        assert await env.links() == [("Steve", U1, "ok")]
+    with_env(go, monkeypatch)
+
+
+def test_unlink_leaving_and_staff_adopt_end_a_claim(monkeypatch):
+    async def go(env):
+        code = code_in(await env.link(U1, "Steve", prove=False))
+        assert (await env.unlink(U1))["content"] == MESSAGES["cancelled"].format(name="Steve")
+        await env.log(P + f"<Steve> {code}")
+        assert await env.links() == [] and await claims(env) == []
+        code = code_in(await env.link(U1, "Steve", prove=False))
+        await env.cog.on_member_remove(env.member(U1))
+        assert await claims(env) == []
+        # staff vouching for a name settles it, whoever had claimed it
+        code = code_in(await env.link(U2, "Alex", prove=False))
+        await env.adopt(MOD, U3, "Alex")
+        await env.log(P + f"<Alex> {code}")
+        assert await env.links() == [("Alex", U3, "ok")] and await claims(env) == []
     with_env(go, monkeypatch)
 
 
@@ -734,8 +846,10 @@ def test_unlink_forgets_the_link_and_nothing_else(monkeypatch):
         assert env.rcon.commands == [] and await env.links() == []
         assert env.mod_lines()[-1] == f"<@{U1}> unlinked the Minecraft name `Steve`"
         assert (await env.unlink(U1))["content"] == MESSAGES["none"]
-        assert (await env.link(U1, "Alex"))["content"] == linked_reply(env, "Alex")
-        assert (await env.link(U2, "Steve"))["content"] == linked_reply(env, "Steve")  # the name is free again
+        reply = await env.link(U1, "Alex")
+        assert reply["content"] == linked_reply(env, "Alex", reply)
+        reply = await env.link(U2, "Steve")
+        assert reply["content"] == linked_reply(env, "Steve", reply)  # the name is free again
     with_env(go, monkeypatch)
 
 
@@ -753,9 +867,158 @@ def test_members_who_leave_or_are_banned_lose_the_link_not_their_access(monkeypa
         await env.cog.on_member_remove(env.member(U2))  # Discord sends both for a ban
         assert await env.links() == []
         assert env.mod_lines()[-1] == (f"<@{U2}> was banned: forgot their Minecraft link `Alex` "
-                                       "(their Monkey SMP access is unchanged)")
+                                       "(their Monkey SMP access is unchanged); nobody else can link it "
+                                       "until the ban is lifted")
         await env.cog.on_member_remove(env.member(U3))  # no link: nothing happens
         assert len(env.mod_lines()) == 4 and env.rcon.commands == []
+    with_env(go, monkeypatch)
+
+
+def test_a_ban_keeps_the_name_so_an_accomplice_cant_carry_the_players_chat_back(monkeypatch):
+    """The banned player owns the name and would gladly prove it for a friend: the name stays
+    the banned member's until the ban is lifted, whichever event Discord sends first."""
+    async def go(env):
+        await env.link(U1, "Griefer")
+        await env.link(U3, "Remover")
+        await env.link(U2, "Alex")
+        await env.cog.on_member_ban(env.guild, SimpleNamespace(id=U1))
+        del env.guild.members[U1]
+        await env.cog.on_member_remove(FakeMember(U3, env.guild))  # the leave first, then the ban
+        await env.cog.on_member_ban(env.guild, SimpleNamespace(id=U3))
+        env.guild.bans.update({U1, U3})
+        await env.unlink(U2)
+        env.t += 30 * 86400
+        await env.poll(R.SWEEP_EVERY)  # holds outlive the tidy-up
+        for name in ("Griefer", "Remover"):
+            reply = await env.link(U2, name, prove=False)
+            assert reply["content"] == MESSAGES["taken"].format(help=env.cog.help_ref())
+            await env.log(P + f"<{name}> FD-AAAAAA")
+        assert await env.links() == [] and await claims(env) == []
+        assert "Griefer" not in await chat(env, "Griefer")
+        await env.cog.on_member_unban(env.guild, SimpleNamespace(id=U1))
+        await env.link(U2, "Griefer")
+        assert await env.links() == [("Griefer", U2, "ok")]
+    with_env(go, monkeypatch)
+
+
+def test_a_ban_long_after_the_leave_still_holds_the_name(monkeypatch):
+    """A player rage-quits and staff ban them hours later: the lapsed leave hold is kept, so
+    the ban still holds the name and an accomplice can't carry the banned player's chat back."""
+    async def go(env):
+        await env.link(U1, "Griefer")
+        await env.link(U3, "Quitter")
+        await env.cog.on_member_remove(env.member(U1))
+        await env.cog.on_member_remove(env.member(U3))
+        del env.guild.members[U1], env.guild.members[U3]
+        env.t += R.LEAVE_HOLD + 60
+        await env.poll(R.SWEEP_EVERY)
+        await env.cog.on_member_ban(env.guild, SimpleNamespace(id=U1))
+        env.guild.bans.add(U1)
+        assert (await env.link(U2, "Griefer", prove=False))["content"] == MESSAGES["taken"].format(
+            help=env.cog.help_ref())
+        await env.log(P + "<Griefer> FD-AAAAAA")
+        env.t += 30 * 86400
+        await env.poll(R.SWEEP_EVERY)
+        assert (await env.link(U2, "Griefer", prove=False))["content"] == MESSAGES["taken"].format(
+            help=env.cog.help_ref())
+        assert await env.links() == [] and "Griefer" not in await chat(env, "Griefer")
+        # past the late-ban window a departed member's name is forgotten for good
+        held = await env.db.fetchall("SELECT name, until FROM monkey_held ORDER BY name")
+        assert [(r["name"], r["until"]) for r in held] == [("Griefer", None)]
+        await env.cog.on_member_ban(env.guild, SimpleNamespace(id=U3))
+        await env.link(U2, "Quitter")
+        assert await env.links() == [("Quitter", U2, "ok")]
+        assert R.LATE_BAN_WINDOW == 14 * 86400
+    with_env(go, monkeypatch)
+
+
+def test_a_ban_lifted_while_the_bot_was_off_frees_the_name(monkeypatch):
+    async def go(env):
+        await env.link(U1, "Griefer")
+        await env.cog.on_member_ban(env.guild, SimpleNamespace(id=U1))
+        del env.guild.members[U1]
+        env.guild.ban_fail = forbidden()  # can't tell: the hold stays
+        await env.poll(R.SWEEP_EVERY)
+        assert (await env.link(U2, "Griefer", prove=False))["content"] == MESSAGES["taken"].format(
+            help=env.cog.help_ref())
+        env.guild.ban_fail = None  # U1 isn't in guild.bans: the ban was lifted meanwhile
+        await env.poll(R.SWEEP_EVERY)
+        assert await env.db.fetchall("SELECT * FROM monkey_held") == []
+        await env.link(U2, "Griefer")
+        assert await env.links() == [("Griefer", U2, "ok")]
+    with_env(go, monkeypatch)
+
+
+def test_leaving_holds_the_name_for_an_hour_or_the_rest_of_a_timeout(monkeypatch):
+    async def go(env):
+        await env.link(U1, "Steve")
+        await env.link(U2, "Muted")
+        await env.cog.on_member_remove(env.member(U1))
+        muted = env.member(U2)
+        muted.timed_out, muted.timed_out_until = True, datetime.fromtimestamp(env.t + 3 * 86400, TZ)
+        await env.cog.on_member_remove(muted)
+        del env.guild.members[U1], env.guild.members[U2]
+        assert (await env.link(U3, "Steve", prove=False))["content"] == MESSAGES["taken"].format(help=env.cog.help_ref())
+        await env.link(U1, "Steve")  # back the same day: their own name is theirs to link again
+        assert await env.links() == [("Steve", U1, "ok")]
+        env.t += R.LEAVE_HOLD
+        assert (await env.link(U3, "Muted", prove=False))["content"] == MESSAGES["taken"].format(help=env.cog.help_ref())
+        env.t += 3 * 86400
+        await env.link(U3, "Muted")
+        assert await env.links() == [("Muted", U3, "ok"), ("Steve", U1, "ok")]
+    with_env(go, monkeypatch)
+
+
+def test_staff_can_link_a_held_name_and_the_mod_log_says_whose_hold_it_was(monkeypatch):
+    async def go(env):
+        await env.link(U1, "Steve")
+        await env.cog.on_member_ban(env.guild, SimpleNamespace(id=U1))
+        reply = await env.adopt(MOD, U2, "Steve")
+        assert reply["content"].startswith("Linked `Steve`") and await env.links() == [("Steve", U2, "ok")]
+        assert env.mod_lines()[-1] == (f"<@{MOD}> linked the Minecraft name `Steve` to <@{U2}> "
+                                       f"(`/smp adopt`, over the hold kept for <@{U1}>)")
+        assert await env.db.fetchall("SELECT * FROM monkey_held") == []
+    with_env(go, monkeypatch)
+
+
+def test_the_sweep_holds_the_name_of_a_member_banned_while_the_bot_was_off(monkeypatch):
+    async def go(env):
+        await env.link(U1, "Griefer")
+        await env.link(U2, "Steve")
+        code = code_in(await env.link(U3, "Alex", prove=False))
+        del env.guild.members[U1], env.guild.members[U3]
+        env.guild.bans.add(U1)
+        env.guild.ban_fail = server_error()
+        assert await env.cog.sweep_departed() == 0
+        assert await env.links() == [("Griefer", U1, "ok"), ("Steve", U2, "ok")]  # unknown: asked again later
+        await env.log(P + f"<Alex> {code}")  # a claim left by someone no longer here proves nothing
+        assert await claims(env) == [] and len(await env.links()) == 2
+        env.guild.ban_fail = None
+        assert await env.cog.sweep_departed() == 1
+        assert "was banned" in env.mod_lines()[-1]
+        assert (await env.link(U2, "Griefer", prove=False))["content"] == MESSAGES["have_one"].format(
+            name="Steve", help=env.cog.help_ref())
+        await env.unlink(U2)
+        assert (await env.link(U2, "Griefer", prove=False))["content"] == MESSAGES["taken"].format(
+            help=env.cog.help_ref())
+    with_env(go, monkeypatch)
+
+
+def test_without_ban_members_the_sweep_treats_the_gone_as_having_left(monkeypatch, caplog):
+    async def go(env):
+        await env.link(U1, "Griefer")
+        await env.link(U2, "Steve")
+        await env.cog.on_member_ban(env.guild, SimpleNamespace(id=U2))  # a ban the bot saw: held
+        del env.guild.members[U1]
+        env.guild.ban_fail = forbidden()
+        with caplog.at_level(logging.INFO):
+            assert await env.cog.sweep_departed() == 1
+            await env.cog.sweep_departed()
+        assert await env.links() == [] and "is no longer here" in env.mod_lines()[-1]
+        assert caplog.text.count("no Ban Members permission") == 1  # said once, not every sweep
+        held = await env.db.fetchall("SELECT name, until FROM monkey_held ORDER BY name")
+        assert [(r["name"], r["until"]) for r in held] == [("Griefer", R.leave_hold_until(env.t, None)),
+                                                           ("Steve", None)]  # the ban's hold isn't given up
     with_env(go, monkeypatch)
 
 
@@ -780,6 +1043,12 @@ def test_sweep_catches_members_who_left_while_the_bot_was_off(monkeypatch):
         env.guild.chunked = True
         await env.poll(R.SWEEP_EVERY)  # the poll runs the sweep
         assert await env.links() == [("Alex", U2, "ok")] and "is no longer here" in env.mod_lines()[-1]
+        # held as after any leave, so a ban seen later still holds it
+        assert (await env.link(U3, "Steve", prove=False))["content"] == MESSAGES["taken"].format(
+            help=env.cog.help_ref())
+        env.t += R.LEAVE_HOLD
+        await env.link(U3, "Steve")
+        assert await env.links() == [("Alex", U2, "ok"), ("Steve", U3, "ok")]
     with_env(go, monkeypatch)
 
 
@@ -984,13 +1253,13 @@ def test_deaths_and_advancements_go_through_the_same_gate_and_joins_do_not(monke
 
 
 def test_claiming_somebodys_name_gets_round_no_mute_and_silences_nobody_else(monkeypatch):
-    """A link is a claim nobody checks against the game (a wrong one is sorted out in a ticket
-    and `/smp remove`). It gives a muted claimant no voice and changes nothing for anybody
-    else's link."""
+    """Even a proven link gives a muted member no voice, and their being banned changes nothing
+    for anybody else's link."""
     async def go(env):
         await env.link(U1, "Steve")
         env.member(U3).timed_out = True  # the claimant is muted in Discord
-        assert (await env.link(U3, "OwnerFriend"))["content"] == linked_reply(env, "OwnerFriend")
+        reply = await env.link(U3, "OwnerFriend")
+        assert reply["content"] == linked_reply(env, "OwnerFriend", reply)
         text = await chat(env, "Steve", "OwnerFriend")
         assert "hi from Steve" in text and "OwnerFriend" not in text
         # the claimant being banned changes nothing for anyone else either
@@ -1423,7 +1692,7 @@ def test_playtime_works_from_the_ping_sample_without_rcon(monkeypatch):
 
 def test_rcon_only_setup_polls_through_rcon(monkeypatch):
     async def go(env):
-        await env.link(U1, "Steve")
+        await env.linked(U1, "Steve")  # no server log to prove a link in: staff adopt names here
         await play(env, 34, "Steve", PAL)
         assert env.pings == 0 and env.posts == []  # no address: no ping, no panel
         assert await env.seconds(U1) == 32 * 60 and await env.balance(U1) == R.SLOT_COINS

@@ -97,7 +97,7 @@ def test_off_without_the_secret_and_no_server_starts():
 def test_unsigned_or_wrongly_signed_requests_are_refused():
     async def go(cog, guild, db):
         for request in (FakeRequest(body_of(), None), FakeRequest(body_of(), "00" * 32),
-                        signed(body_of(), secret="x" * 40)):
+                        signed(body_of(), secret="x" * 40), FakeRequest(body_of(), "ü" * 64)):
             response = await cog.handle(request)
             assert response.status == 401
         assert guild.mod.sent == []

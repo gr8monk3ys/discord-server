@@ -4,6 +4,7 @@ ephemeral port and against real files under tmp_path. Nothing leaves this machin
 
 import asyncio
 import json
+import re
 import struct
 from datetime import date
 from zoneinfo import ZoneInfo
@@ -12,6 +13,7 @@ import pytest
 
 from cogs import monkey as net
 from logic import monkey as R
+from logic.creators import new_code
 
 TZ = ZoneInfo("America/Los_Angeles")
 SECTION = "\u00a7"
@@ -846,3 +848,21 @@ def test_read_log_reads_in_bounded_chunks_and_skips_a_flood(tmp_path):
     state, data, reset = net.read_log(str(path), state)
     assert data == b"" and reset and state.pos == path.stat().st_size
     assert net.read_log(str(tmp_path), state) is None  # a directory, not a file
+
+
+def test_only_the_players_own_chat_line_proves_a_link():
+    code = new_code()
+    assert re.fullmatch(r"FD-[0-9A-Z]{6}", code) and new_code() != code
+    assert R.proves(code, R.Event(R.CHAT, "Steve", code))
+    assert R.proves(code, R.Event(R.CHAT, "Steve", f"my code is {code.lower().replace('-', '–')}!"))
+    assert not R.proves(code, R.Event(R.CHAT, "Steve", code + "X"))  # a whole word only
+    assert not R.proves(code, R.Event(R.CHAT, "Steve", "FD-"))
+    for line in (f"Steve was slain by Alex using [{code}]", f"Steve has made the advancement [{code}]"):
+        event = R.parse_line("[12:34:56] [Server thread/INFO]: " + line)
+        assert event is not None and event.name == "Steve" and not R.proves(code, event)
+
+
+def test_a_departed_members_name_is_held_for_an_hour_or_to_the_end_of_their_timeout():
+    assert R.leave_hold_until(1000, None) == 1000 + R.LEAVE_HOLD
+    assert R.leave_hold_until(1000, 1500) == 1000 + R.LEAVE_HOLD  # a timeout ending sooner
+    assert R.leave_hold_until(1000, 1000 + 7 * 86400) == 1000 + 7 * 86400

@@ -144,3 +144,23 @@ def test_the_realms_tables_and_panel_key_carry_over_to_monkey():
                             " VALUES ('steve', 'Steve', 1, 'ok', 0, 0)")
         await d.close()
     run(go())
+
+
+def test_links_made_before_proofs_stay_links():
+    """Link claims got their own table: every link already made is kept as a proven one."""
+    async def go():
+        d = dbmod.Database(":memory:")
+        await d.connect()
+        last = next(i for i, m in enumerate(dbmod.MIGRATIONS) if "CREATE TABLE monkey_claims" in m[0])
+        dbmod.MIGRATIONS, real = dbmod.MIGRATIONS[:last], dbmod.MIGRATIONS
+        try:
+            await d.migrate()
+        finally:
+            dbmod.MIGRATIONS = real
+        await d.execute("INSERT INTO monkey_links (name_key, name, user_id, state, linked_at, updated_at)"
+                        " VALUES ('alex', 'Alex', 1, 'ok', 0, 0)")
+        assert await d.migrate() == len(dbmod.MIGRATIONS)
+        assert [tuple(r) for r in await d.fetchall("SELECT name, user_id, state FROM monkey_links")] == [("Alex", 1, "ok")]
+        assert await d.fetchall("SELECT * FROM monkey_claims") == []
+        await d.close()
+    run(go())

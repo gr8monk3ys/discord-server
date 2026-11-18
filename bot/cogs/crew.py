@@ -188,7 +188,7 @@ class Crew(commands.Cog):
         if member.bot or not self.ours(member.guild):
             return
         t = clock()
-        if self.raid.add(t, M.is_young(member.created_at.timestamp(), t)):
+        if self.raid.add(t, member.id, M.is_young(member.created_at.timestamp(), t)):
             self.raid_until = t + M.RAID_LOCK
         if community_rules.welcome_on_join(member.flags.completed_onboarding,
                                            await self.onboarding_enabled(member.guild)):

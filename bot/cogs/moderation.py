@@ -6,7 +6,7 @@ up (APPEAL_SECRET), their appeal code and the appeal page; a ban made in Discord
 gets the same DM attempt afterwards, which usually fails, so the mod log says so. Warnings escalate on their own (3 in 30 days: 1 h timeout,
 5: 24 h). Anti-spam times out message floods, repeats and mass mentions and deletes the
 burst. Anti-raid raises the verification level and pauses invites for 30 minutes when
-many accounts join at once, then puts everything back, even across a restart.
+many distinct accounts join at once, then puts everything back, even across a restart.
 
 Needs Moderate Members (timeouts), Ban Members (/ban), Manage Messages (deleting) and
 Manage Server (raid lockdown). Anti-raid needs the Server Members intent and duplicate detection needs
@@ -343,6 +343,12 @@ class Moderation(commands.Cog):
         if not hasattr(channel, "purge"):
             await interaction.response.send_message("I can't purge this kind of channel.", ephemeral=True)
             return
+        where = [c for c in (channel, getattr(channel, "parent", None)) if c is not None]  # a thread counts as its parent
+        if config.match_by_names(where, (config.MOD_LOG_CHANNEL, config.APPEALS_CHANNEL)) is not None:
+            await interaction.response.send_message(
+                "This channel is a staff record, so /purge is off here: the log has to stay complete.",
+                ephemeral=True)
+            return
         if not await self.gate(interaction, perm=["manage_messages", "read_message_history"], channel=channel):
             return
         await interaction.response.defer(ephemeral=True, thinking=True)
@@ -508,7 +514,7 @@ class Moderation(commands.Cog):
         if not self.ours(member.guild) or member.bot:
             return
         young = M.is_young(member.created_at.timestamp(), now())
-        if self.raid.add(clock(), young):
+        if self.raid.add(clock(), member.id, young):
             await self.start_raid(member.guild)
 
     async def load_raid(self) -> tuple[bool, M.RaidState | None]:
@@ -541,7 +547,7 @@ class Moderation(commands.Cog):
             paused_until = guild.invites_paused_until if guild.invites_paused() else None
             prev_inv = int(paused_until.timestamp()) if paused_until is not None else None
             state = M.lockdown(t, guild.verification_level.value, prev_inv)
-            head = f"🚨 **Join raid**: {M.RAID_WEIGHT}+ joins in {M.RAID_WINDOW} s (new accounts count double)."
+            head = f"🚨 **Join raid**: {M.RAID_WEIGHT}+ distinct accounts joined in {M.RAID_WINDOW} s (new accounts count double)."
             if not self.has(guild, "manage_guild"):
                 await self.note_missing(guild, "manage_guild", "Anti-raid lockdown")
                 await self.post_log(guild, head + "\nI couldn't lock the server down: missing **Manage Server**. "

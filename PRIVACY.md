@@ -52,7 +52,7 @@ be deleted (see "Your choices").
 | Guide and setup posts you make: the post's ID, its title and when you posted it (not the post's text) | The one-time post reward |
 | Watch parties you schedule (the event, you as host, the start time) | Reminders and the one-event-per-host limit |
 | Clips shortlisted for the server's YouTube: the message ID, your answer, who gave it and when, the name you asked to be credited as, and the video's YouTube ID once posted | Clipcast, proof of consent, taking a clip down |
-| A Minecraft name you link with `/smp link`, and how long you were online on the Minecraft server each day | Passing your in-game chat to the Monkey SMP channel, playtime coins, `/smp top` |
+| A Minecraft name you link with `/smp link` (while it waits for you to prove it in the game: the name, a one-time code and when you asked; after you leave or are banned, for a while: see below), and how long you were online on the Minecraft server each day | Passing your in-game chat to the Monkey SMP channel, playtime coins, `/smp top` |
 | A faction you register: the name, banner and charter its leader wrote, the leader, the members' Minecraft names, and the staff decision and who made it | The faction list, staff review |
 | Only if you use them: your faction's recruitment pitch, tags and timezone; who pressed Request to join on which faction and when; your `/faction lfg` note and timezone | The recruitment board, the once-a-day request limit, `/faction seekers` |
 | Only if you run `/referral`: your code and the Minecraft name it was made for; for each purchase made with a code, the Tebex transaction ID, both Minecraft names and when | Giving the Kindred Band once per new player, refunds |
@@ -146,9 +146,20 @@ otherwise tells the owner to remove it by hand. The record of the clip and your 
 either way, because it is the proof of what you agreed to.
 
 **Monkey SMP (Minecraft).** The Minecraft server belongs to the server owner and runs on the
-same rented server as Front Desk. `/smp link` keeps the Minecraft name you give with your Discord ID; it is
-not sent to the Minecraft server, and Front Desk never changes who may join it (that is a pass staff grant).
-`/smp unlink`, leaving or a ban deletes the link. What you type in the Monkey SMP channel is
+same rented server as Front Desk. `/smp link` keeps the Minecraft name you give with your Discord ID and a
+one-time code; it is not sent to the Minecraft server, and Front Desk never changes who may join it (that is a
+pass staff grant). The name becomes your link when you say the code in the game's chat as that player, which
+Front Desk reads in the server log; a claim not proven within 24 hours stops working and is deleted at the next
+half-hourly tidy-up (or the next `/smp link`). `/smp unlink`, leaving or a ban deletes the claim and the link at
+once (if you leave while Front Desk is off, at its next half-hourly check, which asks Discord whether you were
+banned; without its Ban Members permission it treats you as having left, and if the check fails otherwise the
+link is kept and asked about again).
+Links made before codes existed were kept as they were. After you leave, nobody else can link the name you had
+for an hour (or until a timeout you left with ends), and the name stays stored with your Discord ID for 14 days
+after that, so that a ban made later still holds it; after a ban it is kept until the ban is lifted (also a ban
+lifted while Front Desk was off, at its next check, which needs that permission too), so nobody else can link
+it meanwhile; a moderator linking
+the name to someone with `/smp adopt` ends that too. What you type in the Monkey SMP channel is
 shown to players in the game with your display name, whatever your `/privacy` setting, and what
 linked players say in the game is posted in that channel; Front Desk keeps neither. In-game chat is
 passed on only from a player whose name is linked to a member who can post in that channel right now, so

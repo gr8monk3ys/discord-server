@@ -13,6 +13,7 @@ import db as dbmod
 from cogs import growth as cogmod
 from cogs.growth import BUMP_DUE_KEY, REMINDER_TEXT, Growth
 from logic import growth as G
+from logic import quests as Q
 
 GUILD_ID = 999
 OWNER, A, B, C, D, E, F = 1, 11, 12, 13, 14, 15, 16
@@ -544,6 +545,19 @@ def test_recruiter_role_at_threshold_and_never_removed(monkeypatch):
         await env.leave(D, at=T0 + 9 * DAY)
         assert await env.cog.award_recruiters() == 0
         assert env.guild.recruiter in env.member(A).roles
+    with_env(go, monkeypatch)
+
+
+def test_recruiter_role_ignores_fresh_alts(monkeypatch):
+    async def go(env):
+        env.guild.invite("aaa", A)
+        env.member(A)
+        await env.cog.on_ready()
+        for n in range(3):
+            await env.join(((T0 - DAY) * 1000 - Q.DISCORD_EPOCH_MS << 22) + n, via="aaa", at=T0)
+        env.t = T0 + 8 * DAY
+        assert await env.cog.award_recruiters() == 0
+        assert env.guild.recruiter not in env.member(A).roles
     with_env(go, monkeypatch)
 
 
