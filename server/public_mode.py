@@ -7,7 +7,7 @@ Unlike setup_server.py this never deletes anything or reorders roles, so it work
 with Front Desk sitting mid-stack (below Keeper/Moderator) and without
 Administrator. It needs Manage Roles, Manage Channels, Manage Server and
 Create Invite on Front Desk's role. The only channels it moves are the ones below:
-a layout channel sitting in another layout category, and retired games' channels.
+a layout channel sitting in another layout category, and retired channels (into the archive).
 
 Steps, all driven by layout.py:
 - create the roles Front Desk hands out (Clip of the Week, Recruiter, Bumper, the house roles,
@@ -47,6 +47,11 @@ Steps, all driven by layout.py:
   server and on every member who has it, and old forum tags stay on old posts. The dry run
   prints every option that would leave and every channel it would hide. Moving the game's line
   back into GAMES undoes it.
+- retire_channels (layout.RETIRED_CHANNELS, and the old channel of a listed game that is not in
+  layout.GAME_CHANNELS): THE OTHER STEP THAT TAKES SOMETHING AWAY. Each channel comes off
+  Onboarding (the default channels and every answer that opens it) and moves into the same
+  archive. A game's answer and role stay; an answer that opened nothing else and gives no role
+  leaves with its channel. Nothing is deleted, and the dry run prints every line of it.
 - fill AutoMod gaps: create Discord's built-in rules the server doesn't have yet (spam,
   mention spam, slur/sexual-content preset, invite links to other servers); never edits or
   deletes an existing rule
@@ -117,7 +122,7 @@ TOO_MANY_QUESTIONS = "Too many questions"
 AUTOMOD_EXEMPT_CATEGORY = "00 · staff"
 AUTOMOD_BLOCKED = "Blocked by AutoMod. Ask a Keeper if that was a mistake."
 AUTOMOD_INVITES = "Front Desk: invite links"
-AUTOMOD_INVITE_BLOCKED = "Invite links to other servers aren't allowed. Partners apply with /partner apply."
+AUTOMOD_INVITE_BLOCKED = "Invite links to other servers aren't allowed."
 # Discord's regex flavour (Rust); at most 260 characters each.
 INVITE_PATTERNS = [r"(?i)discord(?:app)?\.com/invite/[a-z0-9-]+", r"(?i)discord\.gg/[a-z0-9-]+", r"(?i)dsc\.gg/[a-z0-9-]+"]
 INVITE_MARKERS = ("discord.gg", r"discord\.gg", "/invite")  # an existing rule with any of these counts
@@ -606,9 +611,9 @@ class PublicMode:
 
     def games_category(self):
         """The category the layout puts game channels in."""
-        if not layout.GAMES:
+        first = next((slug(name) for name in map(layout.own_channel, layout.GAMES) if name), None)
+        if first is None:
             return None
-        first = slug(self.game_channel_name(layout.GAMES[0]))
         spec = next((c for c in layout.CATEGORIES if any(slug(s["name"]) == first for s in c["channels"])), None)
         return find(self.guild.categories, spec) if spec else None
 
@@ -659,6 +664,8 @@ class PublicMode:
         archive = self.archive()
         back = []
         for game in layout.GAMES if archive is not None else ():
+            if not layout.own_channel(game):
+                continue  # it talks in #gaming; retire_channels() keeps its old channel in the archive
             ch = find(self.guild.text_channels, {"name": self.game_channel_name(game)})
             if ch is not None and ch.category_id == archive.id:
                 back.append(ch)
@@ -699,21 +706,23 @@ class PublicMode:
             if key in have:
                 continue
             role = self.made_roles.get(role_name) or self.role(role_name)
-            ch = self.game_channel(game)
+            own = layout.own_channel(game)  # None: the game talks in #gaming and its answer opens no channel of its own
+            ch = self.game_channel(game) if own else None
             if not self.apply:
                 names.append(role_name)  # whatever is missing is created earlier in the same run
                 continue
-            if role is None or ch is None:
+            if role is None or (own and ch is None):
                 print(f"! skip    {role_name}: its role or channel doesn't exist yet (re-run once it does)")
                 continue
-            if archive is not None and getattr(ch, "category_id", None) == archive.id:
+            if ch is not None and archive is not None and getattr(ch, "category_id", None) == archive.id:
                 print(f"! skip    {role_name}: #{ch.name} is still in {archive.name} (re-run)")
                 continue
             spec = specs.get(key, {})
-            more = [c for c in map(self.layout_channel, spec.get("channels", ())) if c is not None and c.id != ch.id]
+            mine = [ch] if ch is not None else []
+            more = [c for c in map(self.layout_channel, spec.get("channels", ())) if c is not None and c not in mine]
             new[key] = discord.OnboardingPromptOption(
                 title=spec.get("title", role_name), emoji=spec.get("emoji", emoji),
-                description=spec.get("description"), roles=[role], channels=[ch, *more])
+                description=spec.get("description"), roles=[role], channels=[*mine, *more])
             names.append(role_name)
         if not names:
             print("  ok      every listed game is an option")
@@ -852,8 +861,13 @@ class PublicMode:
                 hide.append(ch)
             if self.role(role_name) is not None:
                 print(f"  keep    @{role_name} (the role stays, and so does every member's copy of it)")
-        if not hide:
+        await self.hide(hide, "Game retired (layout.RETIRED_GAMES)")
+
+    async def hide(self, channels, reason):
+        """Move channels into the staff-only archive category, making or locking it first."""
+        if not channels:
             return
+        archive = self.archive()
         who = ", ".join(f"@{n}" for n in layout.GAME_ARCHIVE["private_to"])
         ow = self.private_overwrites(layout.GAME_ARCHIVE["private_to"])
         label = layout.GAME_ARCHIVE["name"]
@@ -863,12 +877,85 @@ class PublicMode:
         elif not self.is_private(archive, ow):
             await self.do("lock", f"category {archive.name} (hidden from @everyone; visible to {who})",
                           lambda: archive.edit(overwrites=ow))
-        for ch in hide:
+        for ch in channels:
             src = getattr(self.guild.get_channel(ch.category_id), "name", None) if ch.category_id else None
             await self.do("hide", f"#{ch.name}: move from {src or 'no category'} into {label} "
                                   f"(only {who} see it; messages are kept)",
-                          lambda ch=ch: ch.edit(category=archive, sync_permissions=True,
-                                                reason="Game retired (layout.RETIRED_GAMES)"))
+                          lambda ch=ch: ch.edit(category=archive, sync_permissions=True, reason=reason))
+
+    async def retire_channels(self):
+        """Takes something away, like retire_games(). The channels in layout.RETIRED_CHANNELS, and
+        the old channel of a listed game with none of its own (layout.GAME_CHANNELS), come off
+        Onboarding and then move into the staff-only archive. A game keeps its answer and its
+        role. Never deletes; taking a game channel back is restore_games()'s job."""
+        print("\nRetired channels (hidden, never deleted)")
+        merged = {slug(self.game_channel_name(g)): g for g in layout.GAMES if not layout.own_channel(g)}
+        in_layout = {slug(s["name"]) for c in layout.CATEGORIES for s in c["channels"]}
+        pool = [*self.guild.text_channels, *self.guild.voice_channels, *self.guild.forums]  # not categories
+        archive = self.archive()
+        hide = []
+        for name in (*layout.RETIRED_CHANNELS, *(self.game_channel_name(g) for g in merged.values())):
+            if slug(name) in in_layout:
+                print(f"! skip    {name}: the layout still lists it (is it in both CATEGORIES and RETIRED_CHANNELS?)")
+                continue
+            ch = find(pool, {"name": name})
+            if ch is None:
+                print(f"  ok      {name}: no channel")
+            elif archive is not None and ch.category_id == archive.id:
+                print(f"  ok      {ch.name} (already in {archive.name})")
+            else:
+                hide.append(ch)
+        if not hide:
+            return
+        # A hidden channel that is still a default or an answer's channel can make Discord refuse
+        # the next Onboarding edit, so they come off Onboarding first, in one edit.
+        try:
+            ob = await self.guild.onboarding()
+        except discord.HTTPException as e:
+            print(f"! skip    nothing hidden: Onboarding has to be checked first ({e.text or e}; re-run)")
+            return
+        gone = {ch.id: ch for ch in hide}
+        defaults = [c for c in ob.default_channels if c.id not in gone]
+        lines = [f"default channels: {', '.join(c.name for c in ob.default_channels if c.id in gone)}"] * (
+            len(defaults) != len(ob.default_channels))
+        specs = {slug(o["title"]): o for p in layout.ONBOARDING_PROMPTS for o in p["options"]}
+        trims, texts = [], []  # (option, channel ids to take off), (option, new description)
+        prompts = []
+        for prompt in ob.prompts:
+            kept = []
+            for option in prompt.options:
+                off = {int(i) for i in option.channel_ids} & set(gone)
+                if not off:
+                    kept.append(option)
+                    continue
+                names = ", ".join(gone[i].name for i in sorted(off, key=list(gone).index))
+                if not option.role_ids and off == {int(i) for i in option.channel_ids}:
+                    lines.append(f"\"{prompt.title}\" answer {option.title} (it only opened {names})")
+                    continue
+                kept.append(option)
+                trims.append((option, off))
+                game = next((g for g in merged.values() if slug(g[2]) == slug(option.title)), None)
+                if game is not None and slug(prompt.title) == slug(GAMES_PROMPT):
+                    texts.append((option, specs[slug(game[2])]["description"]))
+                lines.append(f"\"{prompt.title}\" answer {option.title} no longer opens {names} (the answer stays"
+                             + (f", and now reads: {texts[-1][1]})" if texts and texts[-1][0] is option else ")"))
+            if kept:
+                prompts.append((prompt, kept))
+            else:
+                lines.append(f"question \"{prompt.title}\" (no answer left)")
+
+        async def edit():
+            for option, off in trims:
+                option.channel_ids.difference_update(off)
+            for option, text in texts:
+                option.description = text
+            for prompt, kept in prompts:
+                prompt.options = kept
+            return await self.guild.edit_onboarding(prompts=[p for p, _ in prompts], default_channels=defaults)
+
+        if lines:
+            await self.do("remove", "from Onboarding: " + "\n          ".join(lines), edit)
+        await self.hide(hide, "Channel retired (layout.RETIRED_CHANNELS, layout.GAME_CHANNELS)")
 
     # ------------------------------------------------------------ automod gaps
     @staticmethod
@@ -979,6 +1066,7 @@ class PublicMode:
         await self.game_options()
         await self.game_answer_channels()
         await self.retire_games()
+        await self.retire_channels()
         await self.automod_gaps()
         print("\nDone." if self.apply else "\nThat's the plan. Run again with --apply.")
         return True

@@ -20,9 +20,9 @@ EMPTY_DELAY = 30  # seconds an empty channel lives before it's deleted
 RENAME_LIMIT = 2  # Discord allows about 2 renames...
 RENAME_WINDOW = 10 * 60  # ...per channel per 10 minutes
 
-# A temp channel must never look like a permanent one to config.match_by_name.
-RESERVED = {slug(n) for n in (config.NEW_SQUAD_VOICE, config.NEW_PRIVATE_VOICE, config.SQUAD_VOICE,
-                              config.LOBBY_VOICE)}
+# A temp channel must never look like a permanent one to config.match_by_name, or like a retired
+# one that is still on the server under its name (server/public_mode.py finds those by name).
+RESERVED = {slug(n) for n in (config.NEW_SQUAD_VOICE, config.LOBBY_VOICE, *config.layout.RETIRED_CHANNELS)}
 
 
 # ---------------------------------------------------------------- names

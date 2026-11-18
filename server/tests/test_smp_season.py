@@ -86,9 +86,10 @@ def test_minecraft_opens_the_smp_channels_and_hands_out_no_smp_ping():
         assert "SMP Ping" not in {o.get("role") for o in prompt["options"]}
     for row in public_mode.ONBOARDING_PROMPTS:
         assert "SMP Ping" not in {o.get("role") for o in row["options"]}
-    # A newcomer sees the whole category without answering anything.
-    assert set(SMP_CHANNELS) <= set(layout.ONBOARDING_DEFAULT_CHANNELS)
-    assert not any(g["title"] == "Minecraft" for g in layout.FOCUS_GROUPS)
+    # A newcomer starts with one Monkey SMP channel; this answer, or the Monkey SMP group, opens the rest.
+    assert set(SMP_CHANNELS) & set(layout.ONBOARDING_DEFAULT_CHANNELS) == {"⛏️・monkey-smp"}
+    (group,) = [g for g in layout.FOCUS_GROUPS if g["title"] == "Monkey SMP"]
+    assert sorted(group["channels"]) == sorted(set(SMP_CHANNELS) - {"⛏️・monkey-smp"})
 
 
 def test_extra_answer_channels_are_public_layout_channels():

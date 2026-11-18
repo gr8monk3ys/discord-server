@@ -78,14 +78,14 @@ const FAQ: [string, ReactNode][] = [
     "What does the bot keep about me?",
     <>
       Counts, not content. Front Desk notes how many messages you send each day, never what they say, plus your time in
-      voice and the game Discord shows you playing. That drives levels, coins and house points.{" "}
+      voice and the game Discord shows you playing. That drives levels and coins.{" "}
       <code>/privacy tracking:off</code> stops it and deletes that history. The full list is in the{" "}
       <a className="ink" href={PRIVACY_URL} rel="noopener">privacy policy</a>.
     </>,
   ],
   [
     "My game isn't listed. Can I still join?",
-    "Yes. Ask in general who else plays it. If a few people do, it can get a channel and a role.",
+    "Yes. Ask in general who else plays it. If a few people do, it can get a role of its own.",
   ],
 ];
 
@@ -140,8 +140,8 @@ export default function Home() {
               <>
                 <h2>What we play</h2>
                 <p className="blurb">
-                  Each of these has a channel and a role. Pick yours when you join and you only get pings for those. Playing
-                  something else? Ask in general.
+                  Each of these has a role. Pick yours when you join and you only get pings for those. They all share one
+                  channel, #gaming. Playing something else? Ask in general.
                 </p>
               </>
             }
@@ -155,7 +155,7 @@ export default function Home() {
             head={
               <>
                 <h2>Your first week</h2>
-                <p className="blurb">Four things a new member ends up doing. None of them is required.</p>
+                <p className="blurb">Three things a new member ends up doing. None of them is required.</p>
               </>
             }
           >
@@ -176,14 +176,6 @@ export default function Home() {
                   </p>
                 </li>
                 <li>
-                  <h3 className="card-title">Get sorted into a house</h3>
-                  <p>
-                    Front Desk, the server&apos;s bot, puts you in Fern, Kestrel or Otter. You don&apos;t choose. Voice time,
-                    chatting, squads and the daily word all score for your house, and Monday&apos;s post says which one won the
-                    week.
-                  </p>
-                </li>
-                <li>
                   <h3 className="card-title">Play on Monkey SMP</h3>
                   <p>
                     Monkey SMP is the owner&apos;s modded Minecraft server. It takes its own pass.{" "}
@@ -193,9 +185,8 @@ export default function Home() {
               </ul>
             </div>
             <p className="aside">
-              Smaller things, if you want them: levels for chat and voice time (<code>/rank</code>), coins and a{" "}
-              <code>/shop</code> for name colours, a daily word puzzle (<code>/word guess</code>), and a monthly bracket once
-              four people sign up.
+              Smaller things, if you want them: Front Desk, the server&apos;s bot, keeps levels for chat and voice time (
+              <code>/rank</code>), and coins with a <code>/shop</code> for name colours.
             </p>
           </Ledger>
         </section>
@@ -206,8 +197,8 @@ export default function Home() {
               <>
                 <h2>A normal week</h2>
                 <p className="blurb">
-                  Times are US Pacific. Evenings are when people play. The other rows are what Front Desk, the bot, posts each
-                  week.
+                  Times are US Pacific. Evenings are when people play, and Saturday is the one fixed night. Thursday&apos;s
+                  row is what Front Desk, the bot, posts.
                 </p>
               </>
             }
@@ -218,16 +209,9 @@ export default function Home() {
                 <div>
                   <h3 className="card-title">Voice</h3>
                   <p>
-                    Whoever&apos;s around joins the Lobby and picks a game. Nothing is scheduled, so some nights are busier than
-                    others.
+                    Whoever&apos;s around joins the Lobby and picks a game. Apart from Saturday nothing is scheduled, so some
+                    nights are busier than others.
                   </p>
-                </div>
-              </li>
-              <li>
-                <span className="label">Mon</span>
-                <div>
-                  <h3 className="card-title">House result</h3>
-                  <p>Front Desk adds up last week&apos;s house points and posts the winner.</p>
                 </div>
               </li>
               <li>
@@ -238,12 +222,12 @@ export default function Home() {
                 </div>
               </li>
               <li>
-                <span className="label">Fri</span>
+                <span className="label">Sat</span>
                 <div>
-                  <h3 className="card-title">Game night</h3>
+                  <h3 className="card-title">Saturday night</h3>
                   <p>
-                    At noon Front Desk puts a 9 PM game night on the calendar for whatever was played most that week, unless a
-                    member has already set one up with <code>/gamenight</code>. Come if you&apos;re free.
+                    Saturdays from 5 PM Pacific in the Lobby. Lorenzo, who runs the server, is in the voice room and plays
+                    whatever people bring. Come when you can.
                   </p>
                 </div>
               </li>

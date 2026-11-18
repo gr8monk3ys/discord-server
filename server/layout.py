@@ -13,10 +13,10 @@ MUTED = 0xABB0BA
 SLATE = 0x606976
 
 # ---------------------------------------------------------------- games
-# One ping role + one channel per game. Members pick their games in
-# Onboarding and only see the channels for games they chose, so the sidebar
-# stays short. The list is what the server actually plays (the bot's weekly
-# owner digest says when it has drifted), in the order it is shown.
+# One ping role per game. Members pick their games in Onboarding and get pinged for those. The
+# list is what the server actually plays (the bot's weekly owner digest says when it has
+# drifted), in the order it is shown. The second field is the game's channel, which exists only
+# for the games in GAME_CHANNELS below.
 GAMES = [
     # (emoji, channel name, role name)
     ("🌧️", "risk-of-rain-2", "Risk of Rain 2"),
@@ -28,6 +28,19 @@ GAMES = [
     ("🪖", "wardogs", "Wardogs"),
     ("🔺", "apex-legends", "Apex Legends"),
 ]
+
+# Listed games with a channel of their own (role names). Every other listed game keeps its role,
+# its "What do you play?" answer and its forum tag, and talks in 🕹️・gaming: with about ten people
+# on, eight game channels were eight empty rooms. public_mode.py takes such a game's old channel
+# off its answer and moves it into GAME_ARCHIVE; add the role name here and it moves back.
+GAME_CHANNELS = {"Minecraft"}
+
+
+def own_channel(game) -> str | None:
+    """The name of the game's own channel, or None when it talks in 🕹️・gaming."""
+    emoji, channel, role = game
+    return f"{emoji}・{channel}" if role in GAME_CHANNELS else None
+
 
 # Games the server used to list. Nothing of theirs is deleted: public_mode.py takes them
 # out of the "What do you play?" question, the bot stops offering their roles, and their
@@ -47,6 +60,20 @@ RETIRED_GAMES = [
 # Where retired game channels are kept: hidden from @everyone, visible to these roles. It is
 # deliberately not in CATEGORIES, so nothing else creates, fills or rearranges it.
 GAME_ARCHIVE = {"name": "99 · archive", "private_to": ["Keeper", "Moderator"]}
+
+# Channels the server no longer shows (cut on 2026-11-17 to fit about ten active people). Nothing
+# is deleted: public_mode.py takes each one off Onboarding (the default channels and every answer)
+# and moves it into GAME_ARCHIVE, messages and all. None of them is in CATEGORIES. public_mode.py
+# does not bring one back: list it in CATEGORIES again, take it off this list, and drag it out of
+# the archive by hand (a read-only channel needs its permission set again).
+RETIRED_CHANNELS = [
+    # Rooms for a crowd: the Lobby and New Squad cover every evening so far.
+    "🔊 Lobby 2", "🔒 New Private Squad", "🎮 Duo", "🎮 Trio", "🎮 Squad", "📺 Watch Party",
+    # Their bot modules are parked (bot/main.py PARKED).
+    "🎲・games", "🏆・tournaments", "📺・creators", "🤝・partners", "📚・guides", "🖥・setups",
+    # No use of their own; #general takes it.
+    "🎨・art", "💻・code", "👗・fashion", "♟️・chess",
+]
 
 # Any role, category or channel can list old names under "was": the existing
 # one is renamed and restyled in place, so members, messages and permissions
@@ -137,7 +164,6 @@ CATEGORIES = [
             {"name": "📸・clips", "topic": "Highlights, fails, and receipts.", "slowmode": 10},
             {"name": "⭐・hall-of-fame", "topic": "3 ⭐ on any message and it lands here.", "read_only": True},
             {"name": "🔢・counting", "topic": "Count up together. Same person can't go twice; a wrong number resets."},
-            {"name": "🎲・games", "topic": "Daily word game, weekly challenges, /slots, /trivia and friends."},
             {"name": "💜・supporters", "topic": "A quiet corner for supporters. Thank you for keeping the lights on.",
              "private_to": ["Supporter", "Keeper", "Moderator"]},
         ],
@@ -145,9 +171,8 @@ CATEGORIES = [
     {
         "name": "03 · games",
         "channels": [
-            {"name": "🕹️・gaming", "topic": "General gaming chat.", "was": ["gaming"]},
-            {"name": "🏆・tournaments", "topic": "Sign up, see brackets, report results. Join with the buttons.",
-             "read_only": True},
+            {"name": "🕹️・gaming", "topic": "Every game we play. Ping the game's role to find people.",
+             "was": ["gaming"]},
             {
                 # A forum: one post per session, tagged by game, so squads
                 # don't get buried in chat.
@@ -164,28 +189,8 @@ CATEGORIES = [
             },
             *(
                 {"name": f"{emoji}・{channel}", "topic": f"{role} talk, squads, and strats. Ping @{role}."}
-                for emoji, channel, role in GAMES
+                for emoji, channel, role in GAMES if role in GAME_CHANNELS
             ),
-            {
-                # A forum stays readable when things are quiet: a guide from last month is
-                # still the first thing you see, where a chat channel would just look dead.
-                "name": "📚・guides",
-                "type": "forum",
-                "topic": "\n".join(
-                    [
-                        "Tips, builds, settings and how-tos that are worth finding again next month.",
-                        "One topic per post. Put the game and the point in the title, like "
-                        "\"Overwatch: crosshair settings that work\".",
-                        "Tag the game. Write it so someone new can follow it: steps, numbers, a screenshot if it helps.",
-                        "Your own words, please: no pasted articles, no link-only posts.",
-                        "A real guide that stays up for a day earns a few coins (a couple of posts a week at most).",
-                    ]
-                ),
-                "tags": [*((role, emoji) for emoji, _, role in GAMES),
-                         ("Beginner", "🌱"), ("Advanced", "🧠"), ("Settings", "⚙️"), ("Question", "❓")],
-                "layout": "list", "sort": "latest_activity", "reaction": "👍",
-                "post_slowmode": 600, "slowmode": 5,
-            },
         ],
     },
     {
@@ -241,32 +246,7 @@ CATEGORIES = [
         "name": "05 · off topic",
         "was": ["04 · off topic"],
         "channels": [
-            {"name": "🎨・art", "topic": "Things you made."},
-            {"name": "💻・code", "topic": "Projects, snippets, and bugs."},
-            {"name": "👗・fashion", "topic": "Fits and finds."},
-            {"name": "♟️・chess", "topic": "Games, puzzles, and challenges."},
             {"name": "🤖・bot-commands", "topic": "Music (/play), bump reminders, and other bot spam."},
-            {"name": "📺・creators", "topic": "Members' streams and uploads. Link yours with /creator.", "read_only": True},
-            {"name": "🤝・partners", "topic": "Servers we partner with. Apply with /partner apply.", "read_only": True},
-            {
-                # Image-first: the gallery layout shows each post's first picture.
-                "name": "🖥・setups",
-                "type": "forum",
-                "topic": "\n".join(
-                    [
-                        "Battlestations, PC builds, console corners, desks and in-game bases. Lead with a picture.",
-                        "One setup per post. Say what we're looking at: parts, the game, how long the base took.",
-                        "Tag the type. Your own photos and screenshots only, and nothing that shows an address "
-                        "or a face you'd rather keep private.",
-                        "A setup with a picture that stays up for a day earns a few coins "
-                        "(a couple of posts a week at most).",
-                    ]
-                ),
-                "tags": [("Battlestation", "🖥️"), ("PC Build", "🔧"), ("Console", "🎮"), ("Desk", "🪑"),
-                         ("In-game Base", "🏰"), ("Work in Progress", "🚧")],
-                "layout": "gallery", "sort": "creation_date", "reaction": "🔥",
-                "post_slowmode": 600, "slowmode": 5,
-            },
         ],
     },
     {
@@ -274,15 +254,8 @@ CATEGORIES = [
         "was": ["Voice Channels", "05 · voice"],
         "channels": [
             {"name": "🔊 Lobby", "type": "voice", "was": ["General"]},
-            {"name": "🔊 Lobby 2", "type": "voice"},
             {"name": "➕ New Squad", "type": "voice"},  # join to get your own channel
-            # Join to get your own locked channel: only you and the people you /squad invite can join.
-            {"name": "🔒 New Private Squad", "type": "voice"},
-            {"name": "🎮 Duo", "type": "voice", "user_limit": 2},
-            {"name": "🎮 Trio", "type": "voice", "user_limit": 3},
-            {"name": "🎮 Squad", "type": "voice", "user_limit": 5, "was": ["🎮 Squad I", "General 2"]},
-            {"name": "📺 Watch Party", "type": "voice"},  # screen shares and movies, no event needed
-            # Watch parties and the monthly Town Hall (Front Desk schedules both as Stage events).
+            # /watchparty events (Front Desk schedules them as Stage events).
             {"name": "🎙・stage", "type": "stage"},
             {"name": "💤 AFK", "type": "voice", "afk": True},
         ],
@@ -350,7 +323,6 @@ POSTS = {
                 "**Start here**",
                 "`VOICE`  If someone is in the Lobby, join them. That is how most games here start.",
                 "`GAMES`  Pick yours under **Channels & Roles** at the top of the channel list.",
-                "`HOUSE`  Front Desk sorts you into Fern, Kestrel or Otter. `/house me` shows yours.",
                 "`MINECRAFT`  Monkey SMP is the owner's modded server, with its own pass "
                 "(monkeysmp.lscaturchio.xyz or a ticket in {#help}). All of it is in the Monkey SMP category: "
                 "start with {#smp-rules}, and the commands are in {#smp-commands}.",
@@ -599,59 +571,50 @@ COMMUNITY = {
 # send messages. Everything else public is opt-in (FOCUS_GROUPS below), so a newcomer lands
 # on a short list of rooms with something in them. focus_mode.py applies this and prints
 # the whole plan first; `focus_mode.py --revert` puts ONBOARDING_EVERYTHING back.
-# #gaming is core because game nights, watch parties and the weekly free games are posted
-# there, and it is a plain text channel that certainly counts towards Discord's five.
+# #gaming is core because it is where every game is talked about and where the weekly free
+# games are posted, and it is a plain text channel that certainly counts towards Discord's five.
 ONBOARDING_DEFAULT_CHANNELS = [
     "📌・rules", "📣・announcements", "💬・general", "🆘・help", "🕹️・gaming", "🎮・lfg", "📸・clips",
-    "🔊 Lobby", "🔊 Lobby 2", "➕ New Squad", "🔒 New Private Squad",
+    "🔊 Lobby", "➕ New Squad",
     "📓・field-notes",  # one post a week, quiet otherwise
-    # Monkey SMP, whole: as an opt-in group nobody found it, and it's what the server is pointing people at.
-    "📜・smp-rules", "❔・smp-faq", "⌨️・smp-commands", "⛏️・monkey-smp", "📝・founding-roster", "🚩・smp-forum",
+    # One Monkey SMP channel, the one with the chat and the pinned status. The Minecraft answer
+    # opens the other five (GAME_EXTRA_CHANNELS): as defaults they were a third of a newcomer's list.
+    "⛏️・monkey-smp",
 ]
 # The default list before the core was cut down, word for word: what --revert restores.
 ONBOARDING_EVERYTHING = [
     "📌・rules", "📣・announcements", "👋・welcome", "💬・general",
-    "🆘・help", "💡・suggestions", "🤣・memes", "📸・clips", "⭐・hall-of-fame", "🔢・counting", "🎲・games", "🕹️・gaming", "🎮・lfg", "🎨・art", "💻・code",
-    "👗・fashion", "♟️・chess", "🤖・bot-commands", "📺・creators", "🏆・tournaments", "🎭・roles", "🤝・partners",
-    "🔊 Lobby", "➕ New Squad", "🎮 Squad", "💤 AFK",
-    "📚・guides", "🖥・setups",
+    "🆘・help", "💡・suggestions", "🤣・memes", "📸・clips", "⭐・hall-of-fame", "🔢・counting", "🕹️・gaming", "🎮・lfg",
+    "🤖・bot-commands", "🎭・roles",
+    "🔊 Lobby", "➕ New Squad", "💤 AFK",
     "⛏️・monkey-smp",
     "📓・field-notes",  # added after the cut, as a default from the start
     "📜・smp-rules", "❔・smp-faq", "⌨️・smp-commands", "📝・founding-roster", "🚩・smp-forum",  # likewise, later
-    "🔊 Lobby 2", "🔒 New Private Squad",  # likewise, later still
 ]
 # Opt-in groups: one question under Channels & Roles (asked after joining, so it does not
-# count against Discord's cap on pre-join questions). Every public channel that is not a
-# game channel is in the core, in exactly one group, or in FOCUS_UNLISTED; a test checks it.
+# count against Discord's cap on pre-join questions). Every public channel that a game's answer
+# does not open is in the core, in exactly one group, or in FOCUS_UNLISTED; a test checks it.
 # Nobody loses access: these channels stay visible to @everyone, and members who are already
 # here keep the channel list they have. Only what a newcomer starts with changes.
 FOCUS_PROMPT = "What else do you want to see?"
 FOCUS_GROUPS = [
-    {"title": "Events and tournaments", "emoji": "🏆",
-     "description": "Brackets, sign-ups and results.",
-     "channels": ["🏆・tournaments"]},
-    {"title": "Coins, levels and games", "emoji": "🎲",
-     "description": "Daily word game, counting, coin games and bot commands.",
-     "channels": ["🎲・games", "🔢・counting", "🤖・bot-commands"]},
-    {"title": "Creators and highlights", "emoji": "📺",
-     "description": "Members' streams and uploads, starred messages, partner servers.",
-     "channels": ["📺・creators", "⭐・hall-of-fame", "🤝・partners"]},
-    {"title": "Forums", "emoji": "📚",
-     "description": "Guides, setups and suggestions for the server.",
-     "channels": ["📚・guides", "🖥・setups", "💡・suggestions"]},
-    {"title": "Off topic", "emoji": "🤣",
-     "description": "Memes, art, code, fashion and chess.",
-     "channels": ["🤣・memes", "🎨・art", "💻・code", "👗・fashion", "♟️・chess"]},
-    {"title": "Roles and arrivals", "emoji": "🎭",
-     "description": "The roles panel, and who just joined.",
-     "channels": ["👋・welcome", "🎭・roles"]},
-    {"title": "More voice rooms", "emoji": "🔊",
-     "description": "Duo, trio and five-seat rooms, the watch party room and the AFK room.",
-     "channels": ["🎮 Duo", "🎮 Trio", "🎮 Squad", "📺 Watch Party", "💤 AFK"]},
+    {"title": "Memes and highlights", "emoji": "🤣",
+     "description": "The meme channel and the starred messages.",
+     "channels": ["🤣・memes", "⭐・hall-of-fame"]},
+    {"title": "Counting and bot commands", "emoji": "🔢",
+     "description": "The counting game, music and bump reminders.",
+     "channels": ["🔢・counting", "🤖・bot-commands"]},
+    {"title": "Around the server", "emoji": "🎭",
+     "description": "The roles panel, who just joined, suggestions and the AFK room.",
+     "channels": ["🎭・roles", "👋・welcome", "💡・suggestions", "💤 AFK"]},
+    # The same five the Minecraft answer opens, for someone who skipped that answer.
+    {"title": "Monkey SMP", "emoji": "⛏️",
+     "description": "The rulebook, FAQ, commands, founding roster and forum.",
+     "channels": ["📜・smp-rules", "❔・smp-faq", "⌨️・smp-commands", "📝・founding-roster", "🚩・smp-forum"]},
 ]
 # Event-driven channels (a default only while something is live): none. The bot module that
 # moved the tournaments and realms channels in and out of the defaults was removed, because a
-# default channel only reaches someone who joins during the event. Both are plain opt-in.
+# default channel only reaches someone who joins during the event.
 FOCUS_EVENT_CHANNELS: dict[str, str] = {}
 # Public, but never a default and never an answer. Discord may refuse a Stage as a default
 # channel, and one refused channel fails the whole Onboarding edit; a Stage shows itself to
@@ -661,7 +624,7 @@ FOCUS_UNLISTED = {"🎙・stage": "Discord shows a live Stage to everyone by its
 # count a forum or a voice channel), focus_mode.py adds these one at a time until it does.
 FOCUS_RESERVE = ["🤣・memes", "🤖・bot-commands"]
 # More channels a game's "What do you play?" answer opens, after the game's own channel.
-# public_mode.py adds the missing ones to the answer and never takes a channel off it. Picking
+# public_mode.py adds the missing ones to the answer. Picking
 # Minecraft opens Monkey SMP too; it hands out the @Minecraft role only, never @SMP Ping (that
 # ping stays opt-in, on the 🎭・roles panel).
 GAME_EXTRA_CHANNELS = {
@@ -677,8 +640,9 @@ ONBOARDING_PROMPTS = [
         "options": [
             *(
                 {"title": role, "emoji": emoji, "role": role,
-                 "channels": [f"{emoji}・{channel}", *GAME_EXTRA_CHANNELS.get(role, [])],
-                 "description": f"Get @{role} pings and the #{channel} channel."}
+                 "channels": [*filter(None, [own_channel((emoji, channel, role))]), *GAME_EXTRA_CHANNELS.get(role, [])],
+                 "description": (f"Get @{role} pings and the #{channel} channel." if role in GAME_CHANNELS
+                                 else f"Get @{role} pings. The talk is in #gaming.")}
                 for emoji, channel, role in GAMES
             ),
             {"title": "Just here to hang", "emoji": "🛋️", "role": "Guest",

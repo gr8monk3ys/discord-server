@@ -28,12 +28,11 @@ def test_kind_of_matches_the_two_forums_only():
     assert F.kind_of(None) is None and F.kind_of("") is None
 
 
-def test_reactions_match_the_layout_defaults():
+def test_the_forums_are_retired_along_with_the_module():
     import layout
-    specs = {config.slug(c["name"]): c for cat in layout.CATEGORIES for c in cat["channels"]}
-    for kind, name in F.FORUMS.items():
-        spec = specs[config.slug(name)]
-        assert spec["type"] == "forum" and spec["reaction"] == F.REACTIONS[kind]
+    import main
+    assert "cogs.forums" in main.PARKED
+    assert {config.slug(n) for n in F.FORUMS.values()} <= {config.slug(n) for n in layout.RETIRED_CHANNELS}
 
 
 def test_is_image():

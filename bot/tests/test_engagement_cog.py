@@ -164,8 +164,8 @@ class FakeGuild:
         self.gaming = FakeText(config.GAMING_CHANNEL, self)
         self.mod_log = FakeText(config.MOD_LOG_CHANNEL, self)
         self.text_channels = [self.general, self.counting, self.gaming, self.mod_log]
-        self.squad = SimpleNamespace(id=101, name=config.SQUAD_VOICE, mention="<#101>")
-        self.voice_channels = [self.squad]
+        self.lobby = SimpleNamespace(id=101, name=config.LOBBY_VOICE, mention="<#101>")
+        self.voice_channels = [self.lobby]
         self.roles = [FakeRole(config.BIRTHDAY_ROLE), FakeRole(config.COUNTING_ROLE)]
         self.members: dict[int, FakeMember] = {}
         self.scheduled_events: list[FakeEvent] = []
@@ -297,6 +297,7 @@ def with_env(fn, monkeypatch, questions=QUESTIONS, pairs=PAIRS):
         env = Env(db, guild, bot, cog)
         monkeypatch.setattr(cogmod, "now", lambda: env.t)
         monkeypatch.delenv("QUIET", raising=False)
+        monkeypatch.setenv("AUTO_GAMENIGHT", "on")  # off by default; test_auto_gamenight_is_off_unless_switched_on
         try:
             await fn(env)
         finally:
@@ -824,6 +825,16 @@ async def add_game_time(env, uid, game, start, hours):
                          (uid, game, start, start + int(hours * HOUR)))
 
 
+def test_auto_gamenight_is_off_unless_switched_on(monkeypatch):
+    async def go(env):
+        monkeypatch.delenv("AUTO_GAMENIGHT")
+        await env.tick(ts(2026, 10, 2, 13))
+        await env.tick(ts(2026, 10, 9, 12, 0))
+        assert env.guild.created == []
+        assert not await env.db.fetchall("SELECT 1 FROM jobs WHERE key LIKE 'autogamenight:%'")
+    with_env(go, monkeypatch)
+
+
 def test_auto_gamenight_creates_event_for_top_game(monkeypatch):
     async def go(env):
         await env.tick(ts(2026, 10, 2, 13))  # first startup: Friday 10/2 marked done
@@ -835,7 +846,7 @@ def test_auto_gamenight_creates_event_for_top_game(monkeypatch):
         assert len(env.guild.created) == 1
         ev = env.guild.created[0]
         assert ev["name"] == "Minecraft game night"
-        assert ev["channel"] is env.guild.squad
+        assert ev["channel"] is env.guild.lobby
         assert ev["entity_type"] is discord.EntityType.voice
         assert int(ev["start_time"].timestamp()) == ts(2026, 10, 9, 21)
         rows = [dict(r) for r in await env.db.fetchall("SELECT * FROM gamenights")]

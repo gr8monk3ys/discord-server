@@ -67,9 +67,8 @@ class FakeText:
 class FakeGuild:
     def __init__(self):
         self.id = GUILD_ID
-        self.games = FakeText(config.GAMES_CHANNEL)
-        self.botcmd = FakeText(config.BOT_COMMANDS_CHANNEL)
-        self.text_channels = [self.botcmd, self.games]
+        self.botcmd = FakeText(config.BOT_COMMANDS_CHANNEL)  # the bump command and the weekly thanks
+        self.text_channels = [self.botcmd]
 
 
 class FakeBot:
@@ -224,7 +223,7 @@ def test_vote_next_bump_uses_the_pending_reminder_or_the_last_bump(monkeypatch):
 
 def test_vote_without_the_bot_channel_still_answers(monkeypatch):
     async def go(env):
-        env.guild.text_channels = [env.guild.games]
+        env.guild.text_channels = []
         assert "in the bot channel" in env.fields(await env.vote(A))["Disboard"]
     with_env(go, monkeypatch)
 
@@ -244,7 +243,7 @@ def test_first_run_only_marks_the_week_done(monkeypatch):
         await env.bump(A, SUNDAY - DAY)
         assert await env.cog.run_support() is False
         assert await env.done() == {KEY}
-        assert env.guild.games.sent == [] and await env.ledger() == []
+        assert env.guild.botcmd.sent == [] and await env.ledger() == []
     with_env(go, monkeypatch)
 
 
@@ -259,7 +258,7 @@ def test_thanks_top_three_and_pays_with_refs(monkeypatch):
         await env.bump(D, SUNDAY + 5, times=9)  # after the cut-off: next week's
         env.t = SUNDAY + 60
         assert await env.cog.run_support() is True
-        (msg,) = env.guild.games.sent
+        (msg,) = env.guild.botcmd.sent
         assert msg["allowed_mentions"].to_dict() == discord.AllowedMentions.none().to_dict()
         text = msg["embed"].description
         assert msg["embed"].title == "Bump thanks · 2026-W41"
@@ -276,7 +275,7 @@ def test_thanks_top_three_and_pays_with_refs(monkeypatch):
         assert KEY in await env.done()
         # the next ticks do nothing
         assert await env.cog.run_support() is False
-        assert len(env.guild.games.sent) == 1 and len(await env.ledger()) == 3
+        assert len(env.guild.botcmd.sent) == 1 and len(await env.ledger()) == 3
     with_env(go, monkeypatch)
 
 
@@ -287,7 +286,7 @@ def test_fresh_accounts_are_thanked_but_not_paid(monkeypatch):
         await env.bump(alt, SUNDAY - DAY, times=3)
         await env.bump(A, SUNDAY - DAY)
         assert await env.cog.run_support() is True
-        text = env.guild.games.sent[0]["embed"].description
+        text = env.guild.botcmd.sent[0]["embed"].description
         assert f"<@{alt}>  3 bumps · coins need a" in text
         assert await env.ledger() == [(A, 200, "support", "support:2026-W41:2")]
         assert await env.balance(alt) == 0
@@ -299,21 +298,21 @@ def test_nobody_bumped_posts_nothing_and_is_done(monkeypatch):
         await env.seen(PREV)
         await env.bump(A, PREV - HOUR)  # an older week
         assert await env.cog.run_support() is True
-        assert env.guild.games.sent == [] and await env.ledger() == []
+        assert env.guild.botcmd.sent == [] and await env.ledger() == []
         assert KEY in await env.done()
     with_env(go, monkeypatch)
 
 
-def test_no_games_channel_waits_and_pays_nothing_yet(monkeypatch):
+def test_no_bot_channel_waits_and_pays_nothing_yet(monkeypatch):
     async def go(env):
         await env.seen(PREV)
         await env.bump(A, SUNDAY - DAY)
-        env.guild.text_channels = [env.guild.botcmd]
+        env.guild.text_channels = []
         assert await env.cog.run_support() is False
         assert await env.ledger() == [] and KEY not in await env.done()
-        env.guild.text_channels.append(env.guild.games)
+        env.guild.text_channels.append(env.guild.botcmd)
         assert await env.cog.run_support() is True
-        assert len(env.guild.games.sent) == 1 and await env.balance(A) == 300
+        assert len(env.guild.botcmd.sent) == 1 and await env.balance(A) == 300
     with_env(go, monkeypatch)
 
 
@@ -321,17 +320,17 @@ def test_failed_post_retries_without_paying_twice(monkeypatch):
     async def go(env):
         await env.seen(PREV)
         await env.bump(A, SUNDAY - DAY)
-        env.guild.games.fail = discord.HTTPException(SimpleNamespace(status=500, reason="oops"), "server error")
+        env.guild.botcmd.fail = discord.HTTPException(SimpleNamespace(status=500, reason="oops"), "server error")
         assert await env.cog.run_support() is None  # logged, not raised
         assert KEY not in await env.done()
-        env.guild.games.fail = discord.Forbidden(SimpleNamespace(status=403, reason="no"), "Missing Permissions")
+        env.guild.botcmd.fail = discord.Forbidden(SimpleNamespace(status=403, reason="no"), "Missing Permissions")
         assert await env.cog.run_support() is False
         assert KEY not in await env.done()
-        env.guild.games.fail = None
+        env.guild.botcmd.fail = None
         env.t = SUNDAY + 10 * 60
         assert await env.cog.run_support() is True
-        assert len(env.guild.games.sent) == 1
-        assert "+300 coins" in env.guild.games.sent[0]["embed"].description
+        assert len(env.guild.botcmd.sent) == 1
+        assert "+300 coins" in env.guild.botcmd.sent[0]["embed"].description
         assert await env.ledger() == [(A, 300, "support", "support:2026-W41:1")]
     with_env(go, monkeypatch)
 
@@ -343,7 +342,7 @@ def test_catches_up_once_after_downtime(monkeypatch):
         await env.bump(B, PREV - DAY, times=3)  # a week missed while the bot was off
         env.t = SUNDAY + 2 * DAY  # Tuesday: the bot comes back
         assert await env.cog.run_support() is True
-        (msg,) = env.guild.games.sent
+        (msg,) = env.guild.botcmd.sent
         assert f"<@{A}>" in msg["embed"].description and f"<@{B}>" not in msg["embed"].description
         done = await env.done()
         assert KEY in done and "support:2026-W40" in done  # the missed week is closed, not replayed
@@ -358,7 +357,7 @@ def test_before_sunday_five_nothing_runs(monkeypatch):
         await env.bump(A, SUNDAY - DAY)
         env.t = SUNDAY - 60
         assert await env.cog.run_support() is False
-        assert env.guild.games.sent == [] and await env.ledger() == []
+        assert env.guild.botcmd.sent == [] and await env.ledger() == []
     with_env(go, monkeypatch)
 
 

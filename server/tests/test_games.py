@@ -12,10 +12,31 @@ from pathlib import Path
 import discord
 import pytest
 
-import layout
+import layout as real_layout
 import public_mode
 from names import slug
 from test_server_scripts import NS, FakeGuild, FakeRole
+
+
+def channel_layout(edit=lambda src: src):
+    """layout.py with a channel for every listed game, loaded as a module; `edit` may change the
+    source first. These tests are about a game's own channel (made, hidden, brought back), and
+    the real GAME_CHANNELS gives one to Minecraft only (tests/test_retire_channels.py covers that)."""
+    src = Path(real_layout.__file__).read_text(encoding="utf-8")
+    (line,) = [text for text in src.splitlines() if text.startswith("GAME_CHANNELS = ")]
+    src = edit(src.replace(line, "GAME_CHANNELS = {role for _, _, role in GAMES}"))
+    mod = types.ModuleType("layout_with_game_channels")
+    mod.__file__ = real_layout.__file__
+    exec(compile(src, real_layout.__file__, "exec"), mod.__dict__)
+    return mod
+
+
+layout = channel_layout()
+
+
+@pytest.fixture(autouse=True)
+def every_game_has_a_channel(monkeypatch):
+    monkeypatch.setattr(public_mode, "layout", layout)
 
 OLD_GAMES = [  # what the server listed before: every one of these has a role, a channel and an option
     ("🪖", "wardogs", "Wardogs"), ("⛏️", "minecraft", "Minecraft"), ("🪂", "fortnite", "Fortnite"),
@@ -77,17 +98,30 @@ class LiveGuild(FakeGuild):
         self.text_channels.append(ch)
         return ch
 
-    def add_forum(self, name, tags):
-        forum = NS(id=3000 + len(self.forums), name=name, category_id=None, edits=[],
+    def add_forum(self, name, tags, category=None):
+        forum = NS(id=3000 + len(self.forums), name=name, category_id=category.id if category else None, edits=[],
                    available_tags=[discord.ForumTag(name=n, emoji=e) for n, e in tags],
                    delete=never(f"deleting #{name}"))
 
         async def edit(**kw):
             forum.edits.append(kw)
             forum.available_tags = list(kw.get("available_tags", forum.available_tags))
+            if "category" in kw:
+                forum.category_id = kw["category"].id
         forum.edit = edit
         self.forums.append(forum)
         return forum
+
+    def add_voice(self, name, category):
+        ch = NS(id=4000 + len(self.voice_channels), name=name, category_id=category.id, edits=[],
+                delete=never(f"deleting {name}"))
+
+        async def edit(**kw):
+            ch.edits.append(kw)
+            ch.category_id = kw["category"].id
+        ch.edit = edit
+        self.voice_channels.append(ch)
+        return ch
 
     # what the scripts call
     async def create_role(self, **kw):
@@ -112,6 +146,7 @@ class LiveGuild(FakeGuild):
     async def edit_onboarding(self, **kw):
         self.onboarding_edits.append(kw)
         self.ob.prompts = list(kw["prompts"])
+        self.ob.default_channels = list(kw.get("default_channels", self.ob.default_channels))
 
     # reading the result
     def category_of(self, channel_slug):
@@ -190,16 +225,14 @@ def apply(guild):
 def moved_layout(role_name, to):
     """layout.py as it would be after staff move one game's line into GAMES or RETIRED_GAMES:
     the real file with that one line moved, loaded as a module."""
-    src = Path(layout.__file__).read_text(encoding="utf-8")
-    lines = src.splitlines(keepends=True)
-    (i,) = [n for n, line in enumerate(lines) if line.lstrip().startswith("(") and f'"{role_name}"),' in line]
-    line = lines.pop(i)
-    (head,) = [n for n, text in enumerate(lines) if text.startswith(f"{to} = [")]
-    lines.insert(head + 1, line)
-    mod = types.ModuleType("layout_moved")
-    mod.__file__ = layout.__file__
-    exec(compile("".join(lines), layout.__file__, "exec"), mod.__dict__)
-    return mod
+    def move(src):
+        lines = src.splitlines(keepends=True)
+        (i,) = [n for n, line in enumerate(lines) if line.lstrip().startswith("(") and f'"{role_name}"),' in line]
+        line = lines.pop(i)
+        (head,) = [n for n, text in enumerate(lines) if text.startswith(f"{to} = [")]
+        lines.insert(head + 1, line)
+        return "".join(lines)
+    return channel_layout(move)
 
 
 # ------------------------------------------------------------ the list itself

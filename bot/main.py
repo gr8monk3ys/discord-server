@@ -39,7 +39,7 @@ MODULES = [
     ("cogs.economy", {"message_content"}),  # coins: /daily, /balance, /give, /coinflip, /richest
     ("cogs.games", set()),  # /slots, /blackjack, /trivia, /predict
     ("cogs.shop", {"members"}),  # /shop, /buy, /season
-    ("cogs.engagement", {"members", "message_content"}),  # QOTD, daily poll, counting, auto game night, birthdays
+    ("cogs.engagement", {"members", "message_content"}),  # QOTD, daily poll, counting, birthdays, auto game night (AUTO_GAMENIGHT=on)
     ("cogs.moderation", {"members", "message_content"}),  # /warn /timeout /cases /purge, anti-spam, anti-raid
     ("cogs.ops", set()),  # backups, health alerts, config drift, /status
     ("cogs.utility", {"presences"}),  # /remind, /afk, suggestions, stat channels, tickets
@@ -85,9 +85,10 @@ MODULES = [
 ]
 
 # Modules that stay in the repo but are not loaded: their commands, buttons and scheduled posts are
-# off. Each one is something a member has to start, and none had been used once by 2026-11-09 (the
-# server is small, and a bot that talks to nobody makes a quiet server look quieter). The tables and
-# the data stay. Bring one back by deleting its line here, or set PARKED_MODULES in server/.env to
+# off. The first thirteen are each something a member has to start, and none had been used once by
+# 2026-11-09 (the server is small, and a bot that talks to nobody makes a quiet server look
+# quieter). The last four were parked on 2026-11-17 for the scheduled posts they make to about ten
+# active people. The tables and the data stay. Bring one back by deleting its line here, or set PARKED_MODULES in server/.env to
 # the comma-separated list that should stay parked (short names; "none" loads everything).
 PARKED = frozenset({
     "cogs.games",  # /slots, /blackjack, /trivia, /predict
@@ -103,6 +104,10 @@ PARKED = frozenset({
     "cogs.supporter",
     "cogs.forums",
     "cogs.clipcast",
+    "cogs.houses",  # the three houses, Monday's House Cup result
+    "cogs.clips",  # Sunday's clip-of-the-week poll and role
+    "cogs.vibes",  # chat revival, member of the month; join anniversaries and booster thanks go with it
+    "cogs.news",  # game news; with one #gaming channel every game's feed would land in it
 })
 
 

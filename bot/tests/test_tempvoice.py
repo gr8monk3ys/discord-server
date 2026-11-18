@@ -60,7 +60,7 @@ def test_game_named_like_a_permanent_channel_uses_fallback():
 def test_clean_rename():
     assert T.clean_rename("  chill \n zone ") == "chill zone"
     assert T.clean_rename("\x00\x01  ") is None
-    assert T.clean_rename(config.SQUAD_VOICE) is None
+    assert T.clean_rename(config.LOBBY_VOICE) is None
     assert T.clean_rename("squad") is None
     assert utf16(T.clean_rename("z" * 200)) == 100
 

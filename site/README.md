@@ -244,8 +244,8 @@ numbers when there are any), and no retired games outside the generated games li
 (`src/app/pages.test.tsx` checks both).
 
 The "A normal week" strip is static copy and lists only what happens without anyone hosting it:
-people in voice, and what Front Desk posts on a timer (`bot/cogs/houses.py`, `events.py`,
-`engagement.py`). Update it by hand if those schedules change, and word anything that depends
+people in voice, the owner's Saturday night in the Lobby, and what Front Desk posts on a timer
+(`bot/cogs/events.py`). Update it by hand if those schedules change, and word anything that depends
 on members showing up as exactly that.
 
 ## Security headers and the CSP

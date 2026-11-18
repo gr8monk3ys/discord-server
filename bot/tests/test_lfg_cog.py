@@ -125,7 +125,7 @@ class FakeGuild:
         self.threads = {}  # every thread that exists on "Discord"
         self.cached = set()  # thread ids that guild.get_thread returns
         self.roles = [Named(g.role) for g in config.GAMES] + [Named(config.LFG_ROLE), Named(config.KEEPER_ROLE)]
-        self.voice_channels = [Named(config.SQUAD_VOICE), Named(config.LOBBY_VOICE)]
+        self.voice_channels = [Named(config.LOBBY_VOICE)]
         self.forum = FakeForum(self)
         self.forums = [self.forum]
 
@@ -508,8 +508,7 @@ def test_join_until_full_disables_join_and_announces():
         assert sent["content"].startswith("Squad's full:")
         for uid in (HOST, A, B):
             assert f"<@{uid}>" in sent["content"]
-        assert config.SQUAD_VOICE in [v.name for v in env.guild.voice_channels]
-        assert env.cog.voice["squad"].mention in sent["content"]  # size 3 -> Squad voice
+        assert env.cog.lobby.mention in sent["content"]
         am = sent["allowed_mentions"]
         assert sorted(u.id for u in am.users) == sorted([HOST, A, B]) and am.roles is False and am.everyone is False
 
@@ -524,7 +523,7 @@ def test_big_squad_full_suggests_lobby():
         for uid in range(100, 105):
             await env.press(uid, "join", post)
         (sent,) = env.thread(post).sends()
-        assert env.cog.voice["lobby"].mention in sent["content"]
+        assert env.cog.lobby.mention in sent["content"]
     with_env(go)
 
 

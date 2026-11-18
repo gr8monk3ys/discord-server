@@ -100,7 +100,7 @@ class Lfg(commands.Cog):
         self.game_roles: dict[str, discord.Role] = {}
         self.lfg_role: discord.Role | None = None
         self.keeper_role: discord.Role | None = None
-        self.voice: dict[str, discord.VoiceChannel] = {}
+        self.lobby: discord.VoiceChannel | None = None
 
     async def cog_load(self) -> None:
         self.bot.add_dynamic_items(LfgButton)
@@ -148,7 +148,7 @@ class Lfg(commands.Cog):
             self.ready = False
             return
         self.resolved = True
-        self.game_tags, self.mode_tags, self.game_roles, self.voice = {}, {}, {}, {}
+        self.game_tags, self.mode_tags, self.game_roles = {}, {}, {}
         self.forum = config.match_by_name(guild.forums, config.LFG_FORUM)
         if self.forum is None:
             self.ready = False
@@ -175,10 +175,7 @@ class Lfg(commands.Cog):
                 missing.append(f"tag '{mode}'")
         self.lfg_role = config.match_by_name(guild.roles, config.LFG_ROLE)
         self.keeper_role = config.match_by_name(guild.roles, config.KEEPER_ROLE)
-        for key, name in (("squad", config.SQUAD_VOICE), ("lobby", config.LOBBY_VOICE)):
-            channel = config.match_by_name(guild.voice_channels, name)
-            if channel:
-                self.voice[key] = channel
+        self.lobby = config.match_by_name(guild.voice_channels, config.LOBBY_VOICE)
         if self.lfg_role is None:
             missing.append(f"role @{config.LFG_ROLE}")
         if missing:
@@ -426,8 +423,7 @@ class Lfg(commands.Cog):
 
     async def announce_full(self, thread, post_id: int, roster: Roster) -> None:
         """Ping the squad. Failures are logged, not shown: the join itself worked."""
-        voice = self.voice.get(rules.voice_hint(roster.size))
-        where = f", hop in {voice.mention}" if voice else ""
+        where = f", hop in {self.lobby.mention}" if self.lobby else ""
         mentions = " ".join(f"<@{uid}>" for uid in roster.members)
         try:
             await thread.send(f"Squad's full: {mentions}{where}",

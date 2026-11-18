@@ -441,6 +441,8 @@ class Stats(commands.Cog):
         await self.bot.wait_until_ready()
 
     async def run_weekly(self) -> None:
+        if not config.switched_on("WEEKLY_MVP"):
+            return
         # Marked done only when post_mvp says the week is handled. Nowhere to post, or a
         # Discord error, leaves it for the next tick; the planner drops a week once the next
         # one is due, so a channel that was gone for a month comes back to one post, not four.

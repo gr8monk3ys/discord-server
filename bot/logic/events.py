@@ -15,12 +15,10 @@ from urllib.parse import urlsplit
 
 import discord
 
-import config
 
 MAX_AHEAD = timedelta(days=30)
 REMIND_BEFORE = 15 * 60  # seconds before the start
 REMIND_GRACE = 10 * 60  # still remind up to this long after the start
-SQUAD_MAX = 5  # bigger groups go to the Lobby
 MAX_FREE_GAMES = 8
 
 WHEN_EXAMPLES = "`9pm`, `9:30pm`, `21:00`, `tonight 9pm`, `tomorrow 8pm`, `fri 9pm`, `2026-10-10 20:00`"
@@ -121,11 +119,6 @@ def to_utc(when: datetime) -> datetime:
     return when.astimezone(timezone.utc)
 
 
-def voice_for(size: int | None) -> str:
-    """The voice channel name for a group of `size` (unknown size: Squad)."""
-    return config.LOBBY_VOICE if size is not None and size > SQUAD_MAX else config.SQUAD_VOICE
-
-
 def event_name(game_label: str | None) -> str:
     """"Valorant game night"; plain "Game night" when any game goes (None)."""
     return f"{game_label} game night"[:100] if game_label else "Game night"
@@ -154,7 +147,6 @@ WATCH_HOSTS = frozenset({
 MAX_LINK = 300
 TOWNHALL_NAME = "Town Hall"
 TOWNHALL_WEEKDAY = 5  # Saturday
-TOWNHALL_DEFAULT = time(12, 0)
 TOWNHALL_OFF = {"off", "none", "no", "false", "0", "disabled"}
 
 
@@ -193,10 +185,10 @@ def watchparty_description(host_name: str, link: str | None) -> str:
 
 
 def parse_townhall_time(text: str | None) -> time | None:
-    """The TOWNHALL_TIME setting: "12:00", "7pm", ... (Pacific wall-clock). Unset means the
-    default; "off" (or anything unreadable) means no Town Hall."""
+    """The TOWNHALL_TIME setting: "12:00", "7pm", ... (Pacific wall-clock). Unset, "off" or
+    anything unreadable means no Town Hall."""
     if text is None or not text.strip():
-        return TOWNHALL_DEFAULT
+        return None
     words = " ".join(text.lower().split())
     if words in TOWNHALL_OFF:
         return None

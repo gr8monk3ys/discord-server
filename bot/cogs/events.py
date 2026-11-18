@@ -11,8 +11,8 @@
 - A Town Hall (Stage event) on the first Saturday of each month, created a week ahead and
   announced once in 📣・announcements with a prompt for agenda items. Skipped, with a log line,
   when the stage channel or the permission to schedule on it is missing; cogs/ops.py's
-  permission self-check reports the same gap in the mod log. TOWNHALL_TIME sets the time
-  (default 12:00 Pacific; "off" disables it).
+  permission self-check reports the same gap in the mod log. Off unless TOWNHALL_TIME sets the
+  time (Pacific, like "12:00"): nobody came to one, so it no longer schedules itself.
 - Thursdays 18:00 local, the bot posts new free-to-keep PC games from GamerPower in
   🕹️・gaming. `free_games` stops a giveaway from being posted twice.
 
@@ -157,7 +157,7 @@ class Events(commands.Cog):
     @app_commands.describe(
         game="Which game (or Anything)",
         when="Server time (Pacific), e.g. 9pm, tomorrow 8pm, fri 9pm, 2026-10-10 20:00",
-        size="How many players (over 5 uses the Lobby)",
+        size="How many players",
         note="Anything else people should know",
     )
     @app_commands.choices(game=GAMENIGHT_CHOICES)
@@ -185,7 +185,7 @@ class Events(commands.Cog):
             await interaction.response.send_message(
                 f"{text} Pick a time in the next 30 days. Some examples: {E.WHEN_EXAMPLES}", ephemeral=True)
             return
-        voice_name = E.voice_for(size)
+        voice_name = config.LOBBY_VOICE
         voice = config.match_by_name(guild.voice_channels, voice_name)
         if voice is None:
             await interaction.response.send_message(

@@ -567,9 +567,24 @@ def _with_categories(guild):
     return guild
 
 
+FORUMS = {"lfg", "suggestions", "smpforum"}
+# Every forum setting the scripts know, and a voice room with seats: nothing in layout.py uses
+# them all since the guides and setups forums and the small voice rooms were retired.
+GALLERY = {"name": "🖼・gallery", "type": "forum", "topic": "Pictures.", "layout": "gallery", "sort": "creation_date",
+           "reaction": "🔥", "post_slowmode": 600, "slowmode": 5}
+DUO = {"name": "🎮 Duo", "type": "voice", "user_limit": 2}
+
+
+def _with_extra_channels(monkeypatch):
+    """layout.py plus GALLERY (in the games category) and DUO (in the voice category)."""
+    for cat_name, spec in (("03 · games", GALLERY), ("06 · voice", DUO)):
+        cat = next(c for c in layout.CATEGORIES if c["name"] == cat_name)
+        monkeypatch.setitem(cat, "channels", [*cat["channels"], spec])
+
+
 def test_layout_forums_and_stage_fit_discords_limits():
     forums = [s for s in setup_server.layout_channels() if s.get("type") == "forum"]
-    assert {"guides", "setups"} <= {slug(s["name"]) for s in forums}
+    assert FORUMS <= {slug(s["name"]) for s in forums}
     for spec in forums:
         tags = spec.get("tags", [])
         assert len(tags) <= 20, spec["name"]  # Discord: 20 tags per forum
@@ -577,22 +592,21 @@ def test_layout_forums_and_stage_fit_discords_limits():
         assert all(0 < len(n) <= 20 for n, _ in tags), spec["name"]
         assert 0 < len(spec["topic"]) <= 4096
         setup_server.forum_options(spec)  # every layout/sort name is one the scripts know
-    guides = _spec("guides")
-    assert {role for _, _, role in layout.GAMES} <= {n for n, _ in guides["tags"]}  # one tag per game
-    assert _spec("setups")["layout"] == "gallery"
+    assert {role for _, _, role in layout.GAMES} <= {n for n, _ in _spec("lfg")["tags"]}  # one tag per game
+    assert _spec("smp-forum")["layout"] == "list"
     assert _spec("stage")["type"] == "stage"
     # Public channels must be reachable through Onboarding: a default or an opt-in answer
     # (tests/test_focus_mode.py checks every one). The Stage is the exception: Discord may
     # refuse one as a default (see layout.py).
     reachable = {slug(n) for n in (*layout.ONBOARDING_DEFAULT_CHANNELS,
                                    *(n for g in layout.FOCUS_GROUPS for n in g["channels"]))}
-    assert {"guides", "setups"} <= reachable and "stage" not in reachable
-    assert {"guides", "setups"} <= {slug(n) for n in layout.ONBOARDING_EVERYTHING}
+    assert FORUMS <= reachable and "stage" not in reachable
+    assert FORUMS <= {slug(n) for n in layout.ONBOARDING_EVERYTHING}
 
 
 def test_forum_options_only_pass_what_the_spec_sets():
     assert setup_server.forum_options({"name": "x"}) == {"default_layout": discord.ForumLayoutType.list_view}
-    assert setup_server.forum_options(_spec("setups")) == {
+    assert setup_server.forum_options(GALLERY) == {
         "default_layout": discord.ForumLayoutType.gallery_view,
         "default_sort_order": discord.ForumOrderType.creation_date,
         "default_reaction_emoji": "🔥",
@@ -601,27 +615,27 @@ def test_forum_options_only_pass_what_the_spec_sets():
     }
 
 
-def test_public_mode_creates_new_forums_and_the_stage_once(capsys):
+def test_public_mode_creates_new_forums_and_the_stage_once(capsys, monkeypatch):
+    _with_extra_channels(monkeypatch)
     guild = _with_categories(FakeGuild())
     asyncio.run(public_mode.PublicMode(guild, apply=True).new_channels())
     made = {slug(name): (kind, kw) for kind, name, kw in guild.calls}
-    kind, kw = made["guides"]
-    assert kind == "forum" and kw["category"].name == "03 · games"
-    assert {t.name for t in kw["available_tags"]} >= {"Minecraft", "Beginner", "Question"}
+    kind, kw = made["smpforum"]
+    assert kind == "forum" and kw["category"].name == "04 · monkey smp"
+    assert {t.name for t in kw["available_tags"]} >= {"Faction", "Recruiting", "Bug"}
     assert kw["default_layout"] is discord.ForumLayoutType.list_view
     assert kw["default_sort_order"] is discord.ForumOrderType.latest_activity
-    assert kw["default_reaction_emoji"] == "👍" and kw["slowmode_delay"] == 600
     assert "overwrites" not in kw  # same permissions as the other public channels in the category
-    kind, kw = made["setups"]
+    kind, kw = made["gallery"]
     assert kind == "forum" and kw["default_layout"] is discord.ForumLayoutType.gallery_view
+    assert kw["default_reaction_emoji"] == "🔥" and kw["slowmode_delay"] == 600
     kind, kw = made["stage"]
     assert kind == "stage" and kw["category"].name == "06 · voice"
     assert made["general"][0] == "text" and made["lobby"][0] == "voice"  # the stage isn't mistaken for either
     # Voice rooms get the layout's seat limit; the rest stay unlimited.
     kind, kw = made[slug("🎮 Duo")]
     assert kind == "voice" and kw["user_limit"] == 2 and kw["category"].name == "06 · voice"
-    assert made[slug("🎮 Trio")][1]["user_limit"] == 3 and made[slug("🎮 Squad")][1]["user_limit"] == 5
-    assert "user_limit" not in made[slug("🔊 Lobby 2")][1] and "user_limit" not in made[slug("🔒 New Private Squad")][1]
+    assert "user_limit" not in made["lobby"][1] and "user_limit" not in made[slug("➕ New Squad")][1]
     out = capsys.readouterr().out
     assert "🎮 Duo in 06 · voice (2 seats)" in out
     assert "can't schedule Stage events without Manage Channels, Mute Members, Move Members" in out
@@ -638,12 +652,14 @@ def test_public_mode_creates_new_forums_and_the_stage_once(capsys):
     assert "Stage events" not in capsys.readouterr().out
 
 
-def test_public_mode_forums_and_stage_dry_run_and_missing_category(capsys):
+def test_public_mode_forums_and_stage_dry_run_and_missing_category(capsys, monkeypatch):
+    _with_extra_channels(monkeypatch)
     guild = _with_categories(FakeGuild())
     asyncio.run(public_mode.PublicMode(guild, apply=False).new_channels())
     assert guild.calls == []
     out = capsys.readouterr().out
-    assert "#📚・guides (forum) in 03 · games with 12 tags (layout, sort, reaction, post_slowmode, slowmode)" in out
+    assert "#🖼・gallery (forum) in 03 · games with 0 tags (layout, sort, reaction, post_slowmode, slowmode)" in out
+    assert "#🚩・smp-forum (forum) in 04 · monkey smp with 6 tags (layout, sort)" in out
     assert "🎙・stage (stage) in 06 · voice" in out
 
     bare = FakeGuild()  # no categories at all: skipped with a reason, never created loose
@@ -662,13 +678,14 @@ def test_public_mode_reports_a_stage_the_bot_cannot_schedule_on(capsys):
     assert "without Mute Members (" in out and "Manage Channels" not in out
 
 
-def test_setup_creates_the_stage_as_a_stage_and_forums_with_their_settings():
+def test_setup_creates_the_stage_as_a_stage_and_forums_with_their_settings(monkeypatch):
+    _with_extra_channels(monkeypatch)
     guild = FakeGuild()
     m = setup_server.Makeover(guild, apply=True)
     asyncio.run(m.make_channels())
     made = {slug(name): (kind, kw) for kind, name, kw in guild.calls}
     assert made["stage"][0] == "stage"
-    assert made["setups"][1]["default_layout"] is discord.ForumLayoutType.gallery_view
+    assert made["gallery"][1]["default_layout"] is discord.ForumLayoutType.gallery_view
     assert made["lfg"][1]["default_layout"] is discord.ForumLayoutType.list_view  # unchanged for the old forums
     # Re-running finds the stage instead of making a text channel with its name.
     guild.stage_channels.append(NS(id=5, name="🎙・stage", category_id=None))
@@ -680,7 +697,7 @@ def test_setup_creates_the_stage_as_a_stage_and_forums_with_their_settings():
 # ------------------------------------------------------------ wave 9: everything new, on a server that has none of it
 
 WAVE9_ROLES = ("House Fern", "House Kestrel", "House Otter", "Welcome Crew", "Supporter")
-WAVE9_PUBLIC = {"📚・guides": "forum", "🖥・setups": "forum", "🎙・stage": "stage", "⛏️・monkey-smp": "text"}
+WAVE9_PUBLIC = {"🚩・smp-forum": "forum", "🎙・stage": "stage", "⛏️・monkey-smp": "text"}
 WAVE9_PRIVATE = {"💜・supporters": {"Supporter", "Keeper", "Moderator"}, "🔒・appeals": {"Keeper", "Moderator"}}
 
 
@@ -715,8 +732,7 @@ def test_public_mode_dry_run_lists_everything_wave9_adds_and_changes_nothing(cap
     assert set(layout.HOUSE_ROLES.values()) == set(WAVE9_ROLES[:3])
     for name in WAVE9_ROLES:
         assert f"  create  @{name}\n" in out, name
-    assert "create  #📚・guides (forum) in 03 · games" in out
-    assert "create  #🖥・setups (forum) in " in out
+    assert "create  #🚩・smp-forum (forum) in 04 · monkey smp" in out
     assert "create  🎙・stage (stage) in 06 · voice" in out
     assert "create  #⛏️・monkey-smp in 04 · monkey smp" in out
     assert "create  #💜・supporters (private)" in out
@@ -782,7 +798,7 @@ def test_onboarding_defaults_are_ordinary_public_channels_only():
         assert kind in ("text", "forum", "voice") and not private, name
     everything = {slug(n) for n in layout.ONBOARDING_EVERYTHING}
     assert {slug(n) for n in layout.ONBOARDING_DEFAULT_CHANNELS} <= everything
-    assert {slug(n) for n in ("📚・guides", "🖥・setups", "⛏️・monkey-smp")} <= everything
+    assert {slug(n) for n in ("💡・suggestions", "⛏️・monkey-smp")} <= everything
     assert not everything & {slug(n) for n in ("🎙・stage", "💜・supporters", "🔒・appeals", "📋・mod-log")}
 
 
@@ -794,7 +810,7 @@ def test_onboarding_step_adds_forums_but_never_the_stage_or_a_private_channel(ca
     existing = NS(id=500, name="💬・general")
     guild.text_channels += [existing, NS(id=501, name="⛏️・monkey-smp"), NS(id=502, name="💜・supporters"),
                             NS(id=503, name="🔒・appeals")]
-    guild.forums += [NS(id=510, name="📚・guides"), NS(id=511, name="🖥・setups")]
+    guild.forums += [NS(id=510, name="💡・suggestions")]
     guild.stage_channels.append(NS(id=520, name="🎙・stage"))
     ob = NS(default_channels=[existing], prompts=[])
     edits = []
@@ -810,5 +826,5 @@ def test_onboarding_step_adds_forums_but_never_the_stage_or_a_private_channel(ca
     asyncio.run(public_mode.PublicMode(guild, apply=True).onboarding())
     (edit,) = edits
     names = [c.name for c in edit["default_channels"]]
-    assert names == ["💬・general", "📚・guides", "🖥・setups", "⛏️・monkey-smp"]  # the existing ones first, kept
+    assert names == ["💬・general", "💡・suggestions", "⛏️・monkey-smp"]  # the existing ones first, kept
     assert "🎙・stage" not in capsys.readouterr().out

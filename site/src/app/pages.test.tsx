@@ -49,12 +49,12 @@ describe("home page: copy", () => {
   });
 
   test("it leads with what a new member does", () => {
-    // A small server listing a dozen systems reads as empty machinery: four first-week entries
+    // A small server listing a dozen systems reads as empty machinery: three first-week entries
     // with a title each, then one short untitled list for the rest.
     const features = unescape(section(HOME, "features"));
-    expect(features.match(/<li><h3 class="card-title">/g)).toHaveLength(4);
+    expect(features.match(/<li><h3 class="card-title">/g)).toHaveLength(3);
     expect((features.match(/<li\b/g) ?? []).length).toBeLessThanOrEqual(8);
-    for (const want of ["Lobby", "/lfg", "Fern, Kestrel or Otter", "Monkey SMP", "#smp"]) expect(features, want).toContain(want);
+    for (const want of ["Lobby", "/lfg", "Monkey SMP", "#smp"]) expect(features, want).toContain(want);
   });
 
   test("the copy names no retired game and keeps the house style", () => {
@@ -70,9 +70,10 @@ describe("home page: copy", () => {
   test("the week strip and the FAQ promise only what happens", () => {
     const week = unescape(section(HOME, "week"));
     expect(week).toContain("<h2>A normal week</h2>");
-    // the Friday game night is the bot's calendar entry, not a promise of a crowd
-    expect(week).toContain("puts a 9 PM game night on the calendar");
-    expect(week).not.toContain("Tournament night");
+    // the one fixed night is the owner's own, in the room a newcomer already knows
+    expect(week).toContain("Saturdays from 5 PM Pacific in the Lobby");
+    // the bot's Friday calendar entry and the house result are switched off (bot/main.py PARKED)
+    for (const gone of ["game night on the calendar", "House result", "Tournament night"]) expect(week, gone).not.toContain(gone);
     const faq = unescape(section(HOME, "faq"));
     const details = (faq.match(/<details>/g) ?? []).length;
     expect(details).toBeGreaterThanOrEqual(5);

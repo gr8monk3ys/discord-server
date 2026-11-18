@@ -38,6 +38,12 @@ T0 = ts(2026, 10, 7, 12)  # Wednesday, local noon
 OVERWATCH = config.game_by_key("overwatch")
 
 
+@pytest.fixture(autouse=True)
+def overwatch_has_a_channel(monkeypatch):
+    """These tests follow a game night into the game's own channel; layout.py gives one to Minecraft only."""
+    monkeypatch.setattr(config.layout, "GAME_CHANNELS", {*config.layout.GAME_CHANNELS, OVERWATCH.role})
+
+
 def choice(value, name=None):
     return app_commands.Choice(name=name or value, value=value)
 
@@ -99,9 +105,8 @@ class FakeEvent:
 class FakeGuild:
     def __init__(self):
         self.id = GUILD_ID
-        self.squad = FakeVoice(101, config.SQUAD_VOICE)
         self.lobby = FakeVoice(100, config.LOBBY_VOICE)
-        self.voice_channels = [self.lobby, self.squad]
+        self.voice_channels = [self.lobby]
         self.gaming = FakeText(300, config.GAMING_CHANNEL)
         self.overwatch = FakeText(301, OVERWATCH.channel_name)
         self.text_channels = [self.gaming, self.overwatch]
@@ -266,7 +271,7 @@ def test_gamenight_creates_event_row_and_announcement(monkeypatch):
         kw = ev.kwargs
         assert kw["name"] == "Overwatch game night"
         assert kw["entity_type"] is discord.EntityType.voice
-        assert kw["channel"] is g.squad
+        assert kw["channel"] is g.lobby
         assert kw["privacy_level"] is discord.PrivacyLevel.guild_only
         assert kw["start_time"] == datetime(2026, 10, 8, 4, 0, tzinfo=timezone.utc)
         assert kw["start_time"].tzinfo is not None
@@ -287,13 +292,13 @@ def test_gamenight_creates_event_row_and_announcement(monkeypatch):
     with_env(go, monkeypatch)
 
 
-def test_gamenight_big_group_uses_lobby(monkeypatch):
+def test_gamenight_is_in_the_lobby_whatever_the_size(monkeypatch):
     async def go(env):
         await env.gamenight(size=8)
         ev = next(iter(env.guild.events.values()))
         assert ev.kwargs["channel"] is env.guild.lobby
         await env.gamenight(size=5)
-        assert env.guild.events[ev.id + 1].kwargs["channel"] is env.guild.squad
+        assert env.guild.events[ev.id + 1].kwargs["channel"] is env.guild.lobby
     with_env(go, monkeypatch)
 
 
@@ -366,9 +371,9 @@ def test_gamenight_announcement_failure_still_replies(monkeypatch):
 
 def test_gamenight_missing_voice_channel(monkeypatch):
     async def go(env):
-        env.guild.voice_channels = [env.guild.lobby]
+        env.guild.voice_channels = []
         i = await env.gamenight(size=3)
-        assert config.SQUAD_VOICE in i.of("send_message")[0]["content"]
+        assert config.LOBBY_VOICE in i.of("send_message")[0]["content"]
         assert env.guild.events == {}
     with_env(go, monkeypatch)
 
@@ -395,7 +400,7 @@ def test_reminder_window_and_once_only(monkeypatch):
         await env.cog.run_reminders()
         [post] = env.guild.overwatch.sent
         assert "<@2>" in post["content"] and "<@3>" in post["content"] and "<@50>" not in post["content"]
-        assert env.guild.squad.mention in post["content"]
+        assert env.guild.lobby.mention in post["content"]
         am = post["allowed_mentions"]
         assert sorted(u.id for u in am.users) == [A, B]
         assert am.roles is False and am.everyone is False
@@ -1297,7 +1302,8 @@ def test_townhall_announcement_failure_keeps_the_event(monkeypatch):
 
 def test_townhall_time_setting(monkeypatch, caplog):
     async def go(env):
-        job = Events(env.bot, environ={}).townhall_job
+        assert Events(env.bot, environ={}).townhall_job is None  # off until a time is set
+        job = Events(env.bot, environ={"TOWNHALL_TIME": "12:00"}).townhall_job
         assert (job.name, job.weekday, job.hour, job.minute) == ("townhall", 5, 12, 0)
         job = Events(env.bot, environ={"TOWNHALL_TIME": "7:30pm"}).townhall_job
         assert (job.hour, job.minute) == (19, 30)

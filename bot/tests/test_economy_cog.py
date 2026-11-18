@@ -67,7 +67,7 @@ class FakeGuild:
         community = SimpleNamespace(id=901, name="01 · community")
         voice_cat = SimpleNamespace(id=902, name="05 · voice")
         self.lobby = FakeVoice(100, config.LOBBY_VOICE, voice_cat)
-        self.squad = FakeVoice(101, config.SQUAD_VOICE, voice_cat)
+        self.squad = FakeVoice(101, "🎮 Squad", voice_cat)
         self.afk_channel = FakeVoice(102, "💤 AFK", voice_cat)
         self.staff_voice = FakeVoice(103, "🔒 staff voice", staff)
         self.voice_channels = [self.lobby, self.squad, self.afk_channel, self.staff_voice]

@@ -410,8 +410,8 @@ def test_requirements_tables_cover_config():
     channels_of = {}
     for n in ops.CHANNEL_NEEDS:
         channels_of.setdefault(n.cog, set()).add(n.channel)
-    assert channels_of["seasonal"] == {config.GENERAL_CHANNEL, config.GAMES_CHANNEL, config.ANNOUNCEMENTS_CHANNEL}
-    assert channels_of["votehub"] == {config.GAMES_CHANNEL} and channels_of["gamelink"] == {config.MOD_LOG_CHANNEL}
+    assert channels_of["seasonal"] == {config.GENERAL_CHANNEL, config.BOT_COMMANDS_CHANNEL, config.ANNOUNCEMENTS_CHANNEL}
+    assert channels_of["votehub"] == {config.BOT_COMMANDS_CHANNEL} and channels_of["gamelink"] == {config.MOD_LOG_CHANNEL}
     assert {"send_messages", "embed_links"} <= announce["events"] and {"send_messages", "embed_links"} <= announce[
         "seasonal"]
     assert (config.EVENT_ROLE, "seasonal") in ops.ROLE_NEEDS and "seasonal" in ops.ROLE_HOLDERS

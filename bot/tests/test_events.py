@@ -6,7 +6,6 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-import config
 from logic import events as E
 
 TZ = ZoneInfo("America/Los_Angeles")
@@ -115,14 +114,6 @@ def test_to_utc_is_aware_utc():
 
 
 # ---------------------------------------------------------------- channel, names
-def test_voice_for_size():
-    assert E.voice_for(None) == config.SQUAD_VOICE
-    assert E.voice_for(2) == config.SQUAD_VOICE
-    assert E.voice_for(5) == config.SQUAD_VOICE
-    assert E.voice_for(6) == config.LOBBY_VOICE
-    assert E.voice_for(20) == config.LOBBY_VOICE
-
-
 def test_event_name_and_description():
     assert E.event_name("Valorant") == "Valorant game night"
     assert E.event_name(None) == "Game night"
@@ -262,8 +253,7 @@ def test_watchparty_name_and_description():
 # ---------------------------------------------------------------- Town Hall
 def test_parse_townhall_time():
     from datetime import time
-    assert E.parse_townhall_time(None) == E.TOWNHALL_DEFAULT == time(12, 0)
-    assert E.parse_townhall_time("  ") == time(12, 0)
+    assert E.parse_townhall_time(None) is None and E.parse_townhall_time("  ") is None  # off until a time is set
     assert E.parse_townhall_time("19:30") == time(19, 30) and E.parse_townhall_time("7 PM") == time(19, 0)
     for off in ("off", "OFF", "none", "0"):
         assert E.parse_townhall_time(off) is None

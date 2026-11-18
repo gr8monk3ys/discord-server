@@ -24,7 +24,7 @@ def test_counter_strike_matches_role_tag_and_channel_separately():
     roles = named("Counter-Strike 2", "Valorant")
     channels = named("💣・counter-strike", "🎯・valorant")
     assert config.match_by_name(roles, cs.role).name == "Counter-Strike 2"
-    assert config.match_by_name(channels, cs.channel_name).name == "💣・counter-strike"
+    assert config.match_by_name(channels, f"{cs.emoji}・{cs.channel}").name == "💣・counter-strike"
     # The bug the registry avoids: deriving the role from the channel slug.
     assert config.match_by_name(roles, cs.channel) is None
 
@@ -54,6 +54,20 @@ def test_unknown_game_key():
     assert config.game_by_key("tetris") is None
 
 
+def test_a_game_without_its_own_channel_talks_in_gaming():
+    assert config.game_by_key("minecraft").channel_name == "⛏️・minecraft"
+    assert config.layout.GAME_CHANNELS == {"Minecraft"}
+    for g in config.GAMES:
+        if g.role not in config.layout.GAME_CHANNELS:
+            assert g.channel_name == config.GAMING_CHANNEL, g.role
+
+
+def test_switches_are_off_until_the_env_says_on():
+    assert config.switched_on("AUTO_GAMENIGHT", {}) is False and config.switched_on("WEEKLY_MVP", {"WEEKLY_MVP": " "}) is False
+    assert config.switched_on("WEEKLY_MVP", {"WEEKLY_MVP": "off"}) is False
+    assert config.switched_on("WEEKLY_MVP", {"WEEKLY_MVP": " ON "}) is True
+
+
 def test_retired_games_are_known_but_not_listed():
     assert [g.role for g in config.RETIRED_GAMES] == [role for _, _, role in config.layout.RETIRED_GAMES]
     listed, retired = {g.key for g in config.GAMES}, {g.key for g in config.RETIRED_GAMES}
@@ -64,7 +78,7 @@ def test_retired_games_are_known_but_not_listed():
     for g in config.GAMES:
         assert config.known_game_by_key(g.key) is g
     assert config.known_game_by_key("tetris") is None
-    assert config.known_game_by_key("valorant").channel_name == "🎯・valorant"
+    assert (config.known_game_by_key("valorant").emoji, config.known_game_by_key("valorant").role) == ("🎯", "Valorant")
 
 
 def test_monkey_settings_fall_back_to_their_old_realms_names():

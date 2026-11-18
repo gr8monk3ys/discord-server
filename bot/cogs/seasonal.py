@@ -458,9 +458,9 @@ class Seasonal(commands.Cog):
             paid += [(uid, quest) for uid in await self.settle_day(guild, run, day, t)]
         if not paid:
             return 0
-        channel = self.channel(guild, config.GAMES_CHANNEL)
+        channel = self.channel(guild, config.BOT_COMMANDS_CHANNEL)
         if channel is None:
-            self.warn_once("games", "seasonal: no %s channel to announce quests in", config.GAMES_CHANNEL)
+            self.warn_once("quests", "seasonal: no %s channel to announce quests in", config.BOT_COMMANDS_CHANNEL)
             return len(paid)
         for uid, quest in paid[:MAX_ANNOUNCE]:
             try:

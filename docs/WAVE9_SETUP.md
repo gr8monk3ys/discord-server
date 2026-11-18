@@ -66,9 +66,9 @@ Settings > Roles.
 2. **Mute Members** on the Front Desk role. Needed for Stage events.
 3. **The stage channel.** In 🎙・stage, Front Desk needs View Channel, Manage Channels, Mute
    Members and Move Members. If the role has them server-wide, nothing more is needed.
-   Check: `/watchparty` now puts the event in 🎙・stage, not the Lobby. The Town Hall then appears
-   as a server event one week before the first Saturday of each month, with one post in
-   📣・announcements. To change its time put `TOWNHALL_TIME=7pm` (or `off`) in `server/.env`.
+   Check: `/watchparty` now puts the event in 🎙・stage, not the Lobby. The Town Hall is off
+   until `server/.env` sets its time (`TOWNHALL_TIME=7pm`); it then appears as a server event one
+   week before the first Saturday of each month, with one post in 📣・announcements.
    A watch party's reminder pings the Game Night role only when staff host it; a member's
    watch party reminds the people who tapped Interested and nobody else.
 4. **Role order.** Welcome Crew and the three House roles must sit below the Front Desk role.
