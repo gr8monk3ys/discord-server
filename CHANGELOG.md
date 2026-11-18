@@ -8,6 +8,27 @@ All notable changes to this project are recorded here. The format follows
 
 ### Changed
 
+- The server's surface is cut to fit about ten active people (owner, 2026-11-17): 49 public
+  channels and 10 voice rooms become 26 and 4. `layout.RETIRED_CHANNELS` lists the sixteen
+  channels that go (six voice rooms, the six whose bot modules are parked, and art, code, fashion
+  and chess), and `layout.GAME_CHANNELS` names the games that keep a channel (Minecraft); the other
+  seven keep their role, their "What do you play?" answer and their squad tag, and talk in
+  `#gaming`. `public_mode.py` gained `retire_channels`, which takes each channel off Onboarding and
+  moves it into the staff-only archive. Nothing is deleted. Onboarding starts a newcomer with 11
+  channels instead of 18, one of them Monkey SMP's; the Minecraft answer and a "Monkey SMP" opt-in
+  answer open the other five. Nothing changes on Discord until the owner runs the scripts with
+  `--apply`.
+- Four more bot modules are parked: houses, clips (the clip-of-the-week poll), vibes (chat
+  revival, member of the month, join anniversaries, booster thanks) and game news. Friday's auto
+  game night, Sunday's weekly MVP and the monthly Town Hall are off unless `AUTO_GAMENIGHT=on`,
+  `WEEKLY_MVP=on` or `TOWNHALL_TIME` is set in `server/.env`. `/gamenight` and full-squad pings
+  now always point at the Lobby, and a game without its own channel is announced in `#gaming`.
+  The weekly bump thanks and finished seasonal quests are posted in `#bot-commands`, since
+  `#games` is one of the retired channels.
+- The site and `docs/LISTING.md` no longer promise parked features (houses, `/word guess`, the
+  monthly bracket, Friday's game night, `/partner apply`) and name the one fixed night: Saturdays
+  from 5 PM Pacific in the Lobby. `bot/tests/test_parked.py` now fails when the site, the listing
+  or the text `server/layout.py` puts in Discord names a slash command of a parked module.
 - The landing page's masthead is written in as the page opens: the pen writes the promise along its
   lines and rules the plate in from the left (CSS only, nothing waits on JavaScript, off under
   reduced motion). The live counts fade in with a ping, a theme change is ruled in from the left,

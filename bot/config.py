@@ -79,7 +79,6 @@ HEARTBEAT_FILE = DATA_DIR / "heartbeat"  # written every minute; server/watchdog
 # Wave 3
 EVENT_ROLE = "Event Champ"  # winner of the current seasonal event
 GAMES_CHANNEL = "🎲・games"  # daily word game results, challenge board
-SQUAD_VOICE = "🎮 Squad"
 LOBBY_VOICE = "🔊 Lobby"
 MODES = ("Ranked", "Casual")
 # Houses: (key, name, emoji, colour) and the role each house carries, from layout.py
@@ -118,7 +117,8 @@ class Game:
 
     @property
     def channel_name(self) -> str:
-        return f"{self.emoji}・{self.channel}"
+        """Where the game is talked about: its own channel if it has one (layout.GAME_CHANNELS), else #gaming."""
+        return layout.own_channel((self.emoji, self.channel, self.role)) or GAMING_CHANNEL
 
 
 GAMES = [Game(*g) for g in layout.GAMES]
@@ -243,6 +243,15 @@ def appeal_settings(env=None) -> AppealSettings | None:
     return AppealSettings(secret=secret, page_url=f"{site}/appeal", join_url=f"{site}/join",
                           cooling=_env_days(env, "APPEAL_COOLING_DAYS", 7) * day,
                           reappeal=_env_days(env, "APPEAL_REAPPEAL_DAYS", 90) * day)
+
+
+# Scheduled posts that stay off unless server/.env switches them on (NAME=on), because on a server
+# of about ten active people each one talked to nobody. AUTO_GAMENIGHT: Friday's game night event
+# (cogs/engagement.py). WEEKLY_MVP: Sunday's MVP post and its coins (cogs/stats.py). The Town Hall
+# has its own setting, TOWNHALL_TIME (cogs/events.py), which is also off while unset.
+def switched_on(name: str, environ=None) -> bool:
+    environ = os.environ if environ is None else environ
+    return str(environ.get(name) or "").strip().lower() in {"on", "1", "true", "yes"}
 
 
 # Tonight (cogs/tonight.py): one line in general while people are in voice. TONIGHT=off turns it off.

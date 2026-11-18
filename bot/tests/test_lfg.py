@@ -70,8 +70,3 @@ def test_titles_respect_discord_limit():
     assert len(lfg.closed_title(long)) <= 100
     assert lfg.closed_title("Valorant") == "✓ Valorant"
     assert lfg.closed_title("✓ Valorant") == "✓ Valorant"  # never double-prefixed
-
-
-def test_voice_hint():
-    assert lfg.voice_hint(5) == "squad"
-    assert lfg.voice_hint(6) == "lobby"

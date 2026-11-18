@@ -98,7 +98,7 @@ class FakeGuild:
         voice_cat = SimpleNamespace(id=902, name="05 · voice")
         self.staff_category = staff
         self.lobby = FakeVoice(100, config.LOBBY_VOICE, voice_cat)
-        self.squad = FakeVoice(101, config.SQUAD_VOICE, voice_cat)
+        self.squad = FakeVoice(101, "🎮 Squad", voice_cat)
         self.afk_channel = FakeVoice(102, "💤 AFK", voice_cat)
         self.staff_voice = FakeVoice(103, "🔒 staff voice", staff)
         self.voice_channels = [self.lobby, self.squad, self.afk_channel, self.staff_voice]
@@ -232,6 +232,7 @@ def with_env(fn, monkeypatch, presences=True):
         cog = Stats(bot)
         env = Env(db, guild, bot, cog)
         monkeypatch.setattr(cogmod, "now", lambda: env.t)
+        monkeypatch.setenv("WEEKLY_MVP", "on")  # off by default; test_weekly_mvp_is_off_unless_switched_on
         try:
             await fn(env)
         finally:
@@ -745,6 +746,18 @@ async def busy_week(env):
     for _ in range(5):
         await env.say(C, at=thu + 2 * HOUR)
     await env.say(A, at=thu + 2 * HOUR)
+
+
+def test_weekly_mvp_is_off_unless_switched_on(monkeypatch):
+    async def go(env):
+        monkeypatch.delenv("WEEKLY_MVP")
+        env.t = T0
+        await env.cog.run_weekly()
+        await busy_week(env)
+        env.t = ts(2026, 10, 4, 18, 0)
+        await env.cog.run_weekly()
+        assert env.guild.general.sent == [] and env.bot.dispatched == [] and await env.jobs() == set()
+    with_env(go, monkeypatch)
 
 
 def test_weekly_first_run_marks_done_then_posts_once(monkeypatch):

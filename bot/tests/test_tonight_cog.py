@@ -109,7 +109,7 @@ class FakeGuild:
         self.general = FakeText(config.GENERAL_CHANNEL)
         self.text_channels = [self.general]
         self.lobby = FakeVoice(501, config.LOBBY_VOICE)
-        self.squad = FakeVoice(502, config.SQUAD_VOICE)
+        self.squad = FakeVoice(502, "🎮 Squad")
         self.afk = FakeVoice(503, "AFK")
         self.staff = FakeVoice(504, "Staff room", category=config.STAFF_CATEGORY)
         self.hidden = FakeVoice(505, "Private", view=False)

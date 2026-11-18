@@ -81,7 +81,7 @@ def staff_category(row) -> bool:
 
 
 def game_channels() -> set[str]:
-    return {slug(f"{emoji}・{channel}") for emoji, channel, _ in layout.GAMES}
+    return {slug(name) for name in map(layout.own_channel, layout.GAMES) if name}
 
 
 def group_of() -> dict[str, list[str]]:

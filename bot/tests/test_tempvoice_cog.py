@@ -126,7 +126,7 @@ class FakeGuild:
         self.category = FakeCategory(self, 902, config.VOICE_CATEGORY)
         self.categories = [self.category] if with_category else []
         self.hub = FakeVoice(self, 100, config.NEW_SQUAD_VOICE, self.category, position=1)
-        self.squad = FakeVoice(self, 101, config.SQUAD_VOICE, self.category, position=2)
+        self.squad = FakeVoice(self, 101, "🎮 Squad", self.category, position=2)
         self.lobby = FakeVoice(self, 102, config.LOBBY_VOICE, self.category, position=3)
         self.private_hub = FakeVoice(self, 103, config.NEW_PRIVATE_VOICE, self.category, position=4)
         self.voice_channels = (([self.hub] if with_hub else []) + [self.squad, self.lobby]

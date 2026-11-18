@@ -123,7 +123,7 @@ class FakeGuild:
     def __init__(self):
         self.id = GUILD_ID
         self.general = FakeText(config.GENERAL_CHANNEL)
-        self.games = FakeText(config.GAMES_CHANNEL)
+        self.games = FakeText(config.BOT_COMMANDS_CHANNEL)
         self.news = FakeText(config.ANNOUNCEMENTS_CHANNEL)
         self.other = FakeText("🕹️・gaming")
         self.text_channels = [self.general, self.games, self.news, self.other]

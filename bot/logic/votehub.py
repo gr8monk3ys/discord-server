@@ -3,7 +3,7 @@ Pure: no Discord, no database.
 
 /vote lists Disboard (bumped with /bump in the bot channel; the growth cog records who
 bumped and when), discord.me, top.gg and the short share link. Sundays at 17:00 local the top
-three Disboard bumpers of the past week are thanked in the games channel and paid
+three Disboard bumpers of the past week are thanked in the bot-commands channel and paid
 300/200/100 coins, each with ledger ref support:WEEK:PLACE so nothing is paid twice.
 
 Anti-farming: Disboard allows one bump per server every two hours whoever runs it, so alts

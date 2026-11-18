@@ -11,9 +11,10 @@
 - 🔢・counting: only the next plain integer counts and nobody counts twice in a row. ✅ on a
   good count; ❌, a reset and a short note on a bad one. The best run is kept, and the
   Counting Champ role goes to whoever counted most in it.
-- Weekly auto game night: Fridays at 12:00 local, if nobody has a game night that Friday
-  evening, the bot creates a 21:00 event in 🎮 Squad for the most played server game of the
-  past 7 days (or Anything). It is a normal `gamenights` row, so cogs/events.py reminds people.
+- Weekly auto game night, off unless AUTO_GAMENIGHT=on (nobody hosted the ones it made): Fridays
+  at 12:00 local, if nobody has a game night that Friday evening, the bot creates a 21:00 event in
+  the Lobby for the most played server game of the past 7 days (or Anything). It is a normal
+  `gamenights` row, so cogs/events.py reminds people.
 - Birthdays: /birthday set|remove|list. 09:00 local: a shout-out in 💬・general, the Birthday
   role for 24 h and 250 coins (ref bday:<year>:<user>).
 
@@ -148,6 +149,8 @@ class Engagement(commands.Cog):
         await jobs.run_due(self.db, job, self.tz, now, action, E.plan_daily)
 
     async def run_gamenight(self) -> None:
+        if not config.switched_on("AUTO_GAMENIGHT"):
+            return
         await jobs.run_due(self.db, GAMENIGHT_JOB, self.tz, now, self.auto_gamenight)
 
     async def pick(self, table: str, col: str, size: int) -> E.Pick | None:
@@ -435,16 +438,16 @@ class Engagement(commands.Cog):
             if ev.status in LIVE_EVENTS and ev_start <= int(ev.start_time.timestamp()) < ev_end:
                 log.info("auto game night %s: event %s already that evening", period.key, ev.id)
                 return True
-        voice = config.match_by_name(guild.voice_channels, config.SQUAD_VOICE)
+        voice = config.match_by_name(guild.voice_channels, config.LOBBY_VOICE)
         if voice is None:
-            log.warning("auto game night %s: no %s voice channel", period.key, config.SQUAD_VOICE)
+            log.warning("auto game night %s: no %s voice channel", period.key, config.LOBBY_VOICE)
             return True
         g = await self.top_game(period.window_start, period.window_end)
         when = datetime.fromtimestamp(start, timezone.utc)
         description = ("The weekly community game night. "
                        + (f"{g.role} got the most play time on the server this week, so that's the pick. "
                           if g else "Bring whatever you're playing. ")
-                       + "Tap Interested for a reminder, and hop in Squad voice.")
+                       + "Tap Interested for a reminder, and hop in the Lobby.")
         if now() < self.event_retry_at:
             return False  # Discord said no a moment ago: don't ask every minute
         try:

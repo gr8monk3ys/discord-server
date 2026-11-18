@@ -11,8 +11,9 @@ import layout
 from names import slug
 
 # The Onboarding default list on the day the core was cut down, in layout.py's order.
-# `focus_mode.py --revert` must put exactly this back.
-TODAY = [
+# `focus_mode.py --revert` must put exactly this back, less the channels retired since
+# (layout.RETIRED_CHANNELS): those are in the archive, and a hidden channel can't be a default.
+THAT_DAY = [
     "📌・rules", "📣・announcements", "👋・welcome", "💬・general",
     "🆘・help", "💡・suggestions", "🤣・memes", "📸・clips", "⭐・hall-of-fame", "🔢・counting", "🎲・games",
     "🕹️・gaming", "🎮・lfg", "🎨・art", "💻・code",
@@ -21,9 +22,9 @@ TODAY = [
     "📚・guides", "🖥・setups",
     "⛏️・monkey-smp",
 ]
+TODAY = [n for n in THAT_DAY if n not in layout.RETIRED_CHANNELS]
 # Default channels added to ONBOARDING_EVERYTHING after that day, so --revert keeps them too.
-ADDED_SINCE = ["📓・field-notes", "📜・smp-rules", "❔・smp-faq", "⌨️・smp-commands", "📝・founding-roster", "🚩・smp-forum",
-               "🔊 Lobby 2", "🔒 New Private Squad"]
+ADDED_SINCE = ["📓・field-notes", "📜・smp-rules", "❔・smp-faq", "⌨️・smp-commands", "📝・founding-roster", "🚩・smp-forum"]
 PRIVATE = ["💜・supporters", "🛡️・mod", "🔒・admin", "📋・mod-log", "🔒・appeals", "🔒・squad-chat", "🔒 Squad Only"]
 
 
@@ -38,7 +39,8 @@ def grouped() -> list[str]:
 # ---------------------------------------------------------------- the grouping
 def test_revert_list_is_todays_list_exactly():
     assert [n for n in layout.ONBOARDING_EVERYTHING if n not in ADDED_SINCE] == TODAY
-    assert set(ADDED_SINCE) <= set(layout.ONBOARDING_EVERYTHING) & set(layout.ONBOARDING_DEFAULT_CHANNELS)
+    assert set(ADDED_SINCE) <= set(layout.ONBOARDING_EVERYTHING)
+    assert set(layout.RETIRED_CHANNELS) & set(THAT_DAY) and not set(layout.RETIRED_CHANNELS) & set(TODAY)
 
 
 def test_every_public_channel_is_in_the_core_or_exactly_one_group():
@@ -75,14 +77,14 @@ def test_statuses_and_event_channels():
     for name in layout.ONBOARDING_DEFAULT_CHANNELS:
         assert rows[name]["status"] == focus_mode.CORE
     assert {n for n, r in rows.items() if r["status"] == focus_mode.EVENT} == set(layout.FOCUS_EVENT_CHANNELS)
-    assert rows["🏆・tournaments"]["group"] == "Events and tournaments"
+    assert rows["📜・smp-rules"]["group"] == "Monkey SMP"
     assert rows["⛏️・monkey-smp"]["status"] == focus_mode.CORE
     assert rows["🎙・stage"]["status"] == focus_mode.UNLISTED
     assert rows["⛏️・minecraft"]["status"] == focus_mode.GAME
 
 
 def test_a_forgotten_or_doubled_channel_is_an_error(monkeypatch):
-    monkeypatch.setattr(layout, "FOCUS_GROUPS", [g for g in layout.FOCUS_GROUPS if g["title"] != "Off topic"])
+    monkeypatch.setattr(layout, "FOCUS_GROUPS", [g for g in layout.FOCUS_GROUPS if g["title"] != "Memes and highlights"])
     with pytest.raises(ValueError, match="memes is public but is not in"):
         focus_mode.classify()
     monkeypatch.undo()
@@ -131,8 +133,8 @@ def test_plan_has_one_line_per_channel_in_the_words_the_owner_asked_for():
     assert len(lines) == len(focus_mode.layout_rows())
     by = {line.split("  ")[0].strip(): line for line in lines}
     assert by["💬・general"].endswith("core")
-    assert by["🤣・memes"].endswith('opt-in group "Off topic"')
-    assert by["🏆・tournaments"].endswith('opt-in group "Events and tournaments"')  # plain opt-in, never event-driven
+    assert by["🤣・memes"].endswith('opt-in group "Memes and highlights"')
+    assert by["📜・smp-rules"].endswith('opt-in group "Monkey SMP"')  # one click away, and on the Minecraft answer
     assert by["📋・mod-log"].endswith("private (unchanged)")
     assert "What do you play?" in by["⛏️・minecraft"]
 
@@ -183,9 +185,9 @@ def test_dry_run_prints_the_whole_plan_and_changes_nothing(capsys):
     assert "DRY RUN" in out
     for line in focus_mode.plan_lines():
         assert line in out
-    assert "default channels: 29 -> 18" in out
+    assert f"default channels: {len(TODAY)} -> {len(layout.ONBOARDING_DEFAULT_CHANNELS)}" in out
     assert 'add     question "What else do you want to see?"' in out
-    assert "🤣 Off topic: 🤣・memes, 🎨・art, 💻・code, 👗・fashion, ♟️・chess" in out
+    assert "🤣 Memes and highlights: 🤣・memes, ⭐・hall-of-fame" in out
 
 
 def test_apply_is_one_edit_core_defaults_plus_the_question_last():
@@ -212,7 +214,7 @@ def test_rerun_is_a_noop(capsys):
     assert run(guild, apply=True) is True
     assert len(guild.edits) == 1
     out = capsys.readouterr().out
-    assert "ok      default channels (18)" in out and 'ok      question "What else do you want to see?"' in out
+    assert f"ok      default channels ({len(layout.ONBOARDING_DEFAULT_CHANNELS)})" in out and 'ok      question "What else do you want to see?"' in out
 
 
 def test_revert_restores_todays_defaults_exactly_and_keeps_the_question():

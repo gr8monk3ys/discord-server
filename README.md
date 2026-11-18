@@ -50,9 +50,11 @@ python -m venv .venv
 ```
 
 Edit `layout.py` first. `GAMES` at the top holds your group's actual games, and
-each one gets a ping role plus a channel. `RETIRED_GAMES` under it holds games the
+each one gets a ping role. The games named in `GAME_CHANNELS` also get a channel;
+the rest talk in `#🕹️・gaming`. `RETIRED_GAMES` under it holds games the
 server used to list: their roles stay, they are no longer offered, and
-`public_mode.py` archives their channels. The script is safe to re-run: it
+`public_mode.py` archives their channels. `RETIRED_CHANNELS` holds the other channels
+the server stopped showing (see "Afterwards"). The script is safe to re-run: it
 matches existing channels and roles by plain name, so `#general` becomes
 `#💬・general` instead of a duplicate.
 
@@ -100,7 +102,12 @@ in `layout.ROLES`, and every bot gets `@Bots` so they're grouped in the member l
   Front Desk sitting below the staff roles. It adds what is missing, with one exception: a
   game in `RETIRED_GAMES` leaves the "What do you play?" question and its channel moves into
   the staff-only `99 · archive` category (messages and the role are kept; the dry run lists
-  every channel it would hide).
+  every channel it would hide). The same goes for a channel in `RETIRED_CHANNELS` and for the
+  old channel of a listed game that is not in `GAME_CHANNELS`: it comes off Onboarding (the
+  default channels and any answer that opened it) and moves into the archive, and the game keeps
+  its answer and role. The server was cut this way on 2026-11-17, from 49 public channels and 10
+  voice rooms to 26 and 4, to fit about ten active people. Nothing brings a retired channel back
+  by itself: list it in `CATEGORIES` again and drag it out of the archive.
 - To give newcomers a short channel list, run `focus_mode.py` (`--plan` prints the plan from
   `layout.py` alone, no arguments is a dry run against the server, then `--apply`). The
   Onboarding default channels become the ones in `ONBOARDING_DEFAULT_CHANNELS`, and the other
@@ -171,17 +178,17 @@ day-to-day attention. Design and history:
 | Area | Commands and automatic jobs |
 |---|---|
 | Squad-up | `/lfg` posts in 🎮・lfg with Join/Leave/Close buttons; posts close after 3 h; a host's posts ping the game roles at most once per 30 min (later ones post without pings) |
-| Stats | `/stats`, `/leaderboard`, `/privacy`; weekly MVP Sundays 18:00 (accounts 30+ days old; fresh accounts don't count as voice company for it; if 💬・general is missing at that time the week is retried, not skipped) |
+| Stats | `/stats`, `/leaderboard`, `/privacy`; weekly MVP Sundays 18:00 (off unless `WEEKLY_MVP=on`; accounts 30+ days old; fresh accounts don't count as voice company for it; if 💬・general is missing at that time the week is retried, not skipped) |
 | Growth | `/invites`, `/recruiters` (Recruiter role), `/bumpers`, `/bumpping`; Disboard bump reminders |
 | Community | welcome after Onboarding, `/report` and "Report message", mod log |
 | Hall of fame | 3 ⭐ from other members (accounts 30+ days old) reposts to ⭐・hall-of-fame (public channels only) |
 | Clips | clip of the week poll Sundays 18:05 (retried, not skipped, while 📸・clips is missing); winner gets Clip of the Week (only votes from accounts 30+ days old count, and not the clip author's own) |
-| Voice | join ➕ New Squad for your own channel, or 🔒 New Private Squad for a locked one; `/squad name`, `/squad limit`, `/squad claim`, `/squad lock`, `/squad unlock`, `/squad invite` (one every 15 s; one ping per member per channel every 10 min), `/squad kick`; channel names go through the text filter |
-| Events | `/gamenight`; `/watchparty` (a Stage event in 🎙・stage, or a voice event in the Lobby when the bot can't schedule on the stage; accounts 30+ days old; shares the game-night limits; its reminder pings the Game Night role only when staff host it); a Town Hall on the first Saturday of each month at 12:00 (`TOWNHALL_TIME`), created a week ahead and announced once; 15-min reminders; free Epic/Steam games Thursdays 18:00 |
+| Voice | join ➕ New Squad for your own channel (🔒 New Private Squad, the hub for a locked one, is retired: `/squad lock` locks yours); `/squad name`, `/squad limit`, `/squad claim`, `/squad lock`, `/squad unlock`, `/squad invite` (one every 15 s; one ping per member per channel every 10 min), `/squad kick`; channel names go through the text filter |
+| Events | `/gamenight`; `/watchparty` (a Stage event in 🎙・stage, or a voice event in the Lobby when the bot can't schedule on the stage; accounts 30+ days old; shares the game-night limits; its reminder pings the Game Night role only when staff host it); a Town Hall on the first Saturday of each month (off unless `TOWNHALL_TIME` sets the time, like `12:00`), created a week ahead and announced once; 15-min reminders; free Epic/Steam games Thursdays 18:00 |
 | Economy | `/daily`, `/balance`, `/give` (accounts 30+ days old), `/coinflip`, `/richest`; coins for voice, chat, clips, squads |
 | Games | `/slots`, `/blackjack`, `/trivia`, `/predict` |
 | Shop and seasons | `/shop`, `/buy` (colour role, Hype, shoutout), `/season`; monthly champions |
-| Engagement | question of the day 12:00 and this-or-that poll 18:00 (each pauses while nobody answers it: see Quiet rooms), 🔢・counting, auto game night Fridays, `/birthday` |
+| Engagement | question of the day 12:00 and this-or-that poll 18:00 (each pauses while nobody answers it: see Quiet rooms), 🔢・counting, auto game night Fridays (off unless `AUTO_GAMENIGHT=on`), `/birthday` |
 | Moderation | `/warn`, `/timeout`, `/untimeout`, `/cases`, `/purge` (shown only to members with Timeout Members, like `/xp` and `/suggestion`); `/ban` (staff who also hold Ban Members; DMs the reason first, plus the appeal code when appeals are set up; one line in 📋・mod-log per ban); `/purge` refuses 📋・mod-log, 🔒・appeals and their threads; auto-escalation, anti-spam, anti-raid (each account counts once however often it rejoins, and accounts that set off a raid count single, not double, for 24 hours) |
 | Operations | daily DB backup 04:00, error alerts, back-online note, weekly config drift check, `/status`; permission self-check a minute after start and daily at 09:00 (every channel, permission and role the loaded modules need, plus Administrator on the bot or on a role below a Manage Roles bot: one mod-log note when something is missing, one when it is fixed, and a line in `/status`) |
 | Utility | `/remind`, `/reminders`, `/afk`, suggestion voting, member/online stat channels, tickets in 🆘・help |
@@ -207,7 +214,7 @@ day-to-day attention. Design and history:
 | Text filter | slurs (with evasion spellings) and other servers' invite links are refused in member text the bot reposts: `/lfg` and `/gamenight` notes, shoutouts and Spotlight, tournament names, partner applications |
 | Seasonal events | Halloween (Oct 20 to Nov 1) and Winter Fest (Dec 15 to Jan 2) from `bot/assets/events.json`, every year: 6-10 drops a day in 💬・general while chat is active (Grab button, 25-75 coins + 1 point, gone after 10 min, max 12 a day each), a daily quest (+3 points, 100 coins), `/event` with your points and the top 10; at the end the top 3 win 2000/1000/500 coins, first place gets the Event Champ role and 10+ points earns the event badge; accounts under 30 days old earn nothing |
 | Game accounts | `/link steam` + `/link verify` (members prove ownership with a code in their Steam profile summary), `/unlink`, `/accounts`; staff `/link approve/remove`; persona, Steam link and hours in the server's games show on `/profile`, refreshed daily. No API key |
-| Vote hub | `/vote` (private): Disboard with your bump count and when the next bump is ready, discord.me, top.gg ("coming soon" until listed) and the share link discord.lscaturchio.xyz/join; Sundays 17:00 the week's top 3 Disboard bumpers are thanked in 🎲・games and paid 300/200/100 coins (accounts 30+ days old) |
+| Vote hub | `/vote` (private): Disboard with your bump count and when the next bump is ready, discord.me, top.gg ("coming soon" until listed) and the share link discord.lscaturchio.xyz/join; Sundays 17:00 the week's top 3 Disboard bumpers are thanked in 🤖・bot-commands and paid 300/200/100 coins (accounts 30+ days old) |
 | Catch-up | `/catchup [channel] [hours]`: a private AI summary (5-8 bullets plus a "good moment to jump in") of a public channel's last 1-48 hours (default 12). Two providers: a local Ollama model on the bot's own machine (`OLLAMA_MODEL`, default `llama3.2:3b`; nothing leaves the machine, one summary at a time) or the Anthropic API (`ANTHROPIC_API_KEY`); `CATCHUP_PROVIDER` picks one, otherwise the key wins and Ollama is the fallback, and with neither it says summaries aren't set up. Accounts 30+ days old, 3 a day per member and 60 a day server-wide; bots and members with tracking off are left out; staff `/catchup-usage` shows the provider, requests and tokens |
 | Houses | three houses (Fern, Kestrel, Otter): established members are sorted into the smallest one every 10 min and get its role (one introduction post in 📣・announcements the first time; the permission self-check lists the house roles until `public_mode.py --apply` has made them); `/house me/standings/join/leave/history` (leaving starts a 30-day wait), staff `/house-admin move`; points come from what the other modules already record, capped at 100 per member a week and scored per member of the house; House Cup Mondays 10:10 in 📣・announcements (100 coins to each member of the winning house with 10+ points, once 2 qualify); a season trophy each calendar quarter |
 | Welcome Crew | `/crew` with Join/Leave buttons (accounts 30+ days old, 14 days here, no moderation case in 30 days; a new case takes the role back); one crew ping in 💬・general per 30 min for first-time joins (`CREW_PING_MINUTES`; someone who left and came back is not announced again), never 22:00 to 09:00 (`CREW_QUIET_HOURS`), during a raid or with no crew member online; 40 coins when a newcomer answers you (once per newcomer, 3 paid a day), the Welcoming Committee badge at 5 greetings; staff `/crew-stats` and a line in the owner digest |
@@ -290,8 +297,15 @@ for `/ban` and ban appeals).
 
 A module listed in `PARKED` (`bot/main.py`) stays in `MODULES` and in the tests, but the bot does
 not load it: no commands, no buttons, no scheduled posts. Its tables and data stay. The list holds
-the modules a member has to start that nobody had used by 2026-11-09; the feature table above
-still describes them. To bring one back, delete its line from `PARKED` and restart the bot, or set
+the modules a member has to start that nobody had used by 2026-11-09, and since 2026-11-17 four
+that posted on a timer to about ten active people: houses (the House Cup), clips (the
+clip-of-the-week poll), vibes (chat revival and member of the month; join anniversaries and
+booster thanks go with it) and game news. The feature table above still describes them. Three
+scheduled posts inside modules that stay loaded are off until `server/.env` switches them on:
+`AUTO_GAMENIGHT=on` (Friday's game night event), `WEEKLY_MVP=on` (Sunday's MVP) and
+`TOWNHALL_TIME=12:00` (the monthly Town Hall). `bot/tests/test_parked.py` fails when the site,
+`docs/LISTING.md` or the text `server/layout.py` puts in Discord names a slash command of a
+parked module. To bring one back, delete its line from `PARKED` and restart the bot, or set
 `PARKED_MODULES` in `server/.env` to the comma-separated short names that should stay parked
 (`none` loads everything).
 

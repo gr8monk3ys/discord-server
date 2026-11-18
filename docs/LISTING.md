@@ -31,7 +31,7 @@ The same text as the server description in `server/layout.py` (`PUBLIC`).
 A small, friendly co-op and PvE server. Risk of Rain 2, Gears of War, Overwatch, Minecraft. Evenings, Pacific time.
 ```
 
-## Long description (1,012 characters, fits discord.me's 1,025 limit)
+## Long description (1,024 characters, fits discord.me's 1,025 limit)
 
 Plain text with no markdown and no emoji, so it reads the same on every site. The first
 paragraph stands on its own, because Disboard shows it as the summary.
@@ -41,9 +41,9 @@ Lorenzo's Server is a small, friendly Discord for co-op and PvE games. Nobody he
 
 What we play: Risk of Rain 2, Gears of War, Overwatch, Marvel Rivals, Apex Legends, Tabletop Simulator, Wardogs and Minecraft. The owner runs a modded Minecraft server called Monkey SMP. Playing needs a pass from monkeysmp.lscaturchio.xyz; /smp link connects your Minecraft name to chat in the Discord.
 
-When: people are mostly in voice in the evenings, US Pacific time. It is a small group, so some nights are quiet. If someone is in the Lobby you join them, and that is how most games start.
+When: Saturdays from 5 PM Pacific in the Lobby, the one fixed night. Other evenings, US Pacific time, people are in voice when they are free, so some nights are quiet. If someone is in the Lobby you join them, and that is how most games start.
 
-What to expect: you pick your games when you join and only get pings for those. Front Desk, the server's own bot, sorts everyone into one of three houses (Fern, Kestrel or Otter) and posts which house won the week.
+What to expect: you pick your games when you join and only get pings for those. There is one channel for game talk and one voice Lobby, so you always know where people are.
 
 The rules are short: be decent, play fair, keep ads and NSFW out. A quick check keeps bots out, then you land in general. Say hi.
 
@@ -144,4 +144,3 @@ which shows a live checklist):
 - [ ] Discadia: listed, 10 tags, bot added for `/bump`
 - [ ] Every listing uses the same short description and links the landing page
 - [ ] After 1,000 members and 8 weeks: 2FA for mods, then apply for Discovery
-- [ ] Partners: point friendly servers at `/partner apply` (posts land in 🤝・partners)

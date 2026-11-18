@@ -3,7 +3,7 @@ the member's own bump count and when the next bump is ready, discord.me, top.gg 
 soon" until logic.votehub.TOPGG_URL is set) and the short share link.
 
 Weekly bump thanks: Sundays 17:00 local the top three Disboard bumpers of the past
-week are thanked in the games channel and paid 300/200/100 coins (ledger refs
+week are thanked in the bot-commands channel and paid 300/200/100 coins (ledger refs
 support:WEEK:PLACE, so a retry or restart never pays twice). Nobody bumped = no post.
 (It was called "Supporter thanks" until the Supporter tier arrived; only the wording
 changed, so the job, ledger reason and refs still say "support".)
@@ -164,9 +164,9 @@ class VoteHub(commands.Cog):
             log.info("bump thanks %s: nobody bumped, nothing to post", period.key)
             return True
         guild = self.guild()
-        channel = config.match_by_name(guild.text_channels, config.GAMES_CHANNEL) if guild else None
+        channel = config.match_by_name(guild.text_channels, config.BOT_COMMANDS_CHANNEL) if guild else None
         if channel is None:
-            self.warn_once(period, f"no {config.GAMES_CHANNEL} channel yet")
+            self.warn_once(period, f"no {config.BOT_COMMANDS_CHANNEL} channel yet")
             return False
         t = now()
         async with self.db.transaction() as tx:
@@ -178,7 +178,7 @@ class VoteHub(commands.Cog):
         try:
             await channel.send(embed=embed, allowed_mentions=NO_PINGS)
         except discord.Forbidden:
-            self.warn_once(period, f"can't post in {config.GAMES_CHANNEL}")
+            self.warn_once(period, f"can't post in {config.BOT_COMMANDS_CHANNEL}")
             return False
         log.info("bump thanks %s: posted %d place(s)", period.key, len(podium))
         return True

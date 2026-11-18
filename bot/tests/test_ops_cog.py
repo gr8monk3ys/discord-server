@@ -636,7 +636,7 @@ def perm_guild(env, loaded=("ops", "cards", "recap", "levels", "events")):
     g.forums = [PermChan(n) for n in (config.LFG_FORUM, config.SUGGESTIONS_FORUM,
                                       config.GUIDES_FORUM, config.SETUPS_FORUM)]
     g.stage_channels = [PermChan(config.STAGE_CHANNEL)]
-    g.voice_channels = [PermChan(n) for n in (config.SQUAD_VOICE, config.LOBBY_VOICE, config.NEW_SQUAD_VOICE)]
+    g.voice_channels = [PermChan(n) for n in (config.LOBBY_VOICE, config.NEW_SQUAD_VOICE)]
     g.categories = [PermChan(config.VOICE_CATEGORY)]
     g.roles = g.roles + [Named(name, 1) for name in dict(O.ROLE_NEEDS)]
     bot_role = Named("Front Desk", 2, without())
@@ -772,13 +772,13 @@ def test_permission_check_finds_a_channel_under_its_old_name(monkeypatch, tmp_pa
 
 
 def test_permission_check_ignores_old_names_the_cog_does_not_use(monkeypatch, tmp_path):
-    # The squad room was "General 2" in layout.py, but events only looks for the new name.
+    # The Lobby was "General" in layout.py, but events only looks for the new name.
     async def go(env):
         g = perm_guild(env, loaded=("ops", "events"))
-        assert config.layout_old_names(config.SQUAD_VOICE) == ("🎮 Squad I", "General 2")
-        config.match_by_name(g.voice_channels, config.SQUAD_VOICE).name = "General 2"
+        assert config.layout_old_names(config.LOBBY_VOICE) == ("General",)
+        config.match_by_name(g.voice_channels, config.LOBBY_VOICE).name = "General"
         texts = {(p.where, p.text) for p in await env.cog.check_permissions()}
-        assert texts == {(config.SQUAD_VOICE, "channel not found (needed by events)")}
+        assert texts == {(config.LOBBY_VOICE, "channel not found (needed by events)")}
     with_env(go, monkeypatch, tmp_path)
 
 

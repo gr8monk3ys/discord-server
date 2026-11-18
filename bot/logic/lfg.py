@@ -6,7 +6,6 @@ from enum import Enum
 MIN_PLAYERS = 2
 MAX_PLAYERS = 10
 EXPIRY_SECONDS = 3 * 60 * 60
-SQUAD_VOICE_LIMIT = 5  # 🎮 Squad's user limit in layout.py
 TITLE_LIMIT = 100  # Discord's thread name limit
 CLOSED_PREFIX = "✓ "
 
@@ -84,6 +83,3 @@ def closed_title(current: str) -> str:
     return (CLOSED_PREFIX + current)[:TITLE_LIMIT]
 
 
-def voice_hint(size: int) -> str:
-    """Which voice channel a full squad should use: 'squad' fits 5, else 'lobby'."""
-    return "squad" if size <= SQUAD_VOICE_LIMIT else "lobby"

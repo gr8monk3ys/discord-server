@@ -338,8 +338,7 @@ CHANNEL_NEEDS: list[Need] = [
          was=config.VOICE_CATEGORY_WAS),
     Need("tempvoice", config.NEW_SQUAD_VOICE, VIEW + ("connect",), "voice"),
     Need("events", config.GAMING_CHANNEL, POST),
-    Need("events", config.SQUAD_VOICE, VIEW + ("connect",), "voice"),  # voice events
-    Need("events", config.LOBBY_VOICE, VIEW + ("connect",), "voice"),
+    Need("events", config.LOBBY_VOICE, VIEW + ("connect",), "voice"),  # voice events
     Need("events", config.ANNOUNCEMENTS_CHANNEL, POST),  # the Town Hall announcement and its reminder
     *_game_channels("events"),
     # The Spotlight pin (and unpin). Discord split Pin Messages from Manage Messages (2025-08-20);
@@ -351,7 +350,6 @@ CHANNEL_NEEDS: list[Need] = [
                                                         "read_message_history")),  # who answered: logic/quiet.py
     Need("engagement", config.COUNTING_CHANNEL, POST + ("add_reactions", "read_message_history")),
     Need("engagement", config.GAMING_CHANNEL, POST),
-    Need("engagement", config.SQUAD_VOICE, VIEW + ("connect",), "voice"),
     *_game_channels("engagement"),
     Need("moderation", config.MOD_LOG_CHANNEL, POST),
     Need("ops", config.MOD_LOG_CHANNEL, POST),
@@ -382,10 +380,10 @@ CHANNEL_NEEDS: list[Need] = [
     *_game_channels("news"),
     Need("staffapps", config.MOD_LOG_CHANNEL, POST),
     Need("seasonal", config.GENERAL_CHANNEL, POST),  # drops
-    Need("seasonal", config.GAMES_CHANNEL, POST),  # finished daily quests
+    Need("seasonal", config.BOT_COMMANDS_CHANNEL, POST),  # finished daily quests
     Need("seasonal", config.ANNOUNCEMENTS_CHANNEL, POST),  # an event's opening and its results
     Need("gamelink", config.MOD_LOG_CHANNEL, POST),  # accounts staff approved or removed
-    Need("votehub", config.GAMES_CHANNEL, POST),  # weekly bump thanks
+    Need("votehub", config.BOT_COMMANDS_CHANNEL, POST),  # weekly bump thanks
     Need("vibes", config.GENERAL_CHANNEL, POST + ("read_message_history",)),
     Need("vibes", config.ANNOUNCEMENTS_CHANNEL, POST),  # member of the month
     Need("tonight", config.GENERAL_CHANNEL, POST + ("read_message_history",)),  # the voice line
