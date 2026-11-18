@@ -556,13 +556,14 @@ class RoleGrant:
     administrator: bool
     manage_roles: bool
     mine: bool = False  # one of the bot's own roles
+    managed: bool = False  # another integration's (bot's) own role
 
 
 def admin_problems(roles, bot_admin: bool) -> list[Problem]:
-    """`roles`: every role but @everyone. Reports Administrator on the bot, and every
-    Administrator role sitting below a role with Manage Roles but not Administrator: a
-    holder of that role can give any role below its own top role, so a compromised bot
-    could hand out Administrator."""
+    """`roles`: every role but @everyone. Reports Administrator on the bot, on any other bot's
+    role, and every Administrator role sitting below a role with Manage Roles but not
+    Administrator: a holder of that role can give any role below its own top role, so a
+    compromised bot could hand out Administrator."""
     out = []
     mine = [r.name for r in roles if r.mine and r.administrator]
     if bot_admin or mine:
@@ -572,6 +573,11 @@ def admin_problems(roles, bot_admin: bool) -> list[Problem]:
     managers = [r for r in roles if r.manage_roles and not r.administrator]
     for role in roles:
         if not role.administrator or role.mine:
+            continue
+        if role.managed:
+            out.append(Problem(ROLES, f"{role.name}: a bot's role with Administrator, so a leak of that bot's token"
+                                      f" hands over the server. Server Settings -> Roles -> {role.name} -> turn off"
+                                      " Administrator and give it only what that bot needs"))
             continue
         above = sorted(r.name for r in managers if r.position > role.position)  # reordering bots keeps the text
         if above:

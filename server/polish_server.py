@@ -105,14 +105,18 @@ class Polish:
         try:
             ob = await self.guild.onboarding()
         except discord.HTTPException as e:
-            print(f"  skip    ({e.text or e})")
-            return
+            if self.apply:
+                print(f"  skip    ({e.text or e})")
+                return
+            # A dry run hasn't turned Community on, and Discord may not show Onboarding without it.
+            print(f"  note    can't read Onboarding yet ({e.text or e}); this is the plan for a first build")
+            ob = None
         # The edit below replaces every question and default channel, so it only runs on a first build.
         # Switching Onboarding off keeps its questions, so a server that has any is not a first build.
-        if ob.enabled:
+        if ob is not None and ob.enabled:
             print("  ok      already set up, left alone (later changes: focus_mode.py, public_mode.py)")
             return
-        if ob.prompts:
+        if ob is not None and ob.prompts:
             print("  ok      off but already has questions, left alone "
                   "(switch it on in Server Settings > Onboarding; later changes: focus_mode.py, public_mode.py)")
             return

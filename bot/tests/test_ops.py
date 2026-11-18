@@ -358,6 +358,16 @@ def test_admin_problems_admin_role_below_a_role_manager():
     assert [p.where for p in ops.admin_problems(roles, bot_admin=True)] == [ops.SERVER]
 
 
+def test_admin_problems_on_another_bots_role():
+    grant = ops.RoleGrant
+    # Captcha.bot's own role holds Administrator: reported wherever it sits, once
+    roles = [grant("Captcha.bot", 9, True, True, managed=True), grant("Tebex", 6, False, True, managed=True),
+             grant("Discadia", 3, True, False, managed=True)]
+    problems = ops.admin_problems(roles, bot_admin=False)
+    assert [(p.where, p.text.split(":")[0]) for p in problems] == [(ops.ROLES, "Captcha.bot"), (ops.ROLES, "Discadia")]
+    assert "turn off Administrator" in problems[0].text
+
+
 def test_requirements_tables_cover_config():
     import config
     by_channel = {}

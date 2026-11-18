@@ -281,7 +281,9 @@ def test_polish_server_leaves_onboarding_alone_once_it_has_questions(apply, enab
 
 
 @pytest.mark.parametrize("apply", [False, True])
-def test_polish_server_skips_onboarding_it_cannot_read(apply, capsys):
+def test_polish_server_onboarding_it_cannot_read(apply, capsys):
+    # --apply turns Community on first, so a refused read there means skip; a dry run hasn't, so it
+    # shows the first-build plan instead.
     import polish_server
     guild = polish_ready_server(enabled=False, prompts=False)
 
@@ -290,7 +292,12 @@ def test_polish_server_skips_onboarding_it_cannot_read(apply, capsys):
     guild.onboarding = onboarding
     asyncio.run(polish_server.Polish(guild, apply=apply).onboarding())
     assert guild.onboarding_edits == []
-    assert "  skip    (Missing Access)" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    if apply:
+        assert "  skip    (Missing Access)" in out
+    else:
+        assert "can't read Onboarding yet (Missing Access)" in out
+        assert f"onboarding with {len(layout.ONBOARDING_EVERYTHING)} default channels" in out
 
 
 # ---------------------------------------------------------------- the pinned posts

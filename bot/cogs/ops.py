@@ -430,7 +430,8 @@ class Ops(commands.Cog):
             role = config.match_by_name(guild.roles, name)
             positions[name] = role.position if role is not None else None
         # rank in Discord's role order (position, ties broken by id), not the raw position
-        grants = [O.RoleGrant(r.name, rank, r.permissions.administrator, r.permissions.manage_roles, r in me.roles)
+        grants = [O.RoleGrant(r.name, rank, r.permissions.administrator, r.permissions.manage_roles, r in me.roles,
+                              managed=r.managed)
                   for rank, r in enumerate(sorted(guild.roles)) if not r.is_default()]
         return (O.admin_problems(grants, me.guild_permissions.administrator)
                 + O.guild_problems(granted(me.guild_permissions), loaded=loaded)
