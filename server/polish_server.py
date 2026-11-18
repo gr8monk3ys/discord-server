@@ -6,6 +6,7 @@
 - trims empty channels listed in layout.TRIM (never ones with messages or people in them)
 - safety defaults: @mentions-only notifications, Medium verification, media scanning
 - turns on Community, then Onboarding so members pick their own games and channels
+  (first build only: once Onboarding is on or has questions, focus_mode.py and public_mode.py change it)
 - Welcome Screen with the five channels new members should see first
 - AutoMod: spam, mention raids, slurs and sexual content (trash talk is fine)
 - revokes never-expiring invites the bot made (short-lived links are safer)
@@ -101,6 +102,20 @@ class Polish:
     # ------------------------------------------------------------ onboarding
     async def onboarding(self):
         print("\nOnboarding")
+        try:
+            ob = await self.guild.onboarding()
+        except discord.HTTPException as e:
+            print(f"  skip    ({e.text or e})")
+            return
+        # The edit below replaces every question and default channel, so it only runs on a first build.
+        # Switching Onboarding off keeps its questions, so a server that has any is not a first build.
+        if ob.enabled:
+            print("  ok      already set up, left alone (later changes: focus_mode.py, public_mode.py)")
+            return
+        if ob.prompts:
+            print("  ok      off but already has questions, left alone "
+                  "(switch it on in Server Settings > Onboarding; later changes: focus_mode.py, public_mode.py)")
+            return
         # A first build starts with every public channel as a default. The short list in
         # ONBOARDING_DEFAULT_CHANNELS only makes sense together with the opt-in question, and
         # focus_mode.py is what sets both (in one edit).

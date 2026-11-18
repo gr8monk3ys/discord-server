@@ -2,7 +2,8 @@
 status tags), the member/online stat channels, and "Contact the mods" tickets.
 
 Everything lives in SQLite (reminders, afk, tickets, and stat-channel/ticket-message
-ids in meta), so a restart picks up where it left off. The online counter needs the
+ids in meta), so a restart picks up where it left off. A reminder's row is deleted once it
+is delivered (or given up on) or cancelled. The online counter needs the
 Presence intent; without it that channel is left alone. No privileged intent is needed
 otherwise: AFK uses message.mentions, which Discord sends without Message Content."""
 
@@ -205,7 +206,7 @@ class Utility(commands.Cog):
         uid = interaction.user.id
         if cancel is not None:
             changed = await self.db.execute(
-                "UPDATE reminders SET done = 1 WHERE id = ? AND user_id = ? AND done = 0", (cancel, uid))
+                "DELETE FROM reminders WHERE id = ? AND user_id = ? AND done = 0", (cancel, uid))
             text = (f"Cancelled reminder `#{cancel}`." if changed
                     else f"You don't have a waiting reminder `#{cancel}`.")
             await interaction.response.send_message(text, ephemeral=True)
@@ -257,12 +258,12 @@ class Utility(commands.Cog):
             except Exception:
                 log.exception("reminder %s failed", r["id"])
                 delivered = False
-            # Marked done only after it went out; a temporary failure retries next tick,
+            # Deleted only after it went out; a temporary failure retries next tick,
             # but not forever.
             if delivered or t - r["due_at"] > U.REMINDER_GIVE_UP:
                 if not delivered:
                     log.warning("gave up on reminder %s after a day of failures", r["id"])
-                await self.db.execute("UPDATE reminders SET done = 1 WHERE id = ?", (r["id"],))
+                await self.db.execute("DELETE FROM reminders WHERE id = ?", (r["id"],))
 
     @staticmethod
     def can_post(channel, member) -> bool:

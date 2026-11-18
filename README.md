@@ -64,7 +64,9 @@ matches existing channels and roles by plain name, so `#general` becomes
 ```
 
 This turns on Community and **Onboarding**, so new members pick their own game
-roles on join. It also sets up **AutoMod** (spam, mention raids and slurs, with
+roles on join. Onboarding is set up on the first run only: once it is on (or switched off
+but still has questions), a re-run leaves its questions and default channels alone, and `focus_mode.py` and
+`public_mode.py` change them. It also sets up **AutoMod** (spam, mention raids and slurs, with
 alerts to the mod channel), defaults notifications to @mentions only, and
 removes the empty channels listed in `TRIM`. Everything is configured at the
 bottom of `layout.py`. The bot's role must be at the top for Onboarding to
@@ -181,7 +183,7 @@ day-to-day attention. Design and history:
 | Shop and seasons | `/shop`, `/buy` (colour role, Hype, shoutout), `/season`; monthly champions |
 | Engagement | question of the day 12:00 and this-or-that poll 18:00 (each pauses while nobody answers it: see Quiet rooms), 🔢・counting, auto game night Fridays, `/birthday` |
 | Moderation | `/warn`, `/timeout`, `/untimeout`, `/cases`, `/purge` (shown only to members with Timeout Members, like `/xp` and `/suggestion`); `/ban` (staff who also hold Ban Members; DMs the reason first, plus the appeal code when appeals are set up; one line in 📋・mod-log per ban); auto-escalation, anti-spam, anti-raid |
-| Operations | daily DB backup 04:00, error alerts, back-online note, weekly config drift check, `/status`; permission self-check a minute after start and daily at 09:00 (every channel, permission and role the loaded modules need: one mod-log note when something is missing, one when it is fixed, and a line in `/status`) |
+| Operations | daily DB backup 04:00, error alerts, back-online note, weekly config drift check, `/status`; permission self-check a minute after start and daily at 09:00 (every channel, permission and role the loaded modules need, plus Administrator on the bot or on a role below a Manage Roles bot: one mod-log note when something is missing, one when it is fixed, and a line in `/status`) |
 | Utility | `/remind`, `/reminders`, `/afk`, suggestion voting, member/online stat channels, tickets in 🆘・help |
 | Welcome cards | an image card in 👋・welcome when someone finishes Onboarding (names them without a ping; the #general welcome is the one ping); a card that fails to post is retried every 10 minutes for up to 24 hours while the member is still here |
 | Tournaments | `/tournament create/start/cancel/bracket`; sign-up buttons, brackets with byes, both players confirm results, 1000/400 coin prizes, Tournament Champ role |

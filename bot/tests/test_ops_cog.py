@@ -53,6 +53,12 @@ class Named:
         self.managed = False
         self.permissions = perms or discord.Permissions.none()
 
+    def is_default(self):
+        return self.name == "@everyone"
+
+    def __lt__(self, other):  # discord.py's Role order: position, then the older (lower id) role on top
+        return (self.position, -self.id) < (other.position, -other.id)
+
 
 class FakeChan:
     _next = 7000
@@ -175,8 +181,8 @@ def with_env(fn, monkeypatch, tmp_path):
         env = Env(db, guild, bot, tmp_path)
         monkeypatch.setattr(cogmod, "now", lambda: env.t)
         env.cog = Ops(bot)  # started_at uses the patched clock
-        monkeypatch.setattr(config, "BACKUP_DIR", str(tmp_path / "backups"))
-        monkeypatch.setattr(cogmod, "FALLBACK_DIR", tmp_path / "fallback")
+        monkeypatch.delenv("BACKUP_DIR", raising=False)
+        monkeypatch.setattr(cogmod, "DEFAULT_BACKUP_DIR", tmp_path / "backups")
         monkeypatch.setattr(cogmod, "SNAPSHOT_DIR", tmp_path / "snapshot")
         try:
             await fn(env)
@@ -355,15 +361,44 @@ def test_backup_keeps_newest_fourteen(monkeypatch, tmp_path):
     with_env(go, monkeypatch, tmp_path)
 
 
-def test_backup_falls_back_when_primary_unusable(monkeypatch, tmp_path, caplog):
+def test_backup_uses_absolute_backup_dir_override(monkeypatch, tmp_path):
+    async def go(env):
+        monkeypatch.setenv("BACKUP_DIR", str(tmp_path / "elsewhere"))
+        info = await env.cog.backup(datetime(2026, 10, 5).date())
+        assert (tmp_path / "elsewhere" / "front_desk-2026-10-05.db").exists() and info["fallback"] is False
+        assert not (tmp_path / "backups").exists()
+    with_env(go, monkeypatch, tmp_path)
+
+
+def test_backup_falls_back_when_override_unusable(monkeypatch, tmp_path, caplog):
     async def go(env):
         blocker = tmp_path / "not-a-dir"
         blocker.write_text("file")
-        monkeypatch.setattr(config, "BACKUP_DIR", str(blocker / "front-desk"))
+        monkeypatch.setenv("BACKUP_DIR", str(blocker / "front-desk"))
         info = await env.cog.backup(datetime(2026, 10, 5).date())
-        assert (tmp_path / "fallback" / "front_desk-2026-10-05.db").exists() and info["fallback"] is True
+        assert (tmp_path / "backups" / "front_desk-2026-10-05.db").exists() and info["fallback"] is True
         assert any("unusable" in r.getMessage() for r in caplog.records if r.levelno == logging.WARNING)
     with_env(go, monkeypatch, tmp_path)
+
+
+@pytest.mark.parametrize("relative", [r"D:\Backups\front-desk", "backups", "./x/y"])
+def test_backup_refuses_relative_override(monkeypatch, tmp_path, caplog, relative):
+    async def go(env):
+        cwd = tmp_path / "cwd"
+        cwd.mkdir()
+        monkeypatch.chdir(cwd)
+        monkeypatch.setenv("BACKUP_DIR", relative)
+        info = await env.cog.backup(datetime(2026, 10, 5).date())
+        assert (tmp_path / "backups" / "front_desk-2026-10-05.db").exists() and info["fallback"] is True
+        assert list(cwd.iterdir()) == []  # nothing created relative to the working directory
+        assert any("not an absolute path" in r.getMessage()
+                   for r in caplog.records if r.levelno == logging.WARNING)
+    with_env(go, monkeypatch, tmp_path)
+
+
+def test_backup_dir_env():
+    assert config.backup_dir_env({}) == ""
+    assert config.backup_dir_env({"BACKUP_DIR": "  /srv/backups "}) == "/srv/backups"
 
 
 def test_backup_failure_retries_and_notes_once_per_day(monkeypatch, tmp_path):
@@ -604,8 +639,9 @@ def perm_guild(env, loaded=("ops", "cards", "recap", "levels", "events")):
     g.voice_channels = [PermChan(n) for n in (config.SQUAD_VOICE, config.LOBBY_VOICE, config.NEW_SQUAD_VOICE)]
     g.categories = [PermChan(config.VOICE_CATEGORY)]
     g.roles = g.roles + [Named(name, 1) for name in dict(O.ROLE_NEEDS)]
-    bot_role = Named("Front Desk", 2)
-    g.me = SimpleNamespace(id=7, guild_permissions=discord.Permissions.all(), top_role=bot_role)
+    bot_role = Named("Front Desk", 2, without())
+    g.roles.append(bot_role)
+    g.me = SimpleNamespace(id=7, guild_permissions=without(), top_role=bot_role, roles=[g.role("@everyone"), bot_role])
     return g
 
 
@@ -614,8 +650,9 @@ def chan(guild, name):
 
 
 def without(**flags):
+    """Everything but Administrator (README: the bot doesn't keep it) and `flags`."""
     p = discord.Permissions.all()
-    p.update(**{k: False for k in flags})
+    p.update(administrator=False, **{k: False for k in flags})
     return p
 
 
@@ -636,7 +673,7 @@ def test_permission_check_reports_once_then_all_clear_once(monkeypatch, tmp_path
         assert len(problems) == 3
         (post,) = g.mod_log.sent
         text = post["embed"].description
-        assert post["embed"].title == "Front Desk is missing permissions" and no_pings(post)
+        assert post["embed"].title == "Front Desk's permissions need fixing" and no_pings(post)
         assert "missing Send Messages (cards)" in text and "missing Attach Files (cards)" in text
         assert "missing Send Messages (events, recap)" in text  # the Town Hall is announced there too
         # grouped: one heading per channel
@@ -676,6 +713,44 @@ def test_permission_check_guild_level_roles_and_missing_channel(monkeypatch, tmp
         assert any(w == O.SERVER and "turn on Create Events" in t for w, t in texts)
         assert len(problems) == 4
         assert len(g.mod_log.sent) == 1
+    with_env(go, monkeypatch, tmp_path)
+
+
+def test_permission_check_reports_administrator_on_the_bot_and_within_reach(monkeypatch, tmp_path):
+    # The 2026-11-07 snapshot: Front Desk kept Administrator, and an "Admin" role sat below
+    # bots holding Manage Roles.
+    async def go(env):
+        g = perm_guild(env)
+        front_desk = g.me.top_role
+        front_desk.permissions = discord.Permissions.all()
+        g.me.guild_permissions = discord.Permissions.all()
+        captcha = Named("Captcha.bot", 2, discord.Permissions(manage_roles=True))
+        admin = Named("Admin", 1, discord.Permissions(administrator=True))
+        g.roles += [captcha, admin]
+        texts = {(p.where, p.text) for p in await env.cog.check_permissions()}
+        assert texts == {
+            (O.SERVER, "has Administrator: Server Settings -> Roles -> Front Desk -> turn off Administrator. "
+                       "The bot needs only the permissions printed by python main.py --invite"),
+            (O.ROLES, "Admin: grants Administrator but sits below Captcha.bot, which can manage roles and so give "
+                      "it to anyone. Server Settings -> Roles: drag Admin above them, or turn off its "
+                      "Administrator")}
+        (post,) = g.mod_log.sent
+        assert "turn off Administrator" in post["embed"].description and no_pings(post)
+        await env.cog.check_permissions()
+        assert len(g.mod_log.sent) == 1  # same set: never nags
+
+        # Front Desk loses Administrator: now it is one of the roles that could give Admin away
+        front_desk.permissions = without()
+        g.me.guild_permissions = without()
+        texts = {(p.where, p.text) for p in await env.cog.check_permissions()}
+        assert texts == {(O.ROLES, "Admin: grants Administrator but sits below Captcha.bot, Front Desk, which can "
+                                   "manage roles and so give it to anyone. Server Settings -> Roles: drag Admin "
+                                   "above them, or turn off its Administrator")}
+        admin.position = 2  # tied with both bots, but newer (higher id), so Discord ranks it below them
+        assert {(p.where, p.text) for p in await env.cog.check_permissions()} == texts
+        admin.position = 5  # above every bot role
+        assert await env.cog.check_permissions() == []
+        assert len(g.mod_log.sent) == 3 and g.mod_log.sent[2]["embed"].description == "All permissions OK again."
     with_env(go, monkeypatch, tmp_path)
 
 

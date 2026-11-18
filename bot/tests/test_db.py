@@ -55,6 +55,26 @@ def test_concurrent_transactions_do_not_interleave():
     run(go())
 
 
+def test_migration_purges_finished_reminders_only(monkeypatch):
+    purge = "DELETE FROM reminders WHERE done = 1"
+    full = dbmod.MIGRATIONS
+    before = next(i for i, m in enumerate(full) if purge in m)
+
+    async def go():
+        d = dbmod.Database(":memory:")
+        await d.connect()
+        monkeypatch.setattr(dbmod, "MIGRATIONS", full[:before])
+        await d.migrate()
+        for text, done in (("sent", 1), ("waiting", 0)):
+            await d.execute("INSERT INTO reminders (user_id, channel_id, due_at, text, created_at, done)"
+                            " VALUES (1, 2, 3, ?, 4, ?)", (text, done))
+        monkeypatch.setattr(dbmod, "MIGRATIONS", full)
+        await d.migrate()
+        assert [r["text"] for r in await d.fetchall("SELECT text FROM reminders")] == ["waiting"]
+        await d.close()
+    run(go())
+
+
 def test_privacy_gate():
     async def go():
         d = await fresh()

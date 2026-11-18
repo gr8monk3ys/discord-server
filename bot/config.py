@@ -62,7 +62,6 @@ SUGGESTIONS_FORUM = "💡・suggestions"
 HELP_CHANNEL = "🆘・help"  # the "Contact the mods" ticket button lives here
 BIRTHDAY_ROLE = "Birthday"
 COUNTING_ROLE = "Counting Champ"
-BACKUP_DIR = r"D:\Backups\front-desk"  # bulk data lives on D: (see fleet conventions)
 # Growth features
 WELCOME_CHANNEL = "👋・welcome"  # welcome cards go here
 TOURNAMENTS_CHANNEL = "🏆・tournaments"
@@ -172,6 +171,13 @@ def crew_env() -> tuple[str, str]:
     """Optional Welcome Crew settings, raw (logic/crew.py validates them and has the defaults):
     CREW_PING_MINUTES (gap between crew pings) and CREW_QUIET_HOURS (local hours, like "22-9")."""
     return os.environ.get("CREW_PING_MINUTES", ""), os.environ.get("CREW_QUIET_HOURS", "")
+
+
+def backup_dir_env(environ=None) -> str:
+    """BACKUP_DIR, raw: an absolute folder for the nightly database backups (cogs/ops.py checks
+    it). Unset: backups/ in the data folder."""
+    environ = os.environ if environ is None else environ
+    return environ.get("BACKUP_DIR", "").strip()
 
 
 def support_url_env() -> str:

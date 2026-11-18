@@ -336,7 +336,9 @@ results, welcomes, the voice line) are not kinds and do not go through the gate.
 **Permission self-check (`cogs/ops.py`).** About a minute after ready and daily at 09:00 the
 bot compares what the loaded cogs need (`logic/ops.py` tables) with what it actually has:
 channels exist, channel permissions, server permissions, and handed-out roles exist and sit
-below its own top role. One mod-log embed when the set of problems changes, one when it
+below its own top role. It also reports Administrator on the bot, and any role with Administrator
+sitting below a role that has Manage Roles without it (that role's holders, bots included, could
+hand Administrator out). Read only: it never changes roles. One mod-log embed when the set of problems changes, one when it
 clears; the current count shows in `/status`. A test fails when a module in `MODULES` has no
 `CHANNEL_NEEDS` row and no reason in `NO_CHANNEL`, or when a cog whose source calls
 `add_roles` / `remove_roles` is in neither `ROLE_HOLDERS` nor `NO_ROLE_HOLDER`. It checks that
@@ -408,8 +410,8 @@ event cannot lose progress. Raffle tickets are ledger rows. No message text is s
 exceptions are a quoted reported message and the hall-of-fame copy (both in Discord, not the DB),
 the title of a guide or setup post, and the answers on a ban appeal (blanked after 180 days).
 
-Other files in `bot/data/`: `bot.log*`, `bot.lock`, `heartbeat`, `backups/` (fallback backup
-target), `migrate/` (host-move archives), `site/stats.json` (the landing page's live data,
+Other files in `bot/data/`: `bot.log*`, `bot.lock`, `heartbeat`, `backups/` (nightly
+backups), `migrate/` (host-move archives), `site/stats.json` (the landing page's live data,
 written by `sitedata`), and the two tracked banks `qotd.txt` and `polls.txt`.
 
 ## Server as code (`server/`)
@@ -419,7 +421,7 @@ written by `sitedata`), and the two tracked banks `qotd.txt` and `polls.txt`.
 | `layout.py` | Source of truth: `GAMES` and `RETIRED_GAMES`, roles, categories and channels, Onboarding (the core default channels, `FOCUS_GROUPS` and the other `FOCUS_*` lists), AutoMod, `PUBLIC` text, `TRIM` | no (data) |
 | `names.py` | `slug()`: name matching that ignores emoji, case and separators | no |
 | `setup_server.py` | First build: create or restyle roles and channels, **reorder roles**, post rules and welcome | with `--apply` |
-| `polish_server.py` | Second pass: Community, Onboarding, welcome screen, AutoMod, media lock, trim empty channels | with `--apply` |
+| `polish_server.py` | Second pass: Community, Onboarding (only while it is off with no questions; after that it is left to `focus_mode.py` and `public_mode.py`), welcome screen, AutoMod, media lock, trim empty channels | with `--apply` |
 | `public_mode.py` | Later changes: missing roles and channels, private categories, description, invite, Onboarding prompts, AutoMod gaps, and the games (role, channel, forum tag and "What do you play?" option for each game in `GAMES`; `restore_games` moves a re-listed game's channel back). Additive except for retired games: a game in `RETIRED_GAMES` loses its Onboarding option (in `game_options`, in the same edit that adds a newly listed game, or else in `retire_games`) and its channel moves into the staff-only `GAME_ARCHIVE` category (`99 · archive`; `retire_games` only). Never deletes: messages, roles and forum tags stay | with `--apply` |
 | `focus_mode.py` | The short newcomer channel list, in one Onboarding edit: default channels become `ONBOARDING_DEFAULT_CHANNELS` (the core of 16, the Monkey SMP category included) and one question, `FOCUS_PROMPT`, offers the `FOCUS_GROUPS`. `--plan` prints the plan from `layout.py` without connecting and fails when a public channel is in no list or in two; `--revert` restores `ONBOARDING_EVERYTHING` as the defaults and leaves the question. Never touches permissions, channels, roles or the other questions | with `--apply` |
 | `expressions.py` | Upload emoji and soundboard sounds from `assets/expressions/` (skips existing names) | with `--apply` |
@@ -494,16 +496,14 @@ section with fresh, stale and failed data). CI runs both in the "Site" job.
 |---|---|---|
 | Bot | Docker on the VPS (`docker-compose.yml`, `/srv/front-desk/repo`, `restart: unless-stopped`), since 2026-11 | `docs/HOSTING.md`, "The live VPS". Never run a second copy with the same token; the lock file only protects one machine |
 | Watchdog | Restarts: `bot/run_container.sh` inside the container. Alerts: `front-desk-watchdog.timer` runs `server/watchdog.py --alert-only` every 5 minutes | Units in `deploy/vps/`. `server/install_watchdog.ps1` is the Windows version (restarts and alerts), kept for a rollback |
-| Backups | `ops` daily 04:00, SQLite online backup, integrity-checked, newest 14 kept | `config.BACKUP_DIR`, falling back to `bot/data/backups` when that drive is missing |
+| Backups | `ops` daily 04:00, SQLite online backup, integrity-checked, newest 14 kept | `bot/data/backups`, or `BACKUP_DIR` in `server/.env` (an absolute path; relative, missing or read-only falls back to `bot/data/backups`) |
 | Container kit | `Dockerfile`, `docker-compose.yml`, `bot/run_container.sh` | The live deployment. Read-only root, non-root user, data volume, heartbeat healthcheck and an in-container monitor with the watchdog's thresholds. Steps and cut-over checklist: `docs/HOSTING.md` |
 | Site | Vercel project rooted at `site/`, production branch `main` | Next.js, set by `site/vercel.json` (`bun install --frozen-lockfile`, `bun run build`). The route handlers read their settings from the Vercel project's environment variables |
 | Listening log | `front-desk-spotify-history.timer` runs SpotifyForge's `history sync` hourly in a one-shot container (`deploy/vps/spotify-history`) | The bot mounts `/srv/spotifyforge/data` read-only at `/spotify`, for the field notes' Heard section. The Spotify login is not in that folder |
 | Playlist maintenance | `front-desk-spotify-weekly.timer` runs SpotifyForge's `curate stats`, `refresh`, `reflow`, `describe` on Mondays in the same image and login (`deploy/vps/spotify-history/weekly.sh`) | The bot has no part in it. Its state shares the read-only folder; a lock keeps it from overlapping the hourly job |
 | Site data | `front-desk-site-data.timer` runs `server/publish_site_data.py --apply --quiet` every 30 minutes | Pushes with a deploy key of `frontdesk` on the VPS (`deploy/vps/`); exits 0 without output when there is nothing to do |
 
-Never run the bot on two machines with the same token: the lock is per machine. The
-`front-desk-bot` branch must be kept, because the bot's public privacy link points at
-`PRIVACY.md` on it; fast-forward it after changing `PRIVACY.md` on `main`.
+Never run the bot on two machines with the same token: the lock is per machine.
 
 ## Where to add things
 

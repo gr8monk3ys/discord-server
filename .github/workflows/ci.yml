@@ -1,5 +1,5 @@
-# Lint and both Python test suites, and the site's lint, types, tests and build, on every pull request
-# and every push to main.
+# Lint and both Python test suites, the bot's Docker image, and the site's lint, types, tests and
+# build, on every pull request and every push to main.
 # No path filters on purpose: the job always reports, so "Lint and tests" can be a required check.
 name: CI
 
@@ -51,6 +51,27 @@ jobs:
       - name: Server tests
         working-directory: server
         run: python -m pytest -q tests
+
+  image:
+    # The bot's Docker image, built as on the VPS. The tests above run from the full checkout, so
+    # they cannot see a file the bot reads that .dockerignore leaves out of the image; this runs
+    # the check inside the image, offline, through the image's own entry point.
+    name: Docker image
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build
+        run: docker build -t front-desk-bot:ci .
+
+      - name: Own invite code is in the image
+        run: |
+          docker run --rm --network none front-desk-bot:ci python -c '
+          from logic import textfilter
+          assert textfilter.OWN_INVITES, "no own invite code in the image: allowlist site/src/data/site-config.json in .dockerignore and COPY it in the Dockerfile"
+          print("own invites:", sorted(textfilter.OWN_INVITES))
+          '
 
   site:
     # The landing page (site/): a Next.js app built with bun, as on Vercel. Lint, types, the

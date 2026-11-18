@@ -1,8 +1,9 @@
 """Module 11: Operations autopilot.
 
-- Daily SQLite online backup at 04:00 local into config.BACKUP_DIR (falls back to
-  bot/data/backups when D: is missing or read-only), keeping the newest 14, each one
-  checked with PRAGMA integrity_check before it replaces anything.
+- Daily SQLite online backup at 04:00 local into bot/data/backups (or BACKUP_DIR from
+  server/.env, an absolute path; back to bot/data/backups when it is relative, missing or
+  read-only), keeping the newest 14, each one checked with PRAGMA integrity_check before it
+  replaces anything.
 - Health: a root logging handler counts ERROR records per logger; more than 5 in
   10 minutes posts one alert to the mod log, at most once per hour per logger. After
   more than 30 minutes down, a "back online" note (at most once per 6 h).
@@ -10,7 +11,8 @@
   server/snapshot_lib.py the way snapshot_server.py builds them, compared with the
   JSON in server/snapshot/. Read only: nothing is written into the repo.
 - Permission self-check, about a minute after ready and then daily at 09:00: every
-  channel, permission and role the loaded cogs need (logic/ops.py's tables). One mod-log
+  channel, permission and role the loaded cogs need (logic/ops.py's tables), plus
+  Administrator on the bot or on a role a Manage Roles bot can hand out. One mod-log
   embed when the set of problems changes, one "OK again" when they clear, never a nag.
 - /status for staff: uptime, latency, database size, last backup, permissions, modules, errors.
 """
@@ -41,7 +43,7 @@ log = logging.getLogger(__name__)
 
 BACKUP_JOB = O.Daily("dbbackup", hour=4, minute=0)  # daily 04:00 local
 DRIFT_JOB = Weekly("drift", weekday=6, hour=3, minute=0)  # Sundays 03:00 local
-FALLBACK_DIR = config.DATA_DIR / "backups"
+DEFAULT_BACKUP_DIR = config.DATA_DIR / "backups"
 SNAPSHOT_DIR = config.SERVER_DIR / "snapshot"
 NO_PINGS = ping_only()
 ALERT_META = "ops:alert:"  # + logger name -> unix time of the last alert
@@ -60,18 +62,25 @@ def now() -> int:
 
 
 # ---------------------------------------------------------------- backup (runs in a thread)
-def choose_backup_dir(primary: str | Path, fallback: Path) -> tuple[Path, str | None]:
-    """The primary dir if it can be created and written, else the fallback (and why)."""
-    try:
-        p = Path(primary)
-        p.mkdir(parents=True, exist_ok=True)
-        probe = p / ".write-test"
-        probe.write_bytes(b"")
-        probe.unlink()
-        return p, None
-    except OSError as e:
-        fallback.mkdir(parents=True, exist_ok=True)
-        return fallback, f"{type(e).__name__}: {e}"
+def choose_backup_dir(override: str, default: Path) -> tuple[Path, str | None]:
+    """The override dir if it is absolute and can be created and written, else the default
+    (and why the override was not used)."""
+    why = None
+    if override:
+        p = Path(override)
+        if not p.is_absolute():
+            why = "not an absolute path"
+        else:
+            try:
+                p.mkdir(parents=True, exist_ok=True)
+                probe = p / ".write-test"
+                probe.write_bytes(b"")
+                probe.unlink()
+                return p, None
+            except OSError as e:
+                why = f"{type(e).__name__}: {e}"
+    default.mkdir(parents=True, exist_ok=True)
+    return default, why
 
 
 def make_backup(src: Path, dest_dir: Path, name: str, keep: int = O.KEEP_BACKUPS) -> dict:
@@ -307,9 +316,10 @@ class Ops(commands.Cog):
         src = self.db.path
         if not isinstance(src, Path) and str(src) == ":memory:":
             raise RuntimeError("in-memory database can't be backed up")
-        dest_dir, why = await asyncio.to_thread(choose_backup_dir, config.BACKUP_DIR, FALLBACK_DIR)
+        override = config.backup_dir_env()
+        dest_dir, why = await asyncio.to_thread(choose_backup_dir, override, DEFAULT_BACKUP_DIR)
         if why:
-            log.warning("backup dir %s unusable (%s); using %s", config.BACKUP_DIR, why, dest_dir)
+            log.warning("BACKUP_DIR %s unusable (%s); using %s", override, why, dest_dir)
         info = await asyncio.to_thread(make_backup, Path(src), dest_dir, O.backup_name(local_date))
         info.update(at=now(), fallback=bool(why))
         await self.set_meta(BACKUP_META, json.dumps(info))
@@ -419,7 +429,11 @@ class Ops(commands.Cog):
         for name, _ in O.ROLE_NEEDS:
             role = config.match_by_name(guild.roles, name)
             positions[name] = role.position if role is not None else None
-        return (O.guild_problems(granted(me.guild_permissions), loaded=loaded)
+        # rank in Discord's role order (position, ties broken by id), not the raw position
+        grants = [O.RoleGrant(r.name, rank, r.permissions.administrator, r.permissions.manage_roles, r in me.roles)
+                  for rank, r in enumerate(sorted(guild.roles)) if not r.is_default()]
+        return (O.admin_problems(grants, me.guild_permissions.administrator)
+                + O.guild_problems(granted(me.guild_permissions), loaded=loaded)
                 + O.channel_problems(channels, loaded=loaded)
                 + O.role_problems(positions, me.top_role.position, loaded=loaded))
 
@@ -436,8 +450,8 @@ class Ops(commands.Cog):
             return problems  # nothing new: never nag
         if problems:
             embed = style.embed(
-                title="Front Desk is missing permissions",
-                description=("These will fail until they're fixed. I'll say so here once they are.\n\n"
+                title="Front Desk's permissions need fixing",
+                description=("These need fixing. I'll say so here once they are.\n\n"
                              + O.problems_report(problems)),
                 footer=style.label("permissions", f"{len(problems)} to fix"), color=style.MUTED)
         else:

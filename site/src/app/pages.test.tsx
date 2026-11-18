@@ -11,6 +11,7 @@ import NotFound, { metadata as notFoundMeta } from "@/app/not-found";
 import Appeal, { metadata as appealMeta } from "@/app/appeal/page";
 import Join, { metadata as joinMeta } from "@/app/join/page";
 import LinkedRolePage from "@/app/linked-role/page";
+import { PRIVACY_URL } from "@/components/Footer";
 import { RuleList } from "@/components/Rules";
 import games from "@/data/generated/games.json";
 import rules from "@/data/generated/rules.json";
@@ -168,6 +169,12 @@ describe("home page: structure", () => {
     expect(legal.match(/<p class="fine">/g)).toHaveLength(2);
     expect(legal).toContain("Not affiliated with Discord");
     expect(legal).not.toContain('class="label"');
+  });
+
+  test("the privacy link is PRIVACY.md on main, which can't be deleted like a side branch", () => {
+    expect(PRIVACY_URL).toBe("https://github.com/gr8monk3ys/discord-server/blob/main/PRIVACY.md");
+    expect(tag(HOME, /<footer>[\s\S]*?<\/footer>/)).toContain(`href="${PRIVACY_URL}"`);
+    expect(section(HOME, "faq")).toContain(`href="${PRIVACY_URL}"`);
   });
 });
 

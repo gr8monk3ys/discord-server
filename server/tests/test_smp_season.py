@@ -7,6 +7,7 @@ import asyncio
 import re
 
 import discord
+import pytest
 
 import focus_mode
 import layout
@@ -230,8 +231,9 @@ def test_a_full_run_makes_the_channels_and_opens_them_from_the_minecraft_answer(
     assert channel_ids(guild, OPENED_BY_MINECRAFT) <= set(minecraft_answer(guild).channel_ids)
 
 
-def test_polish_server_first_build_gives_the_minecraft_answer_every_channel():
-    import polish_server
+def polish_ready_server(enabled, prompts):
+    """old_server() with every game channel and answer role polish_server.py's first build needs,
+    and Onboarding in the given state."""
     guild = old_server()  # every layout channel exists; the game channels are the old ones
     for emoji, channel, _ in layout.GAMES:
         if not any(slug(c.name) == slug(channel) for c in guild.text_channels):
@@ -239,11 +241,56 @@ def test_polish_server_first_build_gives_the_minecraft_answer_every_channel():
     for role in {o["role"] for p in layout.ONBOARDING_PROMPTS for o in p["options"] if o.get("role")}:
         if not any(r.name == role for r in guild.roles):
             guild.add_role(role)
+    guild.ob.enabled = enabled
+    if not prompts:
+        guild.ob.prompts = []
+    return guild
+
+
+def test_polish_server_first_build_gives_the_minecraft_answer_every_channel():
+    import polish_server
+    guild = polish_ready_server(enabled=False, prompts=False)
     asyncio.run(polish_server.Polish(guild, apply=True).onboarding())
     (edit,) = guild.onboarding_edits
     answer = minecraft_answer(guild)
     assert set(answer.channel_ids) == channel_ids(guild, minecraft_option()["channels"])
     assert edit["enabled"] is True
+
+
+def test_polish_server_first_build_dry_run_prints_the_plan_and_edits_nothing(capsys):
+    import polish_server
+    guild = polish_ready_server(enabled=False, prompts=False)
+    asyncio.run(polish_server.Polish(guild, apply=False).onboarding())
+    assert guild.onboarding_edits == []
+    assert f"enable  onboarding with {len(layout.ONBOARDING_EVERYTHING)} default channels" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("apply", [False, True])
+@pytest.mark.parametrize(("enabled", "said"), [(True, "already set up, left alone"),
+                                               (False, "off but already has questions, left alone")])
+def test_polish_server_leaves_onboarding_alone_once_it_has_questions(apply, enabled, said, capsys):
+    # The live server's questions and default channels come from focus_mode.py and public_mode.py;
+    # a re-run (for the media lock, say) must not swap them back to the first-build set, and
+    # switching Onboarding off keeps its questions, so that is no first build either.
+    import polish_server
+    guild = polish_ready_server(enabled=enabled, prompts=True)
+    asyncio.run(polish_server.Polish(guild, apply=apply).onboarding())
+    assert guild.onboarding_edits == []
+    out = capsys.readouterr().out
+    assert said in out and "focus_mode.py" in out
+
+
+@pytest.mark.parametrize("apply", [False, True])
+def test_polish_server_skips_onboarding_it_cannot_read(apply, capsys):
+    import polish_server
+    guild = polish_ready_server(enabled=False, prompts=False)
+
+    async def onboarding():
+        raise discord.HTTPException(NS(status=403, reason="Forbidden"), "Missing Access")
+    guild.onboarding = onboarding
+    asyncio.run(polish_server.Polish(guild, apply=apply).onboarding())
+    assert guild.onboarding_edits == []
+    assert "  skip    (Missing Access)" in capsys.readouterr().out
 
 
 # ---------------------------------------------------------------- the pinned posts

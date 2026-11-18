@@ -58,9 +58,11 @@ def load_own_invites(path: Path = SITE_CONFIG) -> frozenset[str]:
     """The site's inviteCode (lowercased), or nothing if the file is missing, unreadable or unset."""
     try:
         code = json.loads(path.read_text(encoding="utf-8")).get("inviteCode")
-    except (OSError, UnicodeDecodeError, ValueError, AttributeError):
+    except (OSError, UnicodeDecodeError, ValueError, AttributeError) as e:
+        log.warning("no own invite code from %s (%s): the server's own invite links will be blocked", path, e)
         return frozenset()
     if not isinstance(code, str) or not _INVITE_CODE.fullmatch(code) or code.upper() == "REPLACE_ME":
+        log.warning("no usable inviteCode in %s (%r): the server's own invite links will be blocked", path, code)
         return frozenset()
     return frozenset({code.lower()})
 

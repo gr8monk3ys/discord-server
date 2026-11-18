@@ -335,7 +335,7 @@ Never run `docker compose down -v` or `docker volume rm`: `-v` deletes the datab
 | Watchdog alert in 📋・mod-log while the bot is down | `server/watchdog.py --alert-only` from a host timer (`deploy/vps/`; on another box, a cron line does the same). The bot also posts its own "back online" note after every restart |
 | `watchdog.py --pause` before stopping on purpose | not needed: `docker compose down` or `stop` stays stopped |
 | Task "Front Desk site data" | `front-desk-site-data.timer` (`deploy/vps/`) |
-| Backups in `D:\Backups\front-desk` | the same nightly 04:00 backup, 14 kept, lands in `backups/` inside the data volume (the bot falls back there because `D:\` does not exist) |
+| Backups in `D:\Backups\front-desk` | the same nightly 04:00 backup, 14 kept, lands in `backups/` inside the data volume (`BACKUP_DIR` in `server/.env` can name another absolute folder the bot can write) |
 
 ### Off-box backups
 

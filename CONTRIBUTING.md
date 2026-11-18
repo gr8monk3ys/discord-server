@@ -84,8 +84,7 @@ since `bot/` imports `server/layout.py` and a layout change can break bot tests 
   what you did not.
 - Commit subjects are short and imperative; a `feat:` / `fix:` / `docs:` / `chore:` prefix
   is welcome.
-- Do not force-push `main`, and keep the `front-desk-bot` branch: the bot's public privacy
-  link points at `PRIVACY.md` on it.
+- Do not force-push `main`.
 - A change is not live when it merges. The owner updates the checkout the bot runs from and
   restarts the bot task (README runbook).
 
