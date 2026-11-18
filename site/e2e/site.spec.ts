@@ -201,11 +201,41 @@ test.describe("the home page", () => {
     await expect(page.locator('nav.sections a[aria-current="location"]')).toHaveCount(1);
   });
 
+  test("the masthead is written in once and ends fully drawn", async ({ page }) => {
+    await offline(page, 404);
+    await page.goto("/");
+    const running = () =>
+      page.evaluate(() =>
+        document.getAnimations().filter((a) => a.timeline === document.timeline).map((a) => (a as CSSAnimation).animationName),
+      );
+    expect(await running()).toEqual(expect.arrayContaining(["write", "rule-in", "pen-edge"]));
+    await page.evaluate(() =>
+      Promise.all(document.getAnimations().filter((a) => a.timeline === document.timeline).map((a) => a.finished)),
+    );
+    const drawn = await page.evaluate(() => {
+      const em = getComputedStyle(document.querySelector(".hero h1 em")!);
+      const lede = getComputedStyle(document.querySelector(".hero .lede")!);
+      const plate = getComputedStyle(document.querySelector(".hero .plate-frame")!);
+      return { promise: em.color, transparent: em.color === "rgba(0, 0, 0, 0)", lede: lede.opacity, clip: plate.clipPath };
+    });
+    expect(drawn.transparent, `the promise is still ${drawn.promise}`).toBe(false);
+    expect(drawn.lede).toBe("1");
+    expect(drawn.clip).toBe("none");
+  });
+
   test("reduced motion leaves everything in place and visible", async ({ page }) => {
     await offline(page, stats(30 * 60 * 1000));
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/");
     await expect(page.locator("#live")).toBeVisible();
+    const moving = await page.evaluate(() =>
+      document
+        .getAnimations()
+        .filter((a) => a.timeline === document.timeline)
+        .map((a) => (a as CSSAnimation).animationName)
+        .filter((name) => name !== "arrive"),
+    );
+    expect(moving, "only the opacity-only arrival may run under reduced motion").toEqual([]);
     const behavior = await page.evaluate(() => getComputedStyle(document.documentElement).scrollBehavior);
     expect(behavior).toBe("auto");
   });

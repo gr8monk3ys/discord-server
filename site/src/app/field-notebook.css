@@ -152,7 +152,7 @@ code {
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .skip, .ink::after, .sections a::after, summary::after, .theme-toggle svg { transition: none; }
-  .btn:active, .theme-toggle:active, .btn-quiet:active { transform: none; }
+  .btn:active, .theme-toggle:active, .btn-quiet:active, .btn:hover svg { transform: none; }
 }
 
 /* -------------------------------------------------------------------- type */
@@ -352,6 +352,9 @@ h3.label { font-family: var(--mono); font-size: 0.72rem; font-weight: 500; lette
 }
 .btn:hover { color: var(--pen-text); filter: brightness(1.05); }
 .btn:active { transform: translateY(1px); }
+/* The mark on the key tips towards the pointer: the one thing on the button that moves. */
+.btn svg { transition: transform 300ms var(--ease-ink); }
+.btn:hover svg { transform: rotate(-10deg) scale(1.08); }
 .btn-lg { height: 48px; padding: 8px 32px; }
 .btn svg { flex: none; }
 
@@ -473,9 +476,9 @@ main > section[id] { scroll-margin-top: var(--header-h); }
   font-size: 0.75rem;
   font-weight: 600;
   line-height: 1rem;
-  transition: color var(--default) var(--ease-ui);
+  transition: color var(--default) var(--ease-ui), border-color var(--default) var(--ease-ui);
 }
-.game:hover { color: var(--pen); }
+.game:hover { color: var(--pen); border-color: color-mix(in srgb, var(--pen) 55%, var(--hairline)); }
 
 /* ------------------------------------------------------------------- rules */
 .rules { counter-reset: rule; border-top: 1px solid var(--hairline); }
@@ -512,6 +515,24 @@ summary::after {
 }
 details[open] summary::after { transform: translateY(3px) rotate(225deg); }
 details p { max-width: 36rem; padding-bottom: 16px; font-size: 0.9375rem; line-height: 1.6; color: var(--ink-muted); }
+/* An answer opens to its own height and closes faster than it opened, where the
+   browser can animate to `auto`; elsewhere it is there or not, as before. */
+@supports (interpolate-size: allow-keywords) {
+  @media (prefers-reduced-motion: no-preference) {
+    .faq { interpolate-size: allow-keywords; }
+    .faq details::details-content {
+      block-size: 0;
+      overflow: clip;
+      opacity: 0;
+      transition: block-size 220ms var(--ease-ui), opacity 160ms ease, content-visibility 220ms allow-discrete;
+    }
+    .faq details[open]::details-content {
+      block-size: auto;
+      opacity: 1;
+      transition: block-size 340ms var(--ease-ink), opacity 300ms ease 60ms, content-visibility 340ms allow-discrete;
+    }
+  }
+}
 
 /* ------------------------------------------------------------------- final */
 .final-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 24px 48px; padding: 40px 0; border-top: 1px solid var(--hairline); }
@@ -698,6 +719,66 @@ footer { border-top: 1px solid color-mix(in srgb, var(--hairline) 60%, transpare
   .inks .rules.armed.inked > li::before { opacity: 1; transition: opacity 240ms ease calc(var(--n, 0) * 50ms); }
   .inks .houses.armed.inked .bar-fill { transform: none; transition: transform 1100ms var(--ease-ink) calc(var(--n, 0) * 120ms + 200ms); }
   .inks .ledger-body > :is(.days, .rules) > li:last-child, .inks .ledger-body > .faq > details:last-child { background-size: 0 1px; }
+}
+
+/* The masthead opens the notebook: one sequence, once, as the page loads. The
+   pen writes the promise along its lines, then rules the plate in from the
+   left with a pen line on the leading edge. "Chill gamers." and everything
+   under it are simply there, so the first paint is the page. CSS only: no
+   script arms it, and where an effect is unsupported the words and the plate
+   stand as they are. */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (background-clip: text) or (-webkit-background-clip: text) {
+    /* A broken inline box paints its background as one strip, so the fill
+       runs along the first line and carries on into the second, like writing. */
+    .hero h1 em {
+      background: linear-gradient(var(--pen), var(--pen)) left center / 100% 100% no-repeat;
+      -webkit-background-clip: text;
+      background-clip: text;
+      animation: write 1200ms var(--ease-ink) 250ms backwards;
+    }
+  }
+  .hero .plate-frame { animation: rule-in 900ms var(--ease-ink) 500ms backwards; }
+  .hero .plate-frame::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-right: 1px solid var(--pen);
+    opacity: 0;
+    pointer-events: none;
+    animation: pen-edge 900ms var(--ease-ink) 500ms backwards;
+  }
+  /* The counts and the "next up" line arrive after a fetch: they settle in,
+     and the dot pings twice to say the number is live. */
+  .counts:not([hidden]) .dot, .now:not([hidden]) .dot { animation: ping 1600ms ease-out 400ms 2; }
+}
+/* Arriving is an opacity change, so it stays under reduced motion. */
+.counts:not([hidden]), .now:not([hidden]) { animation: arrive 500ms ease-out backwards; }
+
+@keyframes write {
+  from { color: transparent; background-size: 0 100%; }
+  to { color: transparent; background-size: 100% 100%; }
+}
+@keyframes rule-in { from { clip-path: inset(-1px 100% -1px -1px); } to { clip-path: inset(-1px); } }
+@keyframes pen-edge {
+  from { transform: translateX(-100%); opacity: 0; }
+  4%, 80% { opacity: 1; }
+  to { transform: none; opacity: 0; }
+}
+@keyframes arrive { from { opacity: 0; } }
+@keyframes ping {
+  from { outline: 1px solid color-mix(in srgb, var(--pen) 70%, transparent); outline-offset: 0; }
+  to { outline: 1px solid transparent; outline-offset: 8px; }
+}
+
+/* Paper to night and back: the new page is ruled in from the left, the way
+   everything else on it arrives. Runs only where the browser can snapshot the
+   page (ThemeToggle starts the transition); elsewhere the theme just changes. */
+::view-transition-old(root) { animation: none; }
+::view-transition-new(root) { animation: rule-page 520ms var(--ease-ink); }
+@keyframes rule-page { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0); } }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
 
 /* The reading meter: on wide screens the heading rail stays put while its
