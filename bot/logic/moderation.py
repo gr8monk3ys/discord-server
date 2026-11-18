@@ -35,7 +35,7 @@ SPAM_COOLDOWN = 60  # after a hit, ignore that member for this long (in-flight m
 RAID_WEIGHT, RAID_WINDOW = 8, 60
 YOUNG_ACCOUNT = 7 * DAY
 RAID_LOCK = 30 * MIN
-RAID_MEMORY = DAY  # how long accounts that set off a raid stop counting toward the next one
+RAID_MEMORY = DAY  # how long accounts that set off a raid count single, however new they are
 HIGH = 3  # discord.VerificationLevel.high
 
 
@@ -177,17 +177,17 @@ def is_young(created_at: float, now: float) -> bool:
 
 class RaidTracker:
     """Weighted joins over the last minute, in memory, each account counted once however often it
-    rejoins. Accounts that set off a raid don't count again for RAID_MEMORY, so the same alts
-    can't close the server again as soon as it reopens. add() is True when a raid starts."""
+    rejoins. Accounts that set off a raid count single, not double, for RAID_MEMORY: the same few
+    young alts can't close the server again as soon as it reopens, while RAID_WEIGHT of them
+    coming back together is still a raid. add() is True when a raid starts."""
 
     def __init__(self):
         self.joins: deque[tuple[float, int, int]] = deque()  # (at, member id, weight)
         self.spent: dict[int, float] = {}  # member id -> when it counts again
 
     def add(self, at: float, member_id: int, young: bool) -> bool:
-        if at < self.spent.get(member_id, 0):
-            return False
-        self.joins.append((at, member_id, 2 if young else 1))
+        doubled = young and at >= self.spent.get(member_id, 0)
+        self.joins.append((at, member_id, 2 if doubled else 1))
         while self.joins and at - self.joins[0][0] >= RAID_WINDOW:
             self.joins.popleft()
         weights = {m: w for _, m, w in self.joins}

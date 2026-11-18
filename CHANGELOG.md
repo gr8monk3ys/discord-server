@@ -73,8 +73,8 @@ All notable changes to this project are recorded here. The format follows
 
 - Anti-raid counts distinct accounts, not joins: one young account joining and leaving four times
   in a minute no longer raises the verification level and pauses invites. Accounts that set off a
-  raid don't count toward another for 24 hours, so the same alts can't close the server again as
-  soon as the lockdown lifts.
+  raid count single, not double, for 24 hours: the same few young alts can't close the server
+  again as soon as the lockdown lifts, and eight of them coming back together still does.
 - `/purge` refuses the 📋・mod-log and 🔒・appeals channels and the threads under them, so a moderator
   can't wipe the case log, the appeal review cards or the staff discussion on an appeal.
 - Monkey SMP: `/smp link` no longer takes a Minecraft name on the member's word. It gives a one-time

@@ -193,9 +193,21 @@ def test_raid_same_accounts_cannot_replay_after_the_lockdown():
     later = T0 + M.RAID_LOCK + 60
     for i in range(4):
         assert not tr.add(later + i, i, young=True)  # the same four alts once the server reopens
+    fresh = later + M.RAID_WINDOW + 10
     for i in range(3):
-        assert not tr.add(later + 10 + i, 10 + i, young=True)
-    assert tr.add(later + 20, 13, young=True)  # four fresh accounts still trip it
+        assert not tr.add(fresh + i, 10 + i, young=True)
+    assert tr.add(fresh + 3, 13, young=True)  # four fresh accounts still trip it
+
+
+def test_raid_spent_accounts_returning_in_force_is_still_a_raid():
+    tr = M.RaidTracker()
+    for i in range(7):
+        tr.add(T0 + i, i, young=False)
+    assert tr.add(T0 + 7, 7, young=False)
+    later = T0 + M.RAID_LOCK + 60
+    for i in range(7):
+        assert not tr.add(later + i, i, young=True)  # single weight each, however new
+    assert tr.add(later + 7, 7, young=True)  # all eight back inside a minute
 
 
 def test_raid_spent_accounts_count_again_after_the_memory():
