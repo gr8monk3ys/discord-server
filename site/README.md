@@ -89,7 +89,7 @@ rules the plate in from the left. It is CSS only, "Chill gamers." and the text u
 from the first paint, and nothing waits on JavaScript. The counts and the "next up" line fade in
 when their data arrives and the dot pings twice. Changing the theme rules the new page in from the
 left (a view transition, where the browser has them), FAQ answers open to their own height, and
-the Join key rises under the pointer and presses flat.
+the mark on the Join button tips towards the pointer.
 
 Below the fold, motion is scroll-driven and quiet. `PageMotion` arms the sections there and inks them in
 as they arrive (headings and rows wipe in left to right with a short stagger, the house bars

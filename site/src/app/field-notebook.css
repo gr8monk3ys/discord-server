@@ -152,7 +152,7 @@ code {
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .skip, .ink::after, .sections a::after, summary::after, .theme-toggle svg { transition: none; }
-  .btn:active, .theme-toggle:active, .btn-quiet:active { transform: none; }
+  .btn:active, .theme-toggle:active, .btn-quiet:active, .btn:hover svg { transform: none; }
 }
 
 /* -------------------------------------------------------------------- type */
@@ -348,11 +348,11 @@ h3.label { font-family: var(--mono); font-size: 0.72rem; font-weight: 500; lette
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
-  transition: filter var(--default) var(--ease-ui), transform 100ms ease, box-shadow 100ms ease;
+  transition: filter var(--default) var(--ease-ui), transform 100ms ease;
 }
-/* The ledge is the key's travel: it rises under the pointer and is pressed flat. */
-.btn:hover { color: var(--pen-text); filter: brightness(1.05); transform: translateY(-2px); box-shadow: 0 3px 0 color-mix(in srgb, var(--pen) 25%, transparent); }
-.btn:active { transform: translateY(1px); box-shadow: 0 0 0 color-mix(in srgb, var(--pen) 25%, transparent); }
+.btn:hover { color: var(--pen-text); filter: brightness(1.05); }
+.btn:active { transform: translateY(1px); }
+/* The mark on the key tips towards the pointer: the one thing on the button that moves. */
 .btn svg { transition: transform 300ms var(--ease-ink); }
 .btn:hover svg { transform: rotate(-10deg) scale(1.08); }
 .btn-lg { height: 48px; padding: 8px 32px; }
@@ -767,8 +767,8 @@ footer { border-top: 1px solid color-mix(in srgb, var(--hairline) 60%, transpare
 }
 @keyframes arrive { from { opacity: 0; } }
 @keyframes ping {
-  from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--pen) 55%, transparent); }
-  to { box-shadow: 0 0 0 9px transparent; }
+  from { outline: 1px solid color-mix(in srgb, var(--pen) 70%, transparent); outline-offset: 0; }
+  to { outline: 1px solid transparent; outline-offset: 8px; }
 }
 
 /* Paper to night and back: the new page is ruled in from the left, the way
