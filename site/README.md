@@ -68,9 +68,9 @@ if a newer bun rewrites it.
 It is styled as a page of lscaturchio.xyz and takes its values from that repo (`DESIGN.md`, "The
 Field Notebook", plus `src/app/globals.css` and the home page components): warm paper with a
 faint grain, one pen (Forest Ink `#184e35`, `#42a979` at night), sand hairlines instead of boxes,
-Fraunces for headings, Instrument Sans for reading and IBM Plex Mono for the small uppercase wall
-labels. The promise in the headline ("No tryhards, no toxicity.") is in the owner's own print
-handwriting (`src/fonts/LorenzoHand-Bold.woff2`, served by next/font like the rest). The structure is the main site's too: the same header (cursive wordmark at the left, which
+Lorenzo Hand (the owner's own handwriting, `src/fonts/LorenzoHand-Bold.woff2`) for headings,
+with Fraunces behind it for any glyph it lacks, Instrument Sans for reading and IBM Plex Mono for the small uppercase wall
+labels. The structure is the main site's too: the same header (cursive wordmark at the left, which
 links back to lscaturchio.xyz; nav pill; theme toggle), a masthead with a square plate, ledger
 sections with a sticky wall-label rail, and the site-map footer. `public/img/cursive.svg` is a
 copy of that repo's `public/cursive.svg`. The fonts are the cuts next/font serves there (Fraunces
