@@ -8,6 +8,10 @@ All notable changes to this project are recorded here. The format follows
 
 ### Changed
 
+- The landing page's masthead is written in as the page opens: the pen writes the promise along its
+  lines and rules the plate in from the left (CSS only, nothing waits on JavaScript, off under
+  reduced motion). The live counts fade in with a ping, a theme change is ruled in from the left,
+  FAQ answers open to their own height, and the Join button rises and presses like a key.
 - PRIVACY.md now lists everything Front Desk stores, including birthdays, moderation cases,
   reminders, AFK notes, help tickets, staff applications, matchmaking, factions and Tebex pass
   cancellations, says how long records are kept, and says that a full deletion is done by the
