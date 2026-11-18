@@ -41,6 +41,7 @@ def test_signature_matches_tebex_recipe():
     assert not L.verify(SECRET, body + b" ", expected)
     assert not L.verify("t" * 32, body, expected)
     assert not L.verify(SECRET, body, None) and not L.verify(SECRET, body, "")
+    assert not L.verify(SECRET, body, "é" * 64) and not L.verify(SECRET, body, expected[:-1] + "\udcff")
 
 
 @pytest.mark.parametrize("body", [b"nope", b"[]", b'{"type": "x"}', b'{"id": "", "type": "x"}',

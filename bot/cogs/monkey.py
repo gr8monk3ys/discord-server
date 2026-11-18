@@ -8,7 +8,16 @@ command says the bridge is not set up.
   what it shows changes. The server is asked with the Server List Ping protocol every two
   minutes; while it does not answer the polls back off and the panel is edited once.
 - Links: `/smp link <name>` records which Minecraft name is whose (one name per member,
-  one member per name), for the chat relay and playtime. A link is only that: it never
+  one member per name), for the chat relay and playtime. It starts as a claim with a code;
+  the claim becomes a link when that player says the code in the game's chat (the log shows
+  whose line it is), and lapses unproven after a day. A claim holds no name and counts for
+  nothing; links from before proofs were kept as they were. A banned member's name stays
+  held for them until the ban is lifted (also a ban that comes up to R.LATE_BAN_WINDOW after
+  they left), a departed member's for a while (R.LEAVE_HOLD), so nobody can take it over to
+  carry that player's chat back. A name handed to a friend before the ban is dealt with through
+  the friend: proof shows the player agreed, not who the linker is, and `/smp remove` alone
+  lets the friend link it again, but a friend who is timed out or banned carries no chat (a
+  ban holds the name too). A link is only that: it never
   gives anyone access to Monkey SMP. Access is a paid pass that staff grant by hand or
   through the store, and this bot never sends `whitelist` or any other command that
   changes the server (`R.sendable`); the one exception is opt-in, REFERRAL_GRANT=rcon, and
@@ -57,6 +66,7 @@ from logic import quests
 from logic import monkey as R
 from logic import smpnudge as N
 from logic import smpwatch as W
+from logic.creators import new_code
 from logic.crew import is_quiet
 
 log = logging.getLogger(__name__)
@@ -68,6 +78,9 @@ SLOW_DOWN, NOT_SENT = "⏳", "📴"
 # Posted (rarely) where a player's chat would have been; no name, none of their text.
 UNLINKED_HINT = "*Some players aren't linked, so their chat stays in the game. `/smp link`*"
 
+NO_BAN_CHECK = ("monkey: no Ban Members permission, so the sweep can't tell whether someone gone was banned: "
+                "their link is forgotten as after a leave, and a ban lifted while the bot was off keeps its hold")
+
 MESSAGES = {
     "off": "The Monkey SMP bridge isn't set up yet.",
     "bad_name": "That isn't a Minecraft Java name: 3 to 16 letters, digits or underscores, nothing else.",
@@ -77,11 +90,15 @@ MESSAGES = {
     "have_one": "You already linked `{name}`. Run `/smp unlink` first if you want to change it.",
     "taken": "Someone here already linked that Minecraft name. If it's yours, open a ticket in {help}.",
     "already": "`{name}` is already linked to you.",
-    "linked": ("Linked `{name}` to your Discord account. What you say in the game now shows up in the Monkey SMP "
-               "channel, and your playtime counts here. A link doesn't get you onto the server; {access} "
-               "`/smp unlink` forgets the link."),
+    "claimed": ("To show `{name}` is yours, play on Monkey SMP as `{name}` and say `{code}` in the game's chat "
+                "within " + str(R.CLAIM_TTL // 3600) + " hours. Then what you say in the game shows up in the Monkey "
+                "SMP channel and your playtime counts here; `/smp status` shows the link. A link doesn't get you "
+                "onto the server; {access} `/smp unlink` forgets the link."),
+    "no_log": ("Linking checks your Minecraft name in the game's chat, and that part of the bridge isn't set up. "
+               "A mod can link it for you: open a ticket in {help}."),
     "none": "You haven't linked a Minecraft name. `/smp link` connects one for chat and playtime.",
     "unlinked": "Unlinked `{name}`. Your access to Monkey SMP doesn't change.",
+    "cancelled": "Cancelled your claim on `{name}`: its code no longer works.",
     "failed": "Something went wrong on my side. Try again in a minute.",
     "nudges_off_here": "Nudges aren't switched on for this server.",
     "nudges_link": "Link your Minecraft name first (`/smp link`): that's how I can tell when you were last on.",
@@ -603,44 +620,97 @@ class MonkeySmp(commands.Cog):
             log.info("monkey: tidied %s link row(s) left from the whitelist days", changed)
         return changed
 
-    async def forget_link(self, user_id: int) -> dict | None:
-        """Delete the member's link and return it; None when they had none. That is all:
-        their access to Monkey SMP is staff's business, not the bot's."""
+    async def forget_link(self, user_id: int, hold: bool = False,
+                          until: int | None = None) -> tuple[dict | None, str | None]:
+        """Delete the member's link and their waiting claim: (the link, the claimed name), each
+        None when they had none. That is all: their access to Monkey SMP is staff's business,
+        not the bot's. With `hold` the name stays theirs until `until` (None: until their ban
+        is lifted)."""
         async with self.db.transaction() as tx:
+            claim = await tx.fetchone("SELECT name FROM monkey_claims WHERE user_id = ?", (user_id,))
+            await tx.execute("DELETE FROM monkey_claims WHERE user_id = ?", (user_id,))
+            claimed = claim["name"] if claim is not None else None
             row = await tx.fetchone("SELECT * FROM monkey_links WHERE user_id = ?", (user_id,))
             if row is None:
-                return None
+                if hold and until is None:  # banned after the leave was seen: hold what the leave held
+                    await tx.execute("UPDATE monkey_held SET until = NULL WHERE user_id = ?", (user_id,))
+                return None, claimed
             await tx.execute("DELETE FROM monkey_links WHERE user_id = ?", (user_id,))
             await tx.execute("DELETE FROM monkey_nudges WHERE user_id = ?", (user_id,))
-        return dict(row)
+            if hold:
+                await tx.execute("INSERT OR REPLACE INTO monkey_held (name_key, name, user_id, until)"
+                                 " VALUES (?, ?, ?, ?)", (row["name_key"], row["name"], user_id, until))
+        return dict(row), claimed
 
-    async def drop_member(self, user_id: int, why: str) -> bool:
+    async def drop_member(self, user_id: int, why: str, hold: bool = False, until: int | None = None) -> bool:
         """Forget a member's link (they left, were banned, or staff said so). True when they
         had one."""
-        row = await self.forget_link(user_id)
+        row, _ = await self.forget_link(user_id, hold, until)
         if row is None:
             return False
+        held = "; nobody else can link it until the ban is lifted" if hold and until is None else ""
         await self.mod_log(f"<@{user_id}> {why}: forgot their Minecraft link `{row['name']}` "
-                           "(their Monkey SMP access is unchanged)")
+                           f"(their Monkey SMP access is unchanged){held}")
         return True
 
     async def sweep_departed(self) -> int:
-        """Links whose member is gone (they left while the bot was off). Only with a
-        complete member list, so a cold cache can never unlink everyone."""
+        """Links whose member is gone (they left or were banned while the bot was off), and
+        their waiting claims. Only with a complete member list, so a cold cache can never unlink
+        everyone. Lapsed claims, holds past the late-ban window and holds for bans lifted while
+        the bot was off go too. Without Ban Members a gone member counts as having left."""
+        t = now()
+        await self.db.execute("DELETE FROM monkey_claims WHERE created_at <= ?", (t - R.CLAIM_TTL,))
+        await self.db.execute("DELETE FROM monkey_held WHERE until <= ?", (t - R.LATE_BAN_WINDOW,))
         guild = self.guild()
-        if guild is None or not getattr(guild, "chunked", False):
+        if guild is None:
             return 0
+        for row in await self.db.fetchall("SELECT DISTINCT user_id FROM monkey_held WHERE until IS NULL"):
+            try:
+                await guild.fetch_ban(discord.Object(id=row["user_id"]))
+            except discord.Forbidden:  # holds then end only with an unban the bot sees
+                self.once("ban-check", logging.WARNING, NO_BAN_CHECK)
+                break
+            except discord.NotFound:
+                await self.db.execute("DELETE FROM monkey_held WHERE user_id = ?", (row["user_id"],))
+            except discord.HTTPException:
+                log.info("monkey: couldn't check whether %s is still banned; the next sweep asks again",
+                         row["user_id"])
+        if not getattr(guild, "chunked", False):
+            return 0
+        for row in await self.db.fetchall("SELECT user_id FROM monkey_claims"):
+            if guild.get_member(row["user_id"]) is None:
+                await self.db.execute("DELETE FROM monkey_claims WHERE user_id = ?", (row["user_id"],))
         gone = 0
         for row in await self.db.fetchall("SELECT user_id FROM monkey_links"):
-            if guild.get_member(row["user_id"]) is None:
-                gone += await self.drop_member(row["user_id"], "is no longer here")
+            uid = row["user_id"]
+            if guild.get_member(uid) is not None:
+                continue
+            try:
+                await guild.fetch_ban(discord.Object(id=uid))
+            except discord.Forbidden:
+                self.once("ban-check", logging.WARNING, NO_BAN_CHECK)
+                banned = False
+            except discord.NotFound:
+                banned = False
+            except discord.HTTPException:
+                log.info("monkey: couldn't check whether %s was banned; the next sweep asks again", uid)
+                continue
+            else:
+                banned = True
+            if banned:
+                gone += await self.drop_member(uid, "was banned", hold=True)
+            else:
+                gone += await self.drop_member(uid, "is no longer here", hold=True,
+                                               until=R.leave_hold_until(t, None))
         return gone
 
     @commands.Cog.listener()
     async def on_member_remove(self, member) -> None:
         try:
             if member.guild.id == self.bot.settings.guild_id:
-                await self.drop_member(member.id, "left")
+                timeout = member.timed_out_until if member.is_timed_out() else None
+                until = R.leave_hold_until(now(), int(timeout.timestamp()) if timeout else None)
+                await self.drop_member(member.id, "left", hold=True, until=until)
         except Exception:
             log.exception("monkey: handling a leave failed")
 
@@ -648,32 +718,94 @@ class MonkeySmp(commands.Cog):
     async def on_member_ban(self, guild, user) -> None:
         try:
             if guild.id == self.bot.settings.guild_id:
-                await self.drop_member(user.id, "was banned")
+                await self.drop_member(user.id, "was banned", hold=True)
         except Exception:
             log.exception("monkey: handling a ban failed")
 
-    async def save_link(self, member_id: int, name: str) -> str | None:
-        """Record `name` as the member's. None when it was saved; otherwise why not:
-        "already" (this name is theirs), "have_one" (they linked another) or "taken"."""
+    @commands.Cog.listener()
+    async def on_member_unban(self, guild, user) -> None:
+        try:
+            if guild.id == self.bot.settings.guild_id:
+                await self.db.execute("DELETE FROM monkey_held WHERE user_id = ?", (user.id,))
+        except Exception:
+            log.exception("monkey: handling an unban failed")
+
+    @staticmethod
+    async def link_problem(tx, member_id: int, key: str, staff: bool = False) -> str | None:
+        """Why the member can't have this name: "already" (it is theirs), "have_one" (they
+        linked another) or "taken" (it is someone else's, or held for a banned or departed
+        member; staff may override a hold). None when they can."""
+        mine = await tx.fetchone("SELECT name_key FROM monkey_links WHERE user_id = ?", (member_id,))
+        if mine is not None:
+            return "already" if mine["name_key"] == key else "have_one"
+        if await tx.fetchone("SELECT 1 FROM monkey_links WHERE name_key = ?", (key,)) is not None:
+            return "taken"
+        if not staff and await tx.fetchone(
+                "SELECT 1 FROM monkey_held WHERE name_key = ? AND user_id != ? AND (until IS NULL OR until > ?)",
+                (key, member_id, now())) is not None:
+            return "taken"
+        return None
+
+    async def save_link(self, member_id: int, name: str, staff: bool = False) -> str | None:
+        """Record `name` as the member's (proven, or staff said so). None when it was saved;
+        otherwise `link_problem`'s reason. Claims on the name, the member's own and a hold on
+        the name are done."""
         key, t = R.name_key(name), now()
         async with self.db.transaction() as tx:
-            mine = await tx.fetchone("SELECT name_key FROM monkey_links WHERE user_id = ?", (member_id,))
-            if mine is not None:
-                return "already" if mine["name_key"] == key else "have_one"
-            if await tx.fetchone("SELECT 1 FROM monkey_links WHERE name_key = ?", (key,)) is not None:
-                return "taken"
+            problem = await self.link_problem(tx, member_id, key, staff)
+            if problem is not None:
+                return problem
             await tx.execute("INSERT INTO monkey_links (name_key, name, user_id, state, attempts, linked_at,"
                              " updated_at) VALUES (?, ?, ?, 'ok', 0, ?, ?)", (key, name, member_id, t, t))
+            await tx.execute("DELETE FROM monkey_claims WHERE user_id = ? OR name_key = ?", (member_id, key))
+            await tx.execute("DELETE FROM monkey_held WHERE name_key = ?", (key,))
         return None
+
+    async def save_claim(self, member_id: int, name: str, t: int) -> tuple[str | None, str | None]:
+        """Store the member's claim on `name`: (None, its code), or (`link_problem`'s reason,
+        None). Claiming the same name again keeps a live code and restarts its time; another
+        name replaces the claim."""
+        key = R.name_key(name)
+        async with self.db.transaction() as tx:
+            await tx.execute("DELETE FROM monkey_claims WHERE created_at <= ?", (t - R.CLAIM_TTL,))
+            problem = await self.link_problem(tx, member_id, key)
+            if problem is not None:
+                return problem, None
+            old = await tx.fetchone("SELECT name_key, code FROM monkey_claims WHERE user_id = ?", (member_id,))
+            if old is not None and old["name_key"] == key:
+                await tx.execute("UPDATE monkey_claims SET created_at = ? WHERE user_id = ?", (t, member_id))
+                return None, old["code"]
+            code = new_code()
+            await tx.execute("INSERT OR REPLACE INTO monkey_claims (user_id, name_key, name, code, created_at)"
+                             " VALUES (?, ?, ?, ?, ?)", (member_id, key, name, code, t))
+        return None, code
+
+    async def prove(self, event) -> bool:
+        """A chat line that says a live claim's code, in the claimed player's own name, makes
+        the claim a link. True when the line carried a code: it then stays out of Discord."""
+        rows = await self.db.fetchall("SELECT user_id, code FROM monkey_claims WHERE name_key = ? AND created_at > ?",
+                                      (R.name_key(event.name), now() - R.CLAIM_TTL))
+        claim = next((r for r in rows if R.proves(r["code"], event)), None)
+        if claim is None:
+            return False
+        uid = claim["user_id"]
+        if await self.save_link(uid, event.name) is None:
+            await self.mod_log(f"<@{uid}> linked the Minecraft name `{event.name}`")
+        else:  # they linked another name, or someone proved this one first, since claiming
+            await self.db.execute("DELETE FROM monkey_claims WHERE user_id = ?", (uid,))
+        return True
 
     async def linked_name(self, user_id: int) -> str | None:
         row = await self.db.fetchone("SELECT name FROM monkey_links WHERE user_id = ?", (user_id,))
         return row["name"] if row is not None else None
 
     async def link_member(self, member, name: str) -> str:
-        """/smp link: returns the reply. The name is never echoed unless it is valid."""
+        """/smp link: returns the reply, with the code that proves the claim. The name is never
+        echoed unless it is valid."""
         if not self.setup.any_on:
             return MESSAGES["off"]
+        if not self.setup.log_on:
+            return MESSAGES["no_log"].format(help=self.help_ref())
         if not R.valid_name(name):
             return MESSAGES["bad_name"]
         t = now()
@@ -686,11 +818,11 @@ class MonkeySmp(commands.Cog):
             return MESSAGES["cooldown"]
         self.last_link = {u: at for u, at in self.last_link.items() if t - at < R.LINK_COOLDOWN}
         self.last_link[member.id] = t
-        problem = await self.save_link(member.id, name)
+        problem, code = await self.save_claim(member.id, name, t)
         if problem is not None:
             return MESSAGES[problem].format(name=await self.linked_name(member.id) or name, help=self.help_ref())
-        await self.mod_log(f"<@{member.id}> linked the Minecraft name `{name}`")
-        return MESSAGES["linked"].format(name=name, access=self.access_text()) + (NUDGE_HINT if self.nudges_on else "")
+        return (MESSAGES["claimed"].format(name=name, code=code, access=self.access_text())
+                + (NUDGE_HINT if self.nudges_on else ""))
 
     async def adopt_member(self, mod, member, name: str) -> str:
         """/smp adopt: staff link a name for a member, without the account-age bar or the
@@ -702,7 +834,9 @@ class MonkeySmp(commands.Cog):
             return MESSAGES["bad_name"]
         if getattr(member, "bot", False):
             return "Bots don't play on Monkey SMP."
-        problem = await self.save_link(member.id, name)
+        held = await self.db.fetchone("SELECT user_id FROM monkey_held WHERE name_key = ? AND user_id != ?"
+                                      " AND (until IS NULL OR until > ?)", (R.name_key(name), member.id, now()))
+        problem = await self.save_link(member.id, name, staff=True)
         if problem == "have_one":
             return f"{member.mention} already has `{await self.linked_name(member.id)}` linked. `/smp remove` it first."
         if problem == "taken":
@@ -711,7 +845,8 @@ class MonkeySmp(commands.Cog):
         if problem == "already":
             return f"`{name}` is already linked to {member.mention}."
         log.info("monkey: %s linked a name for %s", mod.id, member.id)
-        await self.mod_log(f"<@{mod.id}> linked the Minecraft name `{name}` to <@{member.id}> (`/smp adopt`)")
+        overrode = f", over the hold kept for <@{held['user_id']}>" if held is not None else ""
+        await self.mod_log(f"<@{mod.id}> linked the Minecraft name `{name}` to <@{member.id}> (`/smp adopt`{overrode})")
         return (f"Linked `{name}` to {member.mention}. A link gives no access to Monkey SMP; that is a pass, "
                 "granted separately.")
 
@@ -845,9 +980,9 @@ class MonkeySmp(commands.Cog):
     async def unlink(self, interaction: discord.Interaction) -> None:
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
-            row = await self.forget_link(interaction.user.id)
+            row, claimed = await self.forget_link(interaction.user.id)
             if row is None:
-                text = MESSAGES["none"]
+                text = MESSAGES["cancelled"].format(name=claimed) if claimed else MESSAGES["none"]
             else:
                 text = MESSAGES["unlinked"].format(name=row["name"])
                 await self.mod_log(f"<@{interaction.user.id}> unlinked the Minecraft name `{row['name']}`")
@@ -900,7 +1035,12 @@ class MonkeySmp(commands.Cog):
         else:
             lines = [R.panel_text(self.status, self.names, self.down_since)]
         name = await self.linked_name(uid)
-        if name is None:
+        claim = await self.db.fetchone("SELECT name, code, created_at FROM monkey_claims WHERE user_id = ?"
+                                       " AND created_at > ?", (uid, t - R.CLAIM_TTL))
+        if name is None and claim is not None:
+            lines.append(f"\n**You**: `{claim['name']}` is waiting: say `{claim['code']}` in the game's chat as "
+                         f"`{claim['name']}` before <t:{claim['created_at'] + R.CLAIM_TTL}:f>.")
+        elif name is None:
             lines.append("\n**You**: no Minecraft name linked. `/smp link` connects one; only linked players' "
                          "chat is passed on from the game to this channel.")
         else:
@@ -1094,6 +1234,8 @@ class MonkeySmp(commands.Cog):
                     continue
                 if event.kind in (R.JOIN, R.LEAVE):
                     self.next_poll_at = min(self.next_poll_at, now() + R.TICK)  # freshen the panel soon
+                if event.kind == R.CHAT and await self.prove(event):
+                    continue  # a link code: it did its job and is nobody's chat
                 # Join and leave lines are the bot's own words around a validated name: shown for
                 # anyone, so the channel still says who is on. Chat, deaths and advancements
                 # carry text a player can shape (what they typed, a renamed item, a modded

@@ -1,11 +1,12 @@
 from logic import growth as G
+from logic import quests as Q
 from logic.growth import Join
 
 A, B, C, D, E = 1, 2, 3, 4, 5
 DISBOARD = 302050872383242240
 OTHER_BOT = 77
 DAY = 24 * 60 * 60
-NOW = 100 * DAY
+NOW = 1_790_000_000  # a real date: stayed_counts reads account age from the user ids
 
 
 # --- attribute_join: which invite was used ---
@@ -167,6 +168,13 @@ def test_stayed_counts_per_inviter_with_since():
     ]
     assert G.stayed_counts(joins, NOW) == {A: 3, B: 1}
     assert G.stayed_counts(joins, NOW, since=NOW - 30 * DAY) == {A: 2, B: 1}
+
+
+def test_stayed_counts_skip_accounts_too_new_when_they_joined():
+    alts = [((NOW - 20 * DAY) * 1000 - Q.DISCORD_EPOCH_MS << 22) + n for n in range(3)]  # made the day before
+    joins = [j(alt, A, NOW - 19 * DAY) for alt in alts] + [j(C, A, NOW - 19 * DAY)]
+    assert G.stayed_counts(joins, NOW) == {A: 1}
+    assert G.recruiters(G.stayed_counts(joins, NOW)) == set()
 
 
 def test_stayed_counts_same_person_counts_once_per_inviter():

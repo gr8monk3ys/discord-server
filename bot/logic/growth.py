@@ -4,6 +4,8 @@ Pure: no Discord, no database. All times are unix seconds."""
 from collections.abc import Collection, Iterable
 from dataclasses import dataclass
 
+from logic import quests as Q
+
 DAY = 24 * 60 * 60
 STAY_SECONDS = 3 * DAY  # a recruit "stayed" if still in the server this long after joining
 RECRUITER_THRESHOLD = 3  # stayed invites needed for the Recruiter role
@@ -94,10 +96,11 @@ def summary(joins: Iterable[Join], inviter: int, now: int) -> Summary:
 
 
 def stayed_counts(joins: Iterable[Join], now: int, since: int | None = None) -> dict[int, int]:
-    """inviter -> distinct people who stayed, counting joins at or after `since`."""
+    """inviter -> distinct people who stayed, counting joins at or after `since` by accounts
+    that were established (quests.established) when they joined, as the invite contest does."""
     people: dict[int, set[int]] = {}
     for x in _counted(joins, since=since):
-        if stayed(x, now):
+        if stayed(x, now) and Q.established(x.user_id, x.joined_at):
             people.setdefault(x.inviter_id, set()).add(x.user_id)
     return {inviter: len(users) for inviter, users in people.items()}
 

@@ -78,7 +78,7 @@ def signature(secret: str, body: bytes) -> str:
 
 
 def verify(secret: str, body: bytes, header) -> bool:
-    if not header or not isinstance(header, str):
+    if not header or not isinstance(header, str) or not header.isascii():  # compare_digest raises on non-ASCII str
         return False
     return hmac.compare_digest(signature(secret, body), header.strip().lower())
 

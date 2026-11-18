@@ -5,6 +5,7 @@ import pytest
 
 import config
 from logic import tempvoice as T
+from logic import textfilter
 
 
 def utf16(text):
@@ -55,6 +56,25 @@ def test_game_named_like_a_permanent_channel_uses_fallback():
     assert T.channel_name("New Squad", "Bob") == "🎮 Bob's squad"
     assert T.channel_name("New Private Squad", "Bob") == "🎮 Bob's squad"
     assert T.channel_name("Lobby", "Bob") == "🎮 Bob's squad"
+
+
+@pytest.mark.parametrize("game", ["join discord.gg/raid", "free nitro at nitro.gift", "cunt simulator"])
+def test_game_that_fails_the_text_filter_uses_display_name(game):
+    assert T.channel_name(game, "Bob") == "🎮 Bob's squad"
+
+
+@pytest.mark.parametrize("who", ["discord.gg/raid", "shop.xyz", "you cunt"])
+def test_display_name_that_fails_the_text_filter_uses_someone(who):
+    assert T.channel_name(None, who) == "🎮 Someone's squad"
+    assert T.channel_name("cunt simulator", who) == "🎮 Someone's squad"
+
+
+def test_filter_sees_the_cut_name():
+    # The cut at 100 units can leave a blocked word that the full game name didn't have.
+    game = "x" * (T.NAME_MAX - utf16(T.PREFIX) - len(" cunt")) + " cuntx"
+    assert textfilter.check(game)[0]
+    assert T.channel_name(game, "Bob") == "🎮 Bob's squad"
+    assert T.channel_name("Scunthorpe United", "Bob") == "🎮 Scunthorpe United"
 
 
 def test_clean_rename():

@@ -109,8 +109,9 @@ class FakeText:
 class FakeWebhookMessage:
     _next = 70000
 
-    def __init__(self, guild, channel, text, webhook_id=555, content=""):
+    def __init__(self, guild, channel, text, webhook_id=555, content="", interaction_metadata=None):
         FakeWebhookMessage._next += 1
+        self.interaction_metadata = interaction_metadata
         self.id = FakeWebhookMessage._next
         self.guild = guild
         self.channel = channel
@@ -431,6 +432,20 @@ def test_a_non_webhook_message_is_never_an_appeal(monkeypatch):
         await env.cog.on_message(forged)
         assert not forged.deleted and await env.rows() == [] and env.guild.appeals.sent == []
         assert await env.cog.sweep() == 0 and await env.rows() == []
+    with_env(go, monkeypatch)
+
+
+def test_slash_command_replies_in_the_channel_are_left_alone(monkeypatch):
+    async def go(env):
+        used = SimpleNamespace(id=1, type=discord.InteractionType.application_command)
+        reply = env.post("Here's the list.", interaction_metadata=used)  # another app's public reply
+        thinking = env.post(None, interaction_metadata=used)  # a deferred "is thinking..." message
+        for m in (reply, thinking):
+            assert await env.cog.ingest(m) is None
+            await env.cog.on_message(m)
+            assert not m.deleted
+        assert await env.cog.sweep() == 0
+        assert await env.rows() == [] and env.logs() == []
     with_env(go, monkeypatch)
 
 

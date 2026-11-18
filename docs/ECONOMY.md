@@ -25,7 +25,7 @@ Every coin moves through `bot/economy.py` (`apply`, `apply_tx`, `transfer`), so 
 | `mvp` | `logic/coins.py` | 250 | one member a week | n/a (one winner) |
 | `clipweek` | `logic/coins.py` | 500 | one member a week | n/a |
 | `season` | `logic/shop.py` | 1,000 / 500 / 250 | top 3 a month | n/a |
-| `invitecontest` | `logic/recap.py` | 1,500 / 750 / 300 | top 3 a month | **no**: invitees only have to stay (`growth.stayed`), their account age is not checked |
+| `invitecontest` | `logic/recap.py` | 1,500 / 750 / 300 | top 3 a month | yes (invitees established when they joined) |
 | `tournament` | `logic/tournaments.py` | 1,000 first, 400 second | per tournament (one auto a month) | yes (sign-up age check) |
 | `motm` | `logic/vibes.py` | 1,000 | one member a month | yes |
 | `boost` | `logic/vibes.py` | 1,000 | once per boost | yes |

@@ -18,6 +18,7 @@ import config
 from cogkit import is_staff
 from cogs.stats import playing
 from logic import tempvoice as T
+from logic import textfilter
 
 log = logging.getLogger(__name__)
 
@@ -82,6 +83,8 @@ class TempVoice(commands.Cog):
         self.joined: dict[int, dict[int, float]] = {}  # channel_id -> user_id -> joined at
         self.pending: dict[int, asyncio.Task] = {}  # channel_id -> delayed delete
         self.cooldown = T.Cooldown(T.CREATE_COOLDOWN)
+        self.invites = T.Cooldown(T.INVITE_COOLDOWN)
+        self.invite_pings = T.Cooldown(T.INVITE_PING_COOLDOWN)  # keyed by (channel_id, member_id)
         self.renames = T.WindowLimit(T.RENAME_LIMIT, T.RENAME_WINDOW)
         self.warned_missing = False
 
@@ -328,6 +331,9 @@ class TempVoice(commands.Cog):
         if name is None:
             await interaction.response.send_message("Pick a different name.", ephemeral=True)
             return
+        if blocked := textfilter.screen("/squad name", interaction.user.id, [name], allow_links=False):
+            await interaction.response.send_message(blocked, ephemeral=True)
+            return
         wait = self.renames.wait(channel.id, now())
         if wait > 0:
             await interaction.response.send_message(
@@ -397,9 +403,24 @@ class TempVoice(commands.Cog):
         if member.bot or member.id == interaction.user.id:
             await interaction.response.send_message("Pick someone else.", ephemeral=True)
             return
+        current = channel.overwrites.get(member)
+        if current is not None and current.connect is True:
+            await interaction.response.send_message(f"{member.mention} can already join.", ephemeral=True,
+                                                    allowed_mentions=discord.AllowedMentions.none())
+            return
+        if not self.invites.take(interaction.user.id, now()):
+            await interaction.response.send_message(
+                f"You can invite one person every {T.INVITE_COOLDOWN} seconds. Try again in a moment.",
+                ephemeral=True)
+            return
         await interaction.response.defer(ephemeral=True, thinking=True)
-        await channel.set_permissions(member, overwrite=with_connect(channel.overwrites.get(member), True),
+        await channel.set_permissions(member, overwrite=with_connect(current, True),
                                       reason=f"/squad invite by {interaction.user.id}")
+        if not self.invite_pings.take((channel.id, member.id), now()):
+            await interaction.followup.send(f"{member.mention} can join now. They were pinged here recently, "
+                                            "so there's no new ping this time.", ephemeral=True,
+                                            allowed_mentions=discord.AllowedMentions.none())
+            return
         try:
             await channel.send(f"{member.mention}, you're invited: join this channel any time.",
                                allowed_mentions=discord.AllowedMentions(everyone=False, roles=False, users=[member]))

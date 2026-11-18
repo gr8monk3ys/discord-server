@@ -513,8 +513,8 @@ POSTS = {
                 "enchanting table. Nothing that stores items, and nothing in someone else's claim.",
                 "",
                 "**Here on Discord**",
-                "`/smp link <minecraft name>`  connects your Java name, so your game chat shows in "
-                "{#monkey-smp} and your playtime counts. It isn't a pass.",
+                "`/smp link <minecraft name>`  gives you a code to say in the game's chat; once you have, "
+                "your game chat shows in {#monkey-smp} and your playtime counts. It isn't a pass.",
                 "`/smp unlink`  forgets your linked name",
                 "`/smp status`  is the server up, who's on, and your own link and playtime",
                 "`/smp top`  who played the most this week",
