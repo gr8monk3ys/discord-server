@@ -546,6 +546,31 @@ def test_purge_missing_manage_messages(monkeypatch):
     with_env(go, monkeypatch)
 
 
+def test_purge_refused_in_staff_records(monkeypatch):
+    async def go(env):
+        appeals = FakeText(config.APPEALS_CHANNEL)
+        env.guild.text_channels.append(appeals)
+        for channel in (env.guild.mod_log, appeals):
+            inter = env.inter(MOD, channel)
+            await Moderation.purge.callback(env.cog, inter, 100)
+            assert "staff record" in inter.text() and inter.replies()[0]["ephemeral"]
+            assert channel.purged == []
+        assert await env.cases() == []
+    with_env(go, monkeypatch)
+
+
+def test_purge_refused_in_a_thread_under_appeals(monkeypatch):
+    async def go(env):
+        appeals = FakeText(config.APPEALS_CHANNEL)
+        thread = FakeText("Appeal 3 discussion")
+        thread.parent = appeals
+        inter = env.inter(MOD, thread)
+        await Moderation.purge.callback(env.cog, inter, 100)
+        assert "staff record" in inter.text() and inter.replies()[0]["ephemeral"]
+        assert thread.purged == []
+    with_env(go, monkeypatch)
+
+
 # ---------------------------------------------------------------- anti-spam
 def test_flood_times_out_deletes_burst_and_files_a_case(monkeypatch):
     async def go(env):
@@ -674,6 +699,17 @@ def test_young_accounts_count_double(monkeypatch):
     async def go(env):
         await raid(env, 4, age_days=2)
         assert len(env.guild.edits) == 1
+    with_env(go, monkeypatch)
+
+
+def test_one_young_account_rejoining_does_not_trigger(monkeypatch):
+    async def go(env):
+        for _ in range(10):
+            await env.join(1000, age_days=2)
+            env.tick(2)
+        assert env.guild.edits == []
+        await raid(env, 3, age_days=2, start=2000)
+        assert len(env.guild.edits) == 1  # 1000 plus three new accounts
     with_env(go, monkeypatch)
 
 

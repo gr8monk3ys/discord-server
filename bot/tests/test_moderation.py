@@ -152,28 +152,72 @@ def test_tracker_forgets_idle_users():
 def test_raid_eight_joins_in_a_minute():
     tr = M.RaidTracker()
     for i in range(7):
-        assert not tr.add(T0 + i * 5, young=False)
-    assert tr.add(T0 + 40, young=False)
+        assert not tr.add(T0 + i * 5, i, young=False)
+    assert tr.add(T0 + 40, 7, young=False)
 
 
 def test_raid_young_accounts_count_double():
     tr = M.RaidTracker()
     for i in range(3):
-        assert not tr.add(T0 + i, young=True)  # 6
-    assert tr.add(T0 + 10, young=True)  # 8
+        assert not tr.add(T0 + i, i, young=True)  # 6
+    assert tr.add(T0 + 10, 3, young=True)  # 8
 
 
 def test_raid_slow_joins_never_trigger():
     tr = M.RaidTracker()
     for i in range(50):
-        assert not tr.add(T0 + i * 10, young=False)  # at most 6 per 60 s
+        assert not tr.add(T0 + i * 10, i, young=False)  # at most 6 per 60 s
 
 
 def test_raid_trigger_resets_window():
     tr = M.RaidTracker()
     for i in range(8):
-        tr.add(T0 + i, young=False)
-    assert not tr.add(T0 + 9, young=False)
+        tr.add(T0 + i, i, young=False)
+    assert not tr.add(T0 + 9, 8, young=False)
+
+
+def test_raid_one_account_rejoining_counts_once():
+    tr = M.RaidTracker()
+    for i in range(20):
+        assert not tr.add(T0 + i, 42, young=True)
+    for i in range(2):
+        assert not tr.add(T0 + 30 + i, 100 + i, young=True)  # 42 plus two others: 6
+    assert tr.add(T0 + 40, 102, young=True)  # a fourth distinct young account: 8
+
+
+def test_raid_same_accounts_cannot_replay_after_the_lockdown():
+    tr = M.RaidTracker()
+    for i in range(3):
+        tr.add(T0 + i, i, young=True)
+    assert tr.add(T0 + 3, 3, young=True)
+    later = T0 + M.RAID_LOCK + 60
+    for i in range(4):
+        assert not tr.add(later + i, i, young=True)  # the same four alts once the server reopens
+    fresh = later + M.RAID_WINDOW + 10
+    for i in range(3):
+        assert not tr.add(fresh + i, 10 + i, young=True)
+    assert tr.add(fresh + 3, 13, young=True)  # four fresh accounts still trip it
+
+
+def test_raid_spent_accounts_returning_in_force_is_still_a_raid():
+    tr = M.RaidTracker()
+    for i in range(7):
+        tr.add(T0 + i, i, young=False)
+    assert tr.add(T0 + 7, 7, young=False)
+    later = T0 + M.RAID_LOCK + 60
+    for i in range(7):
+        assert not tr.add(later + i, i, young=True)  # single weight each, however new
+    assert tr.add(later + 7, 7, young=True)  # all eight back inside a minute
+
+
+def test_raid_spent_accounts_count_again_after_the_memory():
+    tr = M.RaidTracker()
+    for i in range(4):
+        tr.add(T0 + i, i, young=True)
+    later = T0 + M.RAID_MEMORY + 10
+    for i in range(3):
+        assert not tr.add(later + i, i, young=True)
+    assert tr.add(later + 3, 3, young=True)
 
 
 def test_is_young():

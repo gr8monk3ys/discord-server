@@ -590,6 +590,26 @@ def test_rename_rejects_reserved_or_blank(monkeypatch):
     with_env(go, monkeypatch)
 
 
+@pytest.mark.parametrize("text,reason", [("join discord.gg/raid", "invite"), ("shop.xyz", "link"),
+                                         ("cunt zone", "word")])
+def test_rename_refuses_text_the_filter_blocks(monkeypatch, text, reason):
+    async def go(env):
+        temp = await squad_in_temp(env)
+        inter = env.inter(A)
+        await TempVoice.squad_name.callback(env.cog, inter, text)
+        assert inter.reply() == cogmod.textfilter.MESSAGES[reason] and inter.ephemeral()
+        assert temp.edits == [] and env.cog.renames.wait(temp.id, env.t) == 0
+    with_env(go, monkeypatch)
+
+
+def test_auto_name_from_a_blocked_game_and_display_name_is_neutral(monkeypatch):
+    async def go(env):
+        env.member(A, game="discord.gg/raid").display_name = "cunt"
+        await env.voice(A, env.guild.hub)
+        assert [c.name for c in env.temps()] == ["🎮 Someone's squad"]
+    with_env(go, monkeypatch)
+
+
 def test_claim(monkeypatch):
     async def go(env):
         temp = await squad_in_temp(env)
@@ -688,6 +708,77 @@ def test_invite_lets_someone_into_a_locked_channel(monkeypatch):
             await TempVoice.squad_invite.callback(env.cog, inter, who)
             assert inter.reply() == "Pick someone else."
         assert [t for t, _ in temp.perm_calls] == [c]
+    with_env(go, monkeypatch)
+
+
+def test_invite_someone_who_can_already_join_does_not_ping_again(monkeypatch):
+    async def go(env):
+        await env.voice(A, env.guild.private_hub)
+        [temp] = env.temps()
+        c = env.member(C)
+        await TempVoice.squad_invite.callback(env.cog, env.inter(A), c)
+        for at in (T0 + 60, T0 + 120):
+            env.t = at
+            inter = env.inter(A)
+            await TempVoice.squad_invite.callback(env.cog, inter, c)
+            assert inter.reply() == "<@3> can already join." and inter.ephemeral()
+            assert all(kw["allowed_mentions"].users is False for k, kw in inter.calls if k == "send_message")
+        assert len(temp.sent) == 2 and [t for t, _ in temp.perm_calls] == [c]  # the hello and one invite
+    with_env(go, monkeypatch)
+
+
+def test_invites_have_a_per_owner_cooldown(monkeypatch):
+    async def go(env):
+        await env.voice(A, env.guild.private_hub)
+        [temp] = env.temps()
+        b, c = env.member(B), env.member(C)
+        await TempVoice.squad_invite.callback(env.cog, env.inter(A), b)
+        env.t = T0 + T.INVITE_COOLDOWN - 1
+        inter = env.inter(A)
+        await TempVoice.squad_invite.callback(env.cog, inter, c)
+        assert "every 15 seconds" in inter.reply() and inter.ephemeral()
+        assert [t for t, _ in temp.perm_calls] == [b] and len(temp.sent) == 2
+        env.t = T0 + T.INVITE_COOLDOWN
+        inter = env.inter(A)
+        await TempVoice.squad_invite.callback(env.cog, inter, c)
+        assert inter.reply() == "<@3> can join now."
+        assert [t for t, _ in temp.perm_calls] == [b, c] and temp.sent[-1].startswith("<@3>, you're invited")
+    with_env(go, monkeypatch)
+
+
+def test_a_refused_invite_does_not_start_the_cooldown(monkeypatch):
+    async def go(env):
+        await env.voice(A, env.guild.private_hub)
+        [temp] = env.temps()
+        b, c = env.member(B), env.member(C)
+        temp.overwrites[b] = discord.PermissionOverwrite(connect=True)
+        inter = env.inter(A)
+        await TempVoice.squad_invite.callback(env.cog, inter, b)
+        assert inter.reply() == "<@2> can already join."
+        env.t = T0 + 1
+        inter = env.inter(A)
+        await TempVoice.squad_invite.callback(env.cog, inter, c)
+        assert inter.reply() == "<@3> can join now." and temp.sent[-1].startswith("<@3>, you're invited")
+    with_env(go, monkeypatch)
+
+
+def test_kick_and_reinvite_loop_pings_once_per_ping_cooldown(monkeypatch):
+    async def go(env):
+        await env.voice(A, env.guild.private_hub)
+        [temp] = env.temps()
+        c = env.member(C)
+        for i in range(3):
+            env.t = T0 + i * T.INVITE_COOLDOWN
+            await TempVoice.squad_kick.callback(env.cog, env.inter(A), c)
+            inter = env.inter(A)
+            await TempVoice.squad_invite.callback(env.cog, inter, c)
+            assert temp.overwrites[c].connect is True
+        assert "no new ping" in inter.reply() and inter.ephemeral()
+        assert sum(m.startswith("<@3>, you're invited") for m in temp.sent) == 1
+        env.t = T0 + T.INVITE_PING_COOLDOWN
+        await TempVoice.squad_kick.callback(env.cog, env.inter(A), c)
+        await TempVoice.squad_invite.callback(env.cog, env.inter(A), c)
+        assert sum(m.startswith("<@3>, you're invited") for m in temp.sent) == 2
     with_env(go, monkeypatch)
 
 

@@ -75,9 +75,49 @@ All notable changes to this project are recorded here. The format follows
 
 ### Fixed
 
+- Anti-raid counts distinct accounts, not joins: one young account joining and leaving four times
+  in a minute no longer raises the verification level and pauses invites. Accounts that set off a
+  raid count single, not double, for 24 hours: the same few young alts can't close the server
+  again as soon as the lockdown lifts, and eight of them coming back together still does.
+- `/purge` refuses the 📋・mod-log and 🔒・appeals channels and the threads under them, so a moderator
+  can't wipe the case log, the appeal review cards or the staff discussion on an appeal.
+- Monkey SMP: `/smp link` no longer takes a Minecraft name on the member's word. It gives a one-time
+  code, and the link counts only once that player says the code in the game's chat (the bridge
+  reads it in the server log, so self-linking needs `MONKEY_LOG_PATH`). Until then the claim holds
+  no name, relays no chat and earns no playtime or `/smp top` place, and it lapses after 24 hours.
+  So a member can no longer take a name its player never agreed to: to squat it for its playtime
+  coins and ranking. A banned member's linked name is now held for them until the ban is lifted (also
+  when the ban happened while the bot was off, or up to 14 days after they left), and a departed
+  member's for an hour or to the end of a timeout they left with, so the name can't be taken over
+  after the ban or leave, with the player proving it for someone else, to carry that player's chat
+  back into Discord. A player who hands the name to a friend before the ban is a moderation matter:
+  the proof shows that the player agreed, not who the linker is, and `/smp remove` alone lets the
+  friend link it again, so mods time out or ban the friend (no chat comes through a member who
+  can't post, and a ban holds the name). `/smp unlink` with only a claim now says it cancelled
+  the claim. The half-hourly sweep asks Discord whether a member who left while the bot was off was
+  banned (Ban Members; without it they count as having left). Every link made
+  before this was kept as it was
+  (new `monkey_claims` and `monkey_held` tables; existing `monkey_links` rows are untouched).
+  `/smp adopt` still links a name for a member, and now overrides a hold; `/smp remove` still
+  forgets one.
+- The Recruiter role, `/recruiters` and the recruiter achievement only count invited accounts that
+  were at least 30 days old when they joined, the rule the invite contest already used, so three
+  fresh alts no longer earn the role.
+- A Tebex webhook request whose `X-Signature` header holds non-ASCII characters gets a 401 instead
+  of a 500 with an error in the log (which could trip the health alert in #mod-log).
+- A slash-command reply in the appeals channel (it carries a webhook id too) is no longer deleted
+  and reported as a forged appeal.
 - `polish_server.py` sets up Onboarding only while it is off and has no questions, so re-running it
   (for the media lock, say) no longer replaces the questions and default channels set by
   `focus_mode.py` or `public_mode.py`.
+- Temp voice channel names go through the text filter, since AutoMod never sees channel names:
+  `/squad name` refuses invites, links and blocked words; an automatic name from a game that fails
+  falls back to "🎮 <display name>'s squad", and one from a display name that fails falls back to
+  "🎮 Someone's squad".
+- `/squad invite` no longer pings or re-adds someone who can already join, an owner can invite
+  one person every 15 seconds, and a member is pinged at most once per channel every 10 minutes
+  (a kick and re-invite still lets them in, without a new ping), so it can't be looped to
+  ping-spam a member.
 
 ### Changed
 

@@ -78,6 +78,8 @@ COVERED_BY = {
     "clipcast": "Clipcast (YouTube)",
     "clipcast_prefs": "Clipcast (YouTube)",
     "monkey_links": "Monkey SMP (Minecraft)",
+    "monkey_claims": "Monkey SMP (Minecraft)",
+    "monkey_held": "Monkey SMP (Minecraft)",
     "monkey_playtime": "Monkey SMP (Minecraft)",
     "monkey_nudges": "Monkey SMP (Minecraft)",
     "appeals": "Bans and appeals",
