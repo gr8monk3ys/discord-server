@@ -96,6 +96,7 @@ inside it, and the site job (the bun steps above) on every pull request and push
   the server's Minecraft files and containers alone. Before a long stop there, run
   `python3 server/watchdog.py --alert-only --pause 60` as `frontdesk`, or it alerts #mod-log.
 - The `site-data` branch is not a code branch: it holds one force-pushed, parentless commit
-  with the single file `stats.json`, written only by `server/publish_site_data.py`. Never
+  with `stats.json` and a `site/vercel.json` that stops Vercel building it, written only by
+  `server/publish_site_data.py`. Never
   commit to it, merge it, rebase onto it or delete it; the landing page reads it.
 - Soundboard uploads must be MP3 (discord.py only accepts MP3); `make_sounds.py` needs ffmpeg.

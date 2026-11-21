@@ -13,8 +13,10 @@ raw.githubusercontent.com/<repo>/site-data/stats.json. Each run:
   sections on its own once the published copy is 48 hours old;
 - compares it with what the branch already has, ignoring `generated_at` and the online count,
   and pushes only when the content changed or the published copy is a day old;
-- commits it as the single file stats.json in ONE parentless commit and force-pushes that
-  with a lease on the old tip, so the branch never grows history. This is the only branch the
+- commits it as stats.json in ONE parentless commit and force-pushes that with a lease on the
+  old tip, so the branch never grows history. The commit also holds site/vercel.json turning
+  off Vercel deployments: the Vercel project builds every branch from Root Directory `site`, and
+  without it each push started a preview build that failed. This is the only branch the
   script will ever write: any other branch name is refused before git runs.
 
 All git work happens in a throwaway repository under the system temp directory. The main
@@ -41,6 +43,10 @@ import snapshot_lib
 
 BRANCH = "site-data"  # the only branch this script may write
 FILE_NAME = schema.FILE_NAME
+# Vercel reads git.deploymentEnabled from vercel.json in the Root Directory (`site`) of the pushed commit.
+VERCEL_CONFIG = "site/vercel.json"
+VERCEL_CONFIG_TEXT = '{"git": {"deploymentEnabled": false}}\n'
+BRANCH_FILES = sorted([FILE_NAME, VERCEL_CONFIG])  # everything the branch may hold
 SOURCE_MAX_AGE = 6 * 3600  # the bot refreshes every 30 minutes; older means it is down
 REFRESH_AFTER = 24 * 3600  # push an unchanged file anyway once the published one is this old
 GIT_TIMEOUT = 60
@@ -178,6 +184,9 @@ def publish(source: Path, remote: str, branch: str = BRANCH, apply: bool = False
                 return Result(OFFLINE, "the remote is unreachable")
             shown = git(["show", f"FETCH_HEAD:{FILE_NAME}"], cwd=tmp, check=False)
             remote_text = shown.stdout if shown.returncode == 0 else None
+            switch = git(["show", f"FETCH_HEAD:{VERCEL_CONFIG}"], cwd=tmp, check=False)
+            if switch.returncode != 0 or switch.stdout != VERCEL_CONFIG_TEXT:
+                remote_text = None  # an older branch without the switch: replace it
         if not needs_push(doc, remote_text, now):
             return Result(UNCHANGED, "the branch already has this data")
         size = len(text.encode("utf-8"))
@@ -186,16 +195,18 @@ def publish(source: Path, remote: str, branch: str = BRANCH, apply: bool = False
         if not apply:
             return Result(WOULD_PUSH, f"would push {what} to {branch}. Run with --apply to push.")
 
-        # One parentless commit holding exactly one file.
+        # One parentless commit holding exactly BRANCH_FILES.
         git(["symbolic-ref", "HEAD", f"refs/heads/{branch}"], cwd=tmp)
         (tmp / FILE_NAME).write_text(schema.dumps(doc), encoding="utf-8", newline="\n")
-        git(["add", "--", FILE_NAME], cwd=tmp)
+        (tmp / VERCEL_CONFIG).parent.mkdir()
+        (tmp / VERCEL_CONFIG).write_text(VERCEL_CONFIG_TEXT, encoding="utf-8", newline="\n")
+        git(["add", "--", *BRANCH_FILES], cwd=tmp)
         git(["-c", f"user.name={AUTHOR[0]}", "-c", f"user.email={AUTHOR[1]}", "-c", "commit.gpgsign=false",
              "-c", "core.autocrlf=false", "commit", "--quiet", "--no-verify", "-m", COMMIT_MESSAGE], cwd=tmp)
         tracked = git(["ls-tree", "-r", "--name-only", "HEAD"], cwd=tmp).stdout.split()
         parents = git(["rev-list", "--count", "HEAD"], cwd=tmp).stdout.strip()
-        if tracked != [FILE_NAME] or parents != "1":
-            return Result(FAILED, "the commit is not a single file in a single commit; nothing pushed")
+        if tracked != BRANCH_FILES or parents != "1":
+            return Result(FAILED, "the commit is not the data files in a single commit; nothing pushed")
         try:  # the lease: only replace the tip we looked at (or create the branch if there was none)
             git(["push", "--quiet", "--no-verify", f"--force-with-lease=refs/heads/{branch}:{tip}", remote,
                  f"HEAD:refs/heads/{branch}"], cwd=tmp)

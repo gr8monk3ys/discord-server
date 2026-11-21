@@ -138,8 +138,9 @@ server-wide aggregates, with no member names, avatars or IDs:
    never reach the page. House standings are whole-number points per member, published only
    when every house has 3 or more members who scored that week.
 2. `server/publish_site_data.py --apply` (run it from a scheduled task every 30 minutes) checks the
-   file again against `server/site_schema.py` and pushes it as the single file `stats.json` on the
-   orphan branch `site-data`, only when the content changed or the published copy is a day old.
+   file again against `server/site_schema.py` and pushes it as `stats.json` on the orphan branch
+   `site-data`, only when the content changed or the published copy is a day old. That commit also
+   holds `site/vercel.json` with `git.deploymentEnabled: false`, so Vercel does not build the branch.
    Without `--apply` it is a dry run.
 3. The page fetches `statsUrl` from `src/data/site-config.json`
    (`https://raw.githubusercontent.com/gr8monk3ys/discord-server/site-data/stats.json`) in the
