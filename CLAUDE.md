@@ -100,3 +100,17 @@ inside it, and the site job (the bun steps above) on every pull request and push
   `server/publish_site_data.py`. Never
   commit to it, merge it, rebase onto it or delete it; the landing page reads it.
 - Soundboard uploads must be MP3 (discord.py only accepts MP3); `make_sounds.py` needs ffmpeg.
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues on `gr8monk3ys/discord-server`, via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical roles, label string equal to role name. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
