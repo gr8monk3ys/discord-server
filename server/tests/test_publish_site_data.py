@@ -79,13 +79,13 @@ def test_dry_run_is_the_default_and_pushes_nothing(world):
     assert list(world.work.iterdir()) == []  # the temp repository is cleaned up
 
 
-def test_apply_creates_a_single_file_single_commit_branch(world):
+def test_apply_creates_a_data_only_single_commit_branch(world):
     world.write(document())
     before = checkout_state(world)
     result = world.run()
     assert result.outcome == pub.PUSHED and result.exit_code == 0
     assert sorted(world.heads()) == ["main", pub.BRANCH]
-    assert git("ls-tree", "-r", "--name-only", pub.BRANCH, cwd=world.remote).split() == ["stats.json"]
+    assert git("ls-tree", "-r", "--name-only", pub.BRANCH, cwd=world.remote).split() == pub.BRANCH_FILES
     assert git("rev-list", "--count", pub.BRANCH, cwd=world.remote) == "1"
     assert world.published() == document()
     raw = subprocess.run(["git", "show", f"{pub.BRANCH}:stats.json"], cwd=world.remote, capture_output=True,
@@ -97,6 +97,26 @@ def test_apply_creates_a_single_file_single_commit_branch(world):
     assert not (world.checkout / "stats.json").exists()
     assert git("rev-parse", "main", cwd=world.remote) == before[0]  # main on the remote did not move
     assert list(world.work.iterdir()) == []
+
+
+def test_the_branch_turns_off_its_own_vercel_deployments(world):
+    world.write(document())
+    world.run()
+    config = json.loads(git("show", f"{pub.BRANCH}:site/vercel.json", cwd=world.remote))
+    assert config == {"git": {"deploymentEnabled": False}}
+
+
+def test_a_branch_without_the_vercel_switch_is_replaced_even_when_unchanged(world):
+    # what the branch held before the switch existed: stats.json alone
+    world.write(document())
+    old = world.work.parent / "old"
+    git("init", "--initial-branch", pub.BRANCH, str(old))
+    (old / "stats.json").write_text(schema.dumps(document()), encoding="utf-8", newline="\n")
+    git("add", "stats.json", cwd=old)
+    git("commit", "-m", "Live site data", cwd=old)
+    git("push", str(world.remote), f"{pub.BRANCH}:{pub.BRANCH}", cwd=old)
+    assert world.run().outcome == pub.PUSHED
+    assert git("ls-tree", "-r", "--name-only", pub.BRANCH, cwd=world.remote).split() == pub.BRANCH_FILES
 
 
 def test_unchanged_content_is_not_pushed_again(world):
@@ -119,7 +139,7 @@ def test_changed_content_replaces_the_branch_without_growing_history(world):
     assert world.tip() != first
     assert git("rev-list", "--count", pub.BRANCH, cwd=world.remote) == "1"  # squashed: still one commit
     assert world.published()["week"]["messages"] == 1300
-    assert git("ls-tree", "-r", "--name-only", pub.BRANCH, cwd=world.remote).split() == ["stats.json"]
+    assert git("ls-tree", "-r", "--name-only", pub.BRANCH, cwd=world.remote).split() == pub.BRANCH_FILES
 
 
 def test_refreshes_at_least_daily(world):
