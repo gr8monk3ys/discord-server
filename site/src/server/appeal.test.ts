@@ -1,6 +1,7 @@
 // Tests for the ban-appeal handler (src/server/appeal.ts) and its route. No network: the
 // handler gets a real Request and a fake fetch.
 import { describe, expect, test } from "vitest";
+import { must } from "@/test-support";
 import * as route from "@/app/api/appeal/route";
 import {
   appealCode,
@@ -91,7 +92,7 @@ async function post(ctx: ReturnType<typeof setup>, body: unknown, options?: Opti
 }
 
 type Sent = { allowed_mentions?: unknown; content?: unknown; embeds: { description: string }[] };
-const sentBody = (ctx: ReturnType<typeof setup>, i = 0): Sent => JSON.parse(String(ctx.calls[i].init.body)) as Sent;
+const sentBody = (ctx: ReturnType<typeof setup>, i = 0): Sent => JSON.parse(String(must(ctx.calls[i], "call").init.body)) as Sent;
 
 describe("appeal", () => {
   test("the code matches the Python implementation's shared vector", () => {
@@ -114,7 +115,7 @@ describe("appeal", () => {
     expect(res.json).toEqual({ ok: true, message: "Received." });
     expect(res.headers["cache-control"]).toBe("no-store");
     expect(ctx.calls).toHaveLength(1);
-    const { url, init } = ctx.calls[0];
+    const { url, init } = must(ctx.calls[0], "first call");
     expect(url).toBe(WEBHOOK);
     expect(init.method).toBe("POST");
     expect(init.redirect).toBe("error");
@@ -122,7 +123,7 @@ describe("appeal", () => {
     expect(sent.allowed_mentions).toEqual({ parse: [] });
     expect(sent.content).toBeUndefined();
     expect(sent.embeds).toHaveLength(1);
-    expect(JSON.parse(sent.embeds[0].description)).toEqual({
+    expect(JSON.parse(must(sent.embeds[0], "embed").description)).toEqual({
       v: 1,
       u: USER,
       c: CODE,
@@ -292,7 +293,7 @@ describe("appeal", () => {
     const ctx = setup();
     const res = await post(ctx, { ...GOOD, what: nasty });
     expect(res.status).toBe(200);
-    const description: string = sentBody(ctx).embeds[0].description;
+    const description: string = must(sentBody(ctx).embeds[0], "embed").description;
     expect(description.includes("@everyone") || description.includes("](") || description.includes("**")).toBe(false);
     expect((JSON.parse(description) as { a: string[] }).a[0]).toBe(nasty);
   });
@@ -369,7 +370,7 @@ describe("appeal", () => {
       expect(res.json.error).toBe("delivery");
       expect(ctx.logs).toHaveLength(1);
       for (const secret of [SECRET, CODE, WEBHOOK, "fixture_token", body.what, body.why, USER]) {
-        expect(ctx.logs[0].includes(secret), ctx.logs[0]).toBe(false);
+        expect(must(ctx.logs[0], "log line").includes(secret), ctx.logs[0]).toBe(false);
         expect(res.text.includes(secret)).toBe(false);
       }
     }

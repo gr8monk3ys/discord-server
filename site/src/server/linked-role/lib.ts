@@ -93,8 +93,8 @@ export function stateCookieValue(secret: string, state: string, nowMs: number): 
 export function readStateCookie(secret: string, value: unknown, nowMs: number): string | null {
   if (typeof value !== "string" || value.length > 200) return null;
   const parts = value.split(".");
-  if (parts.length !== 3) return null;
   const [state, expiry, signature] = parts;
+  if (parts.length !== 3 || state === undefined || expiry === undefined || signature === undefined) return null;
   if (!sameString(signature, sign(secret, `${state}.${expiry}`))) return null;
   if (!STATE_SHAPE.test(state) || !/^[0-9]{1,12}$/.test(expiry)) return null;
   if (Number(expiry) * 1000 <= nowMs) return null;

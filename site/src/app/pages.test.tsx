@@ -6,6 +6,7 @@ import path from "node:path";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
+import { must } from "@/test-support";
 import Home, { metadata as homeMeta } from "@/app/page";
 import NotFound, { metadata as notFoundMeta } from "@/app/not-found";
 import Appeal, { metadata as appealMeta } from "@/app/appeal/page";
@@ -105,7 +106,7 @@ describe("home page: structure", () => {
 
   test("the games and rules lists come from the generated data, as text", () => {
     const list = section(HOME, "games");
-    const names = [...list.matchAll(/<li class="game"><span>([^<]+)<\/span><\/li>/g)].map((m) => unescape(m[1]));
+    const names = [...list.matchAll(/<li class="game"><span>([^<]+)<\/span><\/li>/g)].map((m) => unescape(must(m[1], "game name")));
     expect(names).toEqual(games);
     const ruleList = section(HOME, "rules");
     expect(ruleList.match(/<li>/g)).toHaveLength(rules.length);
@@ -203,7 +204,7 @@ describe("every page", () => {
   });
 
   test("absolute links to this site use the one canonical origin", () => {
-    const urls = new Set([...HOME.matchAll(/"(https:\/\/discord\.lscaturchio\.xyz[^"]*)"/g)].map((m) => m[1]));
+    const urls = new Set([...HOME.matchAll(/"(https:\/\/discord\.lscaturchio\.xyz[^"]*)"/g)].map((m) => must(m[1], "url")));
     expect(urls.size).toBeGreaterThan(0);
     for (const u of urls) expect(u.startsWith(CANONICAL)).toBe(true);
   });
@@ -211,7 +212,8 @@ describe("every page", () => {
   test("local links are root-absolute, so they work at any depth", () => {
     for (const [name, page] of Object.entries(PAGES)) {
       for (const m of page.matchAll(/(?:src|href)="([^"#]+)"/g)) {
-        expect(m[1].startsWith("/") || m[1].startsWith("https://"), `${name}: ${m[1]}`).toBe(true);
+        const link = must(m[1], "link");
+        expect(link.startsWith("/") || link.startsWith("https://"), `${name}: ${link}`).toBe(true);
       }
     }
   });
@@ -222,14 +224,16 @@ describe("metadata", () => {
     expect(homeMeta.alternates?.canonical).toBe(CANONICAL);
     const og = homeMeta.openGraph as Record<string, unknown> & { images: Record<string, unknown>[] };
     const tw = homeMeta.twitter as Record<string, unknown> & { images: Record<string, unknown>[] };
+    const ogImage = must(og.images[0], "og image");
+    const twImage = must(tw.images[0], "twitter image");
     expect(og.url).toBe(CANONICAL);
     for (const key of ["title", "description", "siteName", "type"]) expect(String(og[key] ?? "").trim(), key).not.toBe("");
-    expect(og.images[0].url).toBe(`${CANONICAL}img/og.png`); // crawlers need an absolute URL
-    expect([og.images[0].width, og.images[0].height]).toEqual([1200, 630]);
-    expect(String(og.images[0].alt).trim()).not.toBe("");
+    expect(ogImage.url).toBe(`${CANONICAL}img/og.png`); // crawlers need an absolute URL
+    expect([ogImage.width, ogImage.height]).toEqual([1200, 630]);
+    expect(String(ogImage.alt).trim()).not.toBe("");
     expect(tw.card).toBe("summary_large_image");
-    expect(tw.images[0].url).toBe(og.images[0].url);
-    expect(tw.images[0].alt).toBe(og.images[0].alt);
+    expect(twImage.url).toBe(ogImage.url);
+    expect(twImage.alt).toBe(ogImage.alt);
     expect(tw.description).toBe(og.description);
     expect(String(og.description).length).toBeLessThanOrEqual(200);
     expect(TITLE.length).toBeLessThanOrEqual(70);
@@ -240,14 +244,16 @@ describe("metadata", () => {
     const blocks = [...HOME.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)];
     expect(blocks).toHaveLength(1);
     type Node = { "@type": string; url?: string; logo?: string };
-    const data = JSON.parse(blocks[0][1]) as { "@graph": Node[] };
+    const data = JSON.parse(must(blocks[0]?.[1], "JSON-LD block")) as { "@graph": Node[] };
     expect(data).toEqual(JSON_LD);
     const types = Object.fromEntries(data["@graph"].map((n) => [n["@type"], n]));
     expect(Object.keys(types).sort()).toEqual(["Organization", "WebSite"]);
-    expect(types.WebSite.url).toBe(CANONICAL);
-    expect(types.Organization.url).toBe(CANONICAL);
-    expect(types.Organization.logo?.startsWith(`${CANONICAL}img/`)).toBe(true);
-    expect(existsSync(path.join(__dirname, "../../public", String(types.Organization.logo).slice(CANONICAL.length)))).toBe(true);
+    const site = must(types.WebSite, "WebSite node");
+    const org = must(types.Organization, "Organization node");
+    expect(site.url).toBe(CANONICAL);
+    expect(org.url).toBe(CANONICAL);
+    expect(org.logo?.startsWith(`${CANONICAL}img/`)).toBe(true);
+    expect(existsSync(path.join(__dirname, "../../public", String(org.logo).slice(CANONICAL.length)))).toBe(true);
   });
 
   test("the pages that should not be indexed say so", () => {
