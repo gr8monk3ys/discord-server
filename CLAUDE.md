@@ -56,6 +56,9 @@ The bot and scripts share one virtualenv at `server/.venv` (gitignored); it runs
   keep `site/bun.lock` in the version-1 format it reads (`bunx bun@1.3.9 install`)
 - Lint: `server/.venv/Scripts/ruff check .` from the repo root (`ruff.toml`: bug-catching rules only,
   no formatter). `pyrightconfig.json` is for editors; pyright is not clean and is not part of CI.
+- Everything CI runs except the Docker image, Lighthouse and Playwright: `make check` (needs `bun install --frozen-lockfile` in `site/`).
+  The pre-commit hook (`.pre-commit-config.yaml`, `pre-commit install`) runs ruff and the site's lint, types and `depcruise`.
+- Domain terms are in `GLOSSARY.md`; decisions in `docs/adr/`.
 - Every server script dry-runs by default and changes Discord only with `--apply`.
 - `python main.py --invite` (in `bot/`) prints the invite link with the permissions the bot needs.
 

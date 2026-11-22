@@ -1,0 +1,3 @@
+# The server is code: one layout, shared by scripts and bot, changes are additive
+
+`server/layout.py` is the single source of truth for games, roles, categories and channels. The setup scripts build the guild from it and `bot/config.py` imports it, so the two cannot disagree. Every script dry-runs by default (`--apply` changes Discord), looks objects up by name rather than stored IDs, and only adds or moves: a retired game or channel goes to the staff-only archive category instead of being deleted. We chose this over clicking through Discord and over a bot that edits the server freely, so a re-run is safe on a live guild and the repo is public without holding any live IDs.

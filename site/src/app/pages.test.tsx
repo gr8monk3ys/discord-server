@@ -239,14 +239,15 @@ describe("metadata", () => {
   test("the JSON-LD is a minimal Organization and WebSite", () => {
     const blocks = [...HOME.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)];
     expect(blocks).toHaveLength(1);
-    const data = JSON.parse(blocks[0][1]);
+    type Node = { "@type": string; url?: string; logo?: string };
+    const data = JSON.parse(blocks[0][1]) as { "@graph": Node[] };
     expect(data).toEqual(JSON_LD);
-    const types = Object.fromEntries(data["@graph"].map((n: { "@type": string }) => [n["@type"], n]));
+    const types = Object.fromEntries(data["@graph"].map((n) => [n["@type"], n]));
     expect(Object.keys(types).sort()).toEqual(["Organization", "WebSite"]);
     expect(types.WebSite.url).toBe(CANONICAL);
     expect(types.Organization.url).toBe(CANONICAL);
-    expect(types.Organization.logo.startsWith(`${CANONICAL}img/`)).toBe(true);
-    expect(existsSync(path.join(__dirname, "../../public", types.Organization.logo.slice(CANONICAL.length)))).toBe(true);
+    expect(types.Organization.logo?.startsWith(`${CANONICAL}img/`)).toBe(true);
+    expect(existsSync(path.join(__dirname, "../../public", String(types.Organization.logo).slice(CANONICAL.length)))).toBe(true);
   });
 
   test("the pages that should not be indexed say so", () => {

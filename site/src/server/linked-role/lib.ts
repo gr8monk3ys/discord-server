@@ -134,9 +134,8 @@ export function computeRoleConnection(connections: unknown, defs: Definitions = 
   const verified = new Set<string>();
   const list = Array.isArray(connections) ? connections.slice(0, MAX_CONNECTIONS) : [];
   for (const c of list) {
-    if (c && typeof c === "object" && typeof c.type === "string" && c.verified === true && c.revoked !== true) {
-      verified.add(c.type);
-    }
+    const { type, verified: ok, revoked } = (c && typeof c === "object" ? c : {}) as Record<string, unknown>;
+    if (typeof type === "string" && ok === true && revoked !== true) verified.add(type);
   }
   const metadata: Record<string, string> = {};
   let count = 0;

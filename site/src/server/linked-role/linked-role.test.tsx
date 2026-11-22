@@ -1,6 +1,7 @@
 // Tests for the Linked Roles flow (src/server/linked-role/) and its result page. A fake fetch
 // and a fixed clock: nothing here touches the network or the real clock.
 import { renderToStaticMarkup } from "react-dom/server";
+import { fromAny } from "@total-typescript/shoehorn";
 import { describe, expect, test } from "vitest";
 import LinkedRolePage, { metadata } from "@/app/linked-role/page";
 import * as startRoute from "@/app/api/linked-role/start/route";
@@ -82,7 +83,7 @@ async function finish({
 }: { query: string; cookie?: string; routes?: Record<string, Answer>; now?: number; env?: Env; method?: string }) {
   const { impl, calls } = fakeFetch(routes);
   const logs: string[] = [];
-  const handler = createCallback({ env, fetch: impl as unknown as lib.FetchLike, now: () => now, log: (line) => logs.push(line) });
+  const handler = createCallback({ env, fetch: fromAny<lib.FetchLike, typeof impl>(impl), now: () => now, log: (line) => logs.push(line) });
   const req = new Request(`${ORIGIN}/api/linked-role/callback?${query}`, {
     method,
     headers: cookie ? { cookie } : {},

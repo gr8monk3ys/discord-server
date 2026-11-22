@@ -77,9 +77,9 @@ type Res = { status: number; headers: Record<string, string>; text: string; json
 
 async function read(response: Response): Promise<Res> {
   const text = await response.text();
-  let json = {};
+  let json: Res["json"] = {};
   try {
-    json = JSON.parse(text);
+    json = JSON.parse(text) as Res["json"];
   } catch {
     /* not JSON */
   }
@@ -90,7 +90,8 @@ async function post(ctx: ReturnType<typeof setup>, body: unknown, options?: Opti
   return read(await ctx.handler(fakeReq(body, options)));
 }
 
-const sentBody = (ctx: ReturnType<typeof setup>, i = 0) => JSON.parse(String(ctx.calls[i].init.body));
+type Sent = { allowed_mentions?: unknown; content?: unknown; embeds: { description: string }[] };
+const sentBody = (ctx: ReturnType<typeof setup>, i = 0): Sent => JSON.parse(String(ctx.calls[i].init.body)) as Sent;
 
 describe("appeal", () => {
   test("the code matches the Python implementation's shared vector", () => {
@@ -284,7 +285,7 @@ describe("appeal", () => {
   test("hostile text is inert in the payload and survives the round trip", async () => {
     const nasty = '@everyone <@1> <@&2> [x](javascript:alert(1)) **b** `c` ~~d~~ ||e|| # h :tada: a/b &amp; "q" \\ back\nline';
     const payload = buildPayload(USER, CODE, [nasty, "ok", ""]);
-    expect(JSON.parse(payload).a[0]).toBe(nasty);
+    expect((JSON.parse(payload) as { a: string[] }).a[0]).toBe(nasty);
     const literal = inertString(nasty);
     for (const ch of "<>@[]()`*_~|#:/&") expect(literal.includes(ch), ch).toBe(false);
     expect(JSON.parse(literal)).toBe(nasty);
@@ -293,7 +294,7 @@ describe("appeal", () => {
     expect(res.status).toBe(200);
     const description: string = sentBody(ctx).embeds[0].description;
     expect(description.includes("@everyone") || description.includes("](") || description.includes("**")).toBe(false);
-    expect(JSON.parse(description).a[0]).toBe(nasty);
+    expect((JSON.parse(description) as { a: string[] }).a[0]).toBe(nasty);
   });
 
   test("a payload too big for one embed is refused, not truncated", async () => {

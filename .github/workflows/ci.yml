@@ -102,6 +102,9 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
+      - name: Module boundaries and cycles (dependency-cruiser)
+        run: bun run depcruise
+
       - name: Tests with coverage thresholds
         run: bun run test:coverage
 
