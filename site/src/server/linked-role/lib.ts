@@ -93,8 +93,8 @@ export function stateCookieValue(secret: string, state: string, nowMs: number): 
 export function readStateCookie(secret: string, value: unknown, nowMs: number): string | null {
   if (typeof value !== "string" || value.length > 200) return null;
   const parts = value.split(".");
-  if (parts.length !== 3) return null;
   const [state, expiry, signature] = parts;
+  if (parts.length !== 3 || state === undefined || expiry === undefined || signature === undefined) return null;
   if (!sameString(signature, sign(secret, `${state}.${expiry}`))) return null;
   if (!STATE_SHAPE.test(state) || !/^[0-9]{1,12}$/.test(expiry)) return null;
   if (Number(expiry) * 1000 <= nowMs) return null;
@@ -134,9 +134,8 @@ export function computeRoleConnection(connections: unknown, defs: Definitions = 
   const verified = new Set<string>();
   const list = Array.isArray(connections) ? connections.slice(0, MAX_CONNECTIONS) : [];
   for (const c of list) {
-    if (c && typeof c === "object" && typeof c.type === "string" && c.verified === true && c.revoked !== true) {
-      verified.add(c.type);
-    }
+    const { type, verified: ok, revoked } = (c && typeof c === "object" ? c : {}) as Record<string, unknown>;
+    if (typeof type === "string" && ok === true && revoked !== true) verified.add(type);
   }
   const metadata: Record<string, string> = {};
   let count = 0;

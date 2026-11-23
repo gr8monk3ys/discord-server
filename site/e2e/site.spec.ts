@@ -57,7 +57,7 @@ test.describe("headers and CSP", () => {
       expect(h["x-frame-options"], url).toBe("DENY");
       expect(h["permissions-policy"], url).toContain("camera=()");
       expect(h["x-powered-by"], url).toBeUndefined();
-      const csp = h["content-security-policy"];
+      const csp = h["content-security-policy"] ?? "";
       const nonce = csp.match(/script-src 'self' 'nonce-([A-Za-z0-9+/=]+)'/)?.[1];
       expect(nonce, url).toBeTruthy();
       expect(csp).not.toContain("unsafe");

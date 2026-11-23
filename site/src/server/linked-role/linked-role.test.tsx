@@ -1,11 +1,13 @@
 // Tests for the Linked Roles flow (src/server/linked-role/) and its result page. A fake fetch
 // and a fixed clock: nothing here touches the network or the real clock.
 import { renderToStaticMarkup } from "react-dom/server";
+import { fromAny } from "@total-typescript/shoehorn";
 import { describe, expect, test } from "vitest";
 import LinkedRolePage, { metadata } from "@/app/linked-role/page";
 import * as startRoute from "@/app/api/linked-role/start/route";
 import * as callbackRoute from "@/app/api/linked-role/callback/route";
 import { RESULTS } from "@/lib/linked-role-results";
+import { must } from "@/test-support";
 import { createCallback, createStart } from "./flow";
 import * as lib from "./lib";
 
@@ -64,11 +66,13 @@ function startReq(method = "GET", search = "") {
   return new Request(`${ORIGIN}/api/linked-role/start${search}`, { method });
 }
 
+const header = (res: Res, name: string) => must(res.headers[name], `${name} header`);
+
 /** Run start, then hand back what a browser would bring to the callback. */
 async function begin(env: Env = ENV, now = NOW) {
   const res = await read(createStart({ env, now: () => now })(startReq()));
-  const location = new URL(res.headers.location);
-  const cookie = res.headers["set-cookie"].split(";")[0];
+  const location = new URL(header(res, "location"));
+  const cookie = must(header(res, "set-cookie").split(";")[0], "cookie pair");
   return { res, location, cookie, state: location.searchParams.get("state") as string };
 }
 
@@ -82,7 +86,7 @@ async function finish({
 }: { query: string; cookie?: string; routes?: Record<string, Answer>; now?: number; env?: Env; method?: string }) {
   const { impl, calls } = fakeFetch(routes);
   const logs: string[] = [];
-  const handler = createCallback({ env, fetch: impl as unknown as lib.FetchLike, now: () => now, log: (line) => logs.push(line) });
+  const handler = createCallback({ env, fetch: fromAny<lib.FetchLike, typeof impl>(impl), now: () => now, log: (line) => logs.push(line) });
   const req = new Request(`${ORIGIN}/api/linked-role/callback?${query}`, {
     method,
     headers: cookie ? { cookie } : {},
@@ -182,7 +186,7 @@ describe("linked roles: settings and start", () => {
     expect(location.searchParams.get("redirect_uri")).toBe(ENV.LINKED_ROLE_REDIRECT_URI);
     expect(location.searchParams.get("scope")).toBe("identify connections role_connections.write");
     expect(state).toMatch(lib.STATE_SHAPE);
-    const cookie = res.headers["set-cookie"];
+    const cookie = header(res, "set-cookie");
     expect(cookie.startsWith(`__Host-fd_linked_role=${state}.`)).toBe(true);
     for (const attr of ["HttpOnly", "Secure", "SameSite=Lax", "Path=/", "Max-Age=600"]) {
       expect(cookie.split("; "), attr).toContain(attr);
@@ -196,7 +200,7 @@ describe("linked roles: settings and start", () => {
   test("start ignores everything in the request and makes a new state each time", async () => {
     const req = startReq("GET", "?redirect_uri=https://evil.test&next=//evil.test");
     const res = await read(createStart({ env: ENV, now: () => NOW })(req));
-    expect(res.headers.location.startsWith("https://discord.com/oauth2/authorize?")).toBe(true);
+    expect(header(res, "location").startsWith("https://discord.com/oauth2/authorize?")).toBe(true);
     expect(res.headers.location).not.toContain("evil");
     expect((await begin()).state).not.toBe((await begin()).state);
   });
@@ -230,10 +234,10 @@ describe("linked roles: callback", () => {
     expect(logs).toEqual([]);
     expect(calls.map((c) => c.key)).toEqual(Object.keys(HAPPY()));
 
-    const [token, connections, write] = calls;
+    const [token, connections, write] = [must(calls[0], "token call"), must(calls[1], "connections call"), must(calls[2], "write call")];
     expect(token.url).toBe("https://discord.com/api/v10/oauth2/token");
     expect(token.options.headers["Content-Type"]).toBe("application/x-www-form-urlencoded");
-    const basic = Buffer.from(token.options.headers.Authorization.replace("Basic ", ""), "base64").toString();
+    const basic = Buffer.from(must(token.options.headers.Authorization, "Authorization").replace("Basic ", ""), "base64").toString();
     expect(basic).toBe(`${ENV.DISCORD_CLIENT_ID}:${ENV.DISCORD_CLIENT_SECRET}`);
     expect(Object.fromEntries(new URLSearchParams(String(token.options.body)))).toEqual({
       grant_type: "authorization_code",
@@ -300,7 +304,7 @@ describe("linked roles: callback", () => {
 
   test("a forged, re-signed or mismatched state is refused without calling Discord", async () => {
     const { cookie, state } = await begin();
-    const value = cookie.split("=")[1];
+    const value = must(cookie.split("=")[1], "cookie value");
     const [, expiry, signature] = value.split(".");
     const otherState = "A".repeat(43);
     const cases = [
@@ -377,7 +381,7 @@ describe("linked roles: callback", () => {
   test("every redirect either handler can send is Discord's authorize URL or a known flag", async () => {
     const seen = new Set<string>();
     const { cookie, state, res } = await begin();
-    seen.add(res.headers.location.split("?")[0]);
+    seen.add(must(header(res, "location").split("?")[0], "location path"));
     const hostile = [
       `code=c&state=${state}&r=https://evil.test&redirect=//evil.test&next=/%5Cevil.test`,
       `error=https://evil.test&state=${state}`,
@@ -385,7 +389,7 @@ describe("linked roles: callback", () => {
     ];
     for (const query of hostile) {
       const done = await finish({ query, cookie });
-      seen.add(done.res.headers.location);
+      seen.add(header(done.res, "location"));
     }
     const allowed = new Set(["https://discord.com/oauth2/authorize", ...lib.FLAGS.map((f) => lib.RESULT_PAGE + f)]);
     for (const location of seen) expect(allowed.has(location), location).toBe(true);
@@ -397,7 +401,7 @@ describe("linked roles: the result page", () => {
     renderToStaticMarkup(await LinkedRolePage({ searchParams: Promise.resolve(r === undefined ? {} : { r }) }));
   const textOf = (html: string, id: string) => {
     const m = html.match(new RegExp(`id="${id}"[^>]*>([^<]*)<`));
-    return m ? m[1].replace(/&#x27;/g, "'") : null;
+    return m?.[1] === undefined ? null : m[1].replace(/&#x27;/g, "'");
   };
 
   test("knows every flag the callback can send, and takes its text from a fixed list", async () => {

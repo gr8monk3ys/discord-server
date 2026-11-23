@@ -1,6 +1,7 @@
 // Tests for the ban-appeal handler (src/server/appeal.ts) and its route. No network: the
 // handler gets a real Request and a fake fetch.
 import { describe, expect, test } from "vitest";
+import { must } from "@/test-support";
 import * as route from "@/app/api/appeal/route";
 import {
   appealCode,
@@ -77,9 +78,9 @@ type Res = { status: number; headers: Record<string, string>; text: string; json
 
 async function read(response: Response): Promise<Res> {
   const text = await response.text();
-  let json = {};
+  let json: Res["json"] = {};
   try {
-    json = JSON.parse(text);
+    json = JSON.parse(text) as Res["json"];
   } catch {
     /* not JSON */
   }
@@ -90,7 +91,8 @@ async function post(ctx: ReturnType<typeof setup>, body: unknown, options?: Opti
   return read(await ctx.handler(fakeReq(body, options)));
 }
 
-const sentBody = (ctx: ReturnType<typeof setup>, i = 0) => JSON.parse(String(ctx.calls[i].init.body));
+type Sent = { allowed_mentions?: unknown; content?: unknown; embeds: { description: string }[] };
+const sentBody = (ctx: ReturnType<typeof setup>, i = 0): Sent => JSON.parse(String(must(ctx.calls[i], "call").init.body)) as Sent;
 
 describe("appeal", () => {
   test("the code matches the Python implementation's shared vector", () => {
@@ -113,7 +115,7 @@ describe("appeal", () => {
     expect(res.json).toEqual({ ok: true, message: "Received." });
     expect(res.headers["cache-control"]).toBe("no-store");
     expect(ctx.calls).toHaveLength(1);
-    const { url, init } = ctx.calls[0];
+    const { url, init } = must(ctx.calls[0], "first call");
     expect(url).toBe(WEBHOOK);
     expect(init.method).toBe("POST");
     expect(init.redirect).toBe("error");
@@ -121,7 +123,7 @@ describe("appeal", () => {
     expect(sent.allowed_mentions).toEqual({ parse: [] });
     expect(sent.content).toBeUndefined();
     expect(sent.embeds).toHaveLength(1);
-    expect(JSON.parse(sent.embeds[0].description)).toEqual({
+    expect(JSON.parse(must(sent.embeds[0], "embed").description)).toEqual({
       v: 1,
       u: USER,
       c: CODE,
@@ -284,16 +286,16 @@ describe("appeal", () => {
   test("hostile text is inert in the payload and survives the round trip", async () => {
     const nasty = '@everyone <@1> <@&2> [x](javascript:alert(1)) **b** `c` ~~d~~ ||e|| # h :tada: a/b &amp; "q" \\ back\nline';
     const payload = buildPayload(USER, CODE, [nasty, "ok", ""]);
-    expect(JSON.parse(payload).a[0]).toBe(nasty);
+    expect((JSON.parse(payload) as { a: string[] }).a[0]).toBe(nasty);
     const literal = inertString(nasty);
     for (const ch of "<>@[]()`*_~|#:/&") expect(literal.includes(ch), ch).toBe(false);
     expect(JSON.parse(literal)).toBe(nasty);
     const ctx = setup();
     const res = await post(ctx, { ...GOOD, what: nasty });
     expect(res.status).toBe(200);
-    const description: string = sentBody(ctx).embeds[0].description;
+    const description: string = must(sentBody(ctx).embeds[0], "embed").description;
     expect(description.includes("@everyone") || description.includes("](") || description.includes("**")).toBe(false);
-    expect(JSON.parse(description).a[0]).toBe(nasty);
+    expect((JSON.parse(description) as { a: string[] }).a[0]).toBe(nasty);
   });
 
   test("a payload too big for one embed is refused, not truncated", async () => {
@@ -368,7 +370,7 @@ describe("appeal", () => {
       expect(res.json.error).toBe("delivery");
       expect(ctx.logs).toHaveLength(1);
       for (const secret of [SECRET, CODE, WEBHOOK, "fixture_token", body.what, body.why, USER]) {
-        expect(ctx.logs[0].includes(secret), ctx.logs[0]).toBe(false);
+        expect(must(ctx.logs[0], "log line").includes(secret), ctx.logs[0]).toBe(false);
         expect(res.text.includes(secret)).toBe(false);
       }
     }

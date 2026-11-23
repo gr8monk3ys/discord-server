@@ -191,11 +191,12 @@ export function dayRows(stats: Stats, now: number): DayRow[] {
 /** House standings: the pen goes to a clear leader only (a tie is drawn as a tie); each bar
  *  is a share of the top score, never thinner than 2%. */
 export function houseRows(houses: House[]): { name: string; points: number; lead: boolean; width: number }[] {
-  const top = houses.length ? houses[0].points : 0;
+  const [first, second] = houses;
+  const top = first?.points ?? 0;
   return houses.map((h, i) => ({
     name: h.name,
     points: h.points,
-    lead: i === 0 && (houses.length < 2 || h.points > houses[1].points),
+    lead: i === 0 && (!second || h.points > second.points),
     width: top > 0 ? Math.max(2, Math.round((h.points / top) * 100)) : 0,
   }));
 }

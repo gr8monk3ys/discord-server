@@ -1,0 +1,22 @@
+# Fast subset of `make check`: ruff on the repo, lint, types and boundaries on the site.
+# Install once with `pre-commit install` (pip install pre-commit); the full suite is `make check`.
+repos:
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff
+        entry: ruff check
+        language: system
+        types: [python]
+      - id: site-lint
+        name: site lint
+        entry: bash -c 'cd site && bun run lint'
+        language: system
+        files: ^site/
+        pass_filenames: false
+      - id: site-typecheck
+        name: site typecheck and boundaries
+        entry: bash -c 'cd site && bun run typecheck && bun run depcruise'
+        language: system
+        files: ^site/
+        pass_filenames: false

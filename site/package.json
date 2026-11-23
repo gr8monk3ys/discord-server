@@ -16,7 +16,9 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test --project=chromium",
     "knip": "knip",
-    "lighthouse:ci": "node scripts/check-lighthouse-score.mjs http://127.0.0.1:3000 / /appeal"
+    "lighthouse:ci": "node scripts/check-lighthouse-score.mjs http://127.0.0.1:3000 / /appeal",
+    "depcruise": "depcruise src --config .dependency-cruiser.cjs",
+    "check": "bun run lint && bun run typecheck && bun run depcruise && bun run test"
   },
   "dependencies": {
     "next": "^16.3.0",
@@ -28,10 +30,13 @@
     "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4.3.3",
+    "@total-typescript/shoehorn": "^0.1.2",
+    "@total-typescript/ts-reset": "^0.6.1",
     "@types/node": "^26.2.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "19.2.4",
     "@vitest/coverage-v8": "^4.1.10",
+    "dependency-cruiser": "^18.8.0",
     "eslint": "9.39.2",
     "eslint-config-next": "^16.3.0",
     "knip": "^6.32.2",

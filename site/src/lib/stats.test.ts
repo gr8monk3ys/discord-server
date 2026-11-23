@@ -1,6 +1,7 @@
 // The live data check (src/lib/stats.ts): what gets through from stats.json, and the lines
 // the page builds from it. Pure functions, a fixed clock.
 import { describe, expect, test } from "vitest";
+import { must } from "@/test-support";
 import {
   ago,
   hasContent,
@@ -144,8 +145,9 @@ describe("the lines the page builds", () => {
     const rows = dayRows(s, NOW);
     expect(rows[0]).toMatchObject({ label: "Now", iso: null, title: "Spooky week" });
     expect(rows[1]).toMatchObject({ iso: iso(NOW + 2 * HOUR_MS), title: "Helldivers drop" });
-    expect(rows[2].detail).toContain("Game night");
-    expect(rows[2].detail).not.toContain("Risk of Rain 2 · Risk"); // the game only once
+    const third = must(rows[2], "third row");
+    expect(third.detail).toContain("Game night");
+    expect(third.detail).not.toContain("Risk of Rain 2 · Risk"); // the game only once
   });
 
   test("the season countdown", () => {
