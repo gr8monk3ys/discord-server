@@ -160,7 +160,7 @@ def test_site_has_no_trackers_or_ids():
 def test_site_dependencies_are_the_framework_only():
     pkg = json.loads(read("package.json"))
     assert set(pkg["dependencies"]) == {"next", "next-themes", "react", "react-dom"}
-    assert pkg["engines"]["node"] == ">=22"
+    assert pkg["engines"]["node"] == "24.x"
     for script in ("lint", "typecheck", "test", "build"):
         assert script in pkg["scripts"], script
     assert (SITE / "bun.lock").is_file() and not (SITE / "package-lock.json").exists()
