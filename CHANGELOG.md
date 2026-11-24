@@ -8,6 +8,10 @@ All notable changes to this project are recorded here. The format follows
 
 ### Changed
 
+- Site: Node is pinned to 24.x (`engines.node` in `site/package.json`, which Vercel follows, and
+  `setup-node` in both site CI jobs), and Next.js moves from 16.4.3 to 16.4.6 with
+  `eslint-config-next`. `next build` on 16.4.3 stops with a `SecurityFatalError` for a known
+  vulnerability; 16.4.6 builds.
 - Site: every heading and the brand name are set in Lorenzo Hand, the owner's own print
   handwriting (owner, 2026-11-18). The face is `site/src/fonts/LorenzoHand-Bold.woff2`,
   self-hosted by next/font like the other three, so the CSP is unchanged; Fraunces stays behind it
