@@ -8,6 +8,28 @@ build history is `docs/superpowers/specs/2026-10-01-front-desk-bot-design.md`.
 **This repo is public.** Never commit `.env`, tokens, IDs of the live server, member names or
 anything from `bot/data/` (the SQLite DB, logs and lock file live there and are gitignored).
 
+## How we work
+
+`.claude/settings.json` loads four plugins from the `lorenzos-claude-code`
+marketplace (gr8monk3ys/skills), in every clone and every cloud session. Use
+them every time, not only when one happens to trigger:
+
+- **Matt Pocock's skills** (`mattpocock-skills`) for the engineering process:
+  `grilling` before building something new, `tdd` for any behaviour change,
+  `diagnosing-bugs` for bugs, `code-review` before calling work done and `pr`
+  for the PR body. Prefer them over overlapping skills from other plugins.
+- **Impeccable** for any UI, layout, styling or on-screen copy: run
+  `/impeccable critique` or `/impeccable audit` on it before you're done.
+- **Ponytail** is always on: the simplest code that works, no unrequested
+  abstractions or dependencies. Run `ponytail-review` on the diff before
+  opening a PR and cut what the task didn't need.
+- **Tests:** `./scripts/verify` is the fast gate (CI's Ruff and both pytest
+  suites, then the site's lint, knip, typecheck, depcruise and Vitest with
+  coverage; no Docker image, `next build`, Playwright or Lighthouse). A hook
+  runs it before a session can finish and won't let it end while it fails.
+  Still run `make check` before a PR, and let CI cover the image and the
+  browser checks. Never skip, weaken or delete a test to get it green.
+
 ## Where things live
 
 - `server/layout.py` source of truth for games, roles, channels and their emoji names; the bot

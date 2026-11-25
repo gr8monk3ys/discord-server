@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Fast gate that Claude Code runs before a session can finish: CI's "Lint and
+# tests" job plus the site's checks, without the Docker image, `next build`,
+# Playwright or Lighthouse. Uses (or creates) the shared venv at server/.venv.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+if [ ! -d server/.venv ]; then
+  "$(command -v python3.11 || command -v python3 || command -v python)" -m venv server/.venv
+fi
+BIN="$PWD/server/.venv/bin"
+[ -d server/.venv/Scripts ] && BIN="$PWD/server/.venv/Scripts"
+"$BIN/python" -m pip install -q -r requirements-dev.txt
+
+"$BIN/ruff" check .
+(cd bot && "$BIN/python" -m pytest -q -p no:warnings)
+(cd server && "$BIN/python" -m pytest -q tests)
+
+cd site
+bun install --frozen-lockfile
+bun run lint
+bun run knip
+bun run typecheck
+bun run depcruise
+bun run test:coverage
