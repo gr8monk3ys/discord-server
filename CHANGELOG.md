@@ -74,6 +74,10 @@ All notable changes to this project are recorded here. The format follows
 
 ### Added
 
+- Claude Code setup: `.claude/settings.json` loads the owner's plugins (gr8monk3ys/skills),
+  CLAUDE.md says when to use them, and `scripts/verify` is the fast check a session must pass
+  before it can finish (Ruff, both pytest suites and the site's checks, without the Docker
+  image, `next build` or the browser checks).
 - Off-site database backups on the VPS (`front-desk-backup.timer`, `docs/HOSTING.md`, "Off-site backups"): once a
   day an `age`-encrypted copy goes to a private GitHub repository, newest 14 kept. The VPS holds only the
   public key. PRIVACY.md now says so.
